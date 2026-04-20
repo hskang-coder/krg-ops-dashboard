@@ -370,7 +370,15 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 
     <!-- 최근 내역 -->
     <div class="card" style="margin-top:14px">
-      <div class="card-title"><span class="card-dot dot-green"></span>최근 대응 내역</div>
+      <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <span style="display:flex;align-items:center;gap:6px;"><span class="card-dot dot-green"></span>최근 대응 내역</span>
+        <div class="pie-filter-row" style="margin-bottom:0" id="logFilterRow">
+          <button class="pie-filter-btn active"    onclick="switchLogPerson('all')">전체</button>
+          <button class="pie-filter-btn pf-blue"   onclick="switchLogPerson('고송미')">고송미</button>
+          <button class="pie-filter-btn pf-purple" onclick="switchLogPerson('지희이')">지희이</button>
+          <button class="pie-filter-btn pf-green"  onclick="switchLogPerson('강휘수')">강휘수</button>
+        </div>
+      </div>
       <div style="overflow-x:auto;">
         <table class="mini-table">
           <thead>
@@ -417,6 +425,7 @@ let currentView      = 'dashboard';
 let currentPeriod    = 'daily';
 let currentPerson    = '고송미';   // 체크리스트 담당자
 let currentPiePerson = 'all';      // 파이차트 필터
+let currentLogPerson = 'all';      // 최근대응 필터
 let allData          = [];
 let charts           = {};
 
@@ -936,13 +945,22 @@ function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete chart
 
 function switchPiePerson(person) {
   currentPiePerson = person;
-  document.querySelectorAll('.pie-filter-btn').forEach(btn => {
+  // 파이차트 필터 버튼만 갱신 (logFilterRow 버튼 제외)
+  document.getElementById('catPieChart').closest('.card').querySelectorAll('.pie-filter-btn').forEach(btn => {
     const bp = btn.textContent.trim();
-    const match = person === 'all' ? bp === '전체' : bp === person;
-    btn.classList.toggle('active', match);
+    btn.classList.toggle('active', person === 'all' ? bp === '전체' : bp === person);
   });
   const filtered = filterByPeriod(allData);
   renderPieChart(filtered);
+}
+
+function switchLogPerson(person) {
+  currentLogPerson = person;
+  document.querySelectorAll('#logFilterRow .pie-filter-btn').forEach(btn => {
+    const bp = btn.textContent.trim();
+    btn.classList.toggle('active', person === 'all' ? bp === '전체' : bp === person);
+  });
+  renderLogTable(filterByPeriod(allData));
 }
 
 function renderPieChart(data) {
@@ -1082,15 +1100,24 @@ function renderCallTypeChart(data) {
   });
 }
 
+function formatDateObj(d) {
+  if (!d) return '—';
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
 function renderLogTable(data) {
   const tbody  = document.getElementById('logTableBody');
-  const recent = [...data].sort((a,b)=>(b.dateObj||0)-(a.dateObj||0)).slice(0,20);
+  // 담당자 필터 적용
+  const source = currentLogPerson === 'all'
+    ? data
+    : data.filter(r => r.person === currentLogPerson);
+  const recent = [...source].sort((a,b)=>(b.dateObj||0)-(a.dateObj||0)).slice(0,20);
   if (!recent.length) {
     tbody.innerHTML = '<tr><td colspan="7" class="no-data">해당 기간 데이터 없음</td></tr>'; return;
   }
   tbody.innerHTML = recent.map(r => `
     <tr>
-      <td>${r.date}</td><td>${r.person}</td><td>${r.type||'—'}</td>
+      <td>${formatDateObj(r.dateObj)}</td><td>${r.person}</td><td>${r.type||'—'}</td>
       <td><span class="mini-badge cat-${r.cat}">${r.cat}</span></td>
       <td>${r.tell||'—'}</td><td>${r.work||'—'}</td>
       <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.content||'—'}</td>
