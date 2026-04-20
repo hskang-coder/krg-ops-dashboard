@@ -356,6 +356,12 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .ck-time-text { font-size: 11px; color: var(--muted); margin-top: 3px; font-weight: 500; }
 
 /* ─── LOG SUMMARY ─────────────────────────────── */
+.export-btn {
+  background: #1A3A5C; color: #fff; border: none; cursor: pointer;
+  font-size: 11px; font-weight: 700; padding: 5px 12px;
+  border-radius: 7px; transition: background 0.15s; white-space: nowrap;
+}
+.export-btn:hover { background: #2563A8; }
 .log-summary {
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   background: #F3F7FF; border: 1px solid #BFDBFE; border-radius: 10px;
@@ -570,12 +576,18 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <div class="card" style="margin-top:14px">
       <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
         <span style="display:flex;align-items:center;gap:6px;"><span class="card-dot dot-green"></span>최근 대응 내역</span>
-        <div class="pie-filter-row" style="margin-bottom:0" id="logFilterRow">
-          <button class="pie-filter-btn active"    onclick="switchLogPerson('all')">전체</button>
-          <button class="pie-filter-btn pf-blue"   onclick="switchLogPerson('고송미')">고송미</button>
-          <button class="pie-filter-btn pf-purple" onclick="switchLogPerson('이지희')">이지희</button>
-          <button class="pie-filter-btn pf-green"  onclick="switchLogPerson('강휘수')">강휘수</button>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="pie-filter-row" style="margin-bottom:0" id="logFilterRow">
+            <button class="pie-filter-btn active"    onclick="switchLogPerson('all')">전체</button>
+            <button class="pie-filter-btn pf-blue"   onclick="switchLogPerson('고송미')">고송미</button>
+            <button class="pie-filter-btn pf-purple" onclick="switchLogPerson('이지희')">이지희</button>
+            <button class="pie-filter-btn pf-green"  onclick="switchLogPerson('강휘수')">강휘수</button>
+          </div>
+          <button class="export-btn" onclick="exportLogToCSV()">📥 Excel 내보내기</button>
         </div>
+      </div>
+      <div class="pie-filter-row" id="logCatFilterRow" style="padding:0 18px 10px;margin-bottom:0;flex-wrap:wrap;">
+        <button class="pie-filter-btn active" onclick="switchLogCat('all')">전체 업무</button>
       </div>
       <div id="logSummary" style="display:none;"></div>
       <div style="overflow-x:auto;">
@@ -626,7 +638,8 @@ let currentView      = 'dashboard';
 let currentPeriod    = 'daily';
 let currentPerson    = '고송미';   // 체크리스트 담당자
 let currentPiePerson = 'all';      // 파이차트 필터
-let currentLogPerson = 'all';      // 최근대응 필터
+let currentLogPerson = 'all';      // 최근대응 담당자 필터
+let currentLogCat    = 'all';      // 최근대응 업무구분 필터
 let periodOffset     = 0;          // 날짜 이동 오프셋 (0=현재, -1=이전, ...)
 let allData          = [];
 let charts           = {};
@@ -1113,7 +1126,7 @@ async function loadData() {
     if (allData.length > 0) {
       setStatus('ok', `${allData.length}건 로드 완료`);
       setDataStatus('ok', `✅ Google Sheets 연결됨 — 총 ${allData.length}건`);
-      renderCkProgress(); renderDashboard(); return;
+      populateCatFilter(allData); renderCkProgress(); renderDashboard(); return;
     }
   } catch(e1) { console.warn('JSONP 실패:', e1.message); }
   // 2) Proxy
@@ -1130,7 +1143,7 @@ async function loadData() {
     if (allData.length > 0) {
       setStatus('ok', `${allData.length}건 로드 완료`);
       setDataStatus('ok', `✅ Apps Script 연결됨 — 총 ${allData.length}건`);
-      renderCkProgress(); renderDashboard(); return;
+      populateCatFilter(allData); renderCkProgress(); renderDashboard(); return;
     }
   } catch(e2) { console.warn('Proxy 실패:', e2.message); }
   // 3) 실패
@@ -1458,6 +1471,61 @@ function switchPiePerson(person) {
   renderAnalysisPanel(filtered);
 }
 
+function switchLogCat(cat) {
+  currentLogCat = cat;
+  document.querySelectorAll('#logCatFilterRow .pie-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.cat === cat);
+  });
+  renderLogTable(filterByPeriod(allData));
+}
+
+function populateCatFilter(data) {
+  const row = document.getElementById('logCatFilterRow');
+  if (!row) return;
+  const cats = [...new Set(data.map(r => r.cat).filter(Boolean))].sort();
+  const catColors = {
+    '계약관리':'pf-blue','중도퇴실관리':'pf-purple','정산관리':'pf-green',
+    '퇴실관리':'pf-green','데이터관리':'pf-blue','연체관리':'pf-purple',
+    '갱신관리':'pf-green','상담관리':'pf-blue'
+  };
+  row.innerHTML = `<button class="pie-filter-btn${currentLogCat==='all'?' active':''}" data-cat="all" onclick="switchLogCat('all')">전체 업무</button>`
+    + cats.map(c =>
+      `<button class="pie-filter-btn${currentLogCat===c?' active':''} ${catColors[c]||''}" data-cat="${c}" onclick="switchLogCat('${c}')">${c}</button>`
+    ).join('');
+}
+
+function exportLogToCSV() {
+  const data = filterByPeriod(allData)
+    .filter(r => currentLogPerson === 'all' || r.person === currentLogPerson)
+    .filter(r => currentLogCat    === 'all' || r.cat    === currentLogCat)
+    .sort((a,b) => (b.dateObj||0) - (a.dateObj||0));
+  if (!data.length) { alert('내보낼 데이터가 없습니다.'); return; }
+
+  const headers = ['No','일자','담당자','구분','업무구분','대상구분','TELL(분)','업무(분)','하위구분','업무내용'];
+  const rows = data.map((r, i) => [
+    i+1,
+    formatDateObj(r.dateObj),
+    r.person,
+    r.type||'',
+    r.cat||'',
+    r.target||'',
+    r.tell||0,
+    r.work||0,
+    r.sub||'',
+    (r.content||'').replace(/,/g,'，').replace(/\n/g,' ')
+  ]);
+
+  const csv = '\uFEFF' + [headers, ...rows].map(row => row.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const periodLabel = currentPeriod==='daily'?'데일리':currentPeriod==='weekly'?'위클리':'먼슬리';
+  const personLabel = currentLogPerson==='all'?'전체':currentLogPerson;
+  const catLabel    = currentLogCat==='all'?'전체':currentLogCat;
+  a.href = url; a.download = `KRG_대응내역_${periodLabel}_${personLabel}_${catLabel}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
 function switchLogPerson(person) {
   currentLogPerson = person;
   document.querySelectorAll('#logFilterRow .pie-filter-btn').forEach(btn => {
@@ -1695,9 +1763,9 @@ function renderLogTable(data) {
   const tbody   = document.getElementById('logTableBody');
   const sumEl   = document.getElementById('logSummary');
 
-  const source = currentLogPerson === 'all'
-    ? data
-    : data.filter(r => r.person === currentLogPerson);
+  const source = data
+    .filter(r => currentLogPerson === 'all' || r.person === currentLogPerson)
+    .filter(r => currentLogCat    === 'all' || r.cat    === currentLogCat);
   const limit  = currentPeriod === 'daily' ? Infinity : currentPeriod === 'weekly' ? 50 : 100;
   const recent = [...source].sort((a,b)=>(b.dateObj||0)-(a.dateObj||0)).slice(0, limit);
 
