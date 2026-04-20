@@ -145,20 +145,28 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .ratio-work { background: linear-gradient(90deg,#60A5FA,#2563A8); height: 100%; }
 .ratio-footer { display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: #A0ADBE; }
 
-/* 개선 제안 카드 */
-.suggest-cards { display: flex; flex-direction: column; gap: 7px; }
+/* 개선 제안 리스트 */
+.suggest-cards { display: flex; flex-direction: column; }
 .suggest-card {
-  background: #F8FAFF; border-radius: 8px; padding: 9px 11px;
-  border-left: 3px solid #7C3AED;
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 0; border-bottom: 1px solid #EEF2F9;
 }
-.suggest-card-warn { border-left-color: #E53E3E; background: #FFF5F5; }
-.suggest-card-tag  {
+.suggest-card:first-child { padding-top: 0; }
+.suggest-card:last-child  { border-bottom: none; padding-bottom: 0; }
+.suggest-icon {
+  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; background: #EEF2FF; margin-top: 1px;
+}
+.suggest-card-warn .suggest-icon { background: #FEE2E2; }
+.suggest-content { flex: 1; min-width: 0; }
+.suggest-card-tag {
   font-size: 10px; font-weight: 700; color: #5A5FA8;
-  margin-bottom: 3px; display: block;
+  margin-bottom: 3px; display: block; letter-spacing: 0.2px;
 }
 .suggest-card-warn .suggest-card-tag { color: #C53030; }
-.suggest-card-body { font-size: 11px; color: #3A4A6A; line-height: 1.55; }
-.suggest-card-body b { color: #1A2A4A; }
+.suggest-card-body { font-size: 11px; color: #4A5A7A; line-height: 1.55; }
+.suggest-card-body b { color: #1A2A4A; font-weight: 700; }
 
 /* ─── DATE NAV ─────────────────────────────── */
 .date-nav-row {
@@ -1314,10 +1322,22 @@ function buildAnalysisCol(rows, label, avClass) {
       body: `TELL 시간이 업무 시간의 <b>${tellPct}%</b>입니다. 반복 문의를 문자·앱 안내로 전환하면 통화 부담을 줄일 수 있습니다.`
     });
 
+  const iconMap = (tag, warn) => {
+    if (warn) return '⚠️';
+    if (tag.includes('반복')) return '🔄';
+    if (tag.includes('표준')) return '📋';
+    if (tag.includes('수신')) return '📞';
+    if (tag.includes('통화')) return '⏱️';
+    if (tag.includes('집중') || tag.includes('과다')) return '🔺';
+    return '💡';
+  };
   const suggestHtml = suggestions.slice(0, 4).map(s =>
     `<div class="suggest-card${s.warn ? ' suggest-card-warn' : ''}">
-       <span class="suggest-card-tag">${s.tag}</span>
-       <div class="suggest-card-body">${s.body}</div>
+       <div class="suggest-icon">${iconMap(s.tag, s.warn)}</div>
+       <div class="suggest-content">
+         <span class="suggest-card-tag">${s.tag}</span>
+         <div class="suggest-card-body">${s.body}</div>
+       </div>
      </div>`
   ).join('') || '<div class="analysis-empty" style="padding:8px 0">분석할 업무내용이 부족합니다</div>';
 
