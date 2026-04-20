@@ -79,26 +79,32 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .period-tab:hover:not(.active) { color: rgba(255,255,255,0.8); }
 
 /* ─── PIE + ANALYSIS SPLIT ─────────────────────────────── */
-.pie-analysis-split {
-  display: flex; align-items: stretch;
-}
-.pie-split-left {
-  flex: 1; min-width: 0; border-right: 1.5px solid var(--border);
-}
+.pie-analysis-split { display: flex; align-items: stretch; }
+.pie-split-left { flex: 1; min-width: 0; border-right: 1.5px solid var(--border); }
 .pie-split-right {
-  width: 270px; flex-shrink: 0;
-  background: #F8FAFF; padding: 18px 16px;
-  display: flex; flex-direction: column; gap: 14px;
+  width: 260px; flex-shrink: 0; background: #F8FAFF;
+  padding: 16px 14px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto;
 }
 @media(max-width:900px){
   .pie-analysis-split { flex-direction: column; }
   .pie-split-left { border-right: none; border-bottom: 1.5px solid var(--border); }
   .pie-split-right { width: auto; }
 }
-.analysis-panel-title {
-  font-size: 12px; font-weight: 800; color: #1A3A5C;
-  display: flex; align-items: center; gap: 5px; margin-bottom: 2px;
+.analysis-section-title {
+  font-size: 11px; font-weight: 700; color: #5A6A8A;
+  margin-bottom: 6px; display: flex; align-items: center; gap: 4px;
 }
+.analysis-col-header {
+  display: flex; align-items: center; gap: 8px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.analysis-col-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; color: #fff; flex-shrink: 0;
+}
+.analysis-col-name  { font-size: 13px; font-weight: 800; color: #1A3A5C; flex: 1; }
+.analysis-col-stats { font-size: 10px; color: #8A9AB5; text-align: right; line-height: 1.5; }
 .analysis-empty { color: #C8D5E8; font-size: 12px; text-align: center; padding: 20px 0; }
 
 /* TOP3 바 */
@@ -469,7 +475,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         </div>
       </div>
 
-      <!-- 업무구분별 파이 + 분석 요약 -->
+      <!-- 업무구분별 파이 + 분석 패널 -->
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="pie-analysis-split">
           <!-- 왼쪽: 파이차트 -->
@@ -486,12 +492,12 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
             <div style="padding:0 18px 18px;">
               <div id="dataStatus" class="data-status"><span>⏳</span> Google Sheets 데이터 연결 중...</div>
               <div class="chart-wrap" style="display:flex;justify-content:center;">
-                <canvas id="catPieChart" style="max-height:240px;max-width:420px;"></canvas>
+                <canvas id="catPieChart" style="max-height:240px;max-width:400px;"></canvas>
               </div>
               <div class="chart-legend" id="pieLegend"></div>
             </div>
           </div>
-          <!-- 오른쪽: 분석 요약 -->
+          <!-- 오른쪽: 선택 담당자 분석 -->
           <div class="pie-split-right" id="analysisPanel">
             <div class="analysis-empty">📊 데이터 로딩 중...</div>
           </div>
@@ -1109,43 +1115,42 @@ function renderDashboard() {
   renderLogTable(filtered);
 }
 
-function renderAnalysisPanel(data) {
-  const panel = document.getElementById('analysisPanel');
-  if (!panel) return;
+// ── 개인 분석 컬럼 1개 생성 ──
+function buildAnalysisCol(rows, label, avClass, accentColor) {
+  const medals    = ['🥇','🥈','🥉'];
+  const barColors = ['#7C3AED','#2563A8','#059669'];
 
-  if (!data.length) {
-    panel.innerHTML = '<div class="analysis-empty">해당 기간 데이터 없음</div>';
-    return;
+  if (!rows.length) {
+    return `
+      <div class="analysis-col-header">
+        <div class="analysis-col-avatar ${avClass}">${label === '전체' ? '전' : label[0]}</div>
+        <div class="analysis-col-name">${label}</div>
+      </div>
+      <div class="analysis-empty">해당 기간 데이터 없음</div>`;
   }
 
-  // 카테고리별 시간·건수
   const catTime = {}, catCnt = {};
-  data.forEach(r => {
+  rows.forEach(r => {
     const c = r.cat||'기타';
     catTime[c] = (catTime[c]||0) + r.tell + r.work;
     catCnt[c]  = (catCnt[c]||0) + 1;
   });
-  const sorted   = Object.entries(catTime).sort((a,b)=>b[1]-a[1]);
-  const top3     = sorted.slice(0,3);
-  const totalMin = data.reduce((s,r)=>s+r.tell+r.work, 0);
-  const totalTell = data.reduce((s,r)=>s+r.tell, 0);
-  const totalWork = data.reduce((s,r)=>s+r.work, 0);
-  const tellPct  = totalMin > 0 ? Math.round(totalTell/totalMin*100) : 0;
-  const workPct  = 100 - tellPct;
-
-  // TOP3 바 색상
-  const barColors = ['#7C3AED','#2563A8','#059669'];
-  const medals    = ['🥇','🥈','🥉'];
+  const sorted    = Object.entries(catTime).sort((a,b)=>b[1]-a[1]);
+  const top3      = sorted.slice(0,3);
+  const totalMin  = rows.reduce((s,r)=>s+r.tell+r.work, 0);
+  const totalTell = rows.reduce((s,r)=>s+r.tell, 0);
+  const totalWork = rows.reduce((s,r)=>s+r.work, 0);
+  const tellPct   = totalMin > 0 ? Math.round(totalTell/totalMin*100) : 0;
+  const workPct   = 100 - tellPct;
+  const inCnt     = rows.filter(r=>r.type==='수신').length;
+  const outCnt    = rows.filter(r=>r.type==='발신').length;
 
   const top3Html = top3.map(([cat, min], i) => {
     const pct = totalMin > 0 ? Math.round(min/totalMin*100) : 0;
     return `
       <div class="top3-item">
         <div class="top3-label-row">
-          <div>
-            <span class="top3-rank">${medals[i]}</span>
-            <span class="top3-cat">${cat}</span>
-          </div>
+          <div><span class="top3-rank">${medals[i]}</span><span class="top3-cat">${cat}</span></div>
           <span class="top3-meta">${pct}% · ${min}분 · ${catCnt[cat]}건</span>
         </div>
         <div class="top3-bar-bg">
@@ -1154,35 +1159,36 @@ function renderAnalysisPanel(data) {
       </div>`;
   }).join('');
 
-  // 개선 제안 (상위 2개 카테고리 기준)
   const suggestions = [];
   top3.slice(0,2).forEach(([cat]) => {
-    if (CAT_SUGGESTIONS[cat]) suggestions.push({ cat, text: CAT_SUGGESTIONS[cat][0] });
+    if (CAT_SUGGESTIONS[cat]) suggestions.push(CAT_SUGGESTIONS[cat][0]);
   });
-  const inCnt  = data.filter(r=>r.type==='수신').length;
-  const outCnt = data.filter(r=>r.type==='발신').length;
+  if (inCnt > outCnt * 1.5 && inCnt >= 3)
+    suggestions.push(`수신(${inCnt}) > 발신(${outCnt}) — 선제적 안내 강화 검토`);
 
-  const suggestHtml = suggestions.map(s =>
-    `<div class="suggest-compact-item"><span>${s.text}</span></div>`
-  ).join('') +
-  (inCnt > outCnt * 1.5 && inCnt >= 3
-    ? `<div class="suggest-compact-item suggest-compact-warn">수신(${inCnt}건) > 발신(${outCnt}건) — 선제적 안내 강화 검토</div>`
-    : '');
+  const suggestHtml = suggestions.slice(0,3).map((t,i) =>
+    `<div class="suggest-compact-item${i===suggestions.length-1&&inCnt>outCnt*1.5?' suggest-compact-warn':''}"><span>${t}</span></div>`
+  ).join('') || '<div class="analysis-empty" style="padding:8px 0">제안 없음</div>';
 
-  panel.innerHTML = `
+  return `
+    <div class="analysis-col-header">
+      <div class="analysis-col-avatar ${avClass}">${label === '전체' ? '전' : label[0]}</div>
+      <div class="analysis-col-name">${label}</div>
+      <div class="analysis-col-stats">${rows.length}건<br>${formatHour(totalMin)}</div>
+    </div>
     <div>
-      <div class="analysis-panel-title">📊 업무 집중도 TOP 3</div>
+      <div class="analysis-section-title">📊 업무 집중도 TOP 3</div>
       ${top3Html}
     </div>
     <div>
-      <div class="analysis-panel-title" style="margin-bottom:8px;">📞 TELL vs 💼 업무 비율</div>
+      <div class="analysis-section-title">📞 TELL &nbsp;vs&nbsp; 💼 업무</div>
       <div class="ratio-row" style="margin-bottom:4px;">
-        <span class="ratio-label" style="color:#7C3AED;width:36px">${tellPct}%</span>
+        <span class="ratio-label" style="color:#7C3AED;width:32px">${tellPct}%</span>
         <div class="ratio-bar-wrap">
           <div class="ratio-tell" style="width:${tellPct}%"></div>
           <div class="ratio-work" style="width:${workPct}%"></div>
         </div>
-        <span class="ratio-label" style="color:#2563A8;width:36px;text-align:right">${workPct}%</span>
+        <span class="ratio-label" style="color:#2563A8;width:32px;text-align:right">${workPct}%</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:10px;color:#8A9AB5;">
         <span>TELL ${formatHour(totalTell)}</span>
@@ -1190,9 +1196,24 @@ function renderAnalysisPanel(data) {
       </div>
     </div>
     <div>
-      <div class="analysis-panel-title" style="margin-bottom:6px;">💡 개선 제안</div>
-      <div class="suggest-compact">${suggestHtml||'<div class="analysis-empty">제안 없음</div>'}</div>
+      <div class="analysis-section-title">💡 개선 제안</div>
+      <div class="suggest-compact">${suggestHtml}</div>
     </div>`;
+}
+
+function renderAnalysisPanel(data) {
+  const panel = document.getElementById('analysisPanel');
+  if (!panel) return;
+
+  const personMap = {
+    'all':  { label:'전체',  avClass:'av-blue',   rows: data },
+    '고송미': { label:'고송미', avClass:'av-blue',   rows: data.filter(r=>r.person==='고송미') },
+    '이지희': { label:'이지희', avClass:'av-purple', rows: data.filter(r=>r.person==='이지희') },
+    '강휘수': { label:'강휘수', avClass:'av-green',  rows: data.filter(r=>r.person==='강휘수') },
+  };
+
+  const { label, avClass, rows } = personMap[currentPiePerson] || personMap['all'];
+  panel.innerHTML = buildAnalysisCol(rows, label, avClass, '');
 }
 
 function renderKPI(data) {
@@ -1223,7 +1244,9 @@ function switchPiePerson(person) {
     const bp = btn.textContent.trim();
     btn.classList.toggle('active', person === 'all' ? bp === '전체' : bp === person);
   });
-  renderPieChart(filterByPeriod(allData));
+  const filtered = filterByPeriod(allData);
+  renderPieChart(filtered);
+  renderAnalysisPanel(filtered);
 }
 
 function switchLogPerson(person) {
