@@ -1488,7 +1488,9 @@ function switchLogCat(cat) {
 function populateCatFilter(data) {
   const row = document.getElementById('logCatFilterRow');
   if (!row) return;
-  const cats = [...new Set(data.map(r => r.cat).filter(Boolean))].sort();
+  const cats = [...new Set(data.map(r => r.cat).filter(Boolean))]
+    .filter(c => !c.startsWith('기타'))
+    .sort();
   const catColors = {
     '계약관리':'pf-blue','중도퇴실관리':'pf-purple','정산관리':'pf-green',
     '퇴실관리':'pf-green','데이터관리':'pf-blue','연체관리':'pf-purple',
