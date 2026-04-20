@@ -1119,52 +1119,60 @@ function renderDashboard() {
 // ── 업무내용 텍스트 기반 테마 분류 ──
 const CONTENT_THEMES = [
   {
-    theme: '입금·정산 처리',
-    icon: '💰',
-    kw: ['입금','정산','수납','청구','납부','월세','보증','금액','수수료','이체','납기'],
-    suggest: '반복적인 입금 확인 요청은 은행 자동이체 설정 또는 납부 알림 문자 자동화로 처리 시간을 줄일 수 있습니다.'
+    theme: '입금·정산 처리', icon: '💰',
+    kw: ['입금','정산','수납','청구','납부','월세','보증','금액','수수료','이체','납기','미납','연체','보증금','송금'],
+    tool: '은행 자동이체 + 납부 알림 문자(카카오/SMS)',
+    action: '납부 예정일 D-3·D-0 자동 문자 발송으로 수동 확인 건수를 줄일 수 있습니다',
+    savingRate: 0.65
   },
   {
-    theme: '계약서·서류 처리',
-    icon: '📄',
-    kw: ['계약서','서류','증명서','위임장','인감','업로드','메일','발송','제출','폴더','파일','NAS'],
-    suggest: '서류 발송과 업로드 건이 많습니다. 유캔사인 전자서명 + 클라우드 자동 업로드 연동으로 처리 속도를 높일 수 있습니다.'
+    theme: '계약서·서류 처리', icon: '📄',
+    kw: ['계약서','서류','증명서','위임장','인감','업로드','메일','발송','제출','폴더','파일','NAS','첨부','스캔','출력'],
+    tool: '유캔사인 전자서명 + 클라우드 자동 업로드',
+    action: '서명 요청~파일 저장 자동화로 서류 처리 단계를 절반으로 줄일 수 있습니다',
+    savingRate: 0.70
   },
   {
-    theme: '퇴실·해지 처리',
-    icon: '🚪',
-    kw: ['퇴실','중도퇴실','해지','대위','품의','진척','원상복구'],
-    suggest: '퇴실 처리 건에 시간이 소요되고 있습니다. 퇴실 단계별 체크리스트 표준화 및 정산 품의 배치 처리를 검토해 보세요.'
+    theme: '퇴실·해지 처리', icon: '🚪',
+    kw: ['퇴실','중도퇴실','해지','대위','품의','진척','원상복구','보증금반환','정산서','퇴거'],
+    tool: '퇴실 표준 체크리스트 + 정산 배치 처리',
+    action: '퇴실 단계별 체크리스트 표준화 및 정산 품의를 묶어서 처리하면 소요 시간을 단축할 수 있습니다',
+    savingRate: 0.40
   },
   {
-    theme: '임차인 문의·안내',
-    icon: '💬',
-    kw: ['문의','안내','요청','전달','설명','알림','연락','안내','고지','문자'],
-    suggest: '임차인 문의 응대 건수가 높습니다. 주요 문의 유형을 FAQ로 정리하고 카카오 알림톡 자동 발송을 도입하면 응대 시간을 크게 줄일 수 있습니다.'
+    theme: '임차인 문의·안내', icon: '💬',
+    kw: ['문의','안내','요청','전달','설명','알림','연락','고지','문자','카톡','질문','답변','공지','통보'],
+    tool: '카카오 알림톡 + FAQ 자동 응답',
+    action: '자주 묻는 질문 TOP10을 자동 응답으로 설정하면 반복 응대 시간을 크게 줄일 수 있습니다',
+    savingRate: 0.55
   },
   {
-    theme: '계약 변경·갱신',
-    icon: '🔄',
-    kw: ['변경','수정','갱신','연장','재계약','특약','이관','전환','조정'],
-    suggest: '계약 변경·갱신 요청이 반복됩니다. 갱신 대상자 사전 안내 자동화(D-60/D-30 문자)와 표준 변경 양식을 도입하면 처리 시간을 단축할 수 있습니다.'
+    theme: '계약 변경·갱신', icon: '🔄',
+    kw: ['변경','수정','갱신','연장','재계약','특약','이관','전환','조정','만기','갱신'],
+    tool: 'D-60/D-30 갱신 예정 자동 안내',
+    action: '만기 임박 임차인에게 자동 안내 문자를 보내고 표준 갱신 양식을 활용하면 처리 시간이 단축됩니다',
+    savingRate: 0.50
   },
   {
-    theme: '임대인 대응',
-    icon: '🏢',
-    kw: ['임대인','집주인','건물주','동의','사망','상속','대표'],
-    suggest: '임대인 대응 건은 사전 협의 체계가 중요합니다. 임대인별 히스토리를 시스템에 기록해 인수인계 및 대응 시간을 줄이세요.'
+    theme: '임대인 대응', icon: '🏢',
+    kw: ['임대인','집주인','건물주','동의','사망','상속','대표','소유주','건물'],
+    tool: '임대인별 히스토리 CRM',
+    action: '임대인 대응 이력을 시스템에 기록하면 인수인계 및 반복 응대 시간을 줄일 수 있습니다',
+    savingRate: 0.30
   },
   {
-    theme: '데이터·현황 관리',
-    icon: '📊',
-    kw: ['업데이트','현황','확인','체크','데이터','관리','집계','리스트','목록'],
-    suggest: '데이터 업데이트·확인 작업이 반복됩니다. 구글시트 자동 연동 및 알림 트리거를 설정해 수동 확인 횟수를 줄여보세요.'
+    theme: '데이터·현황 관리', icon: '📊',
+    kw: ['업데이트','현황','확인','체크','데이터','관리','집계','리스트','목록','통계','보고','현황표'],
+    tool: '구글시트 자동 연동 + 대시보드 알림',
+    action: '수동 집계 항목을 자동 트리거로 전환하면 반복 확인 업무를 제거할 수 있습니다',
+    savingRate: 0.60
   },
   {
-    theme: '기타 업무',
-    icon: '📌',
+    theme: '기타 업무', icon: '📌',
     kw: [],
-    suggest: '명확하게 분류되지 않은 업무들입니다. 업무 내용을 더 구체적으로 기록하면 패턴 분석이 가능해집니다.'
+    tool: null,
+    action: '업무 내용을 더 구체적으로 기록하면 패턴 분석과 개선 제안이 가능해집니다',
+    savingRate: 0
   }
 ];
 
@@ -1230,17 +1238,62 @@ function buildAnalysisCol(rows, label, avClass) {
       </div>`;
   }).join('');
 
-  // 개선 제안: TOP3 테마 기반 + 발신/수신 패턴
+  // ── 개선 제안: 실제 데이터 기반 동적 생성 ──────────────────────────────
   const suggestions = [];
-  top3.forEach(([theme]) => {
-    const info = CONTENT_THEMES.find(t=>t.theme===theme);
-    if (info && info.suggest) suggestions.push({ warn: false, text: info.suggest });
-  });
-  if (inCnt > outCnt * 1.5 && inCnt >= 3)
-    suggestions.push({ warn: true, text: `수신(${inCnt}건) > 발신(${outCnt}건) — 임차인이 먼저 연락하는 패턴입니다. 선제적 안내 문자를 늘려 수신 건수를 줄일 수 있습니다.` });
 
-  const suggestHtml = suggestions.slice(0,3).map(s =>
-    `<div class="suggest-compact-item${s.warn?' suggest-compact-warn':''}"><span>${s.text}</span></div>`
+  top3.forEach(([theme, v]) => {
+    const info   = CONTENT_THEMES.find(t => t.theme === theme);
+    if (!info) return;
+    const avgMin = v.cnt > 0 ? Math.round(v.min / v.cnt) : 0;
+    const pct    = totalMin > 0 ? Math.round(v.min / totalMin * 100) : 0;
+    const saving = Math.round(v.min * (info.savingRate || 0));
+
+    let tag = '', body = '', warn = false;
+
+    if (v.cnt >= 5 && avgMin <= 20) {
+      // 고빈도·단시간 → 자동화 최우선 대상
+      tag  = `🔄 반복 자동화 추천`;
+      body = `${info.icon} <b>${theme}</b> ${v.cnt}건 반복 처리 (평균 ${avgMin}분/건).`
+           + ` ${info.tool} 도입 시 월 약 <b>${saving}분</b> 절약 가능합니다.`;
+      warn = v.cnt >= 10;
+    } else if (avgMin >= 40) {
+      // 건당 소요 시간 과다 → SOP 필요
+      tag  = `📋 프로세스 표준화 필요`;
+      body = `${info.icon} <b>${theme}</b> 평균 처리 ${avgMin}분 (${v.cnt}건). `
+           + `${info.action}.`;
+    } else if (pct >= 35) {
+      // 전체 비중 과다
+      warn = pct >= 50;
+      tag  = warn ? `⚠️ 업무 집중 과다` : `💡 비중 높음 (${pct}%)`;
+      body = `${info.icon} <b>${theme}</b>이 전체 시간의 ${pct}%를 차지합니다. `
+           + (info.tool ? `${info.tool}으로 ` : '') + `${info.action}.`;
+    } else {
+      tag  = `💡 개선 아이디어`;
+      body = `${info.icon} <b>${theme}</b> ${v.cnt}건·${v.min}분: ${info.action}.`;
+    }
+
+    suggestions.push({ warn, tag, body });
+  });
+
+  // 수신 과다 패턴
+  if (inCnt > outCnt * 1.5 && inCnt >= 3)
+    suggestions.push({
+      warn: true, tag: `📞 수신 과다`,
+      body: `수신 <b>${inCnt}건</b> vs 발신 ${outCnt}건 — 임차인이 먼저 연락하는 패턴입니다. 카카오 알림톡 선제 안내로 수신 문의를 줄일 수 있습니다.`
+    });
+
+  // 통화 비중 과다
+  if (tellPct >= 60 && totalMin >= 30)
+    suggestions.push({
+      warn: false, tag: `⏱️ 통화 비중 ${tellPct}%`,
+      body: `TELL 시간이 업무 시간의 <b>${tellPct}%</b>입니다. 반복 문의를 문자·앱 안내로 전환하면 통화 부담을 줄일 수 있습니다.`
+    });
+
+  const suggestHtml = suggestions.slice(0, 4).map(s =>
+    `<div class="suggest-compact-item${s.warn ? ' suggest-compact-warn' : ''}">
+       <div style="font-size:10px;font-weight:700;color:${s.warn?'#DC2626':'#4F5E7B'};margin-bottom:3px">${s.tag}</div>
+       <span>${s.body}</span>
+     </div>`
   ).join('') || '<div class="analysis-empty" style="padding:8px 0">분석할 업무내용이 부족합니다</div>';
 
   return `
