@@ -341,7 +341,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
       <div class="card">
         <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <span style="display:flex;align-items:center;gap:6px;"><span class="card-dot dot-purple"></span>업무구분별 시간 분포</span>
-          <div class="pie-filter-row" style="margin-bottom:0">
+          <div class="pie-filter-row" style="margin-bottom:0" id="pieFilterRow">
             <button class="pie-filter-btn active"       onclick="switchPiePerson('all')">전체</button>
             <button class="pie-filter-btn pf-blue"      onclick="switchPiePerson('고송미')">고송미</button>
             <button class="pie-filter-btn pf-purple"    onclick="switchPiePerson('지희이')">지희이</button>
@@ -945,13 +945,11 @@ function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete chart
 
 function switchPiePerson(person) {
   currentPiePerson = person;
-  // 파이차트 필터 버튼만 갱신 (logFilterRow 버튼 제외)
-  document.getElementById('catPieChart').closest('.card').querySelectorAll('.pie-filter-btn').forEach(btn => {
+  document.querySelectorAll('#pieFilterRow .pie-filter-btn').forEach(btn => {
     const bp = btn.textContent.trim();
     btn.classList.toggle('active', person === 'all' ? bp === '전체' : bp === person);
   });
-  const filtered = filterByPeriod(allData);
-  renderPieChart(filtered);
+  renderPieChart(filterByPeriod(allData));
 }
 
 function switchLogPerson(person) {
