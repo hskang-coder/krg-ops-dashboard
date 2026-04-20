@@ -78,6 +78,31 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .period-tab.active { color: #FFF; border-bottom-color: #4DA3E8; }
 .period-tab:hover:not(.active) { color: rgba(255,255,255,0.8); }
 
+/* ─── DATE NAV ─────────────────────────────── */
+.date-nav-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 24px; background: rgba(0,0,0,0.10);
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.date-nav-btn {
+  background: rgba(255,255,255,0.10); border: none; cursor: pointer;
+  color: #AACDE8; font-size: 13px; font-weight: 700;
+  width: 28px; height: 28px; border-radius: 6px; transition: all 0.18s;
+  display: flex; align-items: center; justify-content: center;
+}
+.date-nav-btn:hover:not(:disabled) { background: rgba(255,255,255,0.22); color: #fff; }
+.date-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.date-nav-label {
+  color: #FFF; font-size: 13px; font-weight: 700;
+  min-width: 160px; text-align: center;
+}
+.date-nav-today {
+  background: rgba(77,163,232,0.25); border: 1px solid rgba(77,163,232,0.5);
+  border-radius: 12px; cursor: pointer; color: #7EC8F0;
+  font-size: 11px; font-weight: 700; padding: 3px 10px; transition: all 0.18s;
+}
+.date-nav-today:hover { background: rgba(77,163,232,0.45); color: #fff; }
+
 /* ─── CONTENT ─────────────────────────────── */
 .view-content { display: none; }
 .view-content.active { display: block; }
@@ -331,6 +356,14 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <button class="period-tab"        onclick="switchPeriod('weekly')">위클리</button>
     <button class="period-tab"        onclick="switchPeriod('monthly')">먼슬리</button>
   </div>
+
+  <!-- Date navigation -->
+  <div class="date-nav-row">
+    <button class="date-nav-btn" onclick="shiftPeriod(-1)">◀</button>
+    <span id="dateNavLabel" class="date-nav-label">—</span>
+    <button class="date-nav-btn" id="dateNavFwd" onclick="shiftPeriod(1)">▶</button>
+    <button class="date-nav-today" onclick="shiftPeriod(0)">오늘</button>
+  </div>
 </div>
 
 <!-- ─── DASHBOARD VIEW ─── -->
@@ -471,6 +504,7 @@ let currentPeriod    = 'daily';
 let currentPerson    = '고송미';   // 체크리스트 담당자
 let currentPiePerson = 'all';      // 파이차트 필터
 let currentLogPerson = 'all';      // 최근대응 필터
+let periodOffset     = 0;          // 날짜 이동 오프셋 (0=현재, -1=이전, ...)
 let allData          = [];
 let charts           = {};
 
@@ -557,10 +591,24 @@ const CK_COUNTS = {
 // ═══════════════════════════════════════════
 function pad(n) { return String(n).padStart(2,'0'); }
 function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
-function getWeekStart() {
-  const d = today(); d.setDate(d.getDate() - (d.getDay()||7) + 1); return d;
+
+// offset 적용된 기준 날짜 계산
+function getOffsetDay() {
+  const d = today();
+  d.setDate(d.getDate() + periodOffset);
+  return d;
 }
-function getMonthStart() { const d = today(); d.setDate(1); return d; }
+function getWeekStart() {
+  const d = today();
+  d.setDate(d.getDate() - (d.getDay()||7) + 1 + periodOffset * 7);
+  return d;
+}
+function getMonthStart() {
+  const d = today();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + periodOffset);
+  return d;
+}
 
 function parseKoreanDate(str) {
   if (!str) return null;
@@ -584,13 +632,20 @@ function parseKoreanDate(str) {
 }
 
 function filterByPeriod(data) {
-  const t = today(), ws = getWeekStart(), ms = getMonthStart();
   return data.filter(r => {
     const d = parseKoreanDate(r.date);
     if (!d) return false;
-    if (currentPeriod === 'daily')   return d.getTime() === t.getTime();
-    if (currentPeriod === 'weekly')  return d >= ws && d <= t;
-    return d >= ms && d <= t;
+    if (currentPeriod === 'daily') {
+      return d.getTime() === getOffsetDay().getTime();
+    }
+    if (currentPeriod === 'weekly') {
+      const ws = getWeekStart();
+      const we = new Date(ws); we.setDate(ws.getDate() + 6);
+      return d >= ws && d <= we;
+    }
+    // monthly
+    const ms = getMonthStart();
+    return d.getFullYear() === ms.getFullYear() && d.getMonth() === ms.getMonth();
   });
 }
 
@@ -635,6 +690,7 @@ function switchView(view) {
 
 function switchPeriod(period) {
   currentPeriod = period;
+  periodOffset  = 0;
   document.querySelectorAll('.period-tab').forEach((btn,i) => {
     btn.classList.toggle('active', ['daily','weekly','monthly'][i] === period);
   });
@@ -657,19 +713,38 @@ function selectPerson(p) {
 }
 
 function updateDateBadge() {
-  const d = new Date();
   const days = ['일','월','화','수','목','금','토'];
   let text = '';
   if (currentPeriod === 'daily') {
+    const d = getOffsetDay();
     text = `${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
   } else if (currentPeriod === 'weekly') {
-    const mon = new Date(d); mon.setDate(d.getDate() - (d.getDay()||7) + 1);
+    const mon = getWeekStart();
     const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
     text = `${mon.getMonth()+1}/${mon.getDate()} ~ ${sun.getMonth()+1}/${sun.getDate()}`;
   } else {
-    text = `${d.getFullYear()}년 ${d.getMonth()+1}월`;
+    const ms = getMonthStart();
+    text = `${ms.getFullYear()}년 ${ms.getMonth()+1}월`;
   }
   document.getElementById('dateBadge').textContent = text;
+  // 날짜 네비 라벨 업데이트
+  const navLabel = document.getElementById('dateNavLabel');
+  if (navLabel) navLabel.textContent = text;
+  // 미래 이동 버튼 비활성화
+  const fwdBtn = document.getElementById('dateNavFwd');
+  if (fwdBtn) fwdBtn.disabled = periodOffset >= 0;
+}
+
+function shiftPeriod(delta) {
+  if (delta === 0) { periodOffset = 0; }
+  else { periodOffset += delta; }
+  updateDateBadge();
+  if (currentView === 'dashboard') {
+    renderCkProgress();
+    if (allData.length > 0) renderDashboard(); else renderEmpty();
+  } else {
+    renderCkFull();
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1198,10 +1273,10 @@ function generateAnalysis(source, totalTell, totalWork, totalMin) {
     catCnt[c]  = (catCnt[c]||0) + 1;
   });
   const sortedCat = Object.entries(catTime).sort((a,b)=>b[1]-a[1]);
-  const top2Cats  = sortedCat.slice(0,2);
+  const top3Cats  = sortedCat.slice(0,3);
 
   // ── 인사이트: 상위 업무 시간 비중 ──
-  top2Cats.forEach(([cat, min]) => {
+  top3Cats.forEach(([cat, min]) => {
     const pct = totalMin > 0 ? Math.round(min/totalMin*100) : 0;
     const cnt = catCnt[cat]||0;
     insights.push(`<b>${cat}</b> ${pct}% (${min}분 / ${cnt}건)`);
