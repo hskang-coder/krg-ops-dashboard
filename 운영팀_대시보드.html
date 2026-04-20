@@ -82,63 +82,83 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .pie-analysis-split { display: flex; align-items: stretch; }
 .pie-split-left { flex: 1; min-width: 0; border-right: 1.5px solid var(--border); }
 .pie-split-right {
-  width: 260px; flex-shrink: 0; background: #F8FAFF;
-  padding: 16px 14px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto;
+  width: 280px; flex-shrink: 0;
+  display: flex; flex-direction: column; overflow-y: auto;
+  background: #F4F7FD;
 }
 @media(max-width:900px){
   .pie-analysis-split { flex-direction: column; }
   .pie-split-left { border-right: none; border-bottom: 1.5px solid var(--border); }
   .pie-split-right { width: auto; }
 }
-.analysis-section-title {
-  font-size: 11px; font-weight: 700; color: #5A6A8A;
-  margin-bottom: 6px; display: flex; align-items: center; gap: 4px;
-}
+
+/* 헤더 */
 .analysis-col-header {
-  display: flex; align-items: center; gap: 8px; padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px 13px; background: #fff;
+  border-bottom: 2px solid #E8EFF8;
 }
 .analysis-col-avatar {
-  width: 28px; height: 28px; border-radius: 50%;
+  width: 32px; height: 32px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 800; color: #fff; flex-shrink: 0;
+  font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0;
 }
-.analysis-col-name  { font-size: 13px; font-weight: 800; color: #1A3A5C; flex: 1; }
-.analysis-col-stats { font-size: 10px; color: #8A9AB5; text-align: right; line-height: 1.5; }
+.analysis-col-name  { font-size: 14px; font-weight: 800; color: #1A3A5C; flex: 1; }
+.analysis-col-stats { font-size: 11px; color: #7A8CAA; text-align: right; line-height: 1.6; font-weight: 600; }
+
+/* 섹션 공통 */
+.analysis-section {
+  padding: 13px 16px; background: #fff;
+  border-bottom: 1px solid #E8EFF8;
+}
+.analysis-section-title {
+  font-size: 10px; font-weight: 700; color: #9AAAC4;
+  letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 10px;
+}
 .analysis-empty { color: #C8D5E8; font-size: 12px; text-align: center; padding: 20px 0; }
 
-/* TOP3 바 */
-.top3-item { margin-bottom: 10px; }
-.top3-label-row {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 4px;
-}
-.top3-rank { font-size: 10px; font-weight: 800; color: #fff;
-  background: #1A3A5C; border-radius: 4px; padding: 1px 5px; margin-right: 5px; }
+/* TOP3 */
+.top3-item { margin-bottom: 12px; }
+.top3-item:last-child { margin-bottom: 0; }
+.top3-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+.top3-left { display: flex; align-items: center; gap: 5px; }
+.top3-rank { font-size: 15px; line-height: 1; }
 .top3-cat  { font-size: 12px; font-weight: 700; color: #1E2A3A; }
-.top3-meta { font-size: 10px; color: #8A9AB5; }
-.top3-bar-bg   { background: #E8EFF8; border-radius: 999px; height: 6px; overflow: hidden; }
-.top3-bar-fill { height: 100%; border-radius: 999px; transition: width 0.5s ease; }
-
-/* TELL vs 업무 비율 */
-.ratio-row { display: flex; gap: 6px; align-items: center; }
-.ratio-bar-wrap { flex:1; background:#E8EFF8; border-radius:999px; height:10px; overflow:hidden; display:flex; }
-.ratio-tell { background: linear-gradient(90deg,#A78BFA,#7C3AED); height:100%; }
-.ratio-work { background: linear-gradient(90deg,#60A5FA,#2563A8); height:100%; }
-.ratio-label { font-size:10px; font-weight:700; }
-
-/* 개선 제안 (컴팩트) */
-.suggest-compact { display: flex; flex-direction: column; gap: 6px; }
-.suggest-compact-item {
-  font-size: 11px; color: #1F4E3A; line-height: 1.5;
-  background: #fff; border: 1px solid #A7F3D0; border-radius: 6px;
-  padding: 6px 9px; display: flex; gap: 6px; align-items: flex-start;
+.top3-pill {
+  font-size: 10px; font-weight: 700; color: #5066A8;
+  background: #EEF2FF; border-radius: 20px; padding: 2px 7px;
 }
-.suggest-compact-item::before { content: "💡"; flex-shrink: 0; }
-.suggest-compact-warn {
-  background: #EFF6FF; border-color: #BFDBFE; color: #1D4ED8;
+.top3-bar-bg   { background: #EDF2FF; border-radius: 999px; height: 5px; overflow: hidden; }
+.top3-bar-fill { height: 100%; border-radius: 999px; transition: width 0.6s ease; }
+.top3-examples { font-size: 10px; color: #A0ADBE; margin-top: 4px; line-height: 1.5; padding-left: 2px; }
+
+/* TELL vs 업무 */
+.ratio-nums { display: flex; gap: 8px; margin-bottom: 8px; }
+.ratio-num-card {
+  flex: 1; background: #F4F7FD; border-radius: 8px;
+  padding: 8px 10px; text-align: center;
 }
-.suggest-compact-warn::before { content: "📌"; }
+.ratio-num-val { font-size: 18px; font-weight: 800; line-height: 1; }
+.ratio-num-lbl { font-size: 9px; color: #9AAAC4; margin-top: 3px; font-weight: 600; letter-spacing: 0.3px; }
+.ratio-bar-wrap { background: #E8EFF8; border-radius: 999px; height: 8px; overflow: hidden; display: flex; }
+.ratio-tell { background: linear-gradient(90deg,#A78BFA,#7C3AED); height: 100%; }
+.ratio-work { background: linear-gradient(90deg,#60A5FA,#2563A8); height: 100%; }
+.ratio-footer { display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: #A0ADBE; }
+
+/* 개선 제안 카드 */
+.suggest-cards { display: flex; flex-direction: column; gap: 7px; }
+.suggest-card {
+  background: #F8FAFF; border-radius: 8px; padding: 9px 11px;
+  border-left: 3px solid #7C3AED;
+}
+.suggest-card-warn { border-left-color: #E53E3E; background: #FFF5F5; }
+.suggest-card-tag  {
+  font-size: 10px; font-weight: 700; color: #5A5FA8;
+  margin-bottom: 3px; display: block;
+}
+.suggest-card-warn .suggest-card-tag { color: #C53030; }
+.suggest-card-body { font-size: 11px; color: #3A4A6A; line-height: 1.55; }
+.suggest-card-body b { color: #1A2A4A; }
 
 /* ─── DATE NAV ─────────────────────────────── */
 .date-nav-row {
@@ -1197,7 +1217,9 @@ function buildAnalysisCol(rows, label, avClass) {
         <div class="analysis-col-avatar ${avClass}">${label === '전체' ? '전' : label[0]}</div>
         <div class="analysis-col-name">${label}</div>
       </div>
-      <div class="analysis-empty">해당 기간 데이터 없음</div>`;
+      <div class="analysis-section">
+        <div class="analysis-empty">해당 기간 데이터 없음</div>
+      </div>`;
   }
 
   // ── 업무내용 기반 테마별 시간·건수·예시 집계 ──
@@ -1227,17 +1249,17 @@ function buildAnalysisCol(rows, label, avClass) {
     const icon = info ? info.icon : '📌';
     return `
       <div class="top3-item">
-        <div class="top3-label-row">
-          <div>
+        <div class="top3-header-row">
+          <div class="top3-left">
             <span class="top3-rank">${medals[i]}</span>
             <span class="top3-cat">${icon} ${theme}</span>
           </div>
-          <span class="top3-meta">${pct}% · ${v.min}분 · ${v.cnt}건</span>
+          <span class="top3-pill">${pct}% · ${v.cnt}건</span>
         </div>
         <div class="top3-bar-bg">
           <div class="top3-bar-fill" style="width:${pct}%;background:${barColors[i]}"></div>
         </div>
-        ${v.examples.length ? `<div style="font-size:10px;color:#8A9AB5;margin-top:3px;line-height:1.5">${v.examples.map(e=>`"${e}"`).join(' / ')}</div>` : ''}
+        ${v.examples.length ? `<div class="top3-examples">${v.examples.map(e=>`"${e}"`).join('<br>')}</div>` : ''}
       </div>`;
   }).join('');
 
@@ -1293,9 +1315,9 @@ function buildAnalysisCol(rows, label, avClass) {
     });
 
   const suggestHtml = suggestions.slice(0, 4).map(s =>
-    `<div class="suggest-compact-item${s.warn ? ' suggest-compact-warn' : ''}">
-       <div style="font-size:10px;font-weight:700;color:${s.warn?'#DC2626':'#4F5E7B'};margin-bottom:3px">${s.tag}</div>
-       <span>${s.body}</span>
+    `<div class="suggest-card${s.warn ? ' suggest-card-warn' : ''}">
+       <span class="suggest-card-tag">${s.tag}</span>
+       <div class="suggest-card-body">${s.body}</div>
      </div>`
   ).join('') || '<div class="analysis-empty" style="padding:8px 0">분석할 업무내용이 부족합니다</div>';
 
@@ -1305,28 +1327,34 @@ function buildAnalysisCol(rows, label, avClass) {
       <div class="analysis-col-name">${label}</div>
       <div class="analysis-col-stats">${rows.length}건<br>${formatHour(totalMin)}</div>
     </div>
-    <div>
-      <div class="analysis-section-title">📊 업무 집중도 TOP 3 <span style="font-size:9px;color:#B0BDCE;font-weight:500">(업무내용 기반)</span></div>
+    <div class="analysis-section">
+      <div class="analysis-section-title">업무 집중도 TOP 3</div>
       ${top3Html}
     </div>
-    <div>
-      <div class="analysis-section-title">📞 TELL &nbsp;vs&nbsp; 💼 업무</div>
-      <div class="ratio-row" style="margin-bottom:4px;">
-        <span class="ratio-label" style="color:#7C3AED;width:32px">${tellPct}%</span>
-        <div class="ratio-bar-wrap">
-          <div class="ratio-tell" style="width:${tellPct}%"></div>
-          <div class="ratio-work" style="width:${workPct}%"></div>
+    <div class="analysis-section">
+      <div class="analysis-section-title">TELL vs 업무</div>
+      <div class="ratio-nums">
+        <div class="ratio-num-card">
+          <div class="ratio-num-val" style="color:#7C3AED">${tellPct}%</div>
+          <div class="ratio-num-lbl">📞 TELL · ${formatHour(totalTell)}</div>
         </div>
-        <span class="ratio-label" style="color:#2563A8;width:32px;text-align:right">${workPct}%</span>
+        <div class="ratio-num-card">
+          <div class="ratio-num-val" style="color:#2563A8">${workPct}%</div>
+          <div class="ratio-num-lbl">💼 업무 · ${formatHour(totalWork)}</div>
+        </div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:#8A9AB5;">
-        <span>TELL ${formatHour(totalTell)}</span>
-        <span>업무 ${formatHour(totalWork)}</span>
+      <div class="ratio-bar-wrap">
+        <div class="ratio-tell" style="width:${tellPct}%"></div>
+        <div class="ratio-work" style="width:${workPct}%"></div>
+      </div>
+      <div class="ratio-footer">
+        <span>발신 ${outCnt}건</span>
+        <span>수신 ${inCnt}건</span>
       </div>
     </div>
-    <div>
-      <div class="analysis-section-title">💡 개선 제안</div>
-      <div class="suggest-compact">${suggestHtml}</div>
+    <div class="analysis-section">
+      <div class="analysis-section-title">개선 제안</div>
+      <div class="suggest-cards">${suggestHtml}</div>
     </div>`;
 }
 
