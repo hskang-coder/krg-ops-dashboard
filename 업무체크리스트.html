@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KRG 개런티즈 업무 체크리스트</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --blue:   #2563A8;
+  --purple: #7C3AED;
+  --green:  #059669;
+  --bg:     #EDF2F9;
+  --card:   #FFFFFF;
+  --border: #E2EAF5;
+  --text:   #1E2D40;
+  --muted:  #8A9AB5;
+  --done-bg:#F0FDF4;
+  --done-c: #6B7280;
+}
+body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background: var(--bg); min-height: 100vh; color: var(--text); }
+
+/* ── HEADER ── */
+.header { background: #1A3A5C; padding: 0 20px; }
+.header-top { display:flex; align-items:center; justify-content:space-between; padding:14px 0 10px; flex-wrap:wrap; gap:8px; }
+.brand  { color:#7BAED4; font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:2px; }
+.title  { color:#FFF; font-size:18px; font-weight:800; }
+.date-wrap { display:flex; gap:8px; flex-wrap:wrap; }
+.badge { background:rgba(255,255,255,0.12); color:#AACDE8; font-size:11px; padding:4px 12px; border-radius:20px; white-space:nowrap; }
+
+/* ── PERSON TABS ── */
+.person-tabs { display:flex; gap:4px; padding:12px 20px 0; border-top:1px solid rgba(255,255,255,0.08); }
+.person-tab {
+  background:rgba(255,255,255,0.08); border:none; cursor:pointer;
+  color:rgba(255,255,255,0.5); font-size:13px; font-weight:700;
+  padding:8px 20px; border-radius:8px 8px 0 0; transition:all 0.18s;
+}
+.person-tab.active { background:var(--bg); color:var(--blue); }
+.person-tab:not(.active):hover { background:rgba(255,255,255,0.15); color:#fff; }
+
+/* ── CONTENT WRAP ── */
+.content { max-width:860px; margin:0 auto; padding:20px 16px 60px; }
+
+/* ── PERIOD TABS ── */
+.period-row { display:flex; gap:8px; margin-bottom:16px; align-items:center; }
+.period-tab {
+  background:#fff; border:2px solid var(--border); border-radius:24px;
+  cursor:pointer; color:var(--muted); font-size:13px; font-weight:700;
+  padding:7px 22px; transition:all 0.18s;
+}
+.period-tab.active { border-color:var(--blue); color:var(--blue); background:#EBF3FC; }
+.period-tab:not(.active):hover { border-color:#B0C4DE; color:var(--blue); }
+
+/* ── PROGRESS CARD ── */
+.progress-card {
+  background:#fff; border-radius:14px; border:1.5px solid var(--border);
+  padding:16px 20px; margin-bottom:16px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.05);
+}
+.progress-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.progress-label  { font-size:13px; font-weight:700; color:var(--muted); }
+.progress-pct    { font-size:22px; font-weight:900; color:var(--blue); }
+.progress-bar-bg { background:#E8EFF8; border-radius:999px; height:10px; overflow:hidden; }
+.progress-bar-fill {
+  height:100%; border-radius:999px; transition:width 0.4s ease;
+  background:linear-gradient(90deg, #4DA3E8, var(--blue));
+}
+.progress-bar-fill.done { background:linear-gradient(90deg,#34D399,var(--green)); }
+.progress-sub { font-size:11px; color:var(--muted); margin-top:6px; }
+
+/* ── CHECKLIST ── */
+.checklist { display:flex; flex-direction:column; gap:8px; }
+
+.check-item {
+  background:#fff; border-radius:12px; border:1.5px solid var(--border);
+  padding:14px 16px; display:flex; align-items:flex-start; gap:14px;
+  cursor:pointer; transition:all 0.18s; user-select:none;
+  box-shadow:0 1px 4px rgba(0,0,0,0.04);
+}
+.check-item:hover  { border-color:#B0C4DE; box-shadow:0 2px 8px rgba(37,99,168,0.1); }
+.check-item.done   { background:var(--done-bg); border-color:#A7F3D0; }
+
+.check-box {
+  width:22px; height:22px; border-radius:6px; border:2px solid #C8D8EC;
+  flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  transition:all 0.18s; margin-top:1px; background:#fff;
+}
+.check-item.done .check-box {
+  background:var(--green); border-color:var(--green);
+}
+.check-box svg { display:none; }
+.check-item.done .check-box svg { display:block; }
+
+.check-content { flex:1; min-width:0; }
+.check-label {
+  font-size:14px; font-weight:600; color:var(--text); transition:all 0.18s;
+  line-height:1.4;
+}
+.check-item.done .check-label { text-decoration:line-through; color:var(--done-c); }
+.check-time { font-size:11px; color:var(--muted); margin-top:3px; font-weight:500; }
+
+/* ── EMPTY STATE ── */
+.empty { text-align:center; padding:48px 20px; color:var(--muted); }
+.empty-icon { font-size:40px; margin-bottom:12px; }
+.empty-text { font-size:14px; }
+
+/* ── RESET BTN ── */
+.reset-row { display:flex; justify-content:flex-end; margin-top:12px; }
+.reset-btn {
+  background:none; border:1.5px solid #E2EAF5; border-radius:8px;
+  color:var(--muted); font-size:12px; padding:6px 14px; cursor:pointer;
+  transition:all 0.18s;
+}
+.reset-btn:hover { border-color:#F87171; color:#DC2626; background:#FFF5F5; }
+
+/* ── PERSON COLOR VARIANTS ── */
+[data-person="고송미"]  .progress-pct { color:#2563A8; }
+[data-person="고송미"]  .progress-bar-fill { background:linear-gradient(90deg,#60A5FA,#2563A8); }
+[data-person="지희이"]  .progress-pct { color:#7C3AED; }
+[data-person="지희이"]  .progress-bar-fill { background:linear-gradient(90deg,#A78BFA,#7C3AED); }
+[data-person="강휘수"]  .progress-pct { color:#059669; }
+[data-person="강휘수"]  .progress-bar-fill { background:linear-gradient(90deg,#34D399,#059669); }
+
+@media(max-width:600px){
+  .person-tab { padding:8px 14px; font-size:12px; }
+  .period-tab { padding:6px 16px; font-size:12px; }
+  .check-label { font-size:13px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="brand">KRG Guaranteez</div>
+      <div class="title">업무 체크리스트</div>
+    </div>
+    <div class="date-wrap">
+      <span class="badge" id="todayBadge">📅 날짜</span>
+      <span class="badge" id="weekBadge">📆 주차</span>
+      <span class="badge" id="monthBadge">🗓 월</span>
+    </div>
+  </div>
+  <div class="person-tabs">
+    <button class="person-tab active" onclick="selectPerson('고송미')">고송미</button>
+    <button class="person-tab"        onclick="selectPerson('지희이')">지희이</button>
+    <button class="person-tab"        onclick="selectPerson('강휘수')">강휘수</button>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content" id="mainContent">
+  <!-- 동적 렌더링 -->
+</div>
+
+<script>
+// ──────────────────────────────────────────
+// TASK DATA
+// ──────────────────────────────────────────
+const TASKS = {
+  '고송미': {
+    daily: [
+      { id:'gd1', label:'Data 계약번호 NAS 보관',            time:'' },
+      { id:'gd2', label:'임대차 체결일 체크',                 time:'09:00' },
+      { id:'gd3', label:'신규 계약자 업데이트',               time:'09:30' },
+      { id:'gd4', label:'계약관리 업데이트',                  time:'09:30 / 17:00' },
+      { id:'gd5', label:'개런티즈 계약서 발행',               time:'상시' },
+      { id:'gd6', label:'입주 전 임차인 연락',                time:'' },
+      { id:'gd7', label:'심사관리 데이터 업데이트',           time:'09:30 / 14:00 / 18:00' },
+    ],
+    weekly: [
+      { id:'gw1', label:'개런티즈 계약서 발행',   time:'월·수·금' },
+      { id:'gw2', label:'계약 서류 체크',         time:'화' },
+      { id:'gw3', label:'NAS 폴더 동기화',        time:'금' },
+    ],
+    monthly: [],
+  },
+  '지희이': {
+    daily: [
+      { id:'jd1', label:'입주자 체크 수수료 입금 확인', time:'09:00' },
+      { id:'jd2', label:'입주 계약관리',                time:'' },
+    ],
+    weekly: [
+      { id:'jw1', label:'개런티즈 계약서 발행',   time:'월·수·금' },
+      { id:'jw2', label:'갱신 대상자 문자 발송',  time:'수' },
+      { id:'jw3', label:'수납 전화',              time:'' },
+    ],
+    monthly: [
+      { id:'jm1', label:'퇴실 정산 이슈 대응',          time:'' },
+      { id:'jm2', label:'갱신 심사 대응',               time:'15일' },
+      { id:'jm3', label:'갱신 대상자 증빙 문자',        time:'15일' },
+      { id:'jm4', label:'갱신 대상자 홈버튼 등록',      time:'25일' },
+      { id:'jm5', label:'갱신 대상자 수수료 청구',      time:'25일' },
+    ],
+  },
+  '강휘수': {
+    daily: [
+      { id:'kd1', label:'Raw data 업데이트',    time:'09:00' },
+      { id:'kd2', label:'홈버튼 월세 입금 확인', time:'11:30' },
+      { id:'kd3', label:'입주 계약관리',         time:'' },
+    ],
+    weekly: [
+      { id:'kw1', label:'퇴실 정산 대위변제금액 품의', time:'' },
+      { id:'kw2', label:'개런티즈 4.0 고도화',        time:'토' },
+    ],
+    monthly: [
+      { id:'km1', label:'인센티브 품의',          time:'5일' },
+      { id:'km2', label:'인센티브 파트너 전달',   time:'8일' },
+      { id:'km3', label:'홈버튼 정산 승인',       time:'말일' },
+      { id:'km4', label:'임대차 신고',            time:'' },
+      { id:'km5', label:'갱신 계약서 발행',       time:'말일' },
+    ],
+  },
+};
+
+// ──────────────────────────────────────────
+// STATE
+// ──────────────────────────────────────────
+let currentPerson = '고송미';
+let currentPeriod = 'daily';
+
+function pad(n) { return String(n).padStart(2,'0'); }
+
+// 오늘 기준 키 생성
+function getPeriodKey(period) {
+  const d = new Date();
+  if (period === 'daily') {
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  if (period === 'weekly') {
+    const jan1 = new Date(d.getFullYear(),0,1);
+    const w = Math.ceil((((d - jan1) / 86400000) + jan1.getDay() + 1) / 7);
+    return `${d.getFullYear()}-W${pad(w)}`;
+  }
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+}
+
+function storageKey(person, period) {
+  return `ck_${person}_${period}_${getPeriodKey(period)}`;
+}
+
+function loadState(person, period) {
+  try {
+    const raw = localStorage.getItem(storageKey(person, period));
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveState(person, period, state) {
+  try {
+    localStorage.setItem(storageKey(person, period), JSON.stringify(state));
+  } catch {}
+}
+
+// ──────────────────────────────────────────
+// DATE DISPLAY
+// ──────────────────────────────────────────
+function updateDateBadges() {
+  const d = new Date();
+  const weekdays = ['일','월','화','수','목','금','토'];
+  const jan1 = new Date(d.getFullYear(),0,1);
+  const weekNum = Math.ceil((((d - jan1) / 86400000) + jan1.getDay() + 1) / 7);
+
+  document.getElementById('todayBadge').textContent =
+    `📅 ${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} (${weekdays[d.getDay()]})`;
+  document.getElementById('weekBadge').textContent =
+    `📆 ${d.getFullYear()}년 ${weekNum}주차`;
+  document.getElementById('monthBadge').textContent =
+    `🗓 ${d.getFullYear()}년 ${d.getMonth()+1}월`;
+}
+
+// ──────────────────────────────────────────
+// RENDER
+// ──────────────────────────────────────────
+function selectPerson(p) {
+  currentPerson = p;
+  document.querySelectorAll('.person-tab').forEach(t => {
+    t.classList.toggle('active', t.textContent === p);
+  });
+  render();
+}
+
+function selectPeriod(p) {
+  currentPeriod = p;
+  document.querySelectorAll('.period-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.period === p);
+  });
+  renderChecklist();
+}
+
+function toggle(taskId) {
+  const state = loadState(currentPerson, currentPeriod);
+  state[taskId] = !state[taskId];
+  saveState(currentPerson, currentPeriod, state);
+  renderChecklist();
+}
+
+function resetPeriod() {
+  if (!confirm(`${currentPerson}의 ${periodLabel(currentPeriod)} 체크리스트를 초기화할까요?`)) return;
+  localStorage.removeItem(storageKey(currentPerson, currentPeriod));
+  renderChecklist();
+}
+
+function periodLabel(p) {
+  return p === 'daily' ? '데일리' : p === 'weekly' ? '위클리' : '먼슬리';
+}
+
+function render() {
+  const wrap = document.getElementById('mainContent');
+  wrap.dataset.person = currentPerson;
+
+  const personColor = {
+    '고송미': '#2563A8',
+    '지희이': '#7C3AED',
+    '강휘수': '#059669',
+  }[currentPerson] || '#2563A8';
+
+  // 각 기간별 완료율 계산 (요약용)
+  function summaryPct(period) {
+    const tasks = TASKS[currentPerson][period];
+    if (!tasks || tasks.length === 0) return null;
+    const state = loadState(currentPerson, period);
+    const done = tasks.filter(t => state[t.id]).length;
+    return { done, total: tasks.length, pct: Math.round(done / tasks.length * 100) };
+  }
+
+  const daily   = summaryPct('daily');
+  const weekly  = summaryPct('weekly');
+  const monthly = summaryPct('monthly');
+
+  wrap.innerHTML = `
+    <!-- 기간 탭 -->
+    <div class="period-row">
+      <button class="period-tab ${currentPeriod==='daily'?'active':''}"   data-period="daily"   onclick="selectPeriod('daily')">
+        데일리 ${daily   ? `<span style="font-size:11px;opacity:0.8">(${daily.done}/${daily.total})</span>`   : ''}
+      </button>
+      <button class="period-tab ${currentPeriod==='weekly'?'active':''}"  data-period="weekly"  onclick="selectPeriod('weekly')">
+        위클리 ${weekly  ? `<span style="font-size:11px;opacity:0.8">(${weekly.done}/${weekly.total})</span>`  : ''}
+      </button>
+      <button class="period-tab ${currentPeriod==='monthly'?'active':''}" data-period="monthly" onclick="selectPeriod('monthly')">
+        먼슬리 ${monthly ? `<span style="font-size:11px;opacity:0.8">(${monthly.done}/${monthly.total})</span>` : '<span style="font-size:11px;opacity:0.6">(없음)</span>'}
+      </button>
+    </div>
+
+    <!-- 체크리스트 영역 -->
+    <div id="checklistArea"></div>
+  `;
+
+  renderChecklist();
+}
+
+function renderChecklist() {
+  const tasks = TASKS[currentPerson][currentPeriod] || [];
+  const state = loadState(currentPerson, currentPeriod);
+  const done  = tasks.filter(t => state[t.id]).length;
+  const total = tasks.length;
+  const pct   = total === 0 ? 0 : Math.round(done / total * 100);
+  const isDone = pct === 100;
+
+  // 기간 탭 카운터 업데이트
+  document.querySelectorAll('.period-tab').forEach(tab => {
+    const p = tab.dataset.period;
+    const t = TASKS[currentPerson][p] || [];
+    const s = loadState(currentPerson, p);
+    const d2 = t.filter(x => s[x.id]).length;
+    const span = t.length > 0
+      ? `<span style="font-size:11px;opacity:0.8">(${d2}/${t.length})</span>`
+      : `<span style="font-size:11px;opacity:0.6">(없음)</span>`;
+    const label = p === 'daily' ? '데일리' : p === 'weekly' ? '위클리' : '먼슬리';
+    tab.innerHTML = label + ' ' + span;
+    tab.classList.toggle('active', p === currentPeriod);
+  });
+
+  const areaHtml = total === 0
+    ? `<div class="empty">
+         <div class="empty-icon">✅</div>
+         <div class="empty-text">${currentPerson}의 ${periodLabel(currentPeriod)} 업무는 없습니다.</div>
+       </div>`
+    : `
+      <!-- 진행률 카드 -->
+      <div class="progress-card">
+        <div class="progress-header">
+          <span class="progress-label">${currentPerson} · ${periodLabel(currentPeriod)} 진행률</span>
+          <span class="progress-pct" id="pctNum">${pct}%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill ${isDone?'done':''}" id="pctBar" style="width:${pct}%"></div>
+        </div>
+        <div class="progress-sub">${done} / ${total} 완료${isDone ? ' 🎉 모두 완료!' : ''}</div>
+      </div>
+
+      <!-- 체크리스트 -->
+      <div class="checklist">
+        ${tasks.map(task => {
+          const checked = !!state[task.id];
+          return `
+            <div class="check-item ${checked?'done':''}" onclick="toggle('${task.id}')">
+              <div class="check-box">
+                <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+                  <path d="M1.5 5L5 8.5L11.5 1.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="check-content">
+                <div class="check-label">${task.label}</div>
+                ${task.time ? `<div class="check-time">⏰ ${task.time}</div>` : ''}
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+
+      <!-- 초기화 -->
+      <div class="reset-row">
+        <button class="reset-btn" onclick="resetPeriod()">↺ 초기화</button>
+      </div>
+    `;
+
+  document.getElementById('checklistArea').innerHTML = areaHtml;
+  // data-person 속성도 업데이트
+  document.getElementById('mainContent').dataset.person = currentPerson;
+}
+
+// ──────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────
+updateDateBadges();
+render();
+
+// 1분마다 날짜 갱신 (자정 넘어가도 반영)
+setInterval(updateDateBadges, 60000);
+</script>
+</body>
+</html>
