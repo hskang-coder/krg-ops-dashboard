@@ -1717,6 +1717,19 @@ function renderLogTable(data) {
   source.forEach(r => { personCnt[r.person] = (personCnt[r.person]||0)+1; });
   const topPerson = Object.entries(personCnt).sort((a,b)=>b[1]-a[1])[0];
 
+  // 대상구분 집계
+  const targetCnt = {};
+  source.forEach(r => {
+    const t = (r.target||'').trim() || '—';
+    targetCnt[t] = (targetCnt[t]||0) + 1;
+  });
+  const targetSummary = Object.entries(targetCnt)
+    .filter(([k]) => k !== '—')
+    .sort((a,b) => b[1]-a[1])
+    .slice(0, 3)
+    .map(([k,v]) => `<span style="font-weight:600">${k}</span> ${v}건`)
+    .join(' · ') || '—';
+
   const periodLabel = currentPeriod==='daily'?'오늘':currentPeriod==='weekly'?'이번 주':'이번 달';
   const personLabel = currentLogPerson === 'all' ? '전체' : currentLogPerson;
   const { insights, suggestions, tellInsight, callInsight } = generateAnalysis(source, totalTell, totalWork, totalMin);
@@ -1736,6 +1749,10 @@ function renderLogTable(data) {
           <span class="log-sum-label">총 건수</span>
           <span class="log-sum-val">${totalCnt}건</span>
           ${currentLogPerson==='all'&&topPerson?`<span class="log-sum-label">(최다: ${topPerson[0]} ${topPerson[1]}건)</span>`:''}
+        </div>
+        <div class="log-sum-item">
+          <span class="log-sum-label">대상구분</span>
+          <span class="log-sum-val" style="font-size:12px">${targetSummary}</span>
         </div>
         <div class="log-sum-item">
           <span class="log-sum-label">TELL</span>
