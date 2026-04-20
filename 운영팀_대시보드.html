@@ -1237,7 +1237,7 @@ function renderLogTable(data) {
   const source = currentLogPerson === 'all'
     ? data
     : data.filter(r => r.person === currentLogPerson);
-  const limit  = currentPeriod === 'daily' ? Infinity : 20;
+  const limit  = currentPeriod === 'daily' ? Infinity : currentPeriod === 'weekly' ? 50 : 100;
   const recent = [...source].sort((a,b)=>(b.dateObj||0)-(a.dateObj||0)).slice(0, limit);
 
   if (!recent.length) {
