@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KRG 개런티즈 운영팀</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --blue:   #2563A8;
+  --purple: #7C3AED;
+  --green:  #059669;
+  --bg:     #EDF2F9;
+  --card:   #FFFFFF;
+  --border: #E2EAF5;
+  --text:   #1E2A3A;
+  --muted:  #8A9AB5;
+}
+body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background: var(--bg); min-height: 100vh; color: var(--text); }
+
+/* ─── HEADER ─────────────────────────────── */
+.header { background: #1A3A5C; }
+.header-inner { padding: 0 24px; }
+.header-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 0 10px; flex-wrap: wrap; gap: 8px;
+}
+.brand { color: #7BAED4; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
+.dash-title { color: #FFF; font-size: 18px; font-weight: 800; }
+.header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.date-badge { background: rgba(255,255,255,0.12); color: #AACDE8; font-size: 12px; padding: 5px 12px; border-radius: 20px; white-space: nowrap; }
+.refresh-btn {
+  background: rgba(255,255,255,0.12); border: none; cursor: pointer;
+  color: #AACDE8; font-size: 12px; padding: 5px 12px; border-radius: 20px; transition: all 0.2s;
+}
+.refresh-btn:hover { background: rgba(255,255,255,0.22); color: #fff; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #34D399; display: inline-block; margin-right: 4px; vertical-align: middle; }
+.status-dot.loading { background: #FCD34D; animation: blink 1s infinite; }
+.status-dot.error   { background: #F87171; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ─── VIEW TABS ─────────────────────────────── */
+.view-tabs {
+  display: flex; padding: 0 24px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.12);
+}
+.view-tab {
+  background: none; border: none; cursor: pointer;
+  color: rgba(255,255,255,0.5); font-size: 13px; font-weight: 700;
+  padding: 10px 20px; border-bottom: 3px solid transparent; transition: all 0.2s;
+  display: flex; align-items: center; gap: 5px;
+}
+.view-tab.active { color: #FFF; border-bottom-color: #4DA3E8; }
+.view-tab:hover:not(.active) { color: rgba(255,255,255,0.8); }
+
+/* ─── PERSON TABS (체크리스트 전용) ─────────────────────────────── */
+.person-tabs-row {
+  display: flex; gap: 4px; padding: 10px 24px 0;
+}
+.person-tab {
+  background: rgba(255,255,255,0.08); border: none; cursor: pointer;
+  color: rgba(255,255,255,0.5); font-size: 13px; font-weight: 700;
+  padding: 7px 20px; border-radius: 8px 8px 0 0; transition: all 0.18s;
+}
+.person-tab.active        { background: var(--bg); color: var(--blue); }
+.person-tab:not(.active):hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+/* ─── PERIOD TABS ─────────────────────────────── */
+.period-tabs { display: flex; padding: 0 24px; }
+.period-tab {
+  background: none; border: none; cursor: pointer;
+  color: rgba(255,255,255,0.45); font-size: 13px; font-weight: 700;
+  padding: 10px 22px; border-bottom: 3px solid transparent; transition: all 0.2s;
+}
+.period-tab.active { color: #FFF; border-bottom-color: #4DA3E8; }
+.period-tab:hover:not(.active) { color: rgba(255,255,255,0.8); }
+
+/* ─── CONTENT ─────────────────────────────── */
+.view-content { display: none; }
+.view-content.active { display: block; }
+
+/* ─── DASHBOARD LAYOUT ─────────────────────────────── */
+.dash-inner { max-width: 1400px; margin: 0 auto; padding: 20px 16px 40px; }
+
+.kpi-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-bottom: 16px; }
+@media(max-width:1100px){ .kpi-row{ grid-template-columns: repeat(3,1fr); } }
+@media(max-width:700px) { .kpi-row{ grid-template-columns: repeat(2,1fr); } }
+
+.kpi-card { background: #FFF; border-radius: 12px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1.5px solid var(--border); }
+.kpi-label { font-size: 11px; font-weight: 600; color: #8A9AB5; letter-spacing: 0.5px; margin-bottom: 6px; }
+.kpi-value { font-size: 26px; font-weight: 800; line-height: 1; margin-bottom: 3px; }
+.kpi-sub   { font-size: 11px; color: #A0ADBE; }
+.kpi-0 .kpi-value { color: var(--blue); }
+.kpi-1 .kpi-value { color: var(--purple); }
+.kpi-2 .kpi-value { color: var(--green); }
+.kpi-3 .kpi-value { color: #D97706; }
+.kpi-4 .kpi-value { color: #DC2626; }
+
+.main-grid { display: grid; grid-template-columns: 340px 1fr; gap: 14px; margin-bottom: 14px; }
+@media(max-width:900px){ .main-grid{ grid-template-columns: 1fr; } }
+
+.card { background: #FFF; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1.5px solid var(--border); padding: 18px 20px; }
+.card-title { font-size: 13px; font-weight: 700; color: #1A3A5C; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+.card-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot-blue   { background: var(--blue); }
+.dot-purple { background: var(--purple); }
+.dot-green  { background: var(--green); }
+
+.bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media(max-width:900px){ .bottom-grid{ grid-template-columns: 1fr; } }
+
+.chart-wrap { position: relative; }
+.chart-canvas    { max-height: 240px; }
+.chart-canvas-sm { max-height: 200px; }
+
+.chart-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.legend-item  { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #5A6A8A; }
+.legend-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* 담당자 진척 */
+.person-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.person-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #FFF; flex-shrink: 0; }
+.av-blue   { background: var(--blue); }
+.av-purple { background: var(--purple); }
+.av-green  { background: var(--green); }
+.person-info { flex: 1; }
+.person-name-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+.person-name { font-size: 13px; font-weight: 700; color: #1E2A3A; }
+.pbar-bg   { background: #EEF2FA; border-radius: 6px; height: 7px; overflow: hidden; }
+.pbar-fill { height: 100%; border-radius: 6px; transition: width 0.5s ease; }
+.fill-blue   { background: linear-gradient(90deg, var(--blue),   #4DA3E8); }
+.fill-purple { background: linear-gradient(90deg, var(--purple), #A78BFA); }
+.fill-green  { background: linear-gradient(90deg, var(--green),  #34D399); }
+
+.data-status { background: #F0F7FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 10px 14px; font-size: 11px; color: #1D4ED8; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+.data-status.warn  { background: #FFFBEB; border-color: #FDE68A; color: #92400E; }
+.data-status.error { background: #FEF2F2; border-color: #FECACA; color: #991B1B; }
+
+.mini-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mini-table th { background: #1A3A5C; color: #FFF; padding: 6px 10px; text-align: left; font-size: 11px; font-weight: 600; }
+.mini-table td { padding: 6px 10px; border-bottom: 1px solid #EEF2FA; color: #1E2A3A; }
+.mini-table tr:last-child td { border-bottom: none; }
+.mini-table tr:hover td { background: #F5F8FF; }
+.mini-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 8px; }
+.cat-계약관리 { background:#DBEAFE; color:#1D4ED8; }
+.cat-심사관리 { background:#EDE9FE; color:#6D28D9; }
+.cat-정산관리 { background:#D1FAE5; color:#065F46; }
+.cat-퇴실관리 { background:#FEF3C7; color:#92400E; }
+.cat-연체관리 { background:#FEE2E2; color:#991B1B; }
+.cat-갱신관리 { background:#CCFBF1; color:#115E59; }
+.cat-상담관리 { background:#FCE7F3; color:#9D174D; }
+.cat-기타     { background:#F1F5F9; color:#334155; }
+
+.section-divider { height: 1px; background: #EEF2FA; margin: 14px 0; }
+.no-data { text-align: center; color: #C8D5E8; font-size: 13px; padding: 30px 0; }
+
+/* ─── 파이차트 담당자 필터 ─────────────────────────────── */
+.pie-filter-row { display: flex; gap: 5px; margin-bottom: 12px; flex-wrap: wrap; }
+.pie-filter-btn {
+  background: #F0F4FA; border: 1.5px solid var(--border); border-radius: 20px;
+  cursor: pointer; color: var(--muted); font-size: 11px; font-weight: 700;
+  padding: 4px 13px; transition: all 0.18s; line-height: 1.6;
+}
+.pie-filter-btn:hover { border-color: #B0C4DE; color: var(--blue); }
+.pie-filter-btn.active { background: #1A3A5C; border-color: #1A3A5C; color: #FFF; }
+.pie-filter-btn.pf-blue   { }
+.pie-filter-btn.pf-blue.active   { background: var(--blue);   border-color: var(--blue); }
+.pie-filter-btn.pf-purple.active { background: var(--purple); border-color: var(--purple); }
+.pie-filter-btn.pf-green.active  { background: var(--green);  border-color: var(--green); }
+
+/* ─── CHECKLIST LAYOUT ─────────────────────────────── */
+.ck-inner { max-width: 900px; margin: 0 auto; padding: 20px 16px 60px; }
+
+/* 담당자 컬러 */
+.ck-wrap[data-person="고송미"] { --pcolor: var(--blue);   --pgradient: linear-gradient(90deg,#60A5FA,#2563A8); }
+.ck-wrap[data-person="지희이"] { --pcolor: var(--purple); --pgradient: linear-gradient(90deg,#A78BFA,#7C3AED); }
+.ck-wrap[data-person="강휘수"] { --pcolor: var(--green);  --pgradient: linear-gradient(90deg,#34D399,#059669); }
+
+.ck-period-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.ck-period-btn {
+  background: #fff; border: 2px solid var(--border); border-radius: 24px;
+  cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 700;
+  padding: 7px 20px; transition: all 0.18s;
+}
+.ck-period-btn.active { border-color: var(--pcolor, var(--blue)); color: var(--pcolor, var(--blue)); background: #EBF3FC; }
+.ck-period-btn:not(.active):hover { border-color: #B0C4DE; color: var(--blue); }
+
+.ck-progress-card {
+  background: #fff; border-radius: 14px; border: 1.5px solid var(--border);
+  padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.ck-prog-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.ck-prog-label  { font-size: 13px; font-weight: 700; color: var(--muted); }
+.ck-prog-pct    { font-size: 22px; font-weight: 900; color: var(--pcolor, var(--blue)); }
+.ck-bar-bg      { background: #E8EFF8; border-radius: 999px; height: 10px; overflow: hidden; }
+.ck-bar-fill    { height: 100%; border-radius: 999px; transition: width 0.4s ease; background: var(--pgradient, linear-gradient(90deg,#4DA3E8,#2563A8)); }
+.ck-bar-fill.complete { background: linear-gradient(90deg,#34D399,#059669); }
+.ck-prog-sub    { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+.ck-list { display: flex; flex-direction: column; gap: 8px; }
+.ck-item {
+  background: #fff; border-radius: 12px; border: 1.5px solid var(--border);
+  padding: 14px 16px; display: flex; align-items: flex-start; gap: 14px;
+  cursor: pointer; transition: all 0.18s; user-select: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.ck-item:hover      { border-color: #B0C4DE; box-shadow: 0 2px 8px rgba(37,99,168,0.1); }
+.ck-item.done       { background: #F0FDF4; border-color: #A7F3D0; }
+.ck-box {
+  width: 22px; height: 22px; border-radius: 6px; border: 2px solid #C8D8EC;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  transition: all 0.18s; margin-top: 1px; background: #fff;
+}
+.ck-item.done .ck-box { background: var(--green); border-color: var(--green); }
+.ck-box svg { display: none; }
+.ck-item.done .ck-box svg { display: block; }
+.ck-label-text { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.4; transition: all 0.18s; }
+.ck-item.done .ck-label-text { text-decoration: line-through; color: #6B7280; }
+.ck-time-text { font-size: 11px; color: var(--muted); margin-top: 3px; font-weight: 500; }
+
+.ck-empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+.ck-empty-icon { font-size: 40px; margin-bottom: 12px; }
+.ck-empty-text { font-size: 14px; }
+
+.ck-reset-row { display: flex; justify-content: flex-end; margin-top: 12px; }
+.ck-reset-btn {
+  background: none; border: 1.5px solid var(--border); border-radius: 8px;
+  color: var(--muted); font-size: 12px; padding: 6px 14px; cursor: pointer; transition: all 0.18s;
+}
+.ck-reset-btn:hover { border-color: #F87171; color: #DC2626; background: #FFF5F5; }
+
+/* ─── TOAST ─────────────────────────────── */
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: #1A3A5C; color: #FFF; padding: 10px 20px;
+  border-radius: 20px; font-size: 13px; font-weight: 600;
+  opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999;
+}
+.toast.show { opacity: 1; }
+
+@media(max-width:600px){
+  .person-tab   { padding: 7px 14px; font-size: 12px; }
+  .period-tab   { padding: 9px 14px; font-size: 12px; }
+  .ck-period-btn { padding: 6px 14px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── HEADER ─── -->
+<div class="header">
+  <div class="header-inner">
+    <div class="header-top">
+      <div>
+        <div class="brand">KRG그룹 · 개런티즈서비스팀</div>
+        <div class="dash-title" id="pageTitle">운영팀 대시보드</div>
+      </div>
+      <div class="header-right">
+        <span class="date-badge" id="dateBadge">—</span>
+        <span id="statusBadge" class="date-badge">
+          <span class="status-dot loading" id="statusDot"></span>
+          <span id="statusText">로딩 중</span>
+        </span>
+        <button class="refresh-btn" id="refreshBtn" onclick="loadData()">🔄 새로고침</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View toggle -->
+  <div class="view-tabs">
+    <button class="view-tab active" onclick="switchView('dashboard')">📊 대시보드</button>
+    <button class="view-tab"        onclick="switchView('checklist')">✅ 체크리스트</button>
+  </div>
+
+  <!-- Person tabs (checklist only) -->
+  <div class="person-tabs-row" id="personTabsRow" style="display:none">
+    <button class="person-tab active" onclick="selectPerson('고송미')">고송미</button>
+    <button class="person-tab"        onclick="selectPerson('지희이')">지희이</button>
+    <button class="person-tab"        onclick="selectPerson('강휘수')">강휘수</button>
+  </div>
+
+  <!-- Period tabs -->
+  <div class="period-tabs">
+    <button class="period-tab active" onclick="switchPeriod('daily')">데일리</button>
+    <button class="period-tab"        onclick="switchPeriod('weekly')">위클리</button>
+    <button class="period-tab"        onclick="switchPeriod('monthly')">먼슬리</button>
+  </div>
+</div>
+
+<!-- ─── DASHBOARD VIEW ─── -->
+<div id="dashboardView" class="view-content active">
+  <div class="dash-inner">
+
+    <!-- KPI -->
+    <div class="kpi-row">
+      <div class="kpi-card kpi-0">
+        <div class="kpi-label">📞 대응 건수</div>
+        <div class="kpi-value" id="kpi-count">—</div>
+        <div class="kpi-sub"   id="kpi-count-sub">로딩 중...</div>
+      </div>
+      <div class="kpi-card kpi-1">
+        <div class="kpi-label">🕐 TELL 시간</div>
+        <div class="kpi-value" id="kpi-tell">—</div>
+        <div class="kpi-sub"   id="kpi-tell-sub">로딩 중...</div>
+      </div>
+      <div class="kpi-card kpi-2">
+        <div class="kpi-label">💼 업무 시간</div>
+        <div class="kpi-value" id="kpi-work">—</div>
+        <div class="kpi-sub"   id="kpi-work-sub">로딩 중...</div>
+      </div>
+      <div class="kpi-card kpi-3">
+        <div class="kpi-label">📊 발신 / 수신</div>
+        <div class="kpi-value" id="kpi-call">—</div>
+        <div class="kpi-sub"   id="kpi-call-sub">로딩 중...</div>
+      </div>
+      <div class="kpi-card kpi-4">
+        <div class="kpi-label">✅ 체크리스트</div>
+        <div class="kpi-value" id="kpi-check">—</div>
+        <div class="kpi-sub"   id="kpi-check-sub">평균 완료율</div>
+      </div>
+    </div>
+
+    <!-- Main grid -->
+    <div class="main-grid">
+
+      <!-- 담당자별 진척 + 구분별 대응 -->
+      <div class="card">
+        <div class="card-title"><span class="card-dot dot-blue"></span>담당자별 업무 진척</div>
+        <div id="checklistProgressSection"></div>
+        <div class="section-divider"></div>
+        <div class="card-title" style="margin-top:4px"><span class="card-dot dot-green"></span>구분별 대응 건수</div>
+        <div class="chart-wrap">
+          <canvas id="callTypeChart" class="chart-canvas-sm"></canvas>
+        </div>
+      </div>
+
+      <!-- 업무구분별 파이 -->
+      <div class="card">
+        <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <span style="display:flex;align-items:center;gap:6px;"><span class="card-dot dot-purple"></span>업무구분별 시간 분포</span>
+          <div class="pie-filter-row" style="margin-bottom:0">
+            <button class="pie-filter-btn active"       onclick="switchPiePerson('all')">전체</button>
+            <button class="pie-filter-btn pf-blue"      onclick="switchPiePerson('고송미')">고송미</button>
+            <button class="pie-filter-btn pf-purple"    onclick="switchPiePerson('지희이')">지희이</button>
+            <button class="pie-filter-btn pf-green"     onclick="switchPiePerson('강휘수')">강휘수</button>
+          </div>
+        </div>
+        <div id="dataStatus" class="data-status"><span>⏳</span> Google Sheets 데이터 연결 중...</div>
+        <div class="chart-wrap" style="display:flex;justify-content:center;">
+          <canvas id="catPieChart" style="max-height:260px;max-width:500px;"></canvas>
+        </div>
+        <div class="chart-legend" id="pieLegend"></div>
+      </div>
+    </div>
+
+    <!-- Bottom grid -->
+    <div class="bottom-grid">
+      <div class="card">
+        <div class="card-title"><span class="card-dot dot-blue"></span>담당자별 업무시간 현황</div>
+        <div class="chart-wrap"><canvas id="personBarChart" class="chart-canvas"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-dot dot-purple"></span>업무 추이</div>
+        <div class="chart-wrap"><canvas id="trendChart" class="chart-canvas"></canvas></div>
+      </div>
+    </div>
+
+    <!-- 최근 내역 -->
+    <div class="card" style="margin-top:14px">
+      <div class="card-title"><span class="card-dot dot-green"></span>최근 대응 내역</div>
+      <div style="overflow-x:auto;">
+        <table class="mini-table">
+          <thead>
+            <tr>
+              <th>일자</th><th>담당자</th><th>구분</th>
+              <th>업무구분</th><th>TELL(분)</th><th>업무(분)</th><th>업무내용</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody">
+            <tr><td colspan="7" class="no-data">데이터 로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─── CHECKLIST VIEW ─── -->
+<div id="checklistView" class="view-content">
+  <div class="ck-inner">
+    <div class="ck-wrap" id="ckWrap" data-person="고송미">
+      <!-- period tabs + checklist rendered by JS -->
+      <div id="ckPeriodRow" class="ck-period-row"></div>
+      <div id="ckBody"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// ■ CONFIG
+// ═══════════════════════════════════════════
+const SHEET_ID       = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
+const DAEUNG_GID     = '1690142748';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyu3blAI8YFEPTpOQfQsaPfZYnRhvJIVmHSr_Bup9FpGXaWU3dhR1URMuvpLhZ6wEA/exec';
+
+// ═══════════════════════════════════════════
+// ■ SHARED STATE
+// ═══════════════════════════════════════════
+let currentView      = 'dashboard';
+let currentPeriod    = 'daily';
+let currentPerson    = '고송미';   // 체크리스트 담당자
+let currentPiePerson = 'all';      // 파이차트 필터
+let allData          = [];
+let charts           = {};
+
+const PEOPLE = [
+  { name: '고송미', key: '고송미', avClass: 'av-blue',   fillClass: 'fill-blue'   },
+  { name: '지희이', key: '지희이', avClass: 'av-purple', fillClass: 'fill-purple' },
+  { name: '강휘수', key: '강휘수', avClass: 'av-green',  fillClass: 'fill-green'  },
+];
+
+const CAT_COLORS = {
+  '계약관리':'#3B82F6','심사관리':'#8B5CF6','정산관리':'#10B981',
+  '퇴실관리':'#F59E0B','연체관리':'#EF4444','갱신관리':'#06B6D4',
+  '상담관리':'#EC4899','기타(업무 외)':'#94A3B8','기타':'#94A3B8',
+};
+
+// ═══════════════════════════════════════════
+// ■ CHECKLIST TASK DATA
+// ═══════════════════════════════════════════
+const TASKS = {
+  '고송미': {
+    daily: [
+      { id:'gd1', label:'Data 계약번호 NAS 보관',          time:'' },
+      { id:'gd2', label:'임대차 체결일 체크',               time:'09:00' },
+      { id:'gd3', label:'신규 계약자 업데이트',             time:'09:30' },
+      { id:'gd4', label:'계약관리 업데이트',                time:'09:30 / 17:00' },
+      { id:'gd5', label:'개런티즈 계약서 발행',             time:'상시' },
+      { id:'gd6', label:'입주 전 임차인 연락',              time:'' },
+      { id:'gd7', label:'심사관리 데이터 업데이트',         time:'09:30 / 14:00 / 18:00' },
+    ],
+    weekly: [
+      { id:'gw1', label:'개런티즈 계약서 발행', time:'월·수·금' },
+      { id:'gw2', label:'계약 서류 체크',       time:'화' },
+      { id:'gw3', label:'NAS 폴더 동기화',      time:'금' },
+    ],
+    monthly: [],
+  },
+  '지희이': {
+    daily: [
+      { id:'jd1', label:'입주자 체크 수수료 입금 확인', time:'09:00' },
+      { id:'jd2', label:'입주 계약관리',                time:'' },
+    ],
+    weekly: [
+      { id:'jw1', label:'개런티즈 계약서 발행',   time:'월·수·금' },
+      { id:'jw2', label:'갱신 대상자 문자 발송',  time:'수' },
+      { id:'jw3', label:'수납 전화',              time:'' },
+    ],
+    monthly: [
+      { id:'jm1', label:'퇴실 정산 이슈 대응',      time:'' },
+      { id:'jm2', label:'갱신 심사 대응',           time:'15일' },
+      { id:'jm3', label:'갱신 대상자 증빙 문자',    time:'15일' },
+      { id:'jm4', label:'갱신 대상자 홈버튼 등록',  time:'25일' },
+      { id:'jm5', label:'갱신 대상자 수수료 청구',  time:'25일' },
+    ],
+  },
+  '강휘수': {
+    daily: [
+      { id:'kd1', label:'Raw data 업데이트',     time:'09:00' },
+      { id:'kd2', label:'홈버튼 월세 입금 확인', time:'11:30' },
+      { id:'kd3', label:'입주 계약관리',         time:'' },
+    ],
+    weekly: [
+      { id:'kw1', label:'퇴실 정산 대위변제금액 품의', time:'' },
+      { id:'kw2', label:'개런티즈 4.0 고도화',        time:'토' },
+    ],
+    monthly: [
+      { id:'km1', label:'인센티브 품의',        time:'5일' },
+      { id:'km2', label:'인센티브 파트너 전달', time:'8일' },
+      { id:'km3', label:'홈버튼 정산 승인',     time:'말일' },
+      { id:'km4', label:'임대차 신고',          time:'' },
+      { id:'km5', label:'갱신 계약서 발행',     time:'말일' },
+    ],
+  },
+};
+
+// 대시보드 체크리스트 진척 계산용 (항목 수)
+const CK_COUNTS = {
+  '고송미': { daily:7, weekly:3, monthly:0 },
+  '지희이': { daily:2, weekly:3, monthly:5 },
+  '강휘수': { daily:3, weekly:2, monthly:5 },
+};
+
+// ═══════════════════════════════════════════
+// ■ DATE HELPERS
+// ═══════════════════════════════════════════
+function pad(n) { return String(n).padStart(2,'0'); }
+function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function getWeekStart() {
+  const d = today(); d.setDate(d.getDate() - (d.getDay()||7) + 1); return d;
+}
+function getMonthStart() { const d = today(); d.setDate(1); return d; }
+
+function parseKoreanDate(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+
+  // ISO 날짜-시간 문자열 처리 (Apps Script getValues() 반환값)
+  // 예: "2026-04-19T15:00:00.000Z" → UTC+9에서 로컬 날짜 2026-04-20
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+    const d = new Date(s);
+    if (isNaN(d) || d.getFullYear() < 2020) return null;
+    // getFullYear/Month/Date는 로컬 시간 기준이므로 한국시간에 맞게 정확히 변환됨
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  // 한국식 날짜 "2026. 4. 20." 또는 "2026-04-20" 등
+  const m = s.match(/(\d{4})[.\-\s]+(\d{1,2})[.\-\s]+(\d{1,2})/);
+  if (!m) return null;
+  const d = new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+  if (d.getFullYear() < 2020) return null;
+  return d;
+}
+
+function filterByPeriod(data) {
+  const t = today(), ws = getWeekStart(), ms = getMonthStart();
+  return data.filter(r => {
+    const d = parseKoreanDate(r.date);
+    if (!d) return false;
+    if (currentPeriod === 'daily')   return d.getTime() === t.getTime();
+    if (currentPeriod === 'weekly')  return d >= ws && d <= t;
+    return d >= ms && d <= t;
+  });
+}
+
+function getPeriodKey(period) {
+  const d = new Date();
+  if (period === 'daily')  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  if (period === 'weekly') {
+    const jan1 = new Date(d.getFullYear(),0,1);
+    const w = Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7);
+    return `${d.getFullYear()}-W${pad(w)}`;
+  }
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+}
+
+function storageKey(person, period) {
+  return `ck_${person}_${period}_${getPeriodKey(period)}`;
+}
+function ckLoad(person, period) {
+  try { return JSON.parse(localStorage.getItem(storageKey(person,period))||'{}'); } catch { return {}; }
+}
+function ckSave(person, period, state) {
+  try { localStorage.setItem(storageKey(person,period), JSON.stringify(state)); } catch {}
+}
+
+// ═══════════════════════════════════════════
+// ■ VIEW & PERIOD SWITCH
+// ═══════════════════════════════════════════
+function switchView(view) {
+  currentView = view;
+  document.getElementById('dashboardView').classList.toggle('active', view === 'dashboard');
+  document.getElementById('checklistView').classList.toggle('active', view === 'checklist');
+  document.getElementById('personTabsRow').style.display = view === 'checklist' ? 'flex' : 'none';
+  document.getElementById('pageTitle').textContent = view === 'dashboard' ? '운영팀 대시보드' : '업무 체크리스트';
+  document.getElementById('refreshBtn').style.display = view === 'dashboard' ? '' : 'none';
+
+  document.querySelectorAll('.view-tab').forEach((btn,i) => {
+    btn.classList.toggle('active', ['dashboard','checklist'][i] === view);
+  });
+
+  if (view === 'checklist') renderCkFull();
+}
+
+function switchPeriod(period) {
+  currentPeriod = period;
+  document.querySelectorAll('.period-tab').forEach((btn,i) => {
+    btn.classList.toggle('active', ['daily','weekly','monthly'][i] === period);
+  });
+  updateDateBadge();
+
+  if (currentView === 'dashboard') {
+    renderCkProgress();
+    if (allData.length > 0) renderDashboard(); else renderEmpty();
+  } else {
+    renderCkFull();
+  }
+}
+
+function selectPerson(p) {
+  currentPerson = p;
+  document.querySelectorAll('.person-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.textContent.trim() === p);
+  });
+  renderCkFull();
+}
+
+function updateDateBadge() {
+  const d = new Date();
+  const days = ['일','월','화','수','목','금','토'];
+  let text = '';
+  if (currentPeriod === 'daily') {
+    text = `${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
+  } else if (currentPeriod === 'weekly') {
+    const mon = new Date(d); mon.setDate(d.getDate() - (d.getDay()||7) + 1);
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    text = `${mon.getMonth()+1}/${mon.getDate()} ~ ${sun.getMonth()+1}/${sun.getDate()}`;
+  } else {
+    text = `${d.getFullYear()}년 ${d.getMonth()+1}월`;
+  }
+  document.getElementById('dateBadge').textContent = text;
+}
+
+// ═══════════════════════════════════════════
+// ■ DASHBOARD — 체크리스트 진척 (KPI 영역)
+// ═══════════════════════════════════════════
+function getCkProgress(personKey, period) {
+  const total = CK_COUNTS[personKey]?.[period] ?? 0;
+  if (total === 0) return { pct:0, done:0, total:0, noTask:true };
+  const key = `${personKey}_${period}_${getPeriodKey(period)}`;
+  let state = {};
+  try { state = JSON.parse(localStorage.getItem(`ck_${key}`) || '{}'); } catch {}
+  const done = Object.values(state).filter(Boolean).length;
+  return { pct: Math.round(done/total*100), done, total, noTask:false };
+}
+
+function renderCkProgress() {
+  const section  = document.getElementById('checklistProgressSection');
+  const avColors = ['#2563A8','#7C3AED','#059669'];
+  let html = ''; let totalPct = 0; let countWithTask = 0;
+
+  PEOPLE.forEach((p, i) => {
+    const tasks  = TASKS[p.key][currentPeriod] || [];
+    const total  = tasks.length;
+    if (total === 0) {
+      html += `
+        <div class="person-row">
+          <div class="person-avatar ${p.avClass}">${p.name[0]}</div>
+          <div class="person-info">
+            <div class="person-name-row">
+              <span class="person-name">${p.name}</span>
+              <span style="font-size:12px;color:#A0ADBE">N/A</span>
+            </div>
+            <div class="pbar-bg"><div class="pbar-fill ${p.fillClass}" style="width:0%"></div></div>
+          </div>
+        </div>`;
+      return;
+    }
+    const state = ckLoad(p.key, currentPeriod);
+    const done  = tasks.filter(t => state[t.id]).length;
+    const pct   = Math.round(done/total*100);
+    totalPct += pct; countWithTask++;
+    html += `
+      <div class="person-row">
+        <div class="person-avatar ${p.avClass}">${p.name[0]}</div>
+        <div class="person-info">
+          <div class="person-name-row">
+            <span class="person-name">${p.name}</span>
+            <span style="font-size:12px;font-weight:700;color:${avColors[i]}">${pct}%</span>
+          </div>
+          <div class="pbar-bg">
+            <div class="pbar-fill ${p.fillClass}" style="width:${pct}%"></div>
+          </div>
+          <div style="font-size:10px;color:#A0ADBE;margin-top:3px">${done}/${total} 완료</div>
+        </div>
+      </div>`;
+  });
+
+  const avgPct = countWithTask ? Math.round(totalPct/countWithTask) : 0;
+  document.getElementById('kpi-check').textContent = avgPct + '%';
+  document.getElementById('kpi-check-sub').textContent =
+    `평균 완료율 (${currentPeriod==='daily'?'오늘':currentPeriod==='weekly'?'이번 주':'이번 달'})`;
+  section.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════
+// ■ CHECKLIST VIEW — 체크리스트 풀 렌더
+// ═══════════════════════════════════════════
+function renderCkFull() {
+  const wrap = document.getElementById('ckWrap');
+  wrap.dataset.person = currentPerson;
+
+  const periods = ['daily','weekly','monthly'];
+  const pLabels = ['데일리','위클리','먼슬리'];
+  const periodRowEl = document.getElementById('ckPeriodRow');
+  periodRowEl.innerHTML = periods.map((p, i) => {
+    const tasks = TASKS[currentPerson][p] || [];
+    const state = ckLoad(currentPerson, p);
+    const done  = tasks.filter(t => state[t.id]).length;
+    const sub   = tasks.length > 0
+      ? `<span style="font-size:11px;opacity:0.8">(${done}/${tasks.length})</span>`
+      : `<span style="font-size:11px;opacity:0.6">(없음)</span>`;
+    return `<button class="ck-period-btn${currentPeriod===p?' active':''}"
+              onclick="switchPeriod('${p}')">${pLabels[i]} ${sub}</button>`;
+  }).join('');
+
+  const tasks = TASKS[currentPerson][currentPeriod] || [];
+  const state = ckLoad(currentPerson, currentPeriod);
+  const done  = tasks.filter(t => state[t.id]).length;
+  const total = tasks.length;
+  const pct   = total === 0 ? 0 : Math.round(done/total*100);
+
+  const pLabelMap = { daily:'데일리', weekly:'위클리', monthly:'먼슬리' };
+
+  let bodyHtml = '';
+  if (total === 0) {
+    bodyHtml = `
+      <div class="ck-empty">
+        <div class="ck-empty-icon">✅</div>
+        <div class="ck-empty-text">${currentPerson}의 ${pLabelMap[currentPeriod]} 업무는 없습니다.</div>
+      </div>`;
+  } else {
+    const complete = pct === 100;
+    bodyHtml = `
+      <div class="ck-progress-card">
+        <div class="ck-prog-header">
+          <span class="ck-prog-label">${currentPerson} · ${pLabelMap[currentPeriod]} 진행률</span>
+          <span class="ck-prog-pct">${pct}%</span>
+        </div>
+        <div class="ck-bar-bg">
+          <div class="ck-bar-fill${complete?' complete':''}" style="width:${pct}%"></div>
+        </div>
+        <div class="ck-prog-sub">${done} / ${total} 완료${complete?' 🎉 모두 완료!':''}</div>
+      </div>
+      <div class="ck-list">
+        ${tasks.map(task => {
+          const checked = !!state[task.id];
+          return `
+            <div class="ck-item${checked?' done':''}" onclick="ckToggle('${task.id}')">
+              <div class="ck-box">
+                <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+                  <path d="M1.5 5L5 8.5L11.5 1.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="ck-label-text">${task.label}</div>
+                ${task.time ? `<div class="ck-time-text">⏰ ${task.time}</div>` : ''}
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+      <div class="ck-reset-row">
+        <button class="ck-reset-btn" onclick="ckReset()">↺ 초기화</button>
+      </div>`;
+  }
+
+  document.getElementById('ckBody').innerHTML = bodyHtml;
+}
+
+function ckToggle(taskId) {
+  const state = ckLoad(currentPerson, currentPeriod);
+  state[taskId] = !state[taskId];
+  ckSave(currentPerson, currentPeriod, state);
+  renderCkFull();
+  renderCkProgress();
+}
+
+function ckReset() {
+  const labels = { daily:'데일리', weekly:'위클리', monthly:'먼슬리' };
+  if (!confirm(`${currentPerson}의 ${labels[currentPeriod]} 체크리스트를 초기화할까요?`)) return;
+  localStorage.removeItem(storageKey(currentPerson, currentPeriod));
+  renderCkFull();
+  renderCkProgress();
+}
+
+// ═══════════════════════════════════════════
+// ■ GOOGLE SHEETS — JSONP
+// ═══════════════════════════════════════════
+function fetchSheetJSONP(gid) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_gsCb' + Date.now();
+    const params = new URLSearchParams({ gid, range:'A7:Q', headers:'1', tqx:'out:json', callback:cbName });
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?${params}`;
+    let timer = null;
+    window[cbName] = function(resp) {
+      clearTimeout(timer); delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      resolve(resp);
+    };
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = () => {
+      clearTimeout(timer); delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      reject(new Error('스크립트 로드 실패'));
+    };
+    document.head.appendChild(script);
+    timer = setTimeout(() => {
+      if (window[cbName]) {
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        reject(new Error('요청 시간 초과'));
+      }
+    }, 10000);
+  });
+}
+
+function parseGVizTable(resp) {
+  if (!resp || !resp.table) return [];
+  const { cols, rows } = resp.table;
+  const labels = cols.map(c => (c.label||c.id||'').trim());
+  const find = (...names) => {
+    for (const n of names) {
+      const i = labels.findIndex(l => l.includes(n));
+      if (i !== -1) return i;
+    }
+    return -1;
+  };
+  const dateIdx    = find('일자');
+  const typeIdx    = find('구분');
+  const personIdx  = find('담당자');
+  const tellIdx    = find('TELL대응','Tell대응','TELL');
+  const workIdx    = find('업무대응');
+  const catIdx     = find('업무구분');
+  const subIdx     = find('하위구분');
+  const contentIdx = find('업무내용');
+  const result = [];
+  (rows||[]).forEach(row => {
+    const c = row.c || [];
+    const cell = idx => { if (idx<0||!c[idx]) return ''; return String(c[idx].f??c[idx].v??'').trim(); };
+    const num  = idx => parseFloat(cell(idx).replace(/[^0-9.]/g,''))||0;
+    const dateStr = cell(dateIdx), person = cell(personIdx);
+    if (!dateStr||!person||person==='null') return;
+    const d = parseKoreanDate(dateStr);
+    if (!d) return;
+    result.push({ date:dateStr, dateObj:d, person, type:cell(typeIdx),
+      tell:num(tellIdx), work:num(workIdx), cat:cell(catIdx)||'기타',
+      sub:cell(subIdx), content:cell(contentIdx) });
+  });
+  return result;
+}
+
+// ═══════════════════════════════════════════
+// ■ APPS SCRIPT PROXY
+// ═══════════════════════════════════════════
+async function fetchViaProxy() {
+  const res = await fetch(APPS_SCRIPT_URL + '?action=getDaeung', { mode:'cors' });
+  if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
+  const json = await res.json();
+  if (!json.data) throw new Error('프록시 데이터 없음');
+  return json.data;
+}
+
+// ═══════════════════════════════════════════
+// ■ LOAD DATA
+// ═══════════════════════════════════════════
+async function loadData() {
+  setStatus('loading','데이터 로딩 중');
+  // 1) JSONP
+  try {
+    const resp = await fetchSheetJSONP(DAEUNG_GID);
+    allData = parseGVizTable(resp);
+    if (allData.length > 0) {
+      setStatus('ok', `${allData.length}건 로드 완료`);
+      setDataStatus('ok', `✅ Google Sheets 연결됨 — 총 ${allData.length}건`);
+      renderCkProgress(); renderDashboard(); return;
+    }
+  } catch(e1) { console.warn('JSONP 실패:', e1.message); }
+  // 2) Proxy
+  try {
+    const rows = await fetchViaProxy();
+    allData = rows.map(r => {
+      const d = parseKoreanDate(String(r['일자']||''));
+      return { date:String(r['일자']||''), dateObj:d, person:String(r['담당자']||''),
+        type:String(r['구분']||''), tell:parseFloat(String(r['TELL대응']||'0').replace(/[^0-9.]/g,''))||0,
+        work:parseFloat(String(r['업무대응']||'0').replace(/[^0-9.]/g,''))||0,
+        cat:String(r['업무구분']||'기타'), sub:String(r['하위구분']||''), content:String(r['업무내용']||'') };
+    }).filter(r => r.dateObj);
+    if (allData.length > 0) {
+      setStatus('ok', `${allData.length}건 로드 완료`);
+      setDataStatus('ok', `✅ Apps Script 연결됨 — 총 ${allData.length}건`);
+      renderCkProgress(); renderDashboard(); return;
+    }
+  } catch(e2) { console.warn('Proxy 실패:', e2.message); }
+  // 3) 실패
+  setStatus('error','연결 실패');
+  allData = [];
+  setDataStatus('error',
+    `❌ 연결 실패 — ① 시트를 <b>"링크가 있는 모든 사용자 — 뷰어"</b>로 공개 설정<br>
+     ② Apps Script doGet에 <code>action=getDaeung</code> 핸들러 추가 후 재배포`);
+  renderCkProgress(); renderEmpty();
+}
+
+function setStatus(state, text) {
+  document.getElementById('statusDot').className =
+    `status-dot${state==='loading'?' loading':state==='error'?' error':''}`;
+  document.getElementById('statusText').textContent = text;
+}
+function setDataStatus(type, html) {
+  const el = document.getElementById('dataStatus');
+  el.className = `data-status${type==='error'?' error':type==='warn'?' warn':''}`;
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════
+// ■ DASHBOARD RENDER
+// ═══════════════════════════════════════════
+function renderDashboard() {
+  const filtered = filterByPeriod(allData);
+  renderKPI(filtered);
+  renderPieChart(filtered);
+  renderPersonBar(filtered);
+  renderTrendChart();
+  renderCallTypeChart(filtered);
+  renderLogTable(filtered);
+}
+
+function renderKPI(data) {
+  const tellMin  = data.reduce((s,r)=>s+r.tell,0);
+  const workMin  = data.reduce((s,r)=>s+r.work,0);
+  const outgoing = data.filter(r=>r.type==='발신').length;
+  const incoming = data.filter(r=>r.type==='수신').length;
+  document.getElementById('kpi-count').textContent = data.length + '건';
+  document.getElementById('kpi-count-sub').textContent = `발신 ${outgoing} · 수신 ${incoming}`;
+  document.getElementById('kpi-tell').textContent = formatHour(tellMin);
+  document.getElementById('kpi-tell-sub').textContent = `${tellMin}분 합계`;
+  document.getElementById('kpi-work').textContent = formatHour(workMin);
+  document.getElementById('kpi-work-sub').textContent = `${workMin}분 합계`;
+  document.getElementById('kpi-call').textContent = outgoing + ' / ' + incoming;
+  document.getElementById('kpi-call-sub').textContent = '발신 / 수신 건수';
+}
+function formatHour(min) {
+  if (min===0) return '0h';
+  const h = Math.floor(min/60), m = min%60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function switchPiePerson(person) {
+  currentPiePerson = person;
+  document.querySelectorAll('.pie-filter-btn').forEach(btn => {
+    const bp = btn.textContent.trim();
+    const match = person === 'all' ? bp === '전체' : bp === person;
+    btn.classList.toggle('active', match);
+  });
+  const filtered = filterByPeriod(allData);
+  renderPieChart(filtered);
+}
+
+function renderPieChart(data) {
+  destroyChart('pie');
+
+  const source = currentPiePerson === 'all'
+    ? data
+    : data.filter(r => r.person === currentPiePerson);
+
+  const catMap = {};
+  source.forEach(r => { const c = r.cat||'기타'; catMap[c] = (catMap[c]||0)+r.tell+r.work; });
+  const sorted = Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+
+  const legendEl = document.getElementById('pieLegend');
+  if (!sorted.length) {
+    legendEl.innerHTML = '<span style="color:#C8D5E8;font-size:12px">해당 기간 데이터 없음</span>';
+    return;
+  }
+
+  const labels = sorted.map(e=>e[0]), values = sorted.map(e=>e[1]);
+  const colors = labels.map(l=>CAT_COLORS[l]||'#94A3B8');
+  const total  = values.reduce((s,v)=>s+v,0);
+
+  const centerLabel = currentPiePerson === 'all' ? '전체' : currentPiePerson;
+  const centerHours = (total/60).toFixed(1) + 'h';
+
+  const ctx = document.getElementById('catPieChart').getContext('2d');
+  charts['pie'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets:[{ data:values, backgroundColor:colors, borderWidth:2, borderColor:'#FFF' }] },
+    options: {
+      responsive:true, maintainAspectRatio:true, cutout:'62%',
+      plugins: {
+        legend: { display:false },
+        tooltip: { callbacks: { label: c => ` ${c.label}: ${c.raw}분 (${Math.round(c.raw/total*100)}%)` } }
+      }
+    },
+    plugins: [{
+      id: 'centerText',
+      afterDraw(chart) {
+        const { ctx: c, chartArea: { width, height, left, top } } = chart;
+        c.save();
+        const cx = left + width/2, cy = top + height/2;
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.font = 'bold 13px "Apple SD Gothic Neo",sans-serif';
+        c.fillStyle = '#1A3A5C';
+        c.fillText(centerLabel, cx, cy - 9);
+        c.font = 'bold 15px "Apple SD Gothic Neo",sans-serif';
+        c.fillStyle = '#7C3AED';
+        c.fillText(centerHours, cx, cy + 10);
+        c.restore();
+      }
+    }]
+  });
+
+  legendEl.innerHTML = labels.map((l,i) =>
+    `<div class="legend-item">
+       <div class="legend-dot" style="background:${colors[i]}"></div>
+       ${l}&nbsp;<span style="color:#1A3A5C;font-weight:700">${Math.round(values[i]/total*100)}%</span>
+       <span style="color:#B0BDCE;font-size:10px">(${values[i]}분)</span>
+     </div>`
+  ).join('');
+}
+
+function renderPersonBar(data) {
+  destroyChart('personBar');
+  const persons = ['강휘수','지희이','고송미'];
+  const ctx = document.getElementById('personBarChart').getContext('2d');
+  charts['personBar'] = new Chart(ctx, {
+    type:'bar',
+    data:{ labels:persons, datasets:[
+      { label:'TELL시간(분)', data:persons.map(p=>data.filter(r=>r.person===p).reduce((s,r)=>s+r.tell,0)), backgroundColor:'#7C3AED', borderRadius:4 },
+      { label:'업무시간(분)', data:persons.map(p=>data.filter(r=>r.person===p).reduce((s,r)=>s+r.work,0)), backgroundColor:'#2563A8', borderRadius:4 },
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{display:false}}, y:{grid:{color:'#EEF2FA'},ticks:{font:{size:10}}} },
+      plugins:{ legend:{labels:{font:{size:11}}} } }
+  });
+}
+
+function renderTrendChart() {
+  destroyChart('trend');
+  if (!allData.length) return;
+  let labels=[], tellSeries=[], workSeries=[];
+  if (currentPeriod === 'daily') {
+    for (let i=6; i>=0; i--) {
+      const d = new Date(today()); d.setDate(d.getDate()-i);
+      const dd = allData.filter(r=>r.dateObj&&r.dateObj.getTime()===d.getTime());
+      labels.push(`${d.getMonth()+1}/${d.getDate()}`);
+      tellSeries.push(dd.reduce((s,r)=>s+r.tell,0));
+      workSeries.push(dd.reduce((s,r)=>s+r.work,0));
+    }
+  } else if (currentPeriod === 'weekly') {
+    const ws = getWeekStart();
+    for (let i=7; i>=0; i--) {
+      const s = new Date(ws); s.setDate(ws.getDate()-i*7);
+      const e = new Date(s); e.setDate(s.getDate()+6);
+      const wd = allData.filter(r=>r.dateObj&&r.dateObj>=s&&r.dateObj<=e);
+      labels.push(`${s.getMonth()+1}/${s.getDate()}`);
+      tellSeries.push(wd.reduce((s2,r)=>s2+r.tell,0));
+      workSeries.push(wd.reduce((s2,r)=>s2+r.work,0));
+    }
+  } else {
+    const now = new Date();
+    for (let i=5; i>=0; i--) {
+      const y=now.getFullYear(), m=now.getMonth()-i;
+      const ms=new Date(y,m,1), me=new Date(y,m+1,0);
+      const md=allData.filter(r=>r.dateObj&&r.dateObj>=ms&&r.dateObj<=me);
+      labels.push(`${ms.getFullYear()}.${ms.getMonth()+1}`);
+      tellSeries.push(md.reduce((s,r)=>s+r.tell,0));
+      workSeries.push(md.reduce((s,r)=>s+r.work,0));
+    }
+  }
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  charts['trend'] = new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets:[
+      { label:'TELL시간(분)', data:tellSeries, borderColor:'#7C3AED', backgroundColor:'rgba(124,58,237,0.08)', fill:true, tension:0.4, pointRadius:4, borderWidth:2 },
+      { label:'업무시간(분)', data:workSeries, borderColor:'#2563A8', backgroundColor:'rgba(37,99,168,0.06)',  fill:true, tension:0.4, pointRadius:4, borderWidth:2 },
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{display:false},ticks:{font:{size:10}}}, y:{grid:{color:'#EEF2FA'},ticks:{font:{size:10}}} },
+      plugins:{ legend:{labels:{font:{size:11}}} } }
+  });
+}
+
+function renderCallTypeChart(data) {
+  destroyChart('callType');
+  const counts = [data.filter(r=>r.type==='발신').length, data.filter(r=>r.type==='수신').length, data.filter(r=>r.type==='업무').length];
+  const ctx = document.getElementById('callTypeChart').getContext('2d');
+  charts['callType'] = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels:['발신','수신','업무'], datasets:[{ data:counts, backgroundColor:['#7C3AED','#2563A8','#059669'], borderWidth:2, borderColor:'#FFF' }] },
+    options:{ responsive:true, maintainAspectRatio:true, cutout:'55%',
+      plugins:{ legend:{position:'right',labels:{font:{size:11},boxWidth:12}},
+        tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw}건`}} } }
+  });
+}
+
+function renderLogTable(data) {
+  const tbody  = document.getElementById('logTableBody');
+  const recent = [...data].sort((a,b)=>(b.dateObj||0)-(a.dateObj||0)).slice(0,20);
+  if (!recent.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="no-data">해당 기간 데이터 없음</td></tr>'; return;
+  }
+  tbody.innerHTML = recent.map(r => `
+    <tr>
+      <td>${r.date}</td><td>${r.person}</td><td>${r.type||'—'}</td>
+      <td><span class="mini-badge cat-${r.cat}">${r.cat}</span></td>
+      <td>${r.tell||'—'}</td><td>${r.work||'—'}</td>
+      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.content||'—'}</td>
+    </tr>`).join('');
+}
+
+function renderEmpty() {
+  ['kpi-count','kpi-tell','kpi-work','kpi-call'].forEach(id => document.getElementById(id).textContent='—');
+  ['kpi-count-sub','kpi-tell-sub','kpi-work-sub','kpi-call-sub'].forEach(id => {
+    document.getElementById(id).textContent='Sheets 연결 필요';
+  });
+  document.getElementById('logTableBody').innerHTML =
+    '<tr><td colspan="7" class="no-data">Google Sheets 데이터를 불러올 수 없습니다.<br>시트 공개 여부를 확인하거나 새로고침을 눌러주세요.</td></tr>';
+  renderPieChart([]); renderPersonBar([]); renderTrendChart(); renderCallTypeChart([]);
+}
+
+// ═══════════════════════════════════════════
+// ■ TOAST
+// ═══════════════════════════════════════════
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ═══════════════════════════════════════════
+// ■ INIT
+// ═══════════════════════════════════════════
+updateDateBadge();
+renderCkProgress();
+loadData();
+setInterval(() => { updateDateBadge(); renderCkProgress(); }, 60000);
+</script>
+</body>
+</html>
