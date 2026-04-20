@@ -1306,21 +1306,23 @@ function buildAnalysisCol(rows, label, avClass) {
       </div>`;
   }).join('');
 
-  // ── 개선 제안: 업무내용(content) 기반 동적 생성 ────────────────────────
-  // (TOP3 집계와 별도로 content 텍스트 분석)
-  const contentMap = {};
-  rows.forEach(r => {
-    const th = detectContentTheme(r.content);
-    if (!contentMap[th]) contentMap[th] = { min: 0, cnt: 0 };
-    contentMap[th].min += r.tell + r.work;
-    contentMap[th].cnt++;
-  });
-  const contentTop3 = Object.entries(contentMap).sort((a,b)=>b[1].min-a[1].min).slice(0,3);
+  // ── 개선 제안: 실제 업무구분(cat) 기반 ─────────────────────────────────
+  const CAT_IMPROVE = {
+    '계약관리':     { icon:'📋', tool:'유캔사인 전자서명 + 표준 계약서 템플릿', action:'계약서 작성~서명~NAS 업로드 자동화로 처리 단계 축소', savingRate:0.50 },
+    '중도퇴실관리': { icon:'🚪', tool:'퇴실 체크리스트 + 정산 배치 처리',      action:'퇴실 단계 표준화 및 정산 품의 묶음 처리로 소요 시간 단축', savingRate:0.40 },
+    '정산관리':     { icon:'💰', tool:'은행 자동이체 + 납부 알림 문자(D-3/D-0)', action:'입금 확인 반복 작업을 자동화하면 수동 처리 시간 절약', savingRate:0.60 },
+    '퇴실관리':     { icon:'🚪', tool:'퇴실 처리 SOP + 원상복구 체크리스트',   action:'퇴실 절차 표준화로 담당자별 처리 편차 감소', savingRate:0.35 },
+    '데이터관리':   { icon:'📊', tool:'구글시트 자동 집계 + 대시보드 알림',     action:'수동 업데이트 항목을 자동 트리거로 전환하면 반복 확인 업무 제거', savingRate:0.65 },
+    '연체관리':     { icon:'⚠️', tool:'연체 자동 알림 문자(카카오/SMS)',        action:'연체 발생 시 자동 문자 발송으로 수동 연락 건수 절감', savingRate:0.55 },
+    '갱신관리':     { icon:'🔄', tool:'D-60/D-30 갱신 예정 자동 안내',          action:'만기 임박 임차인 자동 안내 + 표준 갱신 양식으로 처리 속도 향상', savingRate:0.50 },
+    '상담관리':     { icon:'💬', tool:'카카오 알림톡 + FAQ 자동 응답',           action:'자주 묻는 질문 자동 응답으로 반복 응대 시간 단축', savingRate:0.50 },
+  };
 
   const suggestions = [];
 
-  contentTop3.forEach(([theme, v]) => {
-    const info   = CONTENT_THEMES.find(t => t.theme === theme);
+  // TOP3 cat 기반 제안 (기타 계열 제외)
+  top3.filter(([theme]) => !theme.startsWith('기타')).forEach(([theme, v]) => {
+    const info   = CAT_IMPROVE[theme];
     if (!info) return;
     const avgMin = v.cnt > 0 ? Math.round(v.min / v.cnt) : 0;
     const pct    = totalMin > 0 ? Math.round(v.min / totalMin * 100) : 0;
@@ -1329,27 +1331,20 @@ function buildAnalysisCol(rows, label, avClass) {
     let tag = '', body = '', warn = false;
 
     if (v.cnt >= 5 && avgMin <= 20) {
-      // 고빈도·단시간 → 자동화 최우선 대상
       tag  = `🔄 반복 자동화 추천`;
-      body = `${info.icon} <b>${theme}</b> ${v.cnt}건 반복 처리 (평균 ${avgMin}분/건).`
-           + ` ${info.tool} 도입 시 월 약 <b>${saving}분</b> 절약 가능합니다.`;
+      body = `${info.icon} <b>${theme}</b> ${v.cnt}건 반복 처리 (평균 ${avgMin}분/건). ${info.tool} 도입 시 월 약 <b>${saving}분</b> 절약 가능합니다.`;
       warn = v.cnt >= 10;
     } else if (avgMin >= 40) {
-      // 건당 소요 시간 과다 → SOP 필요
       tag  = `📋 프로세스 표준화 필요`;
-      body = `${info.icon} <b>${theme}</b> 평균 처리 ${avgMin}분 (${v.cnt}건). `
-           + `${info.action}.`;
-    } else if (pct >= 35) {
-      // 전체 비중 과다
-      warn = pct >= 50;
-      tag  = warn ? `⚠️ 업무 집중 과다` : `💡 비중 높음 (${pct}%)`;
-      body = `${info.icon} <b>${theme}</b>이 전체 시간의 ${pct}%를 차지합니다. `
-           + (info.tool ? `${info.tool}으로 ` : '') + `${info.action}.`;
+      body = `${info.icon} <b>${theme}</b> 평균 처리 ${avgMin}분 (${v.cnt}건). ${info.action}.`;
+    } else if (pct >= 30) {
+      warn = pct >= 45;
+      tag  = warn ? `⚠️ 업무 집중도 높음` : `💡 비중 높음 (${pct}%)`;
+      body = `${info.icon} <b>${theme}</b>이 전체 시간의 <b>${pct}%</b>를 차지합니다. ${info.tool ? info.tool + '으로 ' : ''}${info.action}.`;
     } else {
       tag  = `💡 개선 아이디어`;
-      body = `${info.icon} <b>${theme}</b> ${v.cnt}건·${v.min}분: ${info.action}.`;
+      body = `${info.icon} <b>${theme}</b> ${v.cnt}건 · ${v.min}분: ${info.action}.`;
     }
-
     suggestions.push({ warn, tag, body });
   });
 
@@ -1364,7 +1359,7 @@ function buildAnalysisCol(rows, label, avClass) {
   if (tellPct >= 60 && totalMin >= 30)
     suggestions.push({
       warn: false, tag: `⏱️ 통화 비중 ${tellPct}%`,
-      body: `TELL 시간이 업무 시간의 <b>${tellPct}%</b>입니다. 반복 문의를 문자·앱 안내로 전환하면 통화 부담을 줄일 수 있습니다.`
+      body: `TELL 시간이 전체의 <b>${tellPct}%</b>입니다. 반복 문의를 문자·앱 안내로 전환하면 통화 부담을 줄일 수 있습니다.`
     });
 
   const iconMap = (tag, warn) => {
