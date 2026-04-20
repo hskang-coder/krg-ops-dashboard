@@ -1116,7 +1116,67 @@ function renderDashboard() {
 }
 
 // ── 개인 분석 컬럼 1개 생성 ──
-function buildAnalysisCol(rows, label, avClass, accentColor) {
+// ── 업무내용 텍스트 기반 테마 분류 ──
+const CONTENT_THEMES = [
+  {
+    theme: '입금·정산 처리',
+    icon: '💰',
+    kw: ['입금','정산','수납','청구','납부','월세','보증','금액','수수료','이체','납기'],
+    suggest: '반복적인 입금 확인 요청은 은행 자동이체 설정 또는 납부 알림 문자 자동화로 처리 시간을 줄일 수 있습니다.'
+  },
+  {
+    theme: '계약서·서류 처리',
+    icon: '📄',
+    kw: ['계약서','서류','증명서','위임장','인감','업로드','메일','발송','제출','폴더','파일','NAS'],
+    suggest: '서류 발송과 업로드 건이 많습니다. 유캔사인 전자서명 + 클라우드 자동 업로드 연동으로 처리 속도를 높일 수 있습니다.'
+  },
+  {
+    theme: '퇴실·해지 처리',
+    icon: '🚪',
+    kw: ['퇴실','중도퇴실','해지','대위','품의','진척','원상복구'],
+    suggest: '퇴실 처리 건에 시간이 소요되고 있습니다. 퇴실 단계별 체크리스트 표준화 및 정산 품의 배치 처리를 검토해 보세요.'
+  },
+  {
+    theme: '임차인 문의·안내',
+    icon: '💬',
+    kw: ['문의','안내','요청','전달','설명','알림','연락','안내','고지','문자'],
+    suggest: '임차인 문의 응대 건수가 높습니다. 주요 문의 유형을 FAQ로 정리하고 카카오 알림톡 자동 발송을 도입하면 응대 시간을 크게 줄일 수 있습니다.'
+  },
+  {
+    theme: '계약 변경·갱신',
+    icon: '🔄',
+    kw: ['변경','수정','갱신','연장','재계약','특약','이관','전환','조정'],
+    suggest: '계약 변경·갱신 요청이 반복됩니다. 갱신 대상자 사전 안내 자동화(D-60/D-30 문자)와 표준 변경 양식을 도입하면 처리 시간을 단축할 수 있습니다.'
+  },
+  {
+    theme: '임대인 대응',
+    icon: '🏢',
+    kw: ['임대인','집주인','건물주','동의','사망','상속','대표'],
+    suggest: '임대인 대응 건은 사전 협의 체계가 중요합니다. 임대인별 히스토리를 시스템에 기록해 인수인계 및 대응 시간을 줄이세요.'
+  },
+  {
+    theme: '데이터·현황 관리',
+    icon: '📊',
+    kw: ['업데이트','현황','확인','체크','데이터','관리','집계','리스트','목록'],
+    suggest: '데이터 업데이트·확인 작업이 반복됩니다. 구글시트 자동 연동 및 알림 트리거를 설정해 수동 확인 횟수를 줄여보세요.'
+  },
+  {
+    theme: '기타 업무',
+    icon: '📌',
+    kw: [],
+    suggest: '명확하게 분류되지 않은 업무들입니다. 업무 내용을 더 구체적으로 기록하면 패턴 분석이 가능해집니다.'
+  }
+];
+
+function detectContentTheme(content) {
+  const text = (content||'').toLowerCase();
+  for (const t of CONTENT_THEMES.slice(0, -1)) {
+    if (t.kw.some(k => text.includes(k))) return t.theme;
+  }
+  return '기타 업무';
+}
+
+function buildAnalysisCol(rows, label, avClass) {
   const medals    = ['🥇','🥈','🥉'];
   const barColors = ['#7C3AED','#2563A8','#059669'];
 
@@ -1129,13 +1189,18 @@ function buildAnalysisCol(rows, label, avClass, accentColor) {
       <div class="analysis-empty">해당 기간 데이터 없음</div>`;
   }
 
-  const catTime = {}, catCnt = {};
+  // ── 업무내용 기반 테마별 시간·건수·예시 집계 ──
+  const themeMap = {};
   rows.forEach(r => {
-    const c = r.cat||'기타';
-    catTime[c] = (catTime[c]||0) + r.tell + r.work;
-    catCnt[c]  = (catCnt[c]||0) + 1;
+    const th = detectContentTheme(r.content);
+    if (!themeMap[th]) themeMap[th] = { min: 0, cnt: 0, examples: [] };
+    themeMap[th].min += r.tell + r.work;
+    themeMap[th].cnt++;
+    if (r.content && themeMap[th].examples.length < 2)
+      themeMap[th].examples.push(r.content.slice(0,30) + (r.content.length>30?'…':''));
   });
-  const sorted    = Object.entries(catTime).sort((a,b)=>b[1]-a[1]);
+
+  const sorted    = Object.entries(themeMap).sort((a,b)=>b[1].min-a[1].min);
   const top3      = sorted.slice(0,3);
   const totalMin  = rows.reduce((s,r)=>s+r.tell+r.work, 0);
   const totalTell = rows.reduce((s,r)=>s+r.tell, 0);
@@ -1145,30 +1210,38 @@ function buildAnalysisCol(rows, label, avClass, accentColor) {
   const inCnt     = rows.filter(r=>r.type==='수신').length;
   const outCnt    = rows.filter(r=>r.type==='발신').length;
 
-  const top3Html = top3.map(([cat, min], i) => {
-    const pct = totalMin > 0 ? Math.round(min/totalMin*100) : 0;
+  const top3Html = top3.map(([theme, v], i) => {
+    const pct  = totalMin > 0 ? Math.round(v.min/totalMin*100) : 0;
+    const info = CONTENT_THEMES.find(t=>t.theme===theme);
+    const icon = info ? info.icon : '📌';
     return `
       <div class="top3-item">
         <div class="top3-label-row">
-          <div><span class="top3-rank">${medals[i]}</span><span class="top3-cat">${cat}</span></div>
-          <span class="top3-meta">${pct}% · ${min}분 · ${catCnt[cat]}건</span>
+          <div>
+            <span class="top3-rank">${medals[i]}</span>
+            <span class="top3-cat">${icon} ${theme}</span>
+          </div>
+          <span class="top3-meta">${pct}% · ${v.min}분 · ${v.cnt}건</span>
         </div>
         <div class="top3-bar-bg">
           <div class="top3-bar-fill" style="width:${pct}%;background:${barColors[i]}"></div>
         </div>
+        ${v.examples.length ? `<div style="font-size:10px;color:#8A9AB5;margin-top:3px;line-height:1.5">${v.examples.map(e=>`"${e}"`).join(' / ')}</div>` : ''}
       </div>`;
   }).join('');
 
+  // 개선 제안: TOP3 테마 기반 + 발신/수신 패턴
   const suggestions = [];
-  top3.slice(0,2).forEach(([cat]) => {
-    if (CAT_SUGGESTIONS[cat]) suggestions.push(CAT_SUGGESTIONS[cat][0]);
+  top3.forEach(([theme]) => {
+    const info = CONTENT_THEMES.find(t=>t.theme===theme);
+    if (info && info.suggest) suggestions.push({ warn: false, text: info.suggest });
   });
   if (inCnt > outCnt * 1.5 && inCnt >= 3)
-    suggestions.push(`수신(${inCnt}) > 발신(${outCnt}) — 선제적 안내 강화 검토`);
+    suggestions.push({ warn: true, text: `수신(${inCnt}건) > 발신(${outCnt}건) — 임차인이 먼저 연락하는 패턴입니다. 선제적 안내 문자를 늘려 수신 건수를 줄일 수 있습니다.` });
 
-  const suggestHtml = suggestions.slice(0,3).map((t,i) =>
-    `<div class="suggest-compact-item${i===suggestions.length-1&&inCnt>outCnt*1.5?' suggest-compact-warn':''}"><span>${t}</span></div>`
-  ).join('') || '<div class="analysis-empty" style="padding:8px 0">제안 없음</div>';
+  const suggestHtml = suggestions.slice(0,3).map(s =>
+    `<div class="suggest-compact-item${s.warn?' suggest-compact-warn':''}"><span>${s.text}</span></div>`
+  ).join('') || '<div class="analysis-empty" style="padding:8px 0">분석할 업무내용이 부족합니다</div>';
 
   return `
     <div class="analysis-col-header">
@@ -1177,7 +1250,7 @@ function buildAnalysisCol(rows, label, avClass, accentColor) {
       <div class="analysis-col-stats">${rows.length}건<br>${formatHour(totalMin)}</div>
     </div>
     <div>
-      <div class="analysis-section-title">📊 업무 집중도 TOP 3</div>
+      <div class="analysis-section-title">📊 업무 집중도 TOP 3 <span style="font-size:9px;color:#B0BDCE;font-weight:500">(업무내용 기반)</span></div>
       ${top3Html}
     </div>
     <div>
@@ -1213,7 +1286,7 @@ function renderAnalysisPanel(data) {
   };
 
   const { label, avClass, rows } = personMap[currentPiePerson] || personMap['all'];
-  panel.innerHTML = buildAnalysisCol(rows, label, avClass, '');
+  panel.innerHTML = buildAnalysisCol(rows, label, avClass);
 }
 
 function renderKPI(data) {
