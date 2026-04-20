@@ -176,7 +176,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 
 /* 담당자 컬러 */
 .ck-wrap[data-person="고송미"] { --pcolor: var(--blue);   --pgradient: linear-gradient(90deg,#60A5FA,#2563A8); }
-.ck-wrap[data-person="지희이"] { --pcolor: var(--purple); --pgradient: linear-gradient(90deg,#A78BFA,#7C3AED); }
+.ck-wrap[data-person="이지희"] { --pcolor: var(--purple); --pgradient: linear-gradient(90deg,#A78BFA,#7C3AED); }
 .ck-wrap[data-person="강휘수"] { --pcolor: var(--green);  --pgradient: linear-gradient(90deg,#34D399,#059669); }
 
 .ck-period-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -278,7 +278,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   <!-- Person tabs (checklist only) -->
   <div class="person-tabs-row" id="personTabsRow" style="display:none">
     <button class="person-tab active" onclick="selectPerson('고송미')">고송미</button>
-    <button class="person-tab"        onclick="selectPerson('지희이')">지희이</button>
+    <button class="person-tab"        onclick="selectPerson('이지희')">이지희</button>
     <button class="person-tab"        onclick="selectPerson('강휘수')">강휘수</button>
   </div>
 
@@ -344,7 +344,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
           <div class="pie-filter-row" style="margin-bottom:0" id="pieFilterRow">
             <button class="pie-filter-btn active"       onclick="switchPiePerson('all')">전체</button>
             <button class="pie-filter-btn pf-blue"      onclick="switchPiePerson('고송미')">고송미</button>
-            <button class="pie-filter-btn pf-purple"    onclick="switchPiePerson('지희이')">지희이</button>
+            <button class="pie-filter-btn pf-purple"    onclick="switchPiePerson('이지희')">이지희</button>
             <button class="pie-filter-btn pf-green"     onclick="switchPiePerson('강휘수')">강휘수</button>
           </div>
         </div>
@@ -375,7 +375,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         <div class="pie-filter-row" style="margin-bottom:0" id="logFilterRow">
           <button class="pie-filter-btn active"    onclick="switchLogPerson('all')">전체</button>
           <button class="pie-filter-btn pf-blue"   onclick="switchLogPerson('고송미')">고송미</button>
-          <button class="pie-filter-btn pf-purple" onclick="switchLogPerson('지희이')">지희이</button>
+          <button class="pie-filter-btn pf-purple" onclick="switchLogPerson('이지희')">이지희</button>
           <button class="pie-filter-btn pf-green"  onclick="switchLogPerson('강휘수')">강휘수</button>
         </div>
       </div>
@@ -431,7 +431,7 @@ let charts           = {};
 
 const PEOPLE = [
   { name: '고송미', key: '고송미', avClass: 'av-blue',   fillClass: 'fill-blue'   },
-  { name: '지희이', key: '지희이', avClass: 'av-purple', fillClass: 'fill-purple' },
+  { name: '이지희', key: '이지희', avClass: 'av-purple', fillClass: 'fill-purple' },
   { name: '강휘수', key: '강휘수', avClass: 'av-green',  fillClass: 'fill-green'  },
 ];
 
@@ -462,7 +462,7 @@ const TASKS = {
     ],
     monthly: [],
   },
-  '지희이': {
+  '이지희': {
     daily: [
       { id:'jd1', label:'입주자 체크 수수료 입금 확인', time:'09:00' },
       { id:'jd2', label:'입주 계약관리',                time:'' },
@@ -503,7 +503,7 @@ const TASKS = {
 // 대시보드 체크리스트 진척 계산용 (항목 수)
 const CK_COUNTS = {
   '고송미': { daily:7, weekly:3, monthly:0 },
-  '지희이': { daily:2, weekly:3, monthly:5 },
+  '이지희': { daily:2, weekly:3, monthly:5 },
   '강휘수': { daily:3, weekly:2, monthly:5 },
 };
 
@@ -1025,7 +1025,7 @@ function renderPieChart(data) {
 
 function renderPersonBar(data) {
   destroyChart('personBar');
-  const persons = ['강휘수','지희이','고송미'];
+  const persons = ['강휘수','이지희','고송미'];
   const ctx = document.getElementById('personBarChart').getContext('2d');
   charts['personBar'] = new Chart(ctx, {
     type:'bar',
@@ -1147,7 +1147,10 @@ function showToast(msg) {
 updateDateBadge();
 renderCkProgress();
 loadData();
+// 1분마다 날짜·체크리스트 갱신
 setInterval(() => { updateDateBadge(); renderCkProgress(); }, 60000);
+// 5분마다 Sheets 데이터 자동 재로드
+setInterval(() => { loadData(); }, 5 * 60 * 1000);
 </script>
 </body>
 </html>
