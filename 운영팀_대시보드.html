@@ -1264,15 +1264,13 @@ function buildAnalysisCol(rows, label, avClass) {
       </div>`;
   }
 
-  // ── 업무내용 기반 테마별 시간·건수·예시 집계 ──
+  // ── 업무구분(cat) 기반 집계 ─────────────────────────────────────
   const themeMap = {};
   rows.forEach(r => {
-    const th = detectContentTheme(r.content);
-    if (!themeMap[th]) themeMap[th] = { min: 0, cnt: 0, examples: [] };
+    const th = (r.cat || '기타').trim();
+    if (!themeMap[th]) themeMap[th] = { min: 0, cnt: 0 };
     themeMap[th].min += r.tell + r.work;
     themeMap[th].cnt++;
-    if (r.content && themeMap[th].examples.length < 2)
-      themeMap[th].examples.push(r.content.slice(0,30) + (r.content.length>30?'…':''));
   });
 
   const sorted    = Object.entries(themeMap).sort((a,b)=>b[1].min-a[1].min);
@@ -1285,10 +1283,14 @@ function buildAnalysisCol(rows, label, avClass) {
   const inCnt     = rows.filter(r=>r.type==='수신').length;
   const outCnt    = rows.filter(r=>r.type==='발신').length;
 
+  const CAT_ICONS = {
+    '계약관리':'📋','중도퇴실관리':'🚪','정산관리':'💰','퇴실관리':'🚪',
+    '데이터관리':'📊','연체관리':'⚠️','갱신관리':'🔄','상담관리':'💬',
+    '기타':'📌','기타(업무 외)':'📌'
+  };
   const top3Html = top3.map(([theme, v], i) => {
     const pct  = totalMin > 0 ? Math.round(v.min/totalMin*100) : 0;
-    const info = CONTENT_THEMES.find(t=>t.theme===theme);
-    const icon = info ? info.icon : '📌';
+    const icon = CAT_ICONS[theme] || '📌';
     return `
       <div class="top3-item">
         <div class="top3-header-row">
@@ -1301,14 +1303,23 @@ function buildAnalysisCol(rows, label, avClass) {
         <div class="top3-bar-bg">
           <div class="top3-bar-fill" style="width:${pct}%;background:${barColors[i]}"></div>
         </div>
-
       </div>`;
   }).join('');
 
-  // ── 개선 제안: 실제 데이터 기반 동적 생성 ──────────────────────────────
+  // ── 개선 제안: 업무내용(content) 기반 동적 생성 ────────────────────────
+  // (TOP3 집계와 별도로 content 텍스트 분석)
+  const contentMap = {};
+  rows.forEach(r => {
+    const th = detectContentTheme(r.content);
+    if (!contentMap[th]) contentMap[th] = { min: 0, cnt: 0 };
+    contentMap[th].min += r.tell + r.work;
+    contentMap[th].cnt++;
+  });
+  const contentTop3 = Object.entries(contentMap).sort((a,b)=>b[1].min-a[1].min).slice(0,3);
+
   const suggestions = [];
 
-  top3.forEach(([theme, v]) => {
+  contentTop3.forEach(([theme, v]) => {
     const info   = CONTENT_THEMES.find(t => t.theme === theme);
     if (!info) return;
     const avgMin = v.cnt > 0 ? Math.round(v.min / v.cnt) : 0;
