@@ -145,28 +145,47 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .ratio-work { background: linear-gradient(90deg,#60A5FA,#2563A8); height: 100%; }
 .ratio-footer { display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: #A0ADBE; }
 
-/* 개선 제안 리스트 */
-.suggest-cards { display: flex; flex-direction: column; }
-.suggest-card {
-  display: flex; gap: 10px; align-items: flex-start;
-  padding: 10px 0; border-bottom: 1px solid #EEF2F9;
+/* 개선 제안 — 하단 풀폭 섹션 */
+.suggest-full {
+  border-top: 1.5px solid #E8EFF8;
+  background: #F4F7FD;
+  padding: 14px 20px 18px;
 }
-.suggest-card:first-child { padding-top: 0; }
-.suggest-card:last-child  { border-bottom: none; padding-bottom: 0; }
-.suggest-icon {
-  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+.suggest-full-header {
+  font-size: 10px; font-weight: 700; color: #9AAAC4;
+  letter-spacing: 0.6px; text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.suggest-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media(max-width:700px){ .suggest-grid { grid-template-columns: 1fr; } }
+.suggest-grid-card {
+  display: flex; gap: 11px; align-items: flex-start;
+  background: #fff; border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid #E2EAF8;
+  box-shadow: 0 1px 4px rgba(30,50,100,0.05);
+}
+.suggest-grid-card-warn {
+  border-color: #FECACA; background: #FFFAFA;
+}
+.suggest-grid-icon {
+  width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px; background: #EEF2FF; margin-top: 1px;
+  font-size: 15px; background: #EEF2FF;
 }
-.suggest-card-warn .suggest-icon { background: #FEE2E2; }
-.suggest-content { flex: 1; min-width: 0; }
-.suggest-card-tag {
+.suggest-grid-card-warn .suggest-grid-icon { background: #FEE2E2; }
+.suggest-grid-content { flex: 1; min-width: 0; }
+.suggest-grid-tag {
   font-size: 10px; font-weight: 700; color: #5A5FA8;
-  margin-bottom: 3px; display: block; letter-spacing: 0.2px;
+  margin-bottom: 4px; display: block;
 }
-.suggest-card-warn .suggest-card-tag { color: #C53030; }
-.suggest-card-body { font-size: 11px; color: #4A5A7A; line-height: 1.55; }
-.suggest-card-body b { color: #1A2A4A; font-weight: 700; }
+.suggest-grid-card-warn .suggest-grid-tag { color: #C53030; }
+.suggest-grid-body { font-size: 11.5px; color: #3A4A6A; line-height: 1.55; }
+.suggest-grid-body b { color: #1A2A4A; font-weight: 700; }
 
 /* ─── DATE NAV ─────────────────────────────── */
 .date-nav-row {
@@ -525,11 +544,13 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
               <div class="chart-legend" id="pieLegend"></div>
             </div>
           </div>
-          <!-- 오른쪽: 선택 담당자 분석 -->
+          <!-- 오른쪽: 헤더 + TOP3 + TELL -->
           <div class="pie-split-right" id="analysisPanel">
             <div class="analysis-empty">📊 데이터 로딩 중...</div>
           </div>
         </div>
+        <!-- 하단: 개선 제안 풀폭 -->
+        <div class="suggest-full" id="suggestPanel" style="display:none;"></div>
       </div>
     </div>
 
@@ -1267,7 +1288,7 @@ function buildAnalysisCol(rows, label, avClass) {
         <div class="top3-bar-bg">
           <div class="top3-bar-fill" style="width:${pct}%;background:${barColors[i]}"></div>
         </div>
-        ${v.examples.length ? `<div class="top3-examples">${v.examples.map(e=>`"${e}"`).join('<br>')}</div>` : ''}
+
       </div>`;
   }).join('');
 
@@ -1331,17 +1352,20 @@ function buildAnalysisCol(rows, label, avClass) {
     if (tag.includes('집중') || tag.includes('과다')) return '🔺';
     return '💡';
   };
-  const suggestHtml = suggestions.slice(0, 4).map(s =>
-    `<div class="suggest-card${s.warn ? ' suggest-card-warn' : ''}">
-       <div class="suggest-icon">${iconMap(s.tag, s.warn)}</div>
-       <div class="suggest-content">
-         <span class="suggest-card-tag">${s.tag}</span>
-         <div class="suggest-card-body">${s.body}</div>
+  const suggestCardsHtml = suggestions.slice(0, 4).map(s =>
+    `<div class="suggest-grid-card${s.warn ? ' suggest-grid-card-warn' : ''}">
+       <div class="suggest-grid-icon">${iconMap(s.tag, s.warn)}</div>
+       <div class="suggest-grid-content">
+         <span class="suggest-grid-tag">${s.tag}</span>
+         <div class="suggest-grid-body">${s.body}</div>
        </div>
      </div>`
-  ).join('') || '<div class="analysis-empty" style="padding:8px 0">분석할 업무내용이 부족합니다</div>';
+  ).join('') || `<div class="suggest-grid-card" style="grid-column:1/-1">
+      <div class="suggest-grid-icon">💡</div>
+      <div class="suggest-grid-content"><div class="suggest-grid-body">분석할 업무내용이 부족합니다</div></div>
+    </div>`;
 
-  return `
+  const statsHtml = `
     <div class="analysis-col-header">
       <div class="analysis-col-avatar ${avClass}">${label === '전체' ? '전' : label[0]}</div>
       <div class="analysis-col-name">${label}</div>
@@ -1371,11 +1395,13 @@ function buildAnalysisCol(rows, label, avClass) {
         <span>발신 ${outCnt}건</span>
         <span>수신 ${inCnt}건</span>
       </div>
-    </div>
-    <div class="analysis-section">
-      <div class="analysis-section-title">개선 제안</div>
-      <div class="suggest-cards">${suggestHtml}</div>
     </div>`;
+
+  const suggestHtml = `
+    <div class="suggest-full-header">💡 개선 제안</div>
+    <div class="suggest-grid">${suggestCardsHtml}</div>`;
+
+  return { statsHtml, suggestHtml };
 }
 
 function renderAnalysisPanel(data) {
@@ -1389,8 +1415,14 @@ function renderAnalysisPanel(data) {
     '강휘수': { label:'강휘수', avClass:'av-green',  rows: data.filter(r=>r.person==='강휘수') },
   };
 
+  const suggestPanel = document.getElementById('suggestPanel');
   const { label, avClass, rows } = personMap[currentPiePerson] || personMap['all'];
-  panel.innerHTML = buildAnalysisCol(rows, label, avClass);
+  const { statsHtml, suggestHtml } = buildAnalysisCol(rows, label, avClass);
+  panel.innerHTML = statsHtml;
+  if (suggestPanel) {
+    suggestPanel.style.display = '';
+    suggestPanel.innerHTML = suggestHtml;
+  }
 }
 
 function renderKPI(data) {
