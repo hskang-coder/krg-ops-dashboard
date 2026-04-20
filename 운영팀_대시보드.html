@@ -240,6 +240,29 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   line-height: 1.6; padding: 4px 10px; background: #EBF3FF;
   border-radius: 6px; border: 1px solid #BFDBFE;
 }
+.log-analysis-wrap { display: flex; flex-direction: column; gap: 8px; }
+.log-insight-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  background: #F8F3FF; border: 1px solid #DDD6FE; border-radius: 8px;
+  padding: 8px 12px; font-size: 12px;
+}
+.log-insight-label { color: #6D28D9; font-weight: 700; margin-right: 4px; }
+.log-insight-chip {
+  background: #EDE9FE; color: #4C1D95; border-radius: 6px;
+  padding: 3px 10px; font-size: 11px; font-weight: 600;
+}
+.log-suggest-block {
+  background: #F0FDF4; border: 1px solid #A7F3D0; border-radius: 8px;
+  padding: 10px 14px; display: flex; flex-direction: column; gap: 6px;
+}
+.log-suggest-title { font-size: 12px; font-weight: 700; color: #065F46; margin-bottom: 2px; }
+.log-suggest-item {
+  font-size: 11.5px; color: #1F4E3A; line-height: 1.6;
+  display: flex; align-items: flex-start; gap: 4px;
+}
+.log-suggest-item::before { content: "▸"; color: #059669; flex-shrink: 0; margin-top: 1px; }
+.log-suggest-tell { color: #1D4ED8; background: #EFF6FF; border-radius: 5px; padding: 3px 8px; }
+.log-suggest-tell::before { content: ""; }
 
 .ck-empty { text-align: center; padding: 48px 20px; color: var(--muted); }
 .ck-empty-icon { font-size: 40px; margin-bottom: 12px; }
@@ -1125,11 +1148,92 @@ function formatDateObj(d) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 
+// ── 업무구분별 개선 제안 DB ──
+const CAT_SUGGESTIONS = {
+  '계약관리': [
+    '전자서명(유캔사인) 활용으로 계약서 발행 시간 단축 가능',
+    '반복 문의(납기일·특약 등)는 FAQ 문서 또는 카카오 알림톡 자동발송으로 전화 건수 절감 가능',
+    '계약 체결일 기준 자동 리마인더 설정 검토'
+  ],
+  '중도퇴실관리': [
+    '퇴실 정산 체크리스트 표준화로 누락·재작업 방지',
+    '대위변제·정산금 품의 프로세스를 주간 배치 처리로 묶어 업무 밀도 개선 가능',
+    '퇴실 예정자 사전 연락 자동화(D-30/D-7 문자 발송) 검토'
+  ],
+  '정산관리': [
+    '홈버튼 월세 입금 확인은 은행 API 또는 스프레드시트 자동연동으로 수작업 절감 가능',
+    '월 정산 마감 일정 캘린더 공유로 팀 전체 가시성 확보',
+    '정산 누락 건 발생 시 원인 분류 → 반복 패턴 파악 후 체크리스트 보완'
+  ],
+  '연체관리': [
+    '연체 발생 시 D+1·D+7 자동 문자 발송 설정으로 전화 대응 건수 감소 가능',
+    '연체 이력 데이터 축적 후 고위험 임차인 사전 모니터링 체계 수립 검토',
+    '수납 전화 요일/시간 집중(화요일 오전 등) 패턴화로 업무 효율화'
+  ],
+  '심사관리': [
+    '심사 서류 표준화 및 온라인 제출 채널 마련으로 왕복 소통 감소',
+    '심사 결과 템플릿 활용으로 안내 시간 단축',
+    '갱신 심사 대상자 일괄 처리 배치 일정 수립(15일 집중 처리)'
+  ],
+  '갱신관리': [
+    '갱신 대상자 문자·홈버튼 등록·수수료 청구를 워크플로우로 연결해 누락 방지',
+    '갱신 안내 문자 자동발송(D-60/D-30) 설정으로 사전 대응 가능',
+    '갱신 거절 건 조기 파악을 위한 의향 조사 문자 자동화 검토'
+  ],
+  '상담관리': [
+    '자주 묻는 상담 유형 분류 후 자동응답(FAQ 챗봇·카카오 채널) 연계 검토',
+    '상담 내용 분류 태그 체계화로 데이터 분석 및 서비스 개선 활용'
+  ],
+};
+
+function generateAnalysis(source, totalTell, totalWork, totalMin) {
+  const suggestions = [];
+  const insights    = [];
+
+  // ── 카테고리별 시간 집계 ──
+  const catTime = {}, catCnt = {};
+  source.forEach(r => {
+    const c = r.cat || '기타';
+    catTime[c] = (catTime[c]||0) + r.tell + r.work;
+    catCnt[c]  = (catCnt[c]||0) + 1;
+  });
+  const sortedCat = Object.entries(catTime).sort((a,b)=>b[1]-a[1]);
+  const top2Cats  = sortedCat.slice(0,2);
+
+  // ── 인사이트: 상위 업무 시간 비중 ──
+  top2Cats.forEach(([cat, min]) => {
+    const pct = totalMin > 0 ? Math.round(min/totalMin*100) : 0;
+    const cnt = catCnt[cat]||0;
+    insights.push(`<b>${cat}</b> ${pct}% (${min}분 / ${cnt}건)`);
+    if (CAT_SUGGESTIONS[cat]) {
+      CAT_SUGGESTIONS[cat].slice(0,2).forEach(s => suggestions.push({ cat, text: s }));
+    }
+  });
+
+  // ── 인사이트: TELL 비중 ──
+  const tellRatio = totalMin > 0 ? Math.round(totalTell/totalMin*100) : 0;
+  let tellInsight = '';
+  if (tellRatio >= 60) {
+    tellInsight = `전화 대응 비중이 <b>${tellRatio}%</b>로 높습니다. 반복 문의 유형 파악 후 FAQ·자동안내 도입을 검토해 보세요.`;
+  } else if (tellRatio <= 20 && totalTell > 0) {
+    tellInsight = `업무처리 중심(TELL ${tellRatio}%)으로 내부 프로세스 자동화가 특히 효과적입니다.`;
+  }
+
+  // ── 인사이트: 수신 과다 ──
+  const inCnt  = source.filter(r=>r.type==='수신').length;
+  const outCnt = source.filter(r=>r.type==='발신').length;
+  let callInsight = '';
+  if (inCnt > outCnt * 1.5 && inCnt >= 3) {
+    callInsight = `수신 비중(${inCnt}건)이 발신(${outCnt}건)보다 높습니다. 임차인이 먼저 연락하는 패턴으로, 선제적 안내 강화 시 문의 건수 감소 기대됩니다.`;
+  }
+
+  return { insights, suggestions, tellInsight, callInsight };
+}
+
 function renderLogTable(data) {
   const tbody   = document.getElementById('logTableBody');
   const sumEl   = document.getElementById('logSummary');
 
-  // 담당자 필터 적용
   const source = currentLogPerson === 'all'
     ? data
     : data.filter(r => r.person === currentLogPerson);
@@ -1141,65 +1245,67 @@ function renderLogTable(data) {
     return;
   }
 
-  // ── 요약 계산 ──
   const totalTell = source.reduce((s,r)=>s+r.tell,0);
   const totalWork = source.reduce((s,r)=>s+r.work,0);
   const totalCnt  = source.length;
-
-  // 업무구분 최빈값
-  const catCnt = {};
-  source.forEach(r => { catCnt[r.cat||'기타'] = (catCnt[r.cat||'기타']||0)+1; });
-  const topCat = Object.entries(catCnt).sort((a,b)=>b[1]-a[1])[0];
-
-  // 담당자별 건수
+  const totalMin  = totalTell + totalWork;
+  const outCnt    = source.filter(r=>r.type==='발신').length;
+  const inCnt     = source.filter(r=>r.type==='수신').length;
   const personCnt = {};
   source.forEach(r => { personCnt[r.person] = (personCnt[r.person]||0)+1; });
   const topPerson = Object.entries(personCnt).sort((a,b)=>b[1]-a[1])[0];
 
-  // 발신/수신/업무 비율
-  const outCnt = source.filter(r=>r.type==='발신').length;
-  const inCnt  = source.filter(r=>r.type==='수신').length;
-  const wkCnt  = source.filter(r=>r.type==='업무').length;
-
-  // TELL 대비 업무시간 효율
-  const totalMin = totalTell + totalWork;
-  const tellRatio = totalMin > 0 ? Math.round(totalTell/totalMin*100) : 0;
-
   const periodLabel = currentPeriod==='daily'?'오늘':currentPeriod==='weekly'?'이번 주':'이번 달';
   const personLabel = currentLogPerson === 'all' ? '전체' : currentLogPerson;
+  const { insights, suggestions, tellInsight, callInsight } = generateAnalysis(source, totalTell, totalWork, totalMin);
 
-  // 코멘트 생성
-  let comment = `📋 ${personLabel} ${periodLabel} ${totalCnt}건 대응 — `;
-  if (topCat) comment += `주요 업무 <b>${topCat[0]}</b>(${topCat[1]}건)`;
-  if (currentLogPerson === 'all' && topPerson) comment += ` · 최다 대응 <b>${topPerson[0]}</b>(${topPerson[1]}건)`;
-  if (outCnt+inCnt > 0) comment += ` · 발신 ${outCnt}건 / 수신 ${inCnt}건`;
-  if (totalMin > 0) comment += ` · TELL ${tellRatio}% / 업무 ${100-tellRatio}%`;
+  // ── 개선 제안 HTML ──
+  const suggestHtml = suggestions.length ? `
+    <div class="log-suggest-block">
+      <div class="log-suggest-title">💡 개선 제안</div>
+      ${suggestions.map(s=>`
+        <div class="log-suggest-item">
+          <span class="mini-badge cat-${s.cat}" style="font-size:10px;margin-right:6px">${s.cat}</span>${s.text}
+        </div>`).join('')}
+      ${tellInsight ? `<div class="log-suggest-item log-suggest-tell">📞 ${tellInsight}</div>` : ''}
+      ${callInsight ? `<div class="log-suggest-item log-suggest-tell">📥 ${callInsight}</div>` : ''}
+    </div>` : '';
 
   sumEl.style.display = '';
   sumEl.innerHTML = `
-    <div class="log-summary">
-      <div class="log-sum-item">
-        <span class="log-sum-label">건수</span>
-        <span class="log-sum-val">${totalCnt}건</span>
+    <div class="log-analysis-wrap">
+      <div class="log-summary">
+        <div class="log-sum-item">
+          <span class="log-sum-label">기간</span>
+          <span class="log-sum-val">${periodLabel} · ${personLabel}</span>
+        </div>
+        <div class="log-sum-item">
+          <span class="log-sum-label">총 건수</span>
+          <span class="log-sum-val">${totalCnt}건</span>
+          ${currentLogPerson==='all'&&topPerson?`<span class="log-sum-label">(최다: ${topPerson[0]} ${topPerson[1]}건)</span>`:''}
+        </div>
+        <div class="log-sum-item">
+          <span class="log-sum-label">TELL</span>
+          <span class="log-sum-val" style="color:#7C3AED">${formatHour(totalTell)}</span>
+          <span class="log-sum-label">${totalTell}분 · 발신 ${outCnt}/수신 ${inCnt}</span>
+        </div>
+        <div class="log-sum-item">
+          <span class="log-sum-label">업무</span>
+          <span class="log-sum-val" style="color:#2563A8">${formatHour(totalWork)}</span>
+          <span class="log-sum-label">${totalWork}분</span>
+        </div>
+        <div class="log-sum-item">
+          <span class="log-sum-label">총 시간</span>
+          <span class="log-sum-val" style="color:#059669">${formatHour(totalMin)}</span>
+        </div>
       </div>
-      <div class="log-sum-item">
-        <span class="log-sum-label">TELL 합계</span>
-        <span class="log-sum-val" style="color:#7C3AED">${formatHour(totalTell)}</span>
-        <span class="log-sum-label">(${totalTell}분)</span>
+      <div class="log-insight-row">
+        <span class="log-insight-label">📊 업무 집중도</span>
+        ${insights.map(i=>`<span class="log-insight-chip">${i}</span>`).join('<span style="color:#CBD5E1;margin:0 4px">›</span>')}
       </div>
-      <div class="log-sum-item">
-        <span class="log-sum-label">업무 합계</span>
-        <span class="log-sum-val" style="color:#2563A8">${formatHour(totalWork)}</span>
-        <span class="log-sum-label">(${totalWork}분)</span>
-      </div>
-      <div class="log-sum-item">
-        <span class="log-sum-label">총 합계</span>
-        <span class="log-sum-val" style="color:#059669">${formatHour(totalMin)}</span>
-      </div>
-      <div class="log-comment">💡 ${comment.replace('📋 ','')}</div>
+      ${suggestHtml}
     </div>`;
 
-  // ── 테이블 렌더 ──
   tbody.innerHTML = recent.map((r, i) => `
     <tr>
       <td style="text-align:center;color:#A0ADBE;font-size:11px;font-weight:600">${i+1}</td>
