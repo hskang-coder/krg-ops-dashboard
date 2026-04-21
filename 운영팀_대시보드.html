@@ -1025,9 +1025,9 @@ function switchCrMode(mode) {
   } else {
     searchBox.style.display = '';
     listBox.style.display   = 'none';
-    const ph = { no:'계약번호를 입력하세요', name:'임차인 이름을 입력하세요', phone:'전화번호를 입력하세요 (일부 가능)' };
+    const ph = { no:'계약번호를 입력하세요', name:'이름 2글자 이상 입력하세요', phone:'전화번호를 입력하세요 (일부 가능)' };
     input.placeholder = ph[mode]; input.value = '';
-    input.type = mode === 'no' ? 'number' : 'text';
+    input.type = 'text';
   }
 }
 
@@ -1042,7 +1042,7 @@ async function loadContractData() {
     contractRawData = gvizToObjects(cGviz).filter(r => r['계약번호']);
     paymentRawData  = gvizToObjects(pGviz).filter(r => r['계약번호']);
     crLoaded = true;
-    el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료.<br>원하는 검색 방법을 선택하세요.</div>`;
+    el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료.<br>검색 방법을 선택 후 입력하거나, 📋 목록에서 선택하세요.</div>`;
   } catch(e) {
     el.innerHTML = `<div class="cr-empty">❌ 데이터 로드 실패: ${e.message}</div>`;
   }
@@ -1050,10 +1050,28 @@ async function loadContractData() {
 
 function searchContract() {
   const q = document.getElementById('crInput').value.trim();
+  const el = document.getElementById('crResult');
+
+  // 데이터 로딩 미완료 시
+  if (!crLoaded) {
+    el.innerHTML = '<div class="cr-empty">📡 데이터 로딩 중입니다. 잠시 후 다시 시도하세요.</div>';
+    return;
+  }
   if (!q) return;
+
+  // 이름 검색: 2글자 이상 필요
+  if (crMode === 'name' && q.length < 2) {
+    el.innerHTML = '<div class="cr-empty">⚠️ 이름은 2글자 이상 입력하세요.</div>';
+    return;
+  }
+
   let matches = [];
   if (crMode === 'no') {
-    matches = contractRawData.filter(r => String(r['계약번호']).trim() === q);
+    // 계약번호: 완전일치 또는 포함 검색
+    matches = contractRawData.filter(r =>
+      String(r['계약번호']||'').trim() === q ||
+      String(r['계약번호']||'').trim().includes(q)
+    );
   } else if (crMode === 'name') {
     const kw = q.toLowerCase();
     matches = contractRawData.filter(r =>
@@ -1062,14 +1080,16 @@ function searchContract() {
     );
   } else if (crMode === 'phone') {
     const kw = q.replace(/[^0-9]/g,'');
+    if (!kw) { el.innerHTML = '<div class="cr-empty">⚠️ 숫자를 입력하세요.</div>'; return; }
     matches = contractRawData.filter(r =>
       String(r['임차인휴대폰']||'').replace(/[^0-9]/g,'').includes(kw) ||
-      String(r['임대인연락처']||'').replace(/[^0-9]/g,'').includes(kw)
+      String(r['임대인연락처']||'').replace(/[^0-9]/g,'').includes(kw) ||
+      String(r['긴급연락처']||'').replace(/[^0-9]/g,'').includes(kw)
     );
   }
+
   if (!matches.length) {
-    document.getElementById('crResult').innerHTML =
-      `<div class="cr-empty">⚠️ 검색 결과가 없습니다.</div>`;
+    el.innerHTML = `<div class="cr-empty">⚠️ "${q}"에 해당하는 계약을 찾을 수 없습니다.</div>`;
     return;
   }
   if (matches.length === 1) {
