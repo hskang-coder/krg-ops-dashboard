@@ -1665,9 +1665,10 @@ function renderPaymentTargets() {
     list = list.filter(r => (r.contractType||'').includes(ptFilter.type));
   if (ptFilter.delinq !== '전체') {
     list = list.filter(r => {
-      const isD = (r.payStatus||'').includes('연체') ||
-        paymentRawData.filter(p => String(p['계약번호']||'').trim()===r.no)
-          .some(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0)>0);
+      const isD = paymentRawData
+        .filter(p => String(p['계약번호']||'').trim()===r.no &&
+                     String(p['청구서명']||p['납부종류']||'').includes('임대료'))
+        .some(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0)>0);
       return ptFilter.delinq === '연체' ? isD : !isD;
     });
   }
@@ -1677,7 +1678,10 @@ function renderPaymentTargets() {
     const contract = contractRawData.find(c => String(c['계약번호']||'').trim()===r.no)||{};
     const vacancy  = vacancyRawData.find(v => String(v.no).trim()===r.no)||{};
     const payments = paymentRawData.filter(p => String(p['계약번호']||'').trim()===r.no);
-    const hasDelinq = payments.some(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0)>0);
+    // 전월연체 = 임대료 청구서 기준 미납금 존재 여부
+    const hasDelinq = payments
+      .filter(p => String(p['청구서명']||p['납부종류']||'').includes('임대료'))
+      .some(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0)>0);
     // 임대료 청구서만 필터 후 2회차 = 첫납부 대상
     const rentBills = payments.filter(p => String(p['청구서명']||p['납부종류']||'').includes('임대료'));
     const isFirst   = rentBills.length === 2;
