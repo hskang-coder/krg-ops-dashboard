@@ -211,6 +211,10 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .cr-list-filter input { flex: 1; padding: 7px 12px; border: 1.5px solid #D0DCEE; border-radius: 7px; font-size: 13px; outline: none; }
 .cr-list-filter input:focus { border-color: #2563A8; }
 .cr-grade-pill { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; display: inline-block; }
+.sr-status-filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 20px 0; }
+.sr-status-pill { font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; border: 1px solid transparent; background: #F0F4F8; color: #5A6A8A; transition: all .15s; }
+.sr-status-pill.active { color: #fff !important; }
+.sr-status-pill:not(.active):hover { background: #E2EAF8; }
 .cr-search-result-count { font-size: 11px; color: #9AAAC4; padding: 6px 14px 0; }
 
 /* 헤더 카드 */
@@ -800,6 +804,8 @@ let paymentRawData   = [];
 let daeungRawData    = [];
 let vacancyRawData   = []; // 공실현황 시트 (계약번호 → 공실상태, 퇴실일)
 let crLoaded         = false;
+let srMatches        = [];      // 현재 검색 결과 전체 (상태 필터용)
+let srStatusFilter   = '전체';  // 계약상태 필터 현재값
 let currentPeriod    = 'daily';
 // ── 공유 체크리스트 API (Google Apps Script Web App URL) ──
 const CK_API_URL = 'https://script.google.com/macros/s/AKfycbzp8MtnDWCtOOc3RmA9q10yPjRKKK6BMF84r6Nj4KYB53aNuO1Il-xpaOUNpW-K0h3s/exec';
@@ -1348,21 +1354,62 @@ function searchContract() {
 }
 
 function renderSearchResultList(matches) {
-  const gradeColor = g => ({A:'#16A34A',B:'#2563A8',C:'#D97706',D:'#DC2626',E:'#7C3AED',F:'#DC2626'}[g]||'#8A9AB5');
-  const rows = matches.map(c => {
+  srMatches = matches;
+  srStatusFilter = '전체';
+  _renderSrTable();
+}
+
+function filterSearchResults(status) {
+  srStatusFilter = status;
+  _renderSrTable();
+}
+
+function _renderSrTable() {
+  const gradeColor  = g => ({A:'#16A34A',B:'#2563A8',C:'#D97706',D:'#DC2626',E:'#7C3AED',F:'#DC2626'}[g]||'#8A9AB5');
+  const statusColor = s => ({정상:'#16A34A',예정:'#2563A8',종료:'#8A9AB5',해지:'#DC2626',연체:'#D97706'}[s]||'#8A9AB5');
+
+  // 상태별 카운트 집계
+  const statusCounts = {};
+  srMatches.forEach(c => {
+    const s = String(c['계약상태']||'기타').trim();
+    statusCounts[s] = (statusCounts[s]||0) + 1;
+  });
+  const statuses = ['전체', ...Object.keys(statusCounts).sort()];
+
+  // 필터 적용
+  const filtered = srStatusFilter === '전체'
+    ? srMatches
+    : srMatches.filter(c => String(c['계약상태']||'기타').trim() === srStatusFilter);
+
+  // 필터 pills HTML
+  const pills = statuses.map(s => {
+    const cnt   = s === '전체' ? srMatches.length : (statusCounts[s]||0);
+    const color = s === '전체' ? '#1A3A5C' : statusColor(s);
+    const isAct = srStatusFilter === s;
+    return `<button class="sr-status-pill${isAct?' active':''}"
+      style="${isAct ? `background:${color};border-color:${color}` : `color:${color};border-color:${color}40`}"
+      onclick="filterSearchResults('${s}')">${s} ${cnt}</button>`;
+  }).join('');
+
+  // 테이블 rows
+  const rows = filtered.map(c => {
     const g = String(c['연체등급']||'').replace(/등급$/,'').trim();
+    const s = String(c['계약상태']||'').trim();
     return `<tr onclick="selectContractRow('${String(c['계약번호']).trim()}')">
       <td><b>${c['계약번호']}</b></td>
       <td>${c['임차인명']||c['임차인']||'—'}</td>
       <td>${c['건물명']||'—'} ${c['호수']||''}</td>
       <td style="font-size:11px;color:#5A6A8A">${c['시작일']||'—'} ~ ${c['종료일']||'—'}</td>
-      <td><span style="font-size:11px;font-weight:700;color:${c['계약상태']==='정상'?'#16A34A':'#DC2626'}">${c['계약상태']||'—'}</span></td>
+      <td><span style="font-size:11px;font-weight:700;color:${statusColor(s)}">${s||'—'}</span></td>
       <td><span class="cr-grade-pill" style="background:${gradeColor(g)}22;color:${gradeColor(g)}">${g||'—'}등급</span></td>
     </tr>`;
-  }).join('');
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:#B0BDCE;padding:20px">결과 없음</td></tr>';
+
   document.getElementById('crResult').innerHTML = `
     <div class="cr-card">
-      <div class="cr-card-title">🔍 검색 결과 ${matches.length}건 — 행을 클릭하면 상세 레코드가 표시됩니다</div>
+      <div class="cr-card-title">🔍 검색 결과 ${srMatches.length}건 — 행을 클릭하면 상세 레코드가 표시됩니다</div>
+      <div class="sr-status-filters">${pills}</div>
+      <div style="padding:6px 20px 0;font-size:11px;color:#8A9AB5">표시 ${filtered.length}건</div>
       <div style="overflow-x:auto"><table class="cr-list-table">
         <thead><tr><th>계약번호</th><th>임차인명</th><th>건물명/호수</th><th>계약기간</th><th>계약상태</th><th>등급</th></tr></thead>
         <tbody>${rows}</tbody>
