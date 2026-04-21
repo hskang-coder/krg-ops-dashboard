@@ -1665,9 +1665,16 @@ function renderPaymentTargets() {
     list = list.filter(r => (r.contractType||'').includes(ptFilter.type));
   if (ptFilter.delinq !== '전체') {
     list = list.filter(r => {
+      const now2 = new Date();
+      const pY = now2.getMonth()===0 ? now2.getFullYear()-1 : now2.getFullYear();
+      const pM = now2.getMonth()===0 ? 11 : now2.getMonth()-1;
       const isD = paymentRawData
-        .filter(p => String(p['계약번호']||'').trim()===r.no &&
-                     String(p['청구서명']||p['납부종류']||'').includes('임대료'))
+        .filter(p => {
+          if (String(p['계약번호']||'').trim()!==r.no) return false;
+          if (!String(p['청구서명']||p['납부종류']||'').includes('임대료')) return false;
+          const dd = parseKorDate(String(p['납기일']||''));
+          return dd && dd.getFullYear()===pY && dd.getMonth()===pM;
+        })
         .some(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0)>0);
       return ptFilter.delinq === '연체' ? isD : !isD;
     });
@@ -1678,9 +1685,17 @@ function renderPaymentTargets() {
     const contract = contractRawData.find(c => String(c['계약번호']||'').trim()===r.no)||{};
     const vacancy  = vacancyRawData.find(v => String(v.no).trim()===r.no)||{};
     const payments = paymentRawData.filter(p => String(p['계약번호']||'').trim()===r.no);
-    // 전월연체 = 임대료 청구서 기준 미납금 존재 여부
+    // 전월연체 = 지난달 임대료 청구서에 미납금이 있는 경우
+    const now = new Date();
+    const prevY = now.getMonth() === 0 ? now.getFullYear()-1 : now.getFullYear();
+    const prevM = now.getMonth() === 0 ? 11 : now.getMonth()-1; // 0-based
     const hasDelinq = payments
-      .filter(p => String(p['청구서명']||p['납부종류']||'').includes('임대료'))
+      .filter(p => {
+        if (!String(p['청구서명']||p['납부종류']||'').includes('임대료')) return false;
+        const dd = parseKorDate(String(p['납기일']||''));
+        if (!dd) return false;
+        return dd.getFullYear()===prevY && dd.getMonth()===prevM;
+      })
       .some(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0)>0);
     // 임대료 청구서만 필터 후 2회차 = 첫납부 대상
     const rentBills = payments.filter(p => String(p['청구서명']||p['납부종류']||'').includes('임대료'));
