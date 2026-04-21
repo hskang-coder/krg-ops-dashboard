@@ -999,6 +999,15 @@ async function fetchSheetByName(sheetName) {
   return JSON.parse(m[1]);
 }
 
+async function fetchSheetByGid(gid) {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${gid}`;
+  const res = await fetch(url);
+  const text = await res.text();
+  const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
+  if (!m) throw new Error('parse error');
+  return JSON.parse(m[1]);
+}
+
 function gvizToObjects(gviz) {
   const cols = gviz.table.cols.map(c => c.label.trim());
   return (gviz.table.rows || []).map(row => {
@@ -1101,8 +1110,8 @@ async function loadContractData() {
     paymentRawData  = gvizToObjects(pGviz).filter(r => r['계약번호']);
     crLoaded = true;
     el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료.<br>검색 방법을 선택 후 입력하거나, 📋 목록에서 선택하세요.<br><span style="font-size:11px;color:#B0BDCE">📞 대응내역 로딩 중...</span></div>`;
-    // 2단계: 연체관리(Daily Report) (JSONP, 백그라운드 로드)
-    fetchSheetJSONP(DAILY_RPT_GID).then(dResp => {
+    // 2단계: 연체관리(Daily Report) (fetch API, 백그라운드 로드)
+    fetchSheetByGid(DAILY_RPT_GID).then(dResp => {
       daeungRawData = parseDailyReport(dResp);
       // 이미 계약 레코드가 열려 있으면 대응내역 섹션만 업데이트
       const noEl = document.querySelector('.cr-contract-no');
