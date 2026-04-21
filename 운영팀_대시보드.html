@@ -1181,9 +1181,10 @@ function parseVacancySheet(resp) {
   const noIdx       = fi('계약번호');
   const statusIdx   = fi('공실상태');   // BN열(65)
   const exitDateIdx = fi('실제퇴실일'); // BO열(66) — '퇴실일'은 Z열이므로 정확히 매칭
-  const jIdx        = 9;  // J열 (0-based index 9) = 중도퇴실
-  const landlordIdx = 39; // AO열 (0-based) = 임대인명
-  const tenantIdx   = 44; // AT열 (0-based) = 임차인
+  const jIdx          = 9;  // J열 (0-based index 9) = 중도퇴실
+  const landlordIdx   = 39; // AO열 (0-based) = 임대인명
+  const tenantIdx     = 44; // AT열 (0-based) = 임차인
+  const inspectTypeIdx= 57; // BF열 (0-based) = 심사구분
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -1195,8 +1196,9 @@ function parseVacancySheet(resp) {
       status:       cell(statusIdx),
       exitDate:     cell(exitDateIdx),
       jValue:       cell(jIdx),        // J열: 중도퇴실 관련 값
-      tenantName:   cell(tenantIdx),   // AT열: 임차인 이름
-      landlordName: cell(landlordIdx)  // AO열: 임대인명
+      tenantName:   cell(tenantIdx),    // AT열: 임차인 이름
+      landlordName: cell(landlordIdx), // AO열: 임대인명
+      inspectType:  cell(inspectTypeIdx) // BF열: 심사구분
     };
   }).filter(Boolean);
 }
@@ -1529,7 +1531,8 @@ function renderContractRecord(c, payments, responses = []) {
   const vacancyInfo    = vacancyRawData.find(v => String(v.no).trim() === String(c['계약번호']||'').trim()) || {};
   const vacancyStatus  = vacancyInfo.status   || '';
   const actualExitDate = vacancyInfo.exitDate || '';
-  const vacancyJValue  = vacancyInfo.jValue   || '';
+  const vacancyJValue  = vacancyInfo.jValue      || '';
+  const inspectType    = vacancyInfo.inspectType || '';
   // 중도퇴실 표시값: J열 + BO열
   const midExitDisplay = [vacancyJValue, actualExitDate].filter(Boolean).join('  ');
 
@@ -1654,7 +1657,7 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-info-title">담당 / 부동산</div>
         <div class="cr-field"><span class="cr-field-label">계약담당자</span><span class="cr-field-val">${fmt(c['계약담당자'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">부동산명</span><span class="cr-field-val">${fmt(c['부동산명'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">심사일</span><span class="cr-field-val">${fmt(c['심사일'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">심사일</span><span class="cr-field-val">${fmt(c['심사일'])}${inspectType ? `<span style="margin-left:6px;font-size:11px;font-weight:700;color:#2563A8;background:#EFF6FF;padding:1px 7px;border-radius:10px;border:1px solid #BFDBFE">${inspectType}</span>` : ''}</span></div>
         <div class="cr-field"><span class="cr-field-label">계약체결일</span><span class="cr-field-val">${fmt(c['계약체결일'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">잔여기간</span><span class="cr-field-val">${fmt(c['잔여기간'])}</span></div>
       </div>
