@@ -1063,19 +1063,74 @@ async function loadContractData() {
   const el = document.getElementById('crResult');
   el.innerHTML = '<div class="cr-empty">📡 계약 데이터 로딩 중...</div>';
   try {
-    const [cGviz, pGviz, dResp] = await Promise.all([
+    // 1단계: 계약·입금 데이터 (fetch API, 빠름)
+    const [cGviz, pGviz] = await Promise.all([
       fetchSheetByName(CONTRACT_SHEET),
-      fetchSheetByName(INCOME_SHEET),
-      fetchSheetJSONP(DAEUNG_GID)
+      fetchSheetByName(INCOME_SHEET)
     ]);
     contractRawData = gvizToObjects(cGviz).filter(r => r['계약번호']);
     paymentRawData  = gvizToObjects(pGviz).filter(r => r['계약번호']);
-    daeungRawData   = parseDaeungFull(dResp);
     crLoaded = true;
-    el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료.<br>검색 방법을 선택 후 입력하거나, 📋 목록에서 선택하세요.</div>`;
+    el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료.<br>검색 방법을 선택 후 입력하거나, 📋 목록에서 선택하세요.<br><span style="font-size:11px;color:#B0BDCE">📞 대응내역 로딩 중...</span></div>`;
+    // 2단계: 대응내역 (JSONP, 느릴 수 있음 → 백그라운드 로드)
+    fetchSheetJSONP(DAEUNG_GID).then(dResp => {
+      daeungRawData = parseDaeungFull(dResp);
+      // 이미 계약 레코드가 열려 있으면 대응내역 섹션만 업데이트
+      const noEl = document.querySelector('.cr-contract-no');
+      if (noEl) {
+        const no = noEl.textContent.trim();
+        const responses = daeungRawData.filter(r => String(r.no).trim() === no)
+          .sort((a, b) => a.date < b.date ? 1 : -1);
+        updateResponseSection(no, responses);
+      }
+      // 안내 텍스트 업데이트
+      if (el.querySelector('.cr-empty')) {
+        el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 + 대응내역 ${daeungRawData.length}건 로드 완료.<br>검색 방법을 선택 후 입력하거나, 📋 목록에서 선택하세요.</div>`;
+      }
+    }).catch(() => {
+      daeungRawData = [];
+      if (el.querySelector('.cr-empty')) {
+        el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료. (대응내역 로드 실패)<br>검색 방법을 선택 후 입력하거나, 📋 목록에서 선택하세요.</div>`;
+      }
+    });
   } catch(e) {
     el.innerHTML = `<div class="cr-empty">❌ 데이터 로드 실패: ${e.message}</div>`;
   }
+}
+
+function updateResponseSection(no, responses) {
+  const section = document.getElementById('crResponseSection');
+  if (!section) return;
+  const typeCls = t => t==='발신'?'color:#2563A8;font-weight:700'
+                      : t==='수신'?'color:#16A34A;font-weight:700'
+                      : 'color:#5A6A8A';
+  const catColor = cat => ({'연체관리':'#DC2626','계약관리':'#2563A8','정산관리':'#D97706',
+    '갱신관리':'#7C3AED','퇴실관리':'#EA580C','중도퇴실관리':'#EA580C',
+    '상담관리':'#0891B2','데이터관리':'#16A34A'}[cat] || '#8A9AB5');
+  section.innerHTML = `
+    <div class="cr-card-title">📞 대응 내역 (${responses.length}건)</div>
+    ${responses.length === 0
+      ? `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">대응 내역이 없습니다</div>`
+      : `<div style="overflow-x:auto;padding:0 4px 4px">
+      <table class="cr-detail-table">
+        <thead><tr>
+          <th>일자</th><th>구분</th><th>담당자</th><th>업무구분</th>
+          <th>하위구분</th><th style="text-align:center">TELL</th>
+          <th style="text-align:center">업무</th><th>대상</th><th>연락자</th><th>업무내용</th>
+        </tr></thead>
+        <tbody>${responses.map(r => `<tr>
+          <td style="white-space:nowrap;font-size:11px">${r.date}</td>
+          <td><span style="${typeCls(r.type)}">${r.type||'—'}</span></td>
+          <td>${r.person||'—'}</td>
+          <td><span style="font-size:11px;font-weight:600;color:${catColor(r.cat)}">${r.cat||'—'}</span></td>
+          <td style="font-size:11px;color:#5A6A8A">${r.sub||'—'}</td>
+          <td style="text-align:center;font-size:11px">${r.tell>0?r.tell+'분':'—'}</td>
+          <td style="text-align:center;font-size:11px">${r.work>0?r.work+'분':'—'}</td>
+          <td style="font-size:11px">${r.target||'—'}</td>
+          <td style="font-size:11px;color:#5A6A8A">${r.contact||'—'}</td>
+          <td style="font-size:12px;max-width:240px">${r.content||'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>`}`;
 }
 
 function searchContract() {
@@ -1341,41 +1396,33 @@ function renderContractRecord(c, payments, responses = []) {
     </div>
   </div>
 
-  <div class="cr-card">
-    <div class="cr-card-title">📞 대응 내역 (${responses.length}건)</div>
-    ${responses.length === 0
-      ? `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">대응 내역이 없습니다</div>`
-      : `<div style="overflow-x:auto;padding:0 4px 4px">
-      <table class="cr-detail-table">
-        <thead><tr>
-          <th>일자</th><th>구분</th><th>담당자</th><th>업무구분</th>
+  <div class="cr-card" id="crResponseSection">
+    <div class="cr-card-title">📞 대응 내역 (${responses.length}건 · ${daeungRawData.length===0?'로딩 중...':'완료'})</div>
+    ${responses.length === 0 && daeungRawData.length === 0
+      ? `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">📡 대응내역 로딩 중...</div>`
+      : responses.length === 0
+        ? `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">대응 내역이 없습니다</div>`
+        : `<div style="overflow-x:auto;padding:0 4px 4px"><table class="cr-detail-table">
+          <thead><tr><th>일자</th><th>구분</th><th>담당자</th><th>업무구분</th>
           <th>하위구분</th><th style="text-align:center">TELL</th>
-          <th style="text-align:center">업무</th><th>대상</th><th>연락자</th><th>업무내용</th>
-        </tr></thead>
-        <tbody>${responses.map(r => {
-          const typeCls = r.type==='발신'?'color:#2563A8;font-weight:700'
-                        : r.type==='수신'?'color:#16A34A;font-weight:700'
-                        : 'color:#5A6A8A';
-          const catColor = {
-            '연체관리':'#DC2626','계약관리':'#2563A8','정산관리':'#D97706',
-            '갱신관리':'#7C3AED','퇴실관리':'#EA580C','중도퇴실관리':'#EA580C',
-            '상담관리':'#0891B2','데이터관리':'#16A34A'
-          }[r.cat] || '#8A9AB5';
-          return `<tr>
-            <td style="white-space:nowrap;font-size:11px">${r.date}</td>
-            <td><span style="${typeCls}">${r.type||'—'}</span></td>
-            <td>${r.person||'—'}</td>
-            <td><span style="font-size:11px;font-weight:600;color:${catColor}">${r.cat||'—'}</span></td>
-            <td style="font-size:11px;color:#5A6A8A">${r.sub||'—'}</td>
-            <td style="text-align:center;font-size:11px">${r.tell>0?r.tell+'분':'—'}</td>
-            <td style="text-align:center;font-size:11px">${r.work>0?r.work+'분':'—'}</td>
-            <td style="font-size:11px">${r.target||'—'}</td>
-            <td style="font-size:11px;color:#5A6A8A">${r.contact||'—'}</td>
-            <td style="font-size:12px;max-width:240px">${r.content||'—'}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table></div>`
-    }
+          <th style="text-align:center">업무</th><th>대상</th><th>연락자</th><th>업무내용</th></tr></thead>
+          <tbody>${responses.map(r => {
+            const tc = r.type==='발신'?'color:#2563A8;font-weight:700':r.type==='수신'?'color:#16A34A;font-weight:700':'color:#5A6A8A';
+            const cc = {'연체관리':'#DC2626','계약관리':'#2563A8','정산관리':'#D97706','갱신관리':'#7C3AED','퇴실관리':'#EA580C','중도퇴실관리':'#EA580C','상담관리':'#0891B2','데이터관리':'#16A34A'}[r.cat]||'#8A9AB5';
+            return `<tr>
+              <td style="white-space:nowrap;font-size:11px">${r.date}</td>
+              <td><span style="${tc}">${r.type||'—'}</span></td>
+              <td>${r.person||'—'}</td>
+              <td><span style="font-size:11px;font-weight:600;color:${cc}">${r.cat||'—'}</span></td>
+              <td style="font-size:11px;color:#5A6A8A">${r.sub||'—'}</td>
+              <td style="text-align:center;font-size:11px">${r.tell>0?r.tell+'분':'—'}</td>
+              <td style="text-align:center;font-size:11px">${r.work>0?r.work+'분':'—'}</td>
+              <td style="font-size:11px">${r.target||'—'}</td>
+              <td style="font-size:11px;color:#5A6A8A">${r.contact||'—'}</td>
+              <td style="font-size:12px;max-width:240px">${r.content||'—'}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>`}
   </div>
 
   <div class="cr-card">
@@ -1631,7 +1678,7 @@ function fetchSheetJSONP(gid) {
         if (script.parentNode) script.parentNode.removeChild(script);
         reject(new Error('요청 시간 초과'));
       }
-    }, 10000);
+    }, 20000);
   });
 }
 
