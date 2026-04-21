@@ -1458,31 +1458,6 @@ function renderContractRecord(c, payments, responses = []) {
     </div>
   </div>
 
-  <div class="cr-card">
-    <div class="cr-card-title">⚠️ 연체 현황</div>
-    <div class="cr-delinq-grid">
-      <div class="cr-delinq-card ${totalDelinq===0?'safe':''}">
-        <div class="cr-delinq-title ${totalDelinq===0?'safe':''}">연체 총액</div>
-        <div class="cr-delinq-amount ${totalDelinq===0?'safe':''}">${fmtMoney(totalDelinq)}</div>
-        <div class="cr-delinq-breakdown">
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">임대료 연체</span><span class="cr-delinq-row-val ${rentDelinq>0?'red':''}">${fmtMoney(rentDelinq)}</span></div>
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">수수료 연체</span><span class="cr-delinq-row-val ${feeDelinq>0?'red':''}">${fmtMoney(feeDelinq)}</span></div>
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">최장 연체일</span><span class="cr-delinq-row-val">${stripU(c['연체최장일'])}일</span></div>
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">누적 연체일</span><span class="cr-delinq-row-val">${stripU(c['연체누적일'])}일</span></div>
-        </div>
-      </div>
-      <div class="cr-delinq-card safe">
-        <div class="cr-delinq-title safe">퇴실 정산</div>
-        <div class="cr-delinq-amount safe">${fmtMoney(c['퇴실정산'])}</div>
-        <div class="cr-delinq-breakdown">
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">진척도</span><span class="cr-delinq-row-val">${fmt(c['진척도'])}</span></div>
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">중도퇴실</span><span class="cr-delinq-row-val">${fmt(c['중도퇴실'])}</span></div>
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">보증기한</span><span class="cr-delinq-row-val">${fmt(c['보증기한'])}</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div class="cr-card" id="crResponseSection">
     <div class="cr-card-title">📞 대응 내역 (${responses.length}건${daeungRawData.length===0?' · 로딩 중...':''})</div>
     ${daeungRawData.length === 0
