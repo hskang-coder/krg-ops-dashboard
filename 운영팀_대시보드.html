@@ -1129,6 +1129,7 @@ function parseDailyReport(resp) {
   const payDateIdx = fi('입금예정일');
   const billIdx    = fi('청구서명');
   const contentIdx = fi('대응 상세');
+  const stepIdx    = 4; // E열 (0-based) = 단계
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
@@ -1139,7 +1140,8 @@ function parseDailyReport(resp) {
       no:      no,
       payDate: cell(payDateIdx),
       bill:    cell(billIdx),
-      content: cell(contentIdx)
+      content: cell(contentIdx),
+      step:    cell(stepIdx)   // E열: 단계
     };
   }).filter(Boolean);
 }
@@ -1479,7 +1481,12 @@ function renderContractRecord(c, payments, responses = []) {
   const gradeClass= {A:'cr-grade-A',B:'cr-grade-B',C:'cr-grade-C',D:'cr-grade-D',E:'cr-grade-E',F:'cr-grade-D'}[grade] || 'cr-grade-D';
   const stripU    = v => String(v||'').replace(/[회일월년%]$/, '').trim();
   const maxDay    = parseInt(c['연체최장일']) || 0;
-  const curStep   = Math.min(maxDay, 18);
+  // 현재 단계: Daily Report E열(단계) 최신값 우선, 없으면 연체최장일 기반
+  const latestStepText = responses.find(r => r.step)?.step || '';
+  const extractDNum    = txt => { const m = txt.match(/\[D(\d+)\]/i); return m ? Math.min(parseInt(m[1]),18) : -1; };
+  const reportStepNum  = extractDNum(latestStepText);
+  const curStep        = reportStepNum >= 0 ? reportStepNum : Math.min(maxDay, 18);
+  const curStepLabel   = latestStepText || TL_PROCESSES[curStep] || '—';
   const zoneW     = (cnt, tot) => `style="flex:${cnt};width:${Math.round(cnt/tot*100)}%"`;
 
   // ── 타임라인 ──
@@ -1584,7 +1591,7 @@ function renderContractRecord(c, payments, responses = []) {
       </div>
       <div class="cr-tl-steps">${steps}</div>
       <div class="cr-tl-row">
-        <div class="cr-tl-item"><span class="cr-tl-item-label">현재 프로세스</span><span class="cr-tl-item-val ${curStep>0?'warn':''}">${TL_PROCESSES[curStep]||'—'}</span></div>
+        <div class="cr-tl-item"><span class="cr-tl-item-label">현재 프로세스</span><span class="cr-tl-item-val ${curStep>0?'warn':''}">${curStepLabel}</span></div>
         <div class="cr-tl-item"><span class="cr-tl-item-label">첫 연체</span><span class="cr-tl-item-val">${fmt(c['첫 연체'])}</span></div>
         <div class="cr-tl-item"><span class="cr-tl-item-label">계약상태</span><span class="cr-tl-item-val">${fmt(c['계약상태'])}</span></div>
       </div>
