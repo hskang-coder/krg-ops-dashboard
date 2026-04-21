@@ -1282,6 +1282,7 @@ function parseVacancySheet(resp) {
   const monthRent1Idx = 33; // AH열 (0-based) = 월세①
   const monthRent2Idx = 34; // AI열 (0-based) = 월세②
   const mgmtFeeIdx    = 35; // AJ열 (0-based) = 관리비
+  const billCountIdx  = 70; // BS열 (0-based) = 청구횟수
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -1301,7 +1302,8 @@ function parseVacancySheet(resp) {
       fee:          cell(feeIdx),        // AL열: 서비스 수수료
       monthRent:    (parseFloat(String(cell(monthRent1Idx)).replace(/[^0-9.-]/g,'')||0)
                    + parseFloat(String(cell(monthRent2Idx)).replace(/[^0-9.-]/g,'')||0)) || cell(monthRent1Idx),
-      mgmtFee:      cell(mgmtFeeIdx)     // AJ열: 관리비
+      mgmtFee:      cell(mgmtFeeIdx),     // AJ열: 관리비
+      billCount:    cell(billCountIdx)   // BS열: 청구횟수
     };
   }).filter(Boolean);
 }
@@ -1668,13 +1670,18 @@ function renderPaymentTargets() {
       const now2 = new Date();
       const pY = now2.getMonth()===0 ? now2.getFullYear()-1 : now2.getFullYear();
       const pM = now2.getMonth()===0 ? 11 : now2.getMonth()-1;
+      const isPrevM = p => {
+        const dd = parseKorDate(String(p['납기일']||''));
+        if (dd) return dd.getFullYear()===pY && dd.getMonth()===pM;
+        const nm = String(p['청구서명']||p['납부종류']||'');
+        const mm = nm.match(/(\d{4}).*?(\d{1,2})월/);
+        if (mm) return parseInt(mm[1])===pY && parseInt(mm[2])-1===pM;
+        return false;
+      };
       const isD = paymentRawData
-        .filter(p => {
-          if (String(p['계약번호']||'').trim()!==r.no) return false;
-          if (!String(p['청구서명']||p['납부종류']||'').includes('임대료')) return false;
-          const dd = parseKorDate(String(p['납기일']||''));
-          return dd && dd.getFullYear()===pY && dd.getMonth()===pM;
-        })
+        .filter(p => String(p['계약번호']||'').trim()===r.no &&
+                     String(p['청구서명']||p['납부종류']||'').includes('임대료') &&
+                     isPrevM(p))
         .some(p => (parseInt(String(p['연체일수']||'0').replace(/[^0-9]/g,''))||0) >= 1);
       return ptFilter.delinq === '연체' ? isD : !isD;
     });
@@ -1685,17 +1692,22 @@ function renderPaymentTargets() {
     const contract = contractRawData.find(c => String(c['계약번호']||'').trim()===r.no)||{};
     const vacancy  = vacancyRawData.find(v => String(v.no).trim()===r.no)||{};
     const payments = paymentRawData.filter(p => String(p['계약번호']||'').trim()===r.no);
-    // 전월연체 = 지난달 임대료 청구서에 미납금이 있는 경우
+    // 전월연체 = 1개월 전 임대료 청구서에 연체일수 ≥ 1
     const now = new Date();
     const prevY = now.getMonth() === 0 ? now.getFullYear()-1 : now.getFullYear();
     const prevM = now.getMonth() === 0 ? 11 : now.getMonth()-1; // 0-based
+    const isPrevMonth = p => {
+      // 납기일로 판단
+      const dd = parseKorDate(String(p['납기일']||''));
+      if (dd) return dd.getFullYear()===prevY && dd.getMonth()===prevM;
+      // fallback: 청구서명에서 "N월" 추출 (예: "2026년 3월 임대료")
+      const nm = String(p['청구서명']||p['납부종류']||'');
+      const mm = nm.match(/(\d{4}).*?(\d{1,2})월/);
+      if (mm) return parseInt(mm[1])===prevY && parseInt(mm[2])-1===prevM;
+      return false;
+    };
     const hasDelinq = payments
-      .filter(p => {
-        if (!String(p['청구서명']||p['납부종류']||'').includes('임대료')) return false;
-        const dd = parseKorDate(String(p['납기일']||''));
-        if (!dd) return false;
-        return dd.getFullYear()===prevY && dd.getMonth()===prevM;
-      })
+      .filter(p => String(p['청구서명']||p['납부종류']||'').includes('임대료') && isPrevMonth(p))
       .some(p => (parseInt(String(p['연체일수']||'0').replace(/[^0-9]/g,''))||0) >= 1);
     // 임대료 청구서만 필터 후 2회차 = 첫납부 대상
     const rentBills = payments.filter(p => String(p['청구서명']||p['납부종류']||'').includes('임대료'));
@@ -1775,7 +1787,7 @@ function renderPaymentTargets() {
       <td><b>${r.no}</b></td>
       <td>${x.name}</td>
       <td style="color:#5A6A8A;font-size:11px">${x.phone}</td>
-      <td>${r.payCondition||'—'}</td>
+      <td>${vacancy.billCount ? vacancy.billCount+'회' : '—'}</td>
       <td style="text-align:right" class="pt-money">${fmtMon(vacancy.rent||contract['임대료'])}</td>
       <td style="text-align:right" class="pt-money">${fmtMon(vacancy.fee||contract['수수료'])}</td>
       <td style="text-align:right" class="pt-money">${fmtMon(vacancy.monthRent)}</td>
@@ -1798,7 +1810,7 @@ function renderPaymentTargets() {
       <div style="padding:4px 20px 8px;font-size:11px;color:#8A9AB5">표시 ${display.length}건</div>
       <div style="overflow-x:auto"><table class="pt-table">
         <thead><tr>
-          <th>계약번호</th><th>임차인명</th><th>연락처</th><th>납부조건</th>
+          <th>계약번호</th><th>임차인명</th><th>연락처</th><th>청구횟수</th>
           <th>임대료</th><th>수수료</th><th>월세</th><th>관리비</th>
           <th>납기일</th><th>수납 대상</th>
         </tr></thead>
