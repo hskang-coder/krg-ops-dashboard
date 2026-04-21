@@ -790,6 +790,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyu3blAI8YFEPTp
 let currentView      = 'dashboard';
 let contractRawData  = [];
 let paymentRawData   = [];
+let daeungRawData    = [];
 let crLoaded         = false;
 let currentPeriod    = 'daily';
 let currentPerson    = '고송미';   // 체크리스트 담당자
@@ -1031,16 +1032,45 @@ function switchCrMode(mode) {
   }
 }
 
+function parseDaeungFull(resp) {
+  if (!resp || !resp.table) return [];
+  const { cols, rows } = resp.table;
+  const labels = cols.map(c => (c.label||c.id||'').trim());
+  const fi = name => labels.findIndex(l => l.includes(name));
+  const dateIdx  = fi('일자'), typeIdx = fi('구분'), personIdx = fi('담당자');
+  const tellIdx  = fi('TELL대응'), workIdx = fi('업무대응');
+  const noIdx    = fi('계약번호'), targetIdx = fi('대상구분');
+  const contactIdx = fi('연락자'), catIdx = fi('업무구분');
+  const subIdx   = fi('하위구분'), contentIdx = fi('업무내용');
+  const nextIdx  = fi('다음업무');
+  return (rows||[]).map(row => {
+    const c = row.c || [];
+    const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
+    const num  = i => parseFloat(cell(i).replace(/[^0-9.]/g,'')) || 0;
+    const no = cell(noIdx);
+    if (!no || !cell(dateIdx)) return null;
+    return {
+      date: cell(dateIdx), type: cell(typeIdx), person: cell(personIdx),
+      tell: num(tellIdx), work: num(workIdx),
+      no: no, target: cell(targetIdx), contact: cell(contactIdx),
+      cat: cell(catIdx), sub: cell(subIdx),
+      content: cell(contentIdx), next: cell(nextIdx)
+    };
+  }).filter(Boolean);
+}
+
 async function loadContractData() {
   const el = document.getElementById('crResult');
   el.innerHTML = '<div class="cr-empty">📡 계약 데이터 로딩 중...</div>';
   try {
-    const [cGviz, pGviz] = await Promise.all([
+    const [cGviz, pGviz, dResp] = await Promise.all([
       fetchSheetByName(CONTRACT_SHEET),
-      fetchSheetByName(INCOME_SHEET)
+      fetchSheetByName(INCOME_SHEET),
+      fetchSheetJSONP(DAEUNG_GID)
     ]);
     contractRawData = gvizToObjects(cGviz).filter(r => r['계약번호']);
     paymentRawData  = gvizToObjects(pGviz).filter(r => r['계약번호']);
+    daeungRawData   = parseDaeungFull(dResp);
     crLoaded = true;
     el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료.<br>검색 방법을 선택 후 입력하거나, 📋 목록에서 선택하세요.</div>`;
   } catch(e) {
@@ -1153,8 +1183,10 @@ function filterContractList() {
 function selectContractRow(no) {
   const contract = contractRawData.find(r => String(r['계약번호']).trim() === no);
   if (!contract) return;
-  const payments = paymentRawData.filter(r => String(r['계약번호']).trim() === no);
-  renderContractRecord(contract, payments);
+  const payments  = paymentRawData.filter(r => String(r['계약번호']).trim() === no);
+  const responses = daeungRawData.filter(r => String(r.no).trim() === no)
+    .sort((a, b) => a.date < b.date ? 1 : -1); // 최신순
+  renderContractRecord(contract, payments, responses);
   document.getElementById('crResult').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
@@ -1174,7 +1206,7 @@ const TL_PROCESSES = {
   15:'⑮[D15] 강제집행',16:'⑯[D16] 보증기관청구',17:'⑰[D17] 법원경매',18:'⑱[D18] 채권소멸'
 };
 
-function renderContractRecord(c, payments) {
+function renderContractRecord(c, payments, responses = []) {
   const gradeRaw  = String(c['연체등급']||'').trim();
   const grade     = gradeRaw.replace(/등급$/,'').trim() || '—';
   const gradeClass= {A:'cr-grade-A',B:'cr-grade-B',C:'cr-grade-C',D:'cr-grade-D',E:'cr-grade-E',F:'cr-grade-D'}[grade] || 'cr-grade-D';
@@ -1307,6 +1339,43 @@ function renderContractRecord(c, payments) {
         </div>
       </div>
     </div>
+  </div>
+
+  <div class="cr-card">
+    <div class="cr-card-title">📞 대응 내역 (${responses.length}건)</div>
+    ${responses.length === 0
+      ? `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">대응 내역이 없습니다</div>`
+      : `<div style="overflow-x:auto;padding:0 4px 4px">
+      <table class="cr-detail-table">
+        <thead><tr>
+          <th>일자</th><th>구분</th><th>담당자</th><th>업무구분</th>
+          <th>하위구분</th><th style="text-align:center">TELL</th>
+          <th style="text-align:center">업무</th><th>대상</th><th>연락자</th><th>업무내용</th>
+        </tr></thead>
+        <tbody>${responses.map(r => {
+          const typeCls = r.type==='발신'?'color:#2563A8;font-weight:700'
+                        : r.type==='수신'?'color:#16A34A;font-weight:700'
+                        : 'color:#5A6A8A';
+          const catColor = {
+            '연체관리':'#DC2626','계약관리':'#2563A8','정산관리':'#D97706',
+            '갱신관리':'#7C3AED','퇴실관리':'#EA580C','중도퇴실관리':'#EA580C',
+            '상담관리':'#0891B2','데이터관리':'#16A34A'
+          }[r.cat] || '#8A9AB5';
+          return `<tr>
+            <td style="white-space:nowrap;font-size:11px">${r.date}</td>
+            <td><span style="${typeCls}">${r.type||'—'}</span></td>
+            <td>${r.person||'—'}</td>
+            <td><span style="font-size:11px;font-weight:600;color:${catColor}">${r.cat||'—'}</span></td>
+            <td style="font-size:11px;color:#5A6A8A">${r.sub||'—'}</td>
+            <td style="text-align:center;font-size:11px">${r.tell>0?r.tell+'분':'—'}</td>
+            <td style="text-align:center;font-size:11px">${r.work>0?r.work+'분':'—'}</td>
+            <td style="font-size:11px">${r.target||'—'}</td>
+            <td style="font-size:11px;color:#5A6A8A">${r.contact||'—'}</td>
+            <td style="font-size:12px;max-width:240px">${r.content||'—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`
+    }
   </div>
 
   <div class="cr-card">
