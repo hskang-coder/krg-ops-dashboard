@@ -1609,6 +1609,21 @@ async function loadPaymentTargets() {
   try {
     const resp = await fetchSheetByGid(INCOME_GID);
     incomeRawData = parseIncomeSheet(resp);
+
+    // ── 디버그: 로드 결과 + 첫 3건 원본 확인 ──
+    const rawCols = (resp?.table?.cols||[]).map((c,i)=>`[${i}]${c.label||c.id}`).slice(0,35).join(', ');
+    const sample  = incomeRawData.slice(0,3).map(r=>
+      `no=${r.no} | name=${r.name} | due=${r.dueDate} | type=${r.contractType} | cond=${r.payCondition}`
+    ).join('<br>');
+    document.getElementById('ptResult').innerHTML =
+      `<div style="background:#F0F7FF;border:1px solid #BFDBFE;border-radius:8px;padding:14px 18px;font-size:11px;color:#1D4ED8;margin-bottom:12px">
+        <b>🔍 디버그 정보</b><br>
+        총 로드: <b>${incomeRawData.length}건</b><br>
+        컬럼(0~34): <span style="font-size:10px;color:#5A6A8A">${rawCols}</span><br><br>
+        <b>첫 3건:</b><br>${sample||'(없음)'}
+      </div>
+      <div class="cr-empty">📡 데이터 확인 후 계속 로딩 중...</div>`;
+
     // 계약·입금 데이터도 없으면 함께 로드
     if (!crLoaded) {
       const [cGviz, pGviz] = await Promise.all([
