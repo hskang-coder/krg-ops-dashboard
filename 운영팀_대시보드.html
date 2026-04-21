@@ -1505,10 +1505,21 @@ function renderContractRecord(c, payments, responses = []) {
   const delinqTotal   = delinqRent + delinqFee + delinqExit;
   const hasDelinq     = delinqTotal > 0;
 
-  // 현재 연체중 항목의 최장 연체일 (납부상태가 '연체중'인 것만)
-  const longestCurrentDelinq = payments
-    .filter(p => String(p['납부상태']||'').trim().includes('연체중'))
-    .reduce((max, p) => Math.max(max, parseInt(p['연체일수']||0)), 0);
+  // 현재 연체중 항목의 최장 연체일
+  // ① 납부상태가 '연체중'/'연체' 포함 OR ② 미납금액 > 0 인 항목 모두 검사
+  const longestCurrentDelinq = (() => {
+    const fromStatus = payments
+      .filter(p => String(p['납부상태']||'').trim().includes('연체'))
+      .reduce((max, p) => Math.max(max, parseInt(p['연체일수']||0)), 0);
+    if (fromStatus > 0) return fromStatus;
+    // 미납금액 기준 fallback
+    const fromUnpaid = payments
+      .filter(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0) > 0)
+      .reduce((max, p) => Math.max(max, parseInt(p['연체일수']||0)), 0);
+    if (fromUnpaid > 0) return fromUnpaid;
+    // 계약 데이터의 연체최장일 최후 fallback (연체 총액이 있을 때만)
+    return parseInt(String(c['연체최장일']||'0').replace(/[^0-9]/g,''))||0;
+  })();
 
   // 계약 활성 여부
   const contractStatusStr = String(c['계약상태']||'').trim();
