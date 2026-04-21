@@ -1485,8 +1485,8 @@ function renderContractRecord(c, payments, responses = []) {
   const latestStepText = responses.find(r => r.step)?.step || '';
   const extractDNum    = txt => { const m = txt.match(/\[D(\d+)\]/i); return m ? Math.min(parseInt(m[1]),18) : -1; };
   const reportStepNum  = extractDNum(latestStepText);
-  const curStep        = reportStepNum >= 0 ? reportStepNum : Math.min(maxDay, 18);
-  const curStepLabel   = latestStepText || TL_PROCESSES[curStep] || '—';
+  const curStep        = reportStepNum >= 0 ? reportStepNum : 0; // 현재 연체 데이터 없으면 0
+  const curStepLabel   = latestStepText || '—';                  // 과거 이력 불사용
   const zoneW     = (cnt, tot) => `style="flex:${cnt};width:${Math.round(cnt/tot*100)}%"`;
 
   // ── 타임라인 ──
