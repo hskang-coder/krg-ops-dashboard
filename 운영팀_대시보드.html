@@ -1146,7 +1146,22 @@ function switchView(view) {
     // 대시보드 전환 시 최신 진척 동기화
     ckLoadShared(() => renderCkProgress());
   }
-  if (view === 'contract' && !crLoaded) loadContractData();
+  if (view === 'contract') {
+    if (!crLoaded) {
+      loadContractData();
+    } else if (!daeungRawData.length) {
+      fetchSheetByGid(DAILY_RPT_GID).then(dResp => {
+        daeungRawData = parseDailyReport(dResp);
+        const noEl = document.querySelector('.cr-contract-no');
+        if (noEl) {
+          const no = noEl.textContent.trim();
+          const responses = daeungRawData.filter(r => String(r.no).trim() === no)
+            .sort((a, b) => a.date < b.date ? 1 : -1);
+          updateResponseSection(no, responses);
+        }
+      }).catch(() => { daeungRawData = []; });
+    }
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1580,7 +1595,7 @@ function parseIncomeSheet(resp) {
   const dueDateIdx = 28; // AC열 (0-based) = 납기일
   const typeIdx    = fi('계약종류');
   const condIdx    = fi('납부조건') >= 0 ? fi('납부조건') : fi('납부방법');
-  const statusIdx  = fi('납부상태');
+  const payStatusIdx = 19; // T열 (0-based) = 납부상태
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
@@ -1593,7 +1608,7 @@ function parseIncomeSheet(resp) {
       dueDateRaw: c[dueDateIdx] ? (c[dueDateIdx].v || '') : '',
       contractType: cell(typeIdx),
       payCondition: cell(condIdx),
-      payStatus:  cell(statusIdx)
+      payStatus:  cell(payStatusIdx)
     };
   }).filter(Boolean);
 }
@@ -1682,7 +1697,7 @@ function renderPaymentTargets() {
         .filter(p => String(p['계약번호']||'').trim()===r.no &&
                      String(p['청구서명']||p['납부종류']||'').includes('임대료') &&
                      isPrevM(p))
-        .some(p => (parseInt(String(p['연체일수']||'0').replace(/[^0-9]/g,''))||0) >= 1);
+        .some(p => ['연체중','분납중','연체납부'].some(v => String(p['납부상태']||'').trim().includes(v)));
       return ptFilter.delinq === '연체' ? isD : !isD;
     });
   }
@@ -1708,7 +1723,7 @@ function renderPaymentTargets() {
     };
     const hasDelinq = payments
       .filter(p => String(p['청구서명']||p['납부종류']||'').includes('임대료') && isPrevMonth(p))
-      .some(p => (parseInt(String(p['연체일수']||'0').replace(/[^0-9]/g,''))||0) >= 1);
+      .some(p => ['연체중','분납중','연체납부'].some(v => String(p['납부상태']||'').trim().includes(v)));
     // 임대료 청구서만 필터 후 2회차 = 첫납부 대상
     const rentBills = payments.filter(p => String(p['청구서명']||p['납부종류']||'').includes('임대료'));
     const isFirst   = rentBills.length === 2;
@@ -1788,14 +1803,13 @@ function renderPaymentTargets() {
       <td>${x.name}</td>
       <td style="color:#5A6A8A;font-size:11px">${x.phone}</td>
       <td>${vacancy.billCount ? vacancy.billCount+'회' : '—'}</td>
-      <td style="text-align:right" class="pt-money">${fmtMon(vacancy.rent||contract['임대료'])}</td>
-      <td style="text-align:right" class="pt-money">${fmtMon(vacancy.fee||contract['수수료'])}</td>
-      <td style="text-align:right" class="pt-money">${fmtMon(vacancy.monthRent)}</td>
-      <td style="text-align:right" class="pt-money">${fmtMon(vacancy.mgmtFee)}</td>
+      ${(()=>{ const ds=['연체중','분납중','연체납부']; const s=r.payStatus||'';
+        return s ? (ds.some(v=>s.includes(v)) ? `<td><span class="cr-badge-unpaid">${s}</span></td>` : `<td><span class="cr-badge-paid">${s}</span></td>`) : '<td>—</td>'; })()}
+      <td>${x.cat==='전월연체'?'전월연체자':x.cat==='첫납부'?'첫납부자':'—'}</td>
       <td style="white-space:nowrap">${r.dueDate||'—'}</td>
       <td>${tagHtml(x)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="10" style="text-align:center;color:#B0BDCE;padding:24px">해당 조건의 수납 대상이 없습니다.</td></tr>';
+  }).join('') || '<tr><td colspan="8" style="text-align:center;color:#B0BDCE;padding:24px">해당 조건의 수납 대상이 없습니다.</td></tr>';
 
   document.getElementById('ptResult').innerHTML = `
     <div class="cr-card">
@@ -1811,7 +1825,7 @@ function renderPaymentTargets() {
       <div style="overflow-x:auto"><table class="pt-table">
         <thead><tr>
           <th>계약번호</th><th>임차인명</th><th>연락처</th><th>청구횟수</th>
-          <th>임대료</th><th>수수료</th><th>월세</th><th>관리비</th>
+          <th>당월납부상태</th><th>수납대상여부</th>
           <th>납기일</th><th>수납 대상</th>
         </tr></thead>
         <tbody>${rows}</tbody>
@@ -1896,7 +1910,7 @@ function renderContractRecord(c, payments, responses = []) {
   // ① 납부상태가 '연체중'/'연체' 포함 OR ② 미납금액 > 0 인 항목 모두 검사
   const longestCurrentDelinq = (() => {
     const fromStatus = payments
-      .filter(p => String(p['납부상태']||'').trim().includes('연체'))
+      .filter(p => { const s = String(p['납부상태']||'').trim(); return s.includes('연체') || s.includes('분납'); })
       .reduce((max, p) => Math.max(max, parseInt(p['연체일수']||0)), 0);
     if (fromStatus > 0) return fromStatus;
     // 미납금액 기준 fallback
