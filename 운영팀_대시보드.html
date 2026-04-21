@@ -1099,7 +1099,7 @@ function parseDaeungFull(resp) {
   }).filter(Boolean);
 }
 
-// GID=1953907648 시트 파싱 (계약번호, BN=공실상태, BO=퇴실일)
+// GID=1953907648 시트 파싱 (계약번호, BN=공실상태, BO=퇴실일, J열=중도퇴실 관련)
 function parseVacancySheet(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
@@ -1108,13 +1108,19 @@ function parseVacancySheet(resp) {
   const noIdx       = fi('계약번호');
   const statusIdx   = fi('공실상태');
   const exitDateIdx = fi('퇴실일');
+  const jIdx        = 9; // J열 (0-based index 9)
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
     const no = cell(noIdx);
     if (!no) return null;
-    return { no, status: cell(statusIdx), exitDate: cell(exitDateIdx) };
+    return {
+      no,
+      status:   cell(statusIdx),
+      exitDate: cell(exitDateIdx),
+      jValue:   cell(jIdx)       // J열: 중도퇴실 관련 값
+    };
   }).filter(Boolean);
 }
 
@@ -1363,10 +1369,13 @@ function renderContractRecord(c, payments, responses = []) {
   const contractStatusStr = String(c['계약상태']||'').trim();
   const isActive = !contractStatusStr.includes('종료') && !contractStatusStr.includes('해지');
 
-  // 공실현황 시트에서 공실상태 + 실제 퇴실일 조회
-  const vacancyInfo   = vacancyRawData.find(v => String(v.no).trim() === String(c['계약번호']||'').trim()) || {};
-  const vacancyStatus = vacancyInfo.status   || '';
+  // 공실현황 시트에서 공실상태 + 실제 퇴실일 + J열 조회
+  const vacancyInfo    = vacancyRawData.find(v => String(v.no).trim() === String(c['계약번호']||'').trim()) || {};
+  const vacancyStatus  = vacancyInfo.status   || '';
   const actualExitDate = vacancyInfo.exitDate || '';
+  const vacancyJValue  = vacancyInfo.jValue   || '';
+  // 중도퇴실 표시값: J열 + BO열
+  const midExitDisplay = [vacancyJValue, actualExitDate].filter(Boolean).join('  ');
 
   // ── 입금 상세 테이블 ──
   const detailRows = payments.map(p => {
@@ -1452,7 +1461,7 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-delinq-breakdown">
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">시작일</span><span class="cr-delinq-row-val">${fmt(c['시작일'])}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">퇴실일</span><span class="cr-delinq-row-val ${actualExitDate?'red':''}">${actualExitDate ? fmt(actualExitDate) : fmt(c['종료일'])}</span></div>
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">상태</span><span class="cr-delinq-row-val">${fmt(c['계약상태'])}</span></div>
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">중도퇴실</span><span class="cr-delinq-row-val ${midExitDisplay?'red':''}">${midExitDisplay || '—'}</span></div>
         </div>
       </div>
     </div>
