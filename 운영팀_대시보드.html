@@ -1023,8 +1023,10 @@ const TL_PROCESSES = {
 };
 
 function renderContractRecord(c, payments) {
-  const grade     = fmt(c['연체등급']);
-  const gradeClass= {A:'cr-grade-A',B:'cr-grade-B',C:'cr-grade-C',D:'cr-grade-D',E:'cr-grade-E'}[grade] || 'cr-grade-D';
+  const gradeRaw  = String(c['연체등급']||'').trim();
+  const grade     = gradeRaw.replace(/등급$/,'').trim() || '—';
+  const gradeClass= {A:'cr-grade-A',B:'cr-grade-B',C:'cr-grade-C',D:'cr-grade-D',E:'cr-grade-E',F:'cr-grade-D'}[grade] || 'cr-grade-D';
+  const stripU    = v => String(v||'').replace(/[회일월년%]$/, '').trim();
   const maxDay    = parseInt(c['연체최장일']) || 0;
   const curStep   = Math.min(maxDay, 18);
   const zoneW     = (cnt, tot) => `style="flex:${cnt};width:${Math.round(cnt/tot*100)}%"`;
@@ -1069,10 +1071,10 @@ function renderContractRecord(c, payments) {
         <div style="font-size:12px;color:#5A6A8A;margin-top:4px;font-weight:600">${fmt(c['임차인명'])} · ${fmt(c['건물명'])} ${fmt(c['호수'])}</div>
       </div>
       <div class="cr-stats">
-        <div class="cr-stat"><div class="cr-stat-label">청구횟수</div><div class="cr-stat-val">${fmt(c['청구수'])}회</div></div>
-        <div class="cr-stat"><div class="cr-stat-label">최장연체</div><div class="cr-stat-val ${parseInt(c['연체최장일'])>0?'warn':''}">${fmt(c['연체최장일'])}일</div></div>
-        <div class="cr-stat"><div class="cr-stat-label">연체횟수</div><div class="cr-stat-val ${parseInt(c['연체횟수'])>0?'warn':''}">${fmt(c['연체횟수'])}회</div></div>
-        <div class="cr-stat"><div class="cr-stat-label">누적일수</div><div class="cr-stat-val ${parseInt(c['연체누적일'])>0?'warn':''}">${fmt(c['연체누적일'])}일</div></div>
+        <div class="cr-stat"><div class="cr-stat-label">청구횟수</div><div class="cr-stat-val">${stripU(c['청구수'])}회</div></div>
+        <div class="cr-stat"><div class="cr-stat-label">최장연체</div><div class="cr-stat-val ${parseInt(c['연체최장일'])>0?'warn':''}">${stripU(c['연체최장일'])}일</div></div>
+        <div class="cr-stat"><div class="cr-stat-label">연체횟수</div><div class="cr-stat-val ${parseInt(c['연체횟수'])>0?'warn':''}">${stripU(c['연체횟수'])}회</div></div>
+        <div class="cr-stat"><div class="cr-stat-label">누적일수</div><div class="cr-stat-val ${parseInt(c['연체누적일'])>0?'warn':''}">${stripU(c['연체누적일'])}일</div></div>
         <div class="cr-stat"><div class="cr-stat-label">연체율</div><div class="cr-stat-val ${parseFloat(c['연체비율'])>0?'warn':''}">${fmt(c['연체비율'])}</div></div>
       </div>
     </div>
@@ -1139,8 +1141,8 @@ function renderContractRecord(c, payments) {
         <div class="cr-delinq-breakdown">
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">임대료 연체</span><span class="cr-delinq-row-val ${rentDelinq>0?'red':''}">${fmtMoney(rentDelinq)}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">수수료 연체</span><span class="cr-delinq-row-val ${feeDelinq>0?'red':''}">${fmtMoney(feeDelinq)}</span></div>
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">최장 연체일</span><span class="cr-delinq-row-val">${fmt(c['연체최장일'])}일</span></div>
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">누적 연체일</span><span class="cr-delinq-row-val">${fmt(c['연체누적일'])}일</span></div>
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">최장 연체일</span><span class="cr-delinq-row-val">${stripU(c['연체최장일'])}일</span></div>
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">누적 연체일</span><span class="cr-delinq-row-val">${stripU(c['연체누적일'])}일</span></div>
         </div>
       </div>
       <div class="cr-delinq-card safe">
