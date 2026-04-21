@@ -1635,8 +1635,11 @@ async function loadPaymentTargets() {
 function renderPaymentTargets() {
   const from  = document.getElementById('ptDateFrom').value;
   const to    = document.getElementById('ptDateTo').value;
-  const fromD = from ? new Date(from) : null;
-  const toD   = to   ? new Date(to)   : null;
+  // input[type=date] 값은 "yyyy-mm-dd" → UTC 자정으로 파싱되어 KST에서 날짜 비교 오류 발생
+  // 로컬 자정으로 명시적 생성
+  const parseLocalDate = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y,m-1,d); };
+  const fromD = from ? parseLocalDate(from) : null;
+  const toD   = to   ? parseLocalDate(to)   : null;
   const fmtMon = v => { const n = parseFloat(String(v).replace(/[^0-9.-]/g,''))||0; return n ? '₩'+n.toLocaleString() : '—'; };
 
   // ── 1단계: 날짜·종류·연체 필터 ──
