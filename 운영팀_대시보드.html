@@ -1106,9 +1106,9 @@ function parseVacancySheet(resp) {
   const labels = cols.map(c => (c.label||c.id||'').trim());
   const fi = name => labels.findIndex(l => l.includes(name));
   const noIdx       = fi('계약번호');
-  const statusIdx   = fi('공실상태');
-  const exitDateIdx = fi('퇴실일');
-  const jIdx        = 9; // J열 (0-based index 9)
+  const statusIdx   = fi('공실상태');   // BN열(65)
+  const exitDateIdx = fi('실제퇴실일'); // BO열(66) — '퇴실일'은 Z열이므로 정확히 매칭
+  const jIdx        = 9; // J열 (0-based index 9) = 중도퇴실
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
