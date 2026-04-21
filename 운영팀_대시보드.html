@@ -1161,6 +1161,18 @@ async function loadContractData() {
     // 공실현황 시트 (GID=1953907648) 백그라운드 로드
     fetchSheetByGid(VACANCY_GID).then(vResp => {
       vacancyRawData = parseVacancySheet(vResp);
+      // 이미 계약 레코드가 열려 있으면 공실현황 반영하여 재렌더링
+      const noEl = document.querySelector('.cr-contract-no');
+      if (noEl) {
+        const no = noEl.textContent.trim();
+        const c = contractRawData.find(r => String(r['계약번호']||'').trim() === no);
+        if (c) {
+          const payments  = paymentRawData.filter(p => String(p['계약번호']||'').trim() === no);
+          const responses = daeungRawData.filter(r => String(r.no).trim() === no)
+            .sort((a, b) => a.date < b.date ? 1 : -1);
+          renderContractRecord(c, payments, responses);
+        }
+      }
     }).catch(() => { vacancyRawData = []; });
   } catch(e) {
     el.innerHTML = `<div class="cr-empty">❌ 데이터 로드 실패: ${e.message}</div>`;
