@@ -540,6 +540,9 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 }
 .toast.show { opacity: 1; }
 
+@media(max-width:768px){
+  .ck-all-grid { grid-template-columns: 1fr !important; }
+}
 @media(max-width:600px){
   .person-tab   { padding: 7px 14px; font-size: 12px; }
   .period-tab   { padding: 9px 14px; font-size: 12px; }
@@ -580,6 +583,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <button class="person-tab active" onclick="selectPerson('고송미')">고송미</button>
     <button class="person-tab"        onclick="selectPerson('이지희')">이지희</button>
     <button class="person-tab"        onclick="selectPerson('강휘수')">강휘수</button>
+    <button class="person-tab"        onclick="selectPerson('전체')" style="margin-left:8px;border-left:1px solid rgba(255,255,255,0.3);padding-left:12px">전체 보기</button>
   </div>
 
   <!-- Period tabs -->
@@ -796,6 +800,12 @@ let daeungRawData    = [];
 let vacancyRawData   = []; // 공실현황 시트 (계약번호 → 공실상태, 퇴실일)
 let crLoaded         = false;
 let currentPeriod    = 'daily';
+// ── 공유 체크리스트 API (Google Apps Script Web App URL) ──
+const CK_API_URL = ''; // ← Apps Script 배포 후 여기에 URL 입력
+
+let ckSharedState  = {};   // 서버에서 로드한 전체 상태 캐시
+let ckStateLoaded  = false;
+
 let currentPerson    = '고송미';   // 체크리스트 담당자
 let currentPiePerson = 'all';      // 파이차트 필터
 let currentLogPerson = 'all';      // 최근대응 담당자 필터
@@ -960,10 +970,55 @@ function storageKey(person, period) {
   return `ck_${person}_${period}_${getPeriodKey(period)}`;
 }
 function ckLoad(person, period) {
-  try { return JSON.parse(localStorage.getItem(storageKey(person,period))||'{}'); } catch { return {}; }
+  // 공유 상태 우선, 없으면 localStorage
+  const key = storageKey(person, period);
+  if (CK_API_URL && ckStateLoaded && ckSharedState[key]?.[person]) {
+    return ckSharedState[key][person];
+  }
+  try { return JSON.parse(localStorage.getItem(key)||'{}'); } catch { return {}; }
 }
 function ckSave(person, period, state) {
+  // localStorage 에도 저장 (오프라인 fallback)
   try { localStorage.setItem(storageKey(person,period), JSON.stringify(state)); } catch {}
+}
+
+// ── Google Sheets 공유 상태 로드 (JSONP) ──────────────────────
+function ckLoadShared(onDone) {
+  if (!CK_API_URL) { if (onDone) onDone(); return; }
+  const cb = '_ckCb' + Date.now();
+  const s  = document.createElement('script');
+  window[cb] = data => {
+    ckSharedState  = data || {};
+    ckStateLoaded  = true;
+    delete window[cb];
+    document.head.removeChild(s);
+    if (onDone) onDone();
+  };
+  s.onerror = () => { delete window[cb]; if (onDone) onDone(); };
+  s.src = `${CK_API_URL}?callback=${cb}&_=${Date.now()}`;
+  document.head.appendChild(s);
+  setTimeout(() => { if (window[cb]) { delete window[cb]; if (onDone) onDone(); } }, 10000);
+}
+
+// ── Google Sheets에 단일 항목 저장 (JSONP GET) ───────────────
+function ckSyncToSheets(person, period, taskId, done) {
+  if (!CK_API_URL) return;
+  const key    = storageKey(person, period);
+  const params = new URLSearchParams({ action:'set', dateKey:key, person, taskId, done:String(done), _:Date.now() });
+  const cb     = '_ckWr' + Date.now();
+  const s      = document.createElement('script');
+  window[cb] = data => {
+    // 서버 응답으로 캐시 갱신
+    if (data) ckSharedState = data;
+    delete window[cb];
+    document.head.removeChild(s);
+    // 대시보드 진척도 새로고침
+    if (currentView === 'dashboard') renderCkProgress();
+  };
+  s.onerror = () => { delete window[cb]; };
+  s.src = `${CK_API_URL}?${params}&callback=${cb}`;
+  document.head.appendChild(s);
+  setTimeout(() => { if (window[cb]) { delete window[cb]; } }, 10000);
 }
 
 // ═══════════════════════════════════════════
@@ -983,7 +1038,18 @@ function switchView(view) {
     btn.classList.toggle('active', ['dashboard','checklist','contract'][i] === view);
   });
 
-  if (view === 'checklist') renderCkFull();
+  if (view === 'checklist') {
+    // 공유 상태 로드 후 렌더 (첫 번째 전환 시)
+    if (CK_API_URL && !ckStateLoaded) {
+      ckLoadShared(() => { renderCkFull(); renderCkProgress(); });
+    } else {
+      renderCkFull();
+    }
+  }
+  if (view === 'dashboard' && CK_API_URL) {
+    // 대시보드 전환 시 최신 진척 동기화
+    ckLoadShared(() => renderCkProgress());
+  }
   if (view === 'contract' && !crLoaded) loadContractData();
 }
 
@@ -1636,12 +1702,15 @@ function renderCkProgress() {
     const done  = tasks.filter(t => state[t.id]).length;
     const pct   = Math.round(done/total*100);
     totalPct += pct; countWithTask++;
+    const syncBadge = CK_API_URL
+      ? `<span style="font-size:9px;color:#16A34A;margin-left:4px" title="공유 동기화됨">●</span>`
+      : '';
     html += `
       <div class="person-row">
         <div class="person-avatar ${p.avClass}">${p.name[0]}</div>
         <div class="person-info">
           <div class="person-name-row">
-            <span class="person-name">${p.name}</span>
+            <span class="person-name">${p.name}${syncBadge}</span>
             <span style="font-size:12px;font-weight:700;color:${avColors[i]}">${pct}%</span>
           </div>
           <div class="pbar-bg">
@@ -1662,7 +1731,87 @@ function renderCkProgress() {
 // ═══════════════════════════════════════════
 // ■ CHECKLIST VIEW — 체크리스트 풀 렌더
 // ═══════════════════════════════════════════
+// ── 전체 보기 렌더 ───────────────────────────────────────────────
+function renderCkAll() {
+  const wrap = document.getElementById('ckWrap');
+  wrap.dataset.person = '전체';
+  const pLabelMap = { daily:'데일리', weekly:'위클리', monthly:'먼슬리' };
+  const periods   = ['daily','weekly','monthly'];
+  const pColors   = { '고송미':'#2563A8', '이지희':'#7C3AED', '강휘수':'#059669' };
+  const pBg       = { '고송미':'#EFF6FF',  '이지희':'#F5F3FF',  '강휘수':'#F0FDF4'  };
+  const pBorder   = { '고송미':'#BFDBFE',  '이지희':'#DDD6FE',  '강휘수':'#BBF7D0'  };
+
+  // 기간 탭
+  document.getElementById('ckPeriodRow').innerHTML = periods.map((p, i) => {
+    return `<button class="ck-period-btn${currentPeriod===p?' active':''}"
+              onclick="switchPeriod('${p}')">${['데일리','위클리','먼슬리'][i]}</button>`;
+  }).join('');
+
+  // 3인 병렬 카드
+  let cardsHtml = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px">`;
+  PEOPLE.forEach(p => {
+    const tasks  = TASKS[p.key][currentPeriod] || [];
+    const state  = ckLoad(p.key, currentPeriod);
+    const done   = tasks.filter(t => state[t.id]).length;
+    const total  = tasks.length;
+    const pct    = total === 0 ? 0 : Math.round(done/total*100);
+    const color  = pColors[p.key];
+    const bg     = pBg[p.key];
+    const border = pBorder[p.key];
+    const complete = pct === 100;
+
+    const taskRows = total === 0
+      ? `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">업무 없음</div>`
+      : tasks.map(task => {
+          const checked = !!state[task.id];
+          return `<div class="ck-item${checked?' done':''}"
+                       onclick="ckToggleFor('${p.key}','${task.id}')"
+                       style="padding:8px 10px;cursor:pointer">
+            <div class="ck-box">
+              <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+                <path d="M1.5 5L5 8.5L11.5 1.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <div class="ck-label-text" style="font-size:12px">${task.label}</div>
+              ${task.time?`<div class="ck-time-text">⏰ ${task.time}</div>`:''}
+            </div>
+          </div>`;
+        }).join('');
+
+    cardsHtml += `
+      <div style="background:#fff;border:1.5px solid ${border};border-radius:12px;overflow:hidden">
+        <div style="background:${bg};padding:12px 14px;border-bottom:1px solid ${border}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:13px;font-weight:800;color:${color}">${p.name}</span>
+            <span style="font-size:18px;font-weight:900;color:${complete?'#16A34A':color}">${pct}%</span>
+          </div>
+          <div class="ck-bar-bg" style="height:7px">
+            <div class="ck-bar-fill${complete?' complete':''}" style="width:${pct}%;background:${color}"></div>
+          </div>
+          <div style="font-size:10px;color:#8A9AB5;margin-top:4px">${done}/${total} 완료${complete?' 🎉':''}</div>
+        </div>
+        <div style="padding:8px 6px;max-height:380px;overflow-y:auto">${taskRows}</div>
+      </div>`;
+  });
+  cardsHtml += `</div>`;
+
+  document.getElementById('ckBody').innerHTML = cardsHtml;
+}
+
+// ── 전체 뷰에서 개별 항목 토글 ──────────────────────────────────
+function ckToggleFor(person, taskId) {
+  const prevPerson  = currentPerson;
+  currentPerson     = person;
+  ckToggle(taskId);
+  currentPerson     = prevPerson;
+  renderCkAll();
+}
+
 function renderCkFull() {
+  // 전체 보기 분기
+  if (currentPerson === '전체') { renderCkAll(); return; }
+
   const wrap = document.getElementById('ckWrap');
   wrap.dataset.person = currentPerson;
 
@@ -1734,9 +1883,17 @@ function renderCkFull() {
 }
 
 function ckToggle(taskId) {
-  const state = ckLoad(currentPerson, currentPeriod);
-  state[taskId] = !state[taskId];
+  const state    = ckLoad(currentPerson, currentPeriod);
+  const newDone  = !state[taskId];
+  state[taskId]  = newDone;
+  // 로컬 캐시 & localStorage 저장
+  const key = storageKey(currentPerson, currentPeriod);
+  if (!ckSharedState[key])                ckSharedState[key] = {};
+  if (!ckSharedState[key][currentPerson]) ckSharedState[key][currentPerson] = {};
+  ckSharedState[key][currentPerson][taskId] = newDone;
   ckSave(currentPerson, currentPeriod, state);
+  // Google Sheets에 동기화
+  ckSyncToSheets(currentPerson, currentPeriod, taskId, newDone);
   renderCkFull();
   renderCkProgress();
 }
@@ -1840,7 +1997,14 @@ async function loadData() {
     if (allData.length > 0) {
       setStatus('ok', `${allData.length}건 로드 완료`);
       setDataStatus('ok', `✅ Google Sheets 연결됨 — 총 ${allData.length}건`);
-      populateCatFilter(allData); renderCkProgress(); renderDashboard(); return;
+      populateCatFilter(allData);
+      // 공유 체크리스트 상태 로드 후 진척도 렌더
+      if (CK_API_URL) {
+        ckLoadShared(() => renderCkProgress());
+      } else {
+        renderCkProgress();
+      }
+      renderDashboard(); return;
     }
   } catch(e1) { console.warn('JSONP 실패:', e1.message); }
   // 2) Proxy
@@ -1857,7 +2021,13 @@ async function loadData() {
     if (allData.length > 0) {
       setStatus('ok', `${allData.length}건 로드 완료`);
       setDataStatus('ok', `✅ Apps Script 연결됨 — 총 ${allData.length}건`);
-      populateCatFilter(allData); renderCkProgress(); renderDashboard(); return;
+      populateCatFilter(allData);
+      if (CK_API_URL) {
+        ckLoadShared(() => renderCkProgress());
+      } else {
+        renderCkProgress();
+      }
+      renderDashboard(); return;
     }
   } catch(e2) { console.warn('Proxy 실패:', e2.message); }
   // 3) 실패
