@@ -779,7 +779,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 // ■ CONFIG
 // ═══════════════════════════════════════════
 const SHEET_ID        = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
-const DAEUNG_GID      = '1690142748';
+const DAEUNG_GID      = '1690142748'; // 연체관리(daily report) 시트
 const CONTRACT_SHEET  = '계약관리(Raw DATA)';
 const INCOME_SHEET    = '입금내역(Raw DATA)';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyu3blAI8YFEPTpOQfQsaPfZYnRhvJIVmHSr_Bup9FpGXaWU3dhR1URMuvpLhZ6wEA/exec';
@@ -1102,37 +1102,40 @@ async function loadContractData() {
 function buildResponseTableHTML(responses) {
   if (responses.length === 0)
     return `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">대응 내역이 없습니다</div>`;
-  const typeLabel = t => t==='발신'?'📤발신':t==='수신'?'📥수신':t==='업무'?'📋업무':t||'—';
-  const typeClr   = t => t==='발신'?'#2563A8':t==='수신'?'#16A34A':'#5A6A8A';
-  const catClr    = c => ({'연체관리':'#DC2626','계약관리':'#2563A8','정산관리':'#D97706',
+  const catClr = c => ({'연체관리':'#DC2626','계약관리':'#2563A8','정산관리':'#D97706',
     '갱신관리':'#7C3AED','퇴실관리':'#EA580C','중도퇴실관리':'#EA580C',
     '상담관리':'#0891B2','데이터관리':'#16A34A'}[c]||'#8A9AB5');
-  const isDelinq  = r => r.cat === '연체관리';
+  const typeIcon = t => t==='발신'?'📤':t==='수신'?'📥':t==='업무'?'📋':'📌';
+  // 입금예정: 다음업무가 '종료'/'-'/빈값 아니면 표시, 아니면 빈칸
+  const fmtNext = n => (!n || n==='종료' || n==='-') ? '' : n;
   return `<div style="overflow-x:auto;padding:0 4px 4px">
     <table class="cr-detail-table">
       <thead><tr>
-        <th style="width:36px">No</th>
-        <th style="width:90px">대응일</th>
-        <th>업무구분</th>
-        <th style="width:80px">구분</th>
-        <th>입금예정 / 다음업무</th>
+        <th style="width:36px;text-align:center">No</th>
+        <th style="width:100px">대응일</th>
+        <th style="width:130px">입금예정</th>
         <th>대응 상세내용</th>
       </tr></thead>
-      <tbody>${responses.map((r,i) => `<tr style="${isDelinq(r)?'background:#FFFDE7':''}">
-        <td style="text-align:center;color:#8A9AB5;font-size:11px">${responses.length - i}</td>
-        <td style="white-space:nowrap;font-size:12px;font-weight:600">${r.date}</td>
-        <td><span style="font-size:11px;font-weight:700;color:${catClr(r.cat)}">${r.cat||'—'}</span>
-            ${r.sub?`<br><span style="font-size:10px;color:#8A9AB5">${r.sub}</span>`:''}</td>
-        <td style="text-align:center"><span style="font-size:11px;font-weight:600;color:${typeClr(r.type)}">${typeLabel(r.type)}</span>
-            ${r.tell>0?`<br><span style="font-size:10px;color:#8A9AB5">${r.tell}분</span>`:''}</td>
-        <td style="font-size:12px;color:${r.next&&r.next!=='종료'?'#D97706':'#B0BDCE'};font-weight:${r.next&&r.next!=='종료'?'600':'400'}">
-          ${r.next||'—'}</td>
-        <td style="font-size:12px;max-width:280px">
-          ${r.contact?`<span style="font-size:10px;color:#8A9AB5;display:block">${r.contact}</span>`:''}
-          ${r.content||'—'}
-          ${r.person?`<span style="font-size:10px;color:#B0BDCE;margin-left:4px">(${r.person})</span>`:''}
-        </td>
-      </tr>`).join('')}
+      <tbody>${responses.map((r,i) => {
+        const next = fmtNext(r.next);
+        return `<tr>
+          <td style="text-align:center;color:#8A9AB5;font-size:11px">${responses.length - i}</td>
+          <td style="white-space:nowrap;font-size:12px;font-weight:600">
+            ${r.date}
+            <div style="font-size:10px;color:#8A9AB5;font-weight:400;margin-top:2px">
+              ${typeIcon(r.type)} <span style="color:${catClr(r.cat)};font-weight:600">${r.cat||''}</span>${r.sub?` · ${r.sub}`:''}
+            </div>
+          </td>
+          <td style="font-size:12px;color:${next?'#D97706':'#B0BDCE'};font-weight:${next?'700':'400'}">
+            ${next||'—'}
+          </td>
+          <td style="font-size:12px">
+            ${r.contact?`<span style="font-size:10px;color:#8A9AB5;display:block;margin-bottom:2px">${r.contact}</span>`:''}
+            ${r.content||'—'}
+            ${r.person?`<span style="font-size:10px;color:#B0BDCE;margin-left:6px">(${r.person})</span>`:''}
+          </td>
+        </tr>`;
+      }).join('')}
       </tbody>
     </table></div>`;
 }
@@ -1646,7 +1649,7 @@ function ckReset() {
 function fetchSheetJSONP(gid) {
   return new Promise((resolve, reject) => {
     const cbName = '_gsCb' + Date.now();
-    const params = new URLSearchParams({ gid, range:'A7:Q', headers:'1', tqx:'out:json', callback:cbName });
+    const params = new URLSearchParams({ gid, range:'A7:R', headers:'1', tqx:'out:json', callback:cbName });
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?${params}`;
     let timer = null;
     window[cbName] = function(resp) {
