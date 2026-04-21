@@ -1648,6 +1648,16 @@ function renderPaymentTargets() {
     if (toD   && d > toD)   return false;
     return true;
   });
+  // 계약번호 기준 중복 제거 (납기일 최신 1건만 유지)
+  const seenNos = new Map();
+  list.forEach(r => {
+    const d = parseKorDate(r.dueDate);
+    if (!seenNos.has(r.no) || d > parseKorDate(seenNos.get(r.no).dueDate)) {
+      seenNos.set(r.no, r);
+    }
+  });
+  list = Array.from(seenNos.values());
+
   if (ptFilter.type !== '전체')
     list = list.filter(r => (r.contractType||'').includes(ptFilter.type));
   if (ptFilter.delinq !== '전체') {
