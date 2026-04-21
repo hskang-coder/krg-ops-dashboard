@@ -246,6 +246,19 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .pt-tag-first  { background: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
 .pt-tag-active { background: #EFF6FF; color: #2563A8; border: 1px solid #BFDBFE; }
 .pt-money { font-weight: 700; color: #1A3A5C; font-size: 11px; }
+.pt-summary-chip { cursor: pointer; transition: all .15s; }
+.pt-summary-chip:hover { opacity: .8; }
+.pt-summary-chip.active { box-shadow: 0 0 0 2.5px currentColor; transform: scale(1.04); }
+.pt-chart-wrap { padding: 16px 20px 14px; border-bottom: 1px solid #E8EFF8; display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
+.pt-donut-wrap { position: relative; width: 100px; height: 100px; flex-shrink: 0; }
+.pt-donut-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; color: #1A3A5C; line-height: 1.1; }
+.pt-donut-sub { font-size: 10px; color: #8A9AB5; font-weight: 600; }
+.pt-bars { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 180px; }
+.pt-bar-row { display: flex; align-items: center; gap: 8px; }
+.pt-bar-label { width: 58px; font-size: 11px; font-weight: 700; color: #5A6A8A; text-align: right; white-space: nowrap; }
+.pt-bar-track { flex: 1; background: #F0F4F8; border-radius: 6px; height: 20px; overflow: hidden; }
+.pt-bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 8px; font-size: 10px; font-weight: 800; color: #fff; min-width: 24px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+.pt-bar-count { font-size: 11px; font-weight: 700; color: #1A3A5C; width: 28px; text-align: left; }
 .cr-search-result-count { font-size: 11px; color: #9AAAC4; padding: 6px 14px 0; }
 
 /* 헤더 카드 */
@@ -1263,6 +1276,7 @@ function parseVacancySheet(resp) {
   const landlordIdx   = 39; // AO열 (0-based) = 임대인명
   const tenantIdx     = 44; // AT열 (0-based) = 임차인(이름/연락처)
   const inspectTypeIdx= 57; // BF열 (0-based) = 심사구분
+  const tenantPhoneIdx= 46; // AU열 (0-based) = 임차인 연락처
   const rentIdx       = 36; // AK열 (0-based) = 임대료
   const feeIdx        = 37; // AL열 (0-based) = 서비스 수수료
   const monthRent1Idx = 33; // AH열 (0-based) = 월세①
@@ -1279,7 +1293,8 @@ function parseVacancySheet(resp) {
       status:       cell(statusIdx),
       exitDate:     cell(exitDateIdx),
       jValue:       cell(jIdx),        // J열: 중도퇴실 관련 값
-      tenantName:   cell(tenantIdx),      // AT열: 임차인 이름/연락처
+      tenantName:   cell(tenantIdx),      // AT열: 임차인 이름
+      tenantPhone:  cell(tenantPhoneIdx), // AU열: 임차인 연락처
       landlordName: cell(landlordIdx),   // AO열: 임대인명
       inspectType:  cell(inspectTypeIdx),// BF열: 심사구분
       rent:         cell(rentIdx),       // AK열: 임대료
@@ -1538,13 +1553,18 @@ function filterContractList() {
 // ═══════════════════════════════════════════
 // ■ 수납 대상 (Payment Target)
 // ═══════════════════════════════════════════
-let ptFilter = { type:'전체', delinq:'전체' };
+let ptFilter = { type:'전체', delinq:'전체', category:'전체' };
 
 function setPtFilter(key, val, btn) {
   ptFilter[key] = val;
   const groupId = key === 'type' ? 'ptTypeFilter' : 'ptDelinqFilter';
   document.querySelectorAll(`#${groupId} .pt-radio`).forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  if (ptLoaded) renderPaymentTargets();
+}
+
+function setPtCategory(cat) {
+  ptFilter.category = cat;
   if (ptLoaded) renderPaymentTargets();
 }
 
@@ -1613,90 +1633,135 @@ async function loadPaymentTargets() {
 }
 
 function renderPaymentTargets() {
-  const from = document.getElementById('ptDateFrom').value;
-  const to   = document.getElementById('ptDateTo').value;
+  const from  = document.getElementById('ptDateFrom').value;
+  const to    = document.getElementById('ptDateTo').value;
   const fromD = from ? new Date(from) : null;
   const toD   = to   ? new Date(to)   : null;
+  const fmtMon = v => { const n = parseFloat(String(v).replace(/[^0-9.-]/g,''))||0; return n ? '₩'+n.toLocaleString() : '—'; };
 
-  // 납기일 기간 필터
+  // ── 1단계: 날짜·종류·연체 필터 ──
   let list = incomeRawData.filter(r => {
     if (!r.dueDate) return false;
-    // 날짜 파싱 (yyyy. m. d / yyyy-mm-dd 등)
     const d = parseKorDate(r.dueDate);
     if (!d) return false;
     if (fromD && d < fromD) return false;
     if (toD   && d > toD)   return false;
     return true;
   });
-
-  // 계약종류 필터
-  if (ptFilter.type !== '전체') {
+  if (ptFilter.type !== '전체')
     list = list.filter(r => (r.contractType||'').includes(ptFilter.type));
-  }
-
-  // 연체 여부 필터
   if (ptFilter.delinq !== '전체') {
     list = list.filter(r => {
-      const isDelinq = (r.payStatus||'').includes('연체') ||
-        paymentRawData.filter(p => String(p['계약번호']||'').trim() === r.no)
-          .some(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0) > 0);
-      return ptFilter.delinq === '연체' ? isDelinq : !isDelinq;
+      const isD = (r.payStatus||'').includes('연체') ||
+        paymentRawData.filter(p => String(p['계약번호']||'').trim()===r.no)
+          .some(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0)>0);
+      return ptFilter.delinq === '연체' ? isD : !isD;
     });
   }
 
-  // 수납 대상 분류
-  const fmtMon = v => {
-    const n = parseFloat(String(v).replace(/[^0-9.-]/g,''))||0;
-    return n ? '₩' + n.toLocaleString() : '—';
-  };
-
-  let delinqCnt = 0, firstCnt = 0, activeCnt = 0;
-
-  const rows = list.map(r => {
-    const contract = contractRawData.find(c => String(c['계약번호']||'').trim() === r.no) || {};
-    const vacancy  = vacancyRawData.find(v => String(v.no).trim() === r.no) || {};
-    const payments = paymentRawData.filter(p => String(p['계약번호']||'').trim() === r.no);
-
-    // 수납 대상 분류
-    const tags = [];
-    const isActive = String(contract['계약상태']||'').includes('정상') ||
-                     !String(contract['계약상태']||'').match(/종료|해지/);
-    const hasDelinqPayment = payments.some(p =>
-      (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0) > 0);
-    const isFirst = payments.length <= 1;
-
-    if (hasDelinqPayment) { tags.push('<span class="pt-tag pt-tag-delinq">전월연체</span>'); delinqCnt++; }
-    if (isFirst)          { tags.push('<span class="pt-tag pt-tag-first">첫납부</span>');   firstCnt++; }
-    if (isActive && !hasDelinqPayment && !isFirst)
-                          { tags.push('<span class="pt-tag pt-tag-active">계약중</span>');  activeCnt++; }
-
-    // 연락처: vacancy AT열 우선, 없으면 contractRawData
-    const phone = vacancy.tenantName || contract['임차인휴대폰'] || '—';
+  // ── 2단계: 전체 분류 (카테고리 카운트용) ──
+  const categorized = list.map(r => {
+    const contract = contractRawData.find(c => String(c['계약번호']||'').trim()===r.no)||{};
+    const vacancy  = vacancyRawData.find(v => String(v.no).trim()===r.no)||{};
+    const payments = paymentRawData.filter(p => String(p['계약번호']||'').trim()===r.no);
+    const hasDelinq = payments.some(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0)>0);
+    const isFirst   = payments.length <= 1;
+    const isActive  = !String(contract['계약상태']||'').match(/종료|해지/);
+    // 우선순위: 전월연체 > 첫납부 > 계약중
+    const cat = hasDelinq ? '전월연체' : isFirst ? '첫납부' : isActive ? '계약중' : '기타';
+    const phone = vacancy.tenantPhone || contract['임차인휴대폰'] || '—';
     const name  = r.name || contract['임차인명'] || contract['임차인'] || '—';
+    return { r, contract, vacancy, payments, hasDelinq, isFirst, isActive, cat, phone, name };
+  });
 
+  const counts = { 전체: categorized.length, 전월연체:0, 첫납부:0, 계약중:0 };
+  categorized.forEach(x => { if (counts[x.cat]!==undefined) counts[x.cat]++; });
+
+  // ── 3단계: 카테고리 필터 적용 ──
+  const display = ptFilter.category === '전체'
+    ? categorized
+    : categorized.filter(x => x.cat === ptFilter.category);
+
+  // ── 도넛 차트 SVG ──
+  const total = counts['전체'] || 1;
+  const chartData = [
+    { label:'전월연체', cnt:counts['전월연체'], color:'#DC2626' },
+    { label:'첫납부',   cnt:counts['첫납부'],   color:'#16A34A' },
+    { label:'계약중',   cnt:counts['계약중'],   color:'#2563A8' },
+  ];
+  const R=40, cx=50, cy=50, stroke=14;
+  let offset=0;
+  const circum = 2*Math.PI*R;
+  const arcs = chartData.map(d => {
+    const pct = d.cnt/total;
+    const dash = pct*circum;
+    const arc = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${d.color}"
+      stroke-width="${stroke}" stroke-dasharray="${dash.toFixed(2)} ${(circum-dash).toFixed(2)}"
+      stroke-dashoffset="${(-offset*circum).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset += pct;
+    return arc;
+  }).join('');
+  const donutSvg = `<svg width="100" height="100" viewBox="0 0 100 100">
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#F0F4F8" stroke-width="${stroke}"/>
+    ${arcs}
+  </svg>`;
+
+  // 가로 바 차트
+  const barRows = chartData.map(d => {
+    const pct = total ? Math.round(d.cnt/total*100) : 0;
+    return `<div class="pt-bar-row">
+      <div class="pt-bar-label">${d.label}</div>
+      <div class="pt-bar-track">
+        <div class="pt-bar-fill" style="width:${pct}%;background:${d.color}">${d.cnt>0?d.cnt:''}</div>
+      </div>
+      <div class="pt-bar-count">${d.cnt}건</div>
+    </div>`;
+  }).join('');
+
+  // 카테고리 칩 (클릭 필터)
+  const chipDefs = [
+    { key:'전체',   cls:'pt-chip-total',  label:`전체 ${counts['전체']}건` },
+    { key:'전월연체', cls:'pt-chip-delinq', label:`전월연체 ${counts['전월연체']}건` },
+    { key:'첫납부',  cls:'pt-chip-first',  label:`첫납부 ${counts['첫납부']}건` },
+    { key:'계약중',  cls:'pt-chip-active', label:`계약중 ${counts['계약중']}건` },
+  ];
+  const chips = chipDefs.map(c =>
+    `<span class="pt-summary-chip ${c.cls}${ptFilter.category===c.key?' active':''}"
+      onclick="setPtCategory('${c.key}')">${c.label}</span>`
+  ).join('');
+
+  // 테이블 rows
+  const tagHtml = x => {
+    const m = { 전월연체:'pt-tag-delinq', 첫납부:'pt-tag-first', 계약중:'pt-tag-active' };
+    return x.cat in m ? `<span class="pt-tag ${m[x.cat]}">${x.cat}</span>` : '—';
+  };
+  const rows = display.map(x => {
+    const { r, vacancy, contract } = x;
     return `<tr onclick="selectContractRow('${r.no}');switchView('contract')">
       <td><b>${r.no}</b></td>
-      <td>${name}</td>
-      <td style="color:#5A6A8A;font-size:11px">${phone}</td>
+      <td>${x.name}</td>
+      <td style="color:#5A6A8A;font-size:11px">${x.phone}</td>
       <td>${r.payCondition||'—'}</td>
       <td style="text-align:right" class="pt-money">${fmtMon(vacancy.rent||contract['임대료'])}</td>
       <td style="text-align:right" class="pt-money">${fmtMon(vacancy.fee||contract['수수료'])}</td>
       <td style="text-align:right" class="pt-money">${fmtMon(vacancy.monthRent)}</td>
       <td style="text-align:right" class="pt-money">${fmtMon(vacancy.mgmtFee)}</td>
-      <td>${r.dueDate||'—'}</td>
-      <td>${tags.join(' ')||'—'}</td>
+      <td style="white-space:nowrap">${r.dueDate||'—'}</td>
+      <td>${tagHtml(x)}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="10" style="text-align:center;color:#B0BDCE;padding:24px">해당 조건의 수납 대상이 없습니다.</td></tr>';
 
   document.getElementById('ptResult').innerHTML = `
     <div class="cr-card">
-      <div class="cr-card-title">💰 수납 대상 ${list.length}건 (${from} ~ ${to})</div>
-      <div class="pt-summary">
-        <span class="pt-summary-chip pt-chip-total">전체 ${list.length}건</span>
-        <span class="pt-summary-chip pt-chip-delinq">전월연체 ${delinqCnt}건</span>
-        <span class="pt-summary-chip pt-chip-first">첫납부 ${firstCnt}건</span>
-        <span class="pt-summary-chip pt-chip-active">계약중 ${activeCnt}건</span>
+      <div class="cr-card-title">💰 수납 대상 ${counts['전체']}건 (${from} ~ ${to})</div>
+      <div class="pt-chart-wrap">
+        <div class="pt-donut-wrap">${donutSvg}
+          <div class="pt-donut-label">${counts['전체']}<span class="pt-donut-sub">건</span></div>
+        </div>
+        <div class="pt-bars">${barRows}</div>
       </div>
+      <div style="padding:10px 20px 4px;display:flex;gap:10px;flex-wrap:wrap">${chips}</div>
+      <div style="padding:4px 20px 8px;font-size:11px;color:#8A9AB5">표시 ${display.length}건</div>
       <div style="overflow-x:auto"><table class="pt-table">
         <thead><tr>
           <th>계약번호</th><th>임차인명</th><th>연락처</th><th>납부조건</th>
