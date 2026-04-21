@@ -1310,6 +1310,25 @@ function renderContractRecord(c, payments, responses = []) {
     return `<div class="cr-tl-step ${cls}">${i}</div>`;
   }).join('');
 
+  // ── 현재 연체 현황 계산 (입금내역 기준) ──
+  const isDelinqStatus = p => {
+    const s = String(p['납부상태']||'').trim();
+    return s.includes('연체') || s.includes('분납');
+  };
+  const sumDelinq = (keyword, exclude) => payments
+    .filter(p => isDelinqStatus(p))
+    .filter(p => {
+      const nm = String(p['청구서명']||p['납부종류']||'');
+      return nm.includes(keyword) && (!exclude || !nm.includes(exclude));
+    })
+    .reduce((acc, p) => acc + (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0), 0);
+
+  const delinqRent    = sumDelinq('임대료', '수수료');
+  const delinqFee     = sumDelinq('수수료');
+  const delinqExit    = sumDelinq('퇴실정산');
+  const delinqTotal   = delinqRent + delinqFee + delinqExit;
+  const hasDelinq     = delinqTotal > 0;
+
   // ── 입금 상세 테이블 ──
   const detailRows = payments.map(p => {
     const status = String(p['납부상태']||'').trim();
@@ -1364,6 +1383,33 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-tl-item"><span class="cr-tl-item-label">첫 연체</span><span class="cr-tl-item-val">${fmt(c['첫 연체'])}</span></div>
         <div class="cr-tl-item"><span class="cr-tl-item-label">계약상태</span><span class="cr-tl-item-val">${fmt(c['계약상태'])}</span></div>
       </div>
+    </div>
+  </div>
+
+  <div style="background:${hasDelinq?'#FFF5F5':'#F0FDF4'};border:1px solid ${hasDelinq?'#FECACA':'#BBF7D0'};border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:8px;min-width:120px">
+      <span style="font-size:16px">${hasDelinq?'⚠️':'✅'}</span>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:${hasDelinq?'#DC2626':'#16A34A'};letter-spacing:0.5px">연체 상태</div>
+        <div style="font-size:13px;font-weight:800;color:${hasDelinq?'#DC2626':'#16A34A'}">${hasDelinq?'연체중':'정상'}</div>
+      </div>
+    </div>
+    <div style="width:1px;height:36px;background:${hasDelinq?'#FECACA':'#BBF7D0'}"></div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;flex:1">
+      ${[
+        ['임대료 연체', delinqRent],
+        ['수수료 연체', delinqFee],
+        ['퇴실정산 연체', delinqExit]
+      ].map(([label, amt]) => `
+        <div>
+          <div style="font-size:10px;color:#8A9AB5;font-weight:600;margin-bottom:2px">${label}</div>
+          <div style="font-size:14px;font-weight:800;color:${amt>0?'#DC2626':'#1A3A5C'}">${amt>0?fmtMoney(amt):'₩0'}</div>
+        </div>`).join('')}
+      ${delinqTotal>0?`
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:10px;color:#8A9AB5;font-weight:600;margin-bottom:2px">연체 합계</div>
+        <div style="font-size:16px;font-weight:900;color:#DC2626">${fmtMoney(delinqTotal)}</div>
+      </div>`:''}
     </div>
   </div>
 
