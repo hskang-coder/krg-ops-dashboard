@@ -348,6 +348,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .cr-badge-paid { background: #DCFCE7; color: #16A34A; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
 .cr-badge-unpaid { background: #FEE2E2; color: #DC2626; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
 .cr-badge-partial { background: #FEF3C7; color: #D97706; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+.cr-badge-purple { background: #F3E8FF; color: #7C3AED; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
 .cr-card { background: #fff; border-radius: 12px; border: 1px solid #E2EAF8; box-shadow: 0 2px 8px rgba(30,50,100,0.05); overflow: hidden; }
 .cr-card-title { font-size: 12px; font-weight: 700; color: #5A6A8A; padding: 12px 20px; border-bottom: 1px solid #E8EFF8; display: flex; align-items: center; gap: 6px; }
 
@@ -1803,9 +1804,22 @@ function renderPaymentTargets() {
       <td>${x.name}</td>
       <td style="color:#5A6A8A;font-size:11px">${x.phone}</td>
       <td>${vacancy.billCount ? vacancy.billCount+'회' : '—'}</td>
-      ${(()=>{ const ds=['연체중','분납중','연체납부']; const s=r.payStatus||'';
-        return s ? (ds.some(v=>s.includes(v)) ? `<td><span class="cr-badge-unpaid">${s}</span></td>` : `<td><span class="cr-badge-paid">${s}</span></td>`) : '<td>—</td>'; })()}
-      <td>${x.cat==='전월연체'?'전월연체자':x.cat==='첫납부'?'첫납부자':'—'}</td>
+      ${(()=>{
+        const s = r.payStatus || '';
+        if (!s) return '<td>—</td>';
+        if (s.includes('정상납부')) return `<td><span class="cr-badge-paid">${s}</span></td>`;
+        if (s.includes('납부예정')) return `<td><span class="cr-badge-partial">${s}</span></td>`;
+        if (s.includes('분납중'))  return `<td><span class="cr-badge-purple">${s}</span></td>`;
+        if (s.includes('연체중') || s.includes('연체납부')) return `<td><span class="cr-badge-unpaid">${s}</span></td>`;
+        return `<td><span class="cr-badge-partial">${s}</span></td>`;
+      })()}
+      <td>${(()=>{
+        const s = r.payStatus || '';
+        if (s.includes('정상납부')) return '—';
+        if (x.cat === '전월연체') return '전월연체자';
+        if (x.cat === '첫납부')   return '첫납부자';
+        return '—';
+      })()}</td>
       <td style="white-space:nowrap">${r.dueDate||'—'}</td>
       <td>${tagHtml(x)}</td>
     </tr>`;
