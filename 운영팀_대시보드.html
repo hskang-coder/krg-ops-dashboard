@@ -215,6 +215,37 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .sr-status-pill { font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; border: 1px solid transparent; background: #F0F4F8; color: #5A6A8A; transition: all .15s; }
 .sr-status-pill.active { color: #fff !important; }
 .sr-status-pill:not(.active):hover { background: #E2EAF8; }
+/* ── 수납 대상 뷰 ── */
+.pt-wrap { padding: 16px; max-width: 1200px; margin: 0 auto; }
+.pt-filter-panel { background: #fff; border-radius: 12px; border: 1px solid #E2EAF8; padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(30,50,100,0.05); }
+.pt-filter-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+.pt-filter-group { display: flex; flex-direction: column; gap: 6px; }
+.pt-filter-label { font-size: 11px; font-weight: 700; color: #5A6A8A; }
+.pt-date-range { display: flex; align-items: center; gap: 8px; }
+.pt-date-input { border: 1px solid #D0DBF0; border-radius: 8px; padding: 7px 10px; font-size: 12px; color: #1A3A5C; outline: none; }
+.pt-date-input:focus { border-color: #4DA3E8; }
+.pt-date-sep { font-size: 12px; color: #8A9AB5; }
+.pt-search-btn { background: #1A3A5C; color: #fff; border: none; border-radius: 8px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.pt-search-btn:hover { background: #2563A8; }
+.pt-radio-group { display: flex; gap: 4px; }
+.pt-radio { font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 20px; border: 1px solid #D0DBF0; background: #F0F4F8; color: #5A6A8A; cursor: pointer; }
+.pt-radio.active { background: #1A3A5C; color: #fff; border-color: #1A3A5C; }
+.pt-radio:not(.active):hover { background: #E2EAF8; }
+.pt-summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.pt-summary-chip { font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
+.pt-chip-total { background: #EFF6FF; color: #2563A8; border: 1px solid #BFDBFE; }
+.pt-chip-delinq { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
+.pt-chip-first { background: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
+.pt-chip-active { background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE; }
+.pt-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pt-table th { background: #1A3A5C; color: #fff; padding: 9px 12px; font-weight: 700; text-align: left; font-size: 11px; position: sticky; top: 0; white-space: nowrap; }
+.pt-table td { padding: 9px 12px; border-bottom: 1px solid #F0F4F8; vertical-align: middle; }
+.pt-table tr:hover td { background: #EEF4FF; cursor: pointer; }
+.pt-tag { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; display: inline-block; white-space: nowrap; }
+.pt-tag-delinq { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
+.pt-tag-first  { background: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
+.pt-tag-active { background: #EFF6FF; color: #2563A8; border: 1px solid #BFDBFE; }
+.pt-money { font-weight: 700; color: #1A3A5C; font-size: 11px; }
 .cr-search-result-count { font-size: 11px; color: #9AAAC4; padding: 6px 14px 0; }
 
 /* 헤더 카드 */
@@ -580,6 +611,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <button class="view-tab active" onclick="switchView('dashboard')">📊 대시보드</button>
     <button class="view-tab"        onclick="switchView('checklist')">✅ 체크리스트</button>
     <button class="view-tab"        onclick="switchView('contract')">📋 계약레코드</button>
+    <button class="view-tab"        onclick="switchView('payment')">💰 수납 대상</button>
   </div>
 
   <!-- Person tabs (checklist only) -->
@@ -781,6 +813,46 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   </div>
 </div>
 
+<!-- ─── PAYMENT TARGET VIEW ─── -->
+<div id="paymentView" class="view-content">
+  <div class="pt-wrap">
+    <!-- 필터 패널 -->
+    <div class="pt-filter-panel">
+      <div class="pt-filter-row">
+        <div class="pt-filter-group">
+          <label class="pt-filter-label">📅 납기일 기간</label>
+          <div class="pt-date-range">
+            <input type="date" id="ptDateFrom" class="pt-date-input">
+            <span class="pt-date-sep">~</span>
+            <input type="date" id="ptDateTo" class="pt-date-input">
+            <button class="pt-search-btn" onclick="loadPaymentTargets()">🔍 조회</button>
+          </div>
+        </div>
+        <div class="pt-filter-group">
+          <label class="pt-filter-label">계약종류</label>
+          <div class="pt-radio-group" id="ptTypeFilter">
+            <button class="pt-radio active" onclick="setPtFilter('type','전체',this)">전체</button>
+            <button class="pt-radio" onclick="setPtFilter('type','상업',this)">상업</button>
+            <button class="pt-radio" onclick="setPtFilter('type','주거',this)">주거</button>
+          </div>
+        </div>
+        <div class="pt-filter-group">
+          <label class="pt-filter-label">연체 여부</label>
+          <div class="pt-radio-group" id="ptDelinqFilter">
+            <button class="pt-radio active" onclick="setPtFilter('delinq','전체',this)">전체</button>
+            <button class="pt-radio" onclick="setPtFilter('delinq','연체',this)">연체</button>
+            <button class="pt-radio" onclick="setPtFilter('delinq','정상',this)">정상</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 결과 -->
+    <div id="ptResult">
+      <div class="cr-empty">📅 납기일 기간을 설정하고 조회하세요</div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -793,6 +865,7 @@ const DAILY_RPT_GID   = '554798125';  // 연체관리(Daily Report) 시트
 const VACANCY_GID     = '1953907648'; // 공실현황 시트 (BN=공실상태, BO=퇴실일)
 const CONTRACT_SHEET  = '계약관리(Raw DATA)';
 const INCOME_SHEET    = '입금내역(Raw DATA)';
+const INCOME_GID      = '131074722';   // 입금내역(Raw DATA) GID
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyu3blAI8YFEPTpOQfQsaPfZYnRhvJIVmHSr_Bup9FpGXaWU3dhR1URMuvpLhZ6wEA/exec';
 
 // ═══════════════════════════════════════════
@@ -803,6 +876,8 @@ let contractRawData  = [];
 let paymentRawData   = [];
 let daeungRawData    = [];
 let vacancyRawData   = []; // 공실현황 시트 (계약번호 → 공실상태, 퇴실일)
+let incomeRawData    = []; // 입금내역 시트 (수납 대상용)
+let ptLoaded         = false; // 수납 대상 데이터 로드 여부
 let crLoaded         = false;
 let srMatches        = [];      // 현재 검색 결과 전체 (상태 필터용)
 let srStatusFilter   = '전체';  // 계약상태 필터 현재값
@@ -1036,13 +1111,14 @@ function switchView(view) {
   document.getElementById('dashboardView').classList.toggle('active', view === 'dashboard');
   document.getElementById('checklistView').classList.toggle('active', view === 'checklist');
   document.getElementById('contractView').classList.toggle('active', view === 'contract');
+  document.getElementById('paymentView').classList.toggle('active', view === 'payment');
   document.getElementById('personTabsRow').style.display = view === 'checklist' ? 'flex' : 'none';
-  const titles = { dashboard:'운영팀 대시보드', checklist:'업무 체크리스트', contract:'계약 레코드 관리' };
+  const titles = { dashboard:'운영팀 대시보드', checklist:'업무 체크리스트', contract:'계약 레코드 관리', payment:'수납 대상 관리' };
   document.getElementById('pageTitle').textContent = titles[view] || '';
   document.getElementById('refreshBtn').style.display = view === 'dashboard' ? '' : 'none';
 
   document.querySelectorAll('.view-tab').forEach((btn,i) => {
-    btn.classList.toggle('active', ['dashboard','checklist','contract'][i] === view);
+    btn.classList.toggle('active', ['dashboard','checklist','contract','payment'][i] === view);
   });
 
   if (view === 'checklist') {
@@ -1185,8 +1261,13 @@ function parseVacancySheet(resp) {
   const exitDateIdx = fi('실제퇴실일'); // BO열(66) — '퇴실일'은 Z열이므로 정확히 매칭
   const jIdx          = 9;  // J열 (0-based index 9) = 중도퇴실
   const landlordIdx   = 39; // AO열 (0-based) = 임대인명
-  const tenantIdx     = 44; // AT열 (0-based) = 임차인
+  const tenantIdx     = 44; // AT열 (0-based) = 임차인(이름/연락처)
   const inspectTypeIdx= 57; // BF열 (0-based) = 심사구분
+  const rentIdx       = 36; // AK열 (0-based) = 임대료
+  const feeIdx        = 37; // AL열 (0-based) = 서비스 수수료
+  const monthRent1Idx = 33; // AH열 (0-based) = 월세①
+  const monthRent2Idx = 34; // AI열 (0-based) = 월세②
+  const mgmtFeeIdx    = 35; // AJ열 (0-based) = 관리비
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -1198,9 +1279,14 @@ function parseVacancySheet(resp) {
       status:       cell(statusIdx),
       exitDate:     cell(exitDateIdx),
       jValue:       cell(jIdx),        // J열: 중도퇴실 관련 값
-      tenantName:   cell(tenantIdx),    // AT열: 임차인 이름
-      landlordName: cell(landlordIdx), // AO열: 임대인명
-      inspectType:  cell(inspectTypeIdx) // BF열: 심사구분
+      tenantName:   cell(tenantIdx),      // AT열: 임차인 이름/연락처
+      landlordName: cell(landlordIdx),   // AO열: 임대인명
+      inspectType:  cell(inspectTypeIdx),// BF열: 심사구분
+      rent:         cell(rentIdx),       // AK열: 임대료
+      fee:          cell(feeIdx),        // AL열: 서비스 수수료
+      monthRent:    (parseFloat(String(cell(monthRent1Idx)).replace(/[^0-9.-]/g,'')||0)
+                   + parseFloat(String(cell(monthRent2Idx)).replace(/[^0-9.-]/g,'')||0)) || cell(monthRent1Idx),
+      mgmtFee:      cell(mgmtFeeIdx)     // AJ열: 관리비
     };
   }).filter(Boolean);
 }
@@ -1447,6 +1533,187 @@ function renderContractListTable(filter) {
 
 function filterContractList() {
   renderContractListTable(document.getElementById('crListFilter').value);
+}
+
+// ═══════════════════════════════════════════
+// ■ 수납 대상 (Payment Target)
+// ═══════════════════════════════════════════
+let ptFilter = { type:'전체', delinq:'전체' };
+
+function setPtFilter(key, val, btn) {
+  ptFilter[key] = val;
+  const groupId = key === 'type' ? 'ptTypeFilter' : 'ptDelinqFilter';
+  document.querySelectorAll(`#${groupId} .pt-radio`).forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (ptLoaded) renderPaymentTargets();
+}
+
+function parseIncomeSheet(resp) {
+  if (!resp || !resp.table) return [];
+  const { cols, rows } = resp.table;
+  const labels = cols.map(c => (c.label||c.id||'').trim());
+  const fi = name => labels.findIndex(l => l.includes(name));
+  const noIdx      = 4;  // E열 (0-based) = 계약번호
+  const nameIdx    = 14; // O열 (0-based) = 임차인명
+  const dueDateIdx = 28; // AC열 (0-based) = 납기일
+  const typeIdx    = fi('계약종류');
+  const condIdx    = fi('납부조건') >= 0 ? fi('납부조건') : fi('납부방법');
+  const statusIdx  = fi('납부상태');
+  return (rows||[]).map(row => {
+    const c = row.c || [];
+    const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
+    const no = cell(noIdx);
+    if (!no) return null;
+    return {
+      no,
+      name:       cell(nameIdx),
+      dueDate:    cell(dueDateIdx),
+      dueDateRaw: c[dueDateIdx] ? (c[dueDateIdx].v || '') : '',
+      contractType: cell(typeIdx),
+      payCondition: cell(condIdx),
+      payStatus:  cell(statusIdx)
+    };
+  }).filter(Boolean);
+}
+
+async function loadPaymentTargets() {
+  const from = document.getElementById('ptDateFrom').value;
+  const to   = document.getElementById('ptDateTo').value;
+  if (!from || !to) {
+    document.getElementById('ptResult').innerHTML =
+      '<div class="cr-empty">⚠️ 납기일 시작일과 종료일을 모두 입력하세요.</div>';
+    return;
+  }
+  document.getElementById('ptResult').innerHTML =
+    '<div class="cr-empty">📡 수납 대상 데이터 로딩 중...</div>';
+  try {
+    const resp = await fetchSheetByGid(INCOME_GID);
+    incomeRawData = parseIncomeSheet(resp);
+    // 계약·입금 데이터도 없으면 함께 로드
+    if (!crLoaded) {
+      const [cGviz, pGviz] = await Promise.all([
+        fetchSheetByName(CONTRACT_SHEET),
+        fetchSheetByName(INCOME_SHEET)
+      ]);
+      contractRawData = gvizToObjects(cGviz).filter(r => r['계약번호']);
+      paymentRawData  = gvizToObjects(pGviz).filter(r => r['계약번호']);
+      crLoaded = true;
+    }
+    // 공실현황 없으면 로드
+    if (!vacancyRawData.length) {
+      const vResp = await fetchSheetByGid(VACANCY_GID);
+      vacancyRawData = parseVacancySheet(vResp);
+    }
+    ptLoaded = true;
+    renderPaymentTargets();
+  } catch(e) {
+    document.getElementById('ptResult').innerHTML =
+      `<div class="cr-empty">❌ 로드 실패: ${e.message}</div>`;
+  }
+}
+
+function renderPaymentTargets() {
+  const from = document.getElementById('ptDateFrom').value;
+  const to   = document.getElementById('ptDateTo').value;
+  const fromD = from ? new Date(from) : null;
+  const toD   = to   ? new Date(to)   : null;
+
+  // 납기일 기간 필터
+  let list = incomeRawData.filter(r => {
+    if (!r.dueDate) return false;
+    // 날짜 파싱 (yyyy. m. d / yyyy-mm-dd 등)
+    const d = parseKorDate(r.dueDate);
+    if (!d) return false;
+    if (fromD && d < fromD) return false;
+    if (toD   && d > toD)   return false;
+    return true;
+  });
+
+  // 계약종류 필터
+  if (ptFilter.type !== '전체') {
+    list = list.filter(r => (r.contractType||'').includes(ptFilter.type));
+  }
+
+  // 연체 여부 필터
+  if (ptFilter.delinq !== '전체') {
+    list = list.filter(r => {
+      const isDelinq = (r.payStatus||'').includes('연체') ||
+        paymentRawData.filter(p => String(p['계약번호']||'').trim() === r.no)
+          .some(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0) > 0);
+      return ptFilter.delinq === '연체' ? isDelinq : !isDelinq;
+    });
+  }
+
+  // 수납 대상 분류
+  const fmtMon = v => {
+    const n = parseFloat(String(v).replace(/[^0-9.-]/g,''))||0;
+    return n ? '₩' + n.toLocaleString() : '—';
+  };
+
+  let delinqCnt = 0, firstCnt = 0, activeCnt = 0;
+
+  const rows = list.map(r => {
+    const contract = contractRawData.find(c => String(c['계약번호']||'').trim() === r.no) || {};
+    const vacancy  = vacancyRawData.find(v => String(v.no).trim() === r.no) || {};
+    const payments = paymentRawData.filter(p => String(p['계약번호']||'').trim() === r.no);
+
+    // 수납 대상 분류
+    const tags = [];
+    const isActive = String(contract['계약상태']||'').includes('정상') ||
+                     !String(contract['계약상태']||'').match(/종료|해지/);
+    const hasDelinqPayment = payments.some(p =>
+      (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0) > 0);
+    const isFirst = payments.length <= 1;
+
+    if (hasDelinqPayment) { tags.push('<span class="pt-tag pt-tag-delinq">전월연체</span>'); delinqCnt++; }
+    if (isFirst)          { tags.push('<span class="pt-tag pt-tag-first">첫납부</span>');   firstCnt++; }
+    if (isActive && !hasDelinqPayment && !isFirst)
+                          { tags.push('<span class="pt-tag pt-tag-active">계약중</span>');  activeCnt++; }
+
+    // 연락처: vacancy AT열 우선, 없으면 contractRawData
+    const phone = vacancy.tenantName || contract['임차인휴대폰'] || '—';
+    const name  = r.name || contract['임차인명'] || contract['임차인'] || '—';
+
+    return `<tr onclick="selectContractRow('${r.no}');switchView('contract')">
+      <td><b>${r.no}</b></td>
+      <td>${name}</td>
+      <td style="color:#5A6A8A;font-size:11px">${phone}</td>
+      <td>${r.payCondition||'—'}</td>
+      <td style="text-align:right" class="pt-money">${fmtMon(vacancy.rent||contract['임대료'])}</td>
+      <td style="text-align:right" class="pt-money">${fmtMon(vacancy.fee||contract['수수료'])}</td>
+      <td style="text-align:right" class="pt-money">${fmtMon(vacancy.monthRent)}</td>
+      <td style="text-align:right" class="pt-money">${fmtMon(vacancy.mgmtFee)}</td>
+      <td>${r.dueDate||'—'}</td>
+      <td>${tags.join(' ')||'—'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" style="text-align:center;color:#B0BDCE;padding:24px">해당 조건의 수납 대상이 없습니다.</td></tr>';
+
+  document.getElementById('ptResult').innerHTML = `
+    <div class="cr-card">
+      <div class="cr-card-title">💰 수납 대상 ${list.length}건 (${from} ~ ${to})</div>
+      <div class="pt-summary">
+        <span class="pt-summary-chip pt-chip-total">전체 ${list.length}건</span>
+        <span class="pt-summary-chip pt-chip-delinq">전월연체 ${delinqCnt}건</span>
+        <span class="pt-summary-chip pt-chip-first">첫납부 ${firstCnt}건</span>
+        <span class="pt-summary-chip pt-chip-active">계약중 ${activeCnt}건</span>
+      </div>
+      <div style="overflow-x:auto"><table class="pt-table">
+        <thead><tr>
+          <th>계약번호</th><th>임차인명</th><th>연락처</th><th>납부조건</th>
+          <th>임대료</th><th>수수료</th><th>월세</th><th>관리비</th>
+          <th>납기일</th><th>수납 대상</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>`;
+}
+
+function parseKorDate(str) {
+  if (!str) return null;
+  // "2025. 4. 16" → Date
+  const m = str.match(/(\d{4})[.\-\/\s]+(\d{1,2})[.\-\/\s]+(\d{1,2})/);
+  if (m) return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+  return null;
 }
 
 function selectContractRow(no) {
