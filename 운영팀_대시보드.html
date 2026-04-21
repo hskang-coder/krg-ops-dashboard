@@ -781,6 +781,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 const SHEET_ID        = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
 const DAEUNG_GID      = '1690142748';
 const DAILY_RPT_GID   = '554798125';  // 연체관리(Daily Report) 시트
+const VACANCY_GID     = '1953907648'; // 공실현황 시트 (BN=공실상태, BO=퇴실일)
 const CONTRACT_SHEET  = '계약관리(Raw DATA)';
 const INCOME_SHEET    = '입금내역(Raw DATA)';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyu3blAI8YFEPTpOQfQsaPfZYnRhvJIVmHSr_Bup9FpGXaWU3dhR1URMuvpLhZ6wEA/exec';
@@ -792,6 +793,7 @@ let currentView      = 'dashboard';
 let contractRawData  = [];
 let paymentRawData   = [];
 let daeungRawData    = [];
+let vacancyRawData   = []; // 공실현황 시트 (계약번호 → 공실상태, 퇴실일)
 let crLoaded         = false;
 let currentPeriod    = 'daily';
 let currentPerson    = '고송미';   // 체크리스트 담당자
@@ -1097,6 +1099,25 @@ function parseDaeungFull(resp) {
   }).filter(Boolean);
 }
 
+// GID=1953907648 시트 파싱 (계약번호, BN=공실상태, BO=퇴실일)
+function parseVacancySheet(resp) {
+  if (!resp || !resp.table) return [];
+  const { cols, rows } = resp.table;
+  const labels = cols.map(c => (c.label||c.id||'').trim());
+  const fi = name => labels.findIndex(l => l.includes(name));
+  const noIdx       = fi('계약번호');
+  const statusIdx   = fi('공실상태');
+  const exitDateIdx = fi('퇴실일');
+  if (noIdx < 0) return [];
+  return (rows||[]).map(row => {
+    const c = row.c || [];
+    const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
+    const no = cell(noIdx);
+    if (!no) return null;
+    return { no, status: cell(statusIdx), exitDate: cell(exitDateIdx) };
+  }).filter(Boolean);
+}
+
 async function loadContractData() {
   const el = document.getElementById('crResult');
   el.innerHTML = '<div class="cr-empty">📡 계약 데이터 로딩 중...</div>';
@@ -1110,7 +1131,7 @@ async function loadContractData() {
     paymentRawData  = gvizToObjects(pGviz).filter(r => r['계약번호']);
     crLoaded = true;
     el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료.<br>검색 방법을 선택 후 입력하거나, 📋 목록에서 선택하세요.<br><span style="font-size:11px;color:#B0BDCE">📞 대응내역 로딩 중...</span></div>`;
-    // 2단계: 연체관리(Daily Report) (fetch API, 백그라운드 로드)
+    // 2단계: 연체관리(Daily Report) + 공실현황 (백그라운드 로드)
     fetchSheetByGid(DAILY_RPT_GID).then(dResp => {
       daeungRawData = parseDailyReport(dResp);
       // 이미 계약 레코드가 열려 있으면 대응내역 섹션만 업데이트
@@ -1131,6 +1152,10 @@ async function loadContractData() {
         el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료. (대응내역 로드 실패)<br>검색 방법을 선택 후 입력하거나, 📋 목록에서 선택하세요.</div>`;
       }
     });
+    // 공실현황 시트 (GID=1953907648) 백그라운드 로드
+    fetchSheetByGid(VACANCY_GID).then(vResp => {
+      vacancyRawData = parseVacancySheet(vResp);
+    }).catch(() => { vacancyRawData = []; });
   } catch(e) {
     el.innerHTML = `<div class="cr-empty">❌ 데이터 로드 실패: ${e.message}</div>`;
   }
@@ -1338,6 +1363,11 @@ function renderContractRecord(c, payments, responses = []) {
   const contractStatusStr = String(c['계약상태']||'').trim();
   const isActive = !contractStatusStr.includes('종료') && !contractStatusStr.includes('해지');
 
+  // 공실현황 시트에서 공실상태 + 실제 퇴실일 조회
+  const vacancyInfo   = vacancyRawData.find(v => String(v.no).trim() === String(c['계약번호']||'').trim()) || {};
+  const vacancyStatus = vacancyInfo.status   || '';
+  const actualExitDate = vacancyInfo.exitDate || '';
+
   // ── 입금 상세 테이블 ──
   const detailRows = payments.map(p => {
     const status = String(p['납부상태']||'').trim();
@@ -1415,10 +1445,13 @@ function renderContractRecord(c, payments, responses = []) {
       </div>
       <div class="cr-delinq-card ${isActive?'safe':''}">
         <div class="cr-delinq-title ${isActive?'safe':''}">계약 상태</div>
-        <div class="cr-delinq-amount ${isActive?'safe':''}">${isActive?'계약 중':'계약 종료'}</div>
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+          <div class="cr-delinq-amount ${isActive?'safe':''}">${isActive?'계약 중':'계약 종료'}</div>
+          ${vacancyStatus?`<span style="font-size:13px;font-weight:700;color:${isActive?'#16A34A':'#5A6A8A'};opacity:0.85">(${vacancyStatus})</span>`:''}
+        </div>
         <div class="cr-delinq-breakdown">
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">시작일</span><span class="cr-delinq-row-val">${fmt(c['시작일'])}</span></div>
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">종료일</span><span class="cr-delinq-row-val">${fmt(c['종료일'])}</span></div>
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">퇴실일</span><span class="cr-delinq-row-val ${actualExitDate?'red':''}">${actualExitDate ? fmt(actualExitDate) : fmt(c['종료일'])}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">상태</span><span class="cr-delinq-row-val">${fmt(c['계약상태'])}</span></div>
         </div>
       </div>
