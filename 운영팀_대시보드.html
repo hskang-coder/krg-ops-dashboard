@@ -1329,6 +1329,15 @@ function renderContractRecord(c, payments, responses = []) {
   const delinqTotal   = delinqRent + delinqFee + delinqExit;
   const hasDelinq     = delinqTotal > 0;
 
+  // 현재 연체중 항목의 최장 연체일 (납부상태가 '연체중'인 것만)
+  const longestCurrentDelinq = payments
+    .filter(p => String(p['납부상태']||'').trim().includes('연체중'))
+    .reduce((max, p) => Math.max(max, parseInt(p['연체일수']||0)), 0);
+
+  // 계약 활성 여부
+  const contractStatusStr = String(c['계약상태']||'').trim();
+  const isActive = !contractStatusStr.includes('종료') && !contractStatusStr.includes('해지');
+
   // ── 입금 상세 테이블 ──
   const detailRows = payments.map(p => {
     const status = String(p['납부상태']||'').trim();
@@ -1386,30 +1395,28 @@ function renderContractRecord(c, payments, responses = []) {
     </div>
   </div>
 
-  <div style="background:${hasDelinq?'#FFF5F5':'#F0FDF4'};border:1px solid ${hasDelinq?'#FECACA':'#BBF7D0'};border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-    <div style="display:flex;align-items:center;gap:8px;min-width:120px">
-      <span style="font-size:16px">${hasDelinq?'⚠️':'✅'}</span>
-      <div>
-        <div style="font-size:10px;font-weight:700;color:${hasDelinq?'#DC2626':'#16A34A'};letter-spacing:0.5px">연체 상태</div>
-        <div style="font-size:13px;font-weight:800;color:${hasDelinq?'#DC2626':'#16A34A'}">${hasDelinq?'연체중':'정상'}</div>
+  <div class="cr-card">
+    <div class="cr-card-title">${hasDelinq?'⚠️':'✅'} 현재 연체 현황</div>
+    <div class="cr-delinq-grid">
+      <div class="cr-delinq-card ${hasDelinq?'':'safe'}">
+        <div class="cr-delinq-title ${hasDelinq?'':'safe'}">${hasDelinq?'연체 총액':'연체 없음'}</div>
+        <div class="cr-delinq-amount ${hasDelinq?'':'safe'}">${fmtMoney(delinqTotal)}</div>
+        <div class="cr-delinq-breakdown">
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">임대료 연체</span><span class="cr-delinq-row-val ${delinqRent>0?'red':''}">${fmtMoney(delinqRent)}</span></div>
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">수수료 연체</span><span class="cr-delinq-row-val ${delinqFee>0?'red':''}">${fmtMoney(delinqFee)}</span></div>
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">퇴실정산 연체</span><span class="cr-delinq-row-val ${delinqExit>0?'red':''}">${fmtMoney(delinqExit)}</span></div>
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">현재 최장 연체일</span><span class="cr-delinq-row-val ${longestCurrentDelinq>0?'red':''}">${longestCurrentDelinq}일</span></div>
+        </div>
       </div>
-    </div>
-    <div style="width:1px;height:36px;background:${hasDelinq?'#FECACA':'#BBF7D0'}"></div>
-    <div style="display:flex;gap:20px;flex-wrap:wrap;flex:1">
-      ${[
-        ['임대료 연체', delinqRent],
-        ['수수료 연체', delinqFee],
-        ['퇴실정산 연체', delinqExit]
-      ].map(([label, amt]) => `
-        <div>
-          <div style="font-size:10px;color:#8A9AB5;font-weight:600;margin-bottom:2px">${label}</div>
-          <div style="font-size:14px;font-weight:800;color:${amt>0?'#DC2626':'#1A3A5C'}">${amt>0?fmtMoney(amt):'₩0'}</div>
-        </div>`).join('')}
-      ${delinqTotal>0?`
-      <div style="margin-left:auto;text-align:right">
-        <div style="font-size:10px;color:#8A9AB5;font-weight:600;margin-bottom:2px">연체 합계</div>
-        <div style="font-size:16px;font-weight:900;color:#DC2626">${fmtMoney(delinqTotal)}</div>
-      </div>`:''}
+      <div class="cr-delinq-card ${isActive?'safe':''}">
+        <div class="cr-delinq-title ${isActive?'safe':''}">계약 상태</div>
+        <div class="cr-delinq-amount ${isActive?'safe':''}">${isActive?'계약 중':'계약 종료'}</div>
+        <div class="cr-delinq-breakdown">
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">시작일</span><span class="cr-delinq-row-val">${fmt(c['시작일'])}</span></div>
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">종료일</span><span class="cr-delinq-row-val">${fmt(c['종료일'])}</span></div>
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">상태</span><span class="cr-delinq-row-val">${fmt(c['계약상태'])}</span></div>
+        </div>
+      </div>
     </div>
   </div>
 
