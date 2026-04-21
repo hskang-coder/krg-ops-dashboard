@@ -779,7 +779,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 // ■ CONFIG
 // ═══════════════════════════════════════════
 const SHEET_ID        = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
-const DAEUNG_GID      = '1690142748'; // 연체관리(daily report) 시트
+const DAEUNG_GID      = '1690142748';
+const DAILY_RPT_GID   = '554798125';  // 연체관리(Daily Report) 시트
 const CONTRACT_SHEET  = '계약관리(Raw DATA)';
 const INCOME_SHEET    = '입금내역(Raw DATA)';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyu3blAI8YFEPTpOQfQsaPfZYnRhvJIVmHSr_Bup9FpGXaWU3dhR1URMuvpLhZ6wEA/exec';
@@ -1032,6 +1033,34 @@ function switchCrMode(mode) {
   }
 }
 
+// 연체관리(Daily Report) 시트 파서
+// 컬럼: 대응일 | 계약번호 | 입금예정일 | 청구서명 | 대응 상세내용
+function parseDailyReport(resp) {
+  if (!resp || !resp.table) return [];
+  const { cols, rows } = resp.table;
+  const labels = cols.map(c => (c.label||c.id||'').trim());
+  const fi = name => labels.findIndex(l => l.includes(name));
+  const dateIdx    = fi('대응일');
+  const noIdx      = fi('계약번호');
+  const payDateIdx = fi('입금예정일');
+  const billIdx    = fi('청구서명');
+  const contentIdx = fi('대응 상세');
+  return (rows||[]).map(row => {
+    const c = row.c || [];
+    const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
+    const no = cell(noIdx);
+    if (!no || !cell(dateIdx)) return null;
+    return {
+      date:    cell(dateIdx),
+      no:      no,
+      payDate: cell(payDateIdx),
+      bill:    cell(billIdx),
+      content: cell(contentIdx)
+    };
+  }).filter(Boolean);
+}
+
+// 구 파서 (대응관리 시트용 — 대시보드 메인에서 사용)
 function parseDaeungFull(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
@@ -1042,8 +1071,7 @@ function parseDaeungFull(resp) {
   const noIdx    = fi('계약번호'), targetIdx = fi('대상구분');
   const contactIdx = fi('연락자'), catIdx = fi('업무구분');
   const subIdx   = fi('하위구분'), contentIdx = fi('업무내용');
-  const nextIdx  = fi('다음업무');
-  const jinIdx   = fi('업무진척');
+  const nextIdx  = fi('다음업무'), jinIdx = fi('업무진척');
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
@@ -1073,9 +1101,9 @@ async function loadContractData() {
     paymentRawData  = gvizToObjects(pGviz).filter(r => r['계약번호']);
     crLoaded = true;
     el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료.<br>검색 방법을 선택 후 입력하거나, 📋 목록에서 선택하세요.<br><span style="font-size:11px;color:#B0BDCE">📞 대응내역 로딩 중...</span></div>`;
-    // 2단계: 대응내역 (JSONP, 느릴 수 있음 → 백그라운드 로드)
-    fetchSheetJSONP(DAEUNG_GID).then(dResp => {
-      daeungRawData = parseDaeungFull(dResp);
+    // 2단계: 연체관리(Daily Report) (JSONP, 백그라운드 로드)
+    fetchSheetJSONP(DAILY_RPT_GID).then(dResp => {
+      daeungRawData = parseDailyReport(dResp);
       // 이미 계약 레코드가 열려 있으면 대응내역 섹션만 업데이트
       const noEl = document.querySelector('.cr-contract-no');
       if (noEl) {
@@ -1102,40 +1130,24 @@ async function loadContractData() {
 function buildResponseTableHTML(responses) {
   if (responses.length === 0)
     return `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">대응 내역이 없습니다</div>`;
-  const catClr = c => ({'연체관리':'#DC2626','계약관리':'#2563A8','정산관리':'#D97706',
-    '갱신관리':'#7C3AED','퇴실관리':'#EA580C','중도퇴실관리':'#EA580C',
-    '상담관리':'#0891B2','데이터관리':'#16A34A'}[c]||'#8A9AB5');
-  const typeIcon = t => t==='발신'?'📤':t==='수신'?'📥':t==='업무'?'📋':'📌';
-  // 입금예정: 다음업무가 '종료'/'-'/빈값 아니면 표시, 아니면 빈칸
-  const fmtNext = n => (!n || n==='종료' || n==='-') ? '' : n;
   return `<div style="overflow-x:auto;padding:0 4px 4px">
     <table class="cr-detail-table">
       <thead><tr>
         <th style="width:36px;text-align:center">No</th>
         <th style="width:100px">대응일</th>
-        <th style="width:130px">입금예정</th>
+        <th style="width:120px">입금예정일</th>
+        <th style="width:160px">청구서명</th>
         <th>대응 상세내용</th>
       </tr></thead>
-      <tbody>${responses.map((r,i) => {
-        const next = fmtNext(r.next);
-        return `<tr>
-          <td style="text-align:center;color:#8A9AB5;font-size:11px">${responses.length - i}</td>
-          <td style="white-space:nowrap;font-size:12px;font-weight:600">
-            ${r.date}
-            <div style="font-size:10px;color:#8A9AB5;font-weight:400;margin-top:2px">
-              ${typeIcon(r.type)} <span style="color:${catClr(r.cat)};font-weight:600">${r.cat||''}</span>${r.sub?` · ${r.sub}`:''}
-            </div>
-          </td>
-          <td style="font-size:12px;color:${next?'#D97706':'#B0BDCE'};font-weight:${next?'700':'400'}">
-            ${next||'—'}
-          </td>
-          <td style="font-size:12px">
-            ${r.contact?`<span style="font-size:10px;color:#8A9AB5;display:block;margin-bottom:2px">${r.contact}</span>`:''}
-            ${r.content||'—'}
-            ${r.person?`<span style="font-size:10px;color:#B0BDCE;margin-left:6px">(${r.person})</span>`:''}
-          </td>
-        </tr>`;
-      }).join('')}
+      <tbody>${responses.map((r,i) => `<tr>
+        <td style="text-align:center;color:#8A9AB5;font-size:11px">${responses.length - i}</td>
+        <td style="white-space:nowrap;font-size:12px;font-weight:600">${r.date}</td>
+        <td style="font-size:12px;color:${r.payDate?'#D97706':'#B0BDCE'};font-weight:${r.payDate?'700':'400'}">
+          ${r.payDate||'—'}
+        </td>
+        <td style="font-size:11px;color:#5A6A8A">${r.bill||'—'}</td>
+        <td style="font-size:12px">${r.content||'—'}</td>
+      </tr>`).join('')}
       </tbody>
     </table></div>`;
 }
