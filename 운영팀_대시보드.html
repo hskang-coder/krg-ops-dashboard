@@ -237,6 +237,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .pt-chip-delinq { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
 .pt-chip-first { background: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
 .pt-chip-active { background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE; }
+.pt-chip-mgmt  { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
 .pt-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .pt-table th { background: #1A3A5C; color: #fff; padding: 9px 12px; font-weight: 700; text-align: left; font-size: 11px; position: sticky; top: 0; white-space: nowrap; }
 .pt-table td { padding: 9px 12px; border-bottom: 1px solid #F0F4F8; vertical-align: middle; }
@@ -599,6 +600,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 }
 </style>
 <!-- v1776770227 -->
+<!-- v1776770401 -->
 </head>
 <body>
 
@@ -1737,13 +1739,21 @@ function renderPaymentTargets() {
     return { r, contract, vacancy, payments, hasDelinq, isFirst, isActive, cat, phone, name };
   });
 
-  const counts = { 전체: categorized.length, 전월연체:0, 첫납부:0, 계약중:0 };
-  categorized.forEach(x => { if (counts[x.cat]!==undefined) counts[x.cat]++; });
+  const counts = { 전체: categorized.length, 전월연체:0, 첫납부:0, 계약중:0, 수납관리대상:0 };
+  categorized.forEach(x => {
+    if (counts[x.cat] !== undefined) counts[x.cat]++;
+    const ps = String(x.r.payStatus || '');
+    if ((x.cat === '전월연체' || x.cat === '첫납부') && !ps.includes('정상납부')) counts['수납관리대상']++;
+  });
 
   // ── 3단계: 카테고리 필터 적용 ──
   const display = ptFilter.category === '전체'
     ? categorized
-    : categorized.filter(x => x.cat === ptFilter.category);
+    : ptFilter.category === '수납관리대상'
+      ? categorized.filter(x =>
+          (x.cat === '전월연체' || x.cat === '첫납부') &&
+          !String(x.r.payStatus || '').includes('정상납부'))
+      : categorized.filter(x => x.cat === ptFilter.category);
 
   // ── 도넛 차트 SVG ──
   const total = counts['전체'] || 1;
@@ -1783,10 +1793,11 @@ function renderPaymentTargets() {
 
   // 카테고리 칩 (클릭 필터)
   const chipDefs = [
-    { key:'전체',   cls:'pt-chip-total',  label:`전체 ${counts['전체']}건` },
-    { key:'전월연체', cls:'pt-chip-delinq', label:`전월연체 ${counts['전월연체']}건` },
-    { key:'첫납부',  cls:'pt-chip-first',  label:`첫납부 ${counts['첫납부']}건` },
-    { key:'계약중',  cls:'pt-chip-active', label:`계약중 ${counts['계약중']}건` },
+    { key:'전체',      cls:'pt-chip-total',  label:`전체 ${counts['전체']}건` },
+    { key:'수납관리대상', cls:'pt-chip-mgmt',  label:`🎯 수납관리대상 ${counts['수납관리대상']}건` },
+    { key:'전월연체',  cls:'pt-chip-delinq', label:`전월연체 ${counts['전월연체']}건` },
+    { key:'첫납부',   cls:'pt-chip-first',  label:`첫납부 ${counts['첫납부']}건` },
+    { key:'계약중',   cls:'pt-chip-active', label:`계약중 ${counts['계약중']}건` },
   ];
   const chips = chipDefs.map(c =>
     `<span class="pt-summary-chip ${c.cls}${ptFilter.category===c.key?' active':''}"
