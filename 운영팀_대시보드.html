@@ -1400,12 +1400,17 @@ function renderContractRecord(c, payments, responses = []) {
     <div class="cr-delinq-grid">
       <div class="cr-delinq-card ${hasDelinq?'':'safe'}">
         <div class="cr-delinq-title ${hasDelinq?'':'safe'}">${hasDelinq?'연체 총액':'연체 없음'}</div>
-        <div class="cr-delinq-amount ${hasDelinq?'':'safe'}">${fmtMoney(delinqTotal)}</div>
+        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+          <div class="cr-delinq-amount ${hasDelinq?'':'safe'}">${fmtMoney(delinqTotal)}</div>
+          ${longestCurrentDelinq>0?`<div style="display:flex;align-items:baseline;gap:3px">
+            <span style="font-size:26px;font-weight:900;color:#DC2626">${longestCurrentDelinq}</span>
+            <span style="font-size:13px;font-weight:700;color:#DC2626">일 연체</span>
+          </div>`:''}
+        </div>
         <div class="cr-delinq-breakdown">
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">임대료 연체</span><span class="cr-delinq-row-val ${delinqRent>0?'red':''}">${fmtMoney(delinqRent)}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">수수료 연체</span><span class="cr-delinq-row-val ${delinqFee>0?'red':''}">${fmtMoney(delinqFee)}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">퇴실정산 연체</span><span class="cr-delinq-row-val ${delinqExit>0?'red':''}">${fmtMoney(delinqExit)}</span></div>
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">현재 최장 연체일</span><span class="cr-delinq-row-val ${longestCurrentDelinq>0?'red':''}">${longestCurrentDelinq}일</span></div>
         </div>
       </div>
       <div class="cr-delinq-card ${isActive?'safe':''}">
