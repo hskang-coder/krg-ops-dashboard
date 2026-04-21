@@ -1665,7 +1665,7 @@ function renderPaymentTargets() {
     const vacancy  = vacancyRawData.find(v => String(v.no).trim()===r.no)||{};
     const payments = paymentRawData.filter(p => String(p['계약번호']||'').trim()===r.no);
     const hasDelinq = payments.some(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0)>0);
-    const isFirst   = payments.length <= 1;
+    const isFirst   = payments.length === 2; // 입주 후 임대료 청구 2회차 = 첫납부 대상
     const isActive  = !String(contract['계약상태']||'').match(/종료|해지/);
     // 우선순위: 전월연체 > 첫납부 > 계약중
     const cat = hasDelinq ? '전월연체' : isFirst ? '첫납부' : isActive ? '계약중' : '기타';
