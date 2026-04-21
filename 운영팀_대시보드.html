@@ -602,6 +602,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 <!-- v1776770227 -->
 <!-- v1776770401 -->
 <!-- v1776770427 -->
+<!-- v1776770859 -->
 </head>
 <body>
 
@@ -1741,10 +1742,13 @@ function renderPaymentTargets() {
   });
 
   const counts = { 전체: categorized.length, 전월연체:0, 첫납부:0, 계약중:0, 수납관리대상:0 };
+  let delinqNormal=0, delinqOther=0, firstNormal=0, firstOther=0;
   categorized.forEach(x => {
     if (counts[x.cat] !== undefined) counts[x.cat]++;
     const ps = String(x.r.payStatus || '');
     if ((x.cat === '전월연체' || x.cat === '첫납부') && !ps.includes('정상납부')) counts['수납관리대상']++;
+    if (x.cat === '전월연체') { ps.includes('정상납부') ? delinqNormal++ : delinqOther++; }
+    if (x.cat === '첫납부')   { ps.includes('정상납부') ? firstNormal++  : firstOther++;  }
   });
 
   // ── 3단계: 카테고리 필터 적용 ──
@@ -1756,41 +1760,17 @@ function renderPaymentTargets() {
           !String(x.r.payStatus || '').includes('정상납부'))
       : categorized.filter(x => x.cat === ptFilter.category);
 
-  // ── 도넛 차트 SVG ──
-  const total = counts['전체'] || 1;
-  const chartData = [
-    { label:'전월연체', cnt:counts['전월연체'], color:'#DC2626' },
-    { label:'첫납부',   cnt:counts['첫납부'],   color:'#16A34A' },
-    { label:'계약중',   cnt:counts['계약중'],   color:'#2563A8' },
-  ];
-  const R=40, cx=50, cy=50, stroke=14;
-  let offset=0;
-  const circum = 2*Math.PI*R;
-  const arcs = chartData.map(d => {
-    const pct = d.cnt/total;
-    const dash = pct*circum;
-    const arc = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${d.color}"
-      stroke-width="${stroke}" stroke-dasharray="${dash.toFixed(2)} ${(circum-dash).toFixed(2)}"
-      stroke-dashoffset="${(-offset*circum).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
-    offset += pct;
-    return arc;
-  }).join('');
-  const donutSvg = `<svg width="100" height="100" viewBox="0 0 100 100">
-    <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#F0F4F8" stroke-width="${stroke}"/>
-    ${arcs}
-  </svg>`;
-
-  // 가로 바 차트
-  const barRows = chartData.map(d => {
-    const pct = total ? Math.round(d.cnt/total*100) : 0;
-    return `<div class="pt-bar-row">
-      <div class="pt-bar-label">${d.label}</div>
-      <div class="pt-bar-track">
-        <div class="pt-bar-fill" style="width:${pct}%;background:${d.color}">${d.cnt>0?d.cnt:''}</div>
-      </div>
-      <div class="pt-bar-count">${d.cnt}건</div>
-    </div>`;
-  }).join('');
+  // ── 요약 패널 헬퍼 ──
+  const mkBar = (cnt, totalN, color) => {
+    const pct = totalN ? Math.max(cnt / totalN * 100, cnt > 0 ? 4 : 0) : 0;
+    return '<div style="flex:1;background:#F0F4F8;border-radius:6px;height:22px;overflow:hidden">'
+      + `<div style="width:${pct.toFixed(1)}%;background:${color};height:100%;border-radius:6px;`
+      + `display:flex;align-items:center;justify-content:flex-end;padding-right:6px;`
+      + `font-size:11px;font-weight:800;color:#fff;min-width:${cnt > 0 ? '26px' : '0'};box-sizing:border-box">`
+      + `${cnt > 0 ? cnt : ''}</div></div>`;
+  };
+  const dTotal = counts['전월연체'] || 1;
+  const fTotal = counts['첫납부']   || 1;
 
   // 카테고리 칩 (클릭 필터)
   const chipDefs = [
@@ -1841,11 +1821,54 @@ function renderPaymentTargets() {
   document.getElementById('ptResult').innerHTML = `
     <div class="cr-card">
       <div class="cr-card-title">💰 수납 대상 ${counts['전체']}건 (${from} ~ ${to})</div>
-      <div class="pt-chart-wrap">
-        <div class="pt-donut-wrap">${donutSvg}
-          <div class="pt-donut-label">${counts['전체']}<span class="pt-donut-sub">건</span></div>
+      <div style="padding:16px 20px 8px">
+        <!-- 상단: 총수납대상 / 수납관리대상 -->
+        <div style="display:flex;gap:0;margin-bottom:14px">
+          <div style="flex:1;padding:14px 20px;background:#F0F6FF;border-radius:10px;margin-right:10px">
+            <div style="font-size:11px;color:#5A6A8A;font-weight:600;margin-bottom:4px">총 수납대상</div>
+            <div style="font-size:28px;font-weight:900;color:#1A3A5C">${counts['전체']}<span style="font-size:13px;font-weight:600;color:#8A9AB5;margin-left:3px">건</span></div>
+          </div>
+          <div style="flex:1;padding:14px 20px;background:#FFF7ED;border-radius:10px;border:1.5px solid #FED7AA">
+            <div style="font-size:11px;color:#92400E;font-weight:600;margin-bottom:4px">🎯 수납관리대상 <span style="font-weight:400;color:#B45309">(납기일 전 연락 필요)</span></div>
+            <div style="font-size:28px;font-weight:900;color:#C2410C">${counts['수납관리대상']}<span style="font-size:13px;font-weight:600;color:#D97706;margin-left:3px">건</span></div>
+          </div>
         </div>
-        <div class="pt-bars">${barRows}</div>
+        <!-- 구분선 -->
+        <div style="border-top:1px solid #E8EEF6;margin-bottom:14px"></div>
+        <!-- 전월연체 바 차트 -->
+        <div style="margin-bottom:12px">
+          <div style="display:flex;align-items:center;margin-bottom:7px">
+            <span style="font-size:12px;font-weight:800;color:#DC2626;margin-right:6px">전월연체 대상</span>
+            <span style="font-size:13px;font-weight:900;color:#DC2626">${counts['전월연체']}건</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:5px">
+            <span style="font-size:11px;color:#16A34A;font-weight:700;width:48px;flex-shrink:0">정상납부</span>
+            ${mkBar(delinqNormal, dTotal, '#16A34A')}
+            <span style="font-size:11px;font-weight:700;color:#16A34A;width:32px;text-align:right;flex-shrink:0">${delinqNormal}명</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span style="font-size:11px;color:#D97706;font-weight:700;width:48px;flex-shrink:0">납부예정</span>
+            ${mkBar(delinqOther, dTotal, '#D97706')}
+            <span style="font-size:11px;font-weight:700;color:#D97706;width:32px;text-align:right;flex-shrink:0">${delinqOther}명</span>
+          </div>
+        </div>
+        <!-- 첫납부 바 차트 -->
+        <div>
+          <div style="display:flex;align-items:center;margin-bottom:7px">
+            <span style="font-size:12px;font-weight:800;color:#16A34A;margin-right:6px">첫납부 대상</span>
+            <span style="font-size:13px;font-weight:900;color:#16A34A">${counts['첫납부']}건</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:5px">
+            <span style="font-size:11px;color:#16A34A;font-weight:700;width:48px;flex-shrink:0">정상납부</span>
+            ${mkBar(firstNormal, fTotal, '#16A34A')}
+            <span style="font-size:11px;font-weight:700;color:#16A34A;width:32px;text-align:right;flex-shrink:0">${firstNormal}명</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span style="font-size:11px;color:#D97706;font-weight:700;width:48px;flex-shrink:0">납부예정</span>
+            ${mkBar(firstOther, fTotal, '#D97706')}
+            <span style="font-size:11px;font-weight:700;color:#D97706;width:32px;text-align:right;flex-shrink:0">${firstOther}명</span>
+          </div>
+        </div>
       </div>
       <div style="padding:10px 20px 4px;display:flex;gap:10px;flex-wrap:wrap">${chips}</div>
       <div style="padding:4px 20px 8px;font-size:11px;color:#8A9AB5">표시 ${display.length}건</div>
