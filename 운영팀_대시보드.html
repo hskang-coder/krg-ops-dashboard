@@ -748,7 +748,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <div class="cr-search-panel">
       <div class="cr-mode-tabs">
         <button class="cr-mode-tab active" onclick="switchCrMode('no')">🔢 계약번호</button>
-        <button class="cr-mode-tab"        onclick="switchCrMode('name')">👤 이름</button>
+        <button class="cr-mode-tab"        onclick="switchCrMode('tenant')">👤 임차인 이름</button>
+        <button class="cr-mode-tab"        onclick="switchCrMode('landlord')">🏢 임대인 이름</button>
         <button class="cr-mode-tab"        onclick="switchCrMode('phone')">📞 전화번호</button>
         <button class="cr-mode-tab"        onclick="switchCrMode('list')">📋 목록 선택</button>
       </div>
@@ -1092,7 +1093,7 @@ let crMode = 'no';
 function switchCrMode(mode) {
   crMode = mode;
   document.querySelectorAll('.cr-mode-tab').forEach((btn,i) => {
-    btn.classList.toggle('active', ['no','name','phone','list'][i] === mode);
+    btn.classList.toggle('active', ['no','tenant','landlord','phone','list'][i] === mode);
   });
   const searchBox = document.getElementById('crSearchBox');
   const listBox   = document.getElementById('crListBox');
@@ -1104,7 +1105,7 @@ function switchCrMode(mode) {
   } else {
     searchBox.style.display = '';
     listBox.style.display   = 'none';
-    const ph = { no:'계약번호를 입력하세요', name:'이름 2글자 이상 입력하세요', phone:'전화번호를 입력하세요 (일부 가능)' };
+    const ph = { no:'계약번호를 입력하세요', tenant:'임차인 이름 2글자 이상 입력하세요', landlord:'임대인 이름 2글자 이상 입력하세요', phone:'전화번호를 입력하세요 (일부 가능)' };
     input.placeholder = ph[mode]; input.value = '';
     input.type = 'text';
   }
@@ -1174,7 +1175,9 @@ function parseVacancySheet(resp) {
   const noIdx       = fi('계약번호');
   const statusIdx   = fi('공실상태');   // BN열(65)
   const exitDateIdx = fi('실제퇴실일'); // BO열(66) — '퇴실일'은 Z열이므로 정확히 매칭
-  const jIdx        = 9; // J열 (0-based index 9) = 중도퇴실
+  const jIdx        = 9;  // J열 (0-based index 9) = 중도퇴실
+  const landlordIdx = 39; // AO열 (0-based) = 임대인명
+  const tenantIdx   = 44; // AT열 (0-based) = 임차인
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -1183,9 +1186,11 @@ function parseVacancySheet(resp) {
     if (!no) return null;
     return {
       no,
-      status:   cell(statusIdx),
-      exitDate: cell(exitDateIdx),
-      jValue:   cell(jIdx)       // J열: 중도퇴실 관련 값
+      status:       cell(statusIdx),
+      exitDate:     cell(exitDateIdx),
+      jValue:       cell(jIdx),        // J열: 중도퇴실 관련 값
+      tenantName:   cell(tenantIdx),   // AT열: 임차인 이름
+      landlordName: cell(landlordIdx)  // AO열: 임대인명
     };
   }).filter(Boolean);
 }
@@ -1288,7 +1293,7 @@ function searchContract() {
   if (!q) return;
 
   // 이름 검색: 2글자 이상 필요
-  if (crMode === 'name' && q.length < 2) {
+  if ((crMode === 'tenant' || crMode === 'landlord') && q.length < 2) {
     el.innerHTML = '<div class="cr-empty">⚠️ 이름은 2글자 이상 입력하세요.</div>';
     return;
   }
@@ -1300,11 +1305,26 @@ function searchContract() {
       String(r['계약번호']||'').trim() === q ||
       String(r['계약번호']||'').trim().includes(q)
     );
-  } else if (crMode === 'name') {
+  } else if (crMode === 'tenant') {
     const kw = q.toLowerCase();
+    // vacancyRawData(GID=1953907648 AT열)에서 임차인 이름으로 계약번호 추출
+    const matchedNos = new Set(
+      vacancyRawData.filter(v => String(v.tenantName||'').toLowerCase().includes(kw)).map(v => v.no)
+    );
     matches = contractRawData.filter(r =>
+      matchedNos.has(String(r['계약번호']||'').trim()) ||
       String(r['임차인명']||'').toLowerCase().includes(kw) ||
       String(r['임차인']||'').toLowerCase().includes(kw)
+    );
+  } else if (crMode === 'landlord') {
+    const kw = q.toLowerCase();
+    // vacancyRawData(GID=1953907648 AO열)에서 임대인 이름으로 계약번호 추출
+    const matchedNos = new Set(
+      vacancyRawData.filter(v => String(v.landlordName||'').toLowerCase().includes(kw)).map(v => v.no)
+    );
+    matches = contractRawData.filter(r =>
+      matchedNos.has(String(r['계약번호']||'').trim()) ||
+      String(r['임대인명']||'').toLowerCase().includes(kw)
     );
   } else if (crMode === 'phone') {
     const kw = q.replace(/[^0-9]/g,'');
