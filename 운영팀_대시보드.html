@@ -189,18 +189,29 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 
 /* ─── CONTRACT RECORD ──────────────────────── */
 .cr-wrap { max-width: 960px; margin: 0 auto; padding: 18px 16px; display: flex; flex-direction: column; gap: 14px; }
-.cr-search-bar { display: flex; gap: 8px; align-items: center; }
+.cr-search-panel { background: #fff; border-radius: 12px; border: 1px solid #E2EAF8; box-shadow: 0 2px 8px rgba(30,50,100,0.06); overflow: hidden; }
+.cr-mode-tabs { display: flex; border-bottom: 1px solid #E8EFF8; }
+.cr-mode-tab { flex: 1; padding: 10px 8px; font-size: 12px; font-weight: 700; color: #8A9AB5; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+.cr-mode-tab.active { color: #1A3A5C; border-bottom-color: #2563A8; background: #F8FAFF; }
+.cr-search-bar { display: flex; gap: 8px; align-items: center; padding: 12px 14px; }
 .cr-search-bar input {
-  flex: 1; max-width: 280px; padding: 9px 14px; border: 1.5px solid #D0DCEE;
+  flex: 1; padding: 9px 14px; border: 1.5px solid #D0DCEE;
   border-radius: 8px; font-size: 14px; outline: none; transition: border 0.15s;
 }
 .cr-search-bar input:focus { border-color: #2563A8; }
-.cr-search-btn {
-  background: #1A3A5C; color: #fff; border: none; cursor: pointer;
-  padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 700;
-}
+.cr-search-btn { background: #1A3A5C; color: #fff; border: none; cursor: pointer; padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .cr-search-btn:hover { background: #2563A8; }
 .cr-empty { text-align: center; color: #B0BDCE; padding: 60px 0; font-size: 14px; }
+.cr-list-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.cr-list-table th { background: #1A3A5C; color: #fff; padding: 9px 12px; font-weight: 700; text-align: left; font-size: 11px; position: sticky; top: 0; }
+.cr-list-table td { padding: 9px 12px; border-bottom: 1px solid #F0F4F8; cursor: pointer; }
+.cr-list-table tr:hover td { background: #EEF4FF; }
+.cr-list-wrap { max-height: 480px; overflow-y: auto; }
+.cr-list-filter { padding: 10px 14px; border-bottom: 1px solid #E8EFF8; display: flex; gap: 8px; }
+.cr-list-filter input { flex: 1; padding: 7px 12px; border: 1.5px solid #D0DCEE; border-radius: 7px; font-size: 13px; outline: none; }
+.cr-list-filter input:focus { border-color: #2563A8; }
+.cr-grade-pill { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; display: inline-block; }
+.cr-search-result-count { font-size: 11px; color: #9AAAC4; padding: 6px 14px 0; }
 
 /* 헤더 카드 */
 .cr-header-card {
@@ -730,9 +741,30 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 <!-- ─── CONTRACT VIEW ─── -->
 <div id="contractView" class="view-content">
   <div class="cr-wrap">
-    <div class="cr-search-bar">
-      <input type="number" id="crInput" placeholder="계약번호 입력 후 검색..." onkeydown="if(event.key==='Enter')searchContract()">
-      <button class="cr-search-btn" onclick="searchContract()">🔍 검색</button>
+    <div class="cr-search-panel">
+      <div class="cr-mode-tabs">
+        <button class="cr-mode-tab active" onclick="switchCrMode('no')">🔢 계약번호</button>
+        <button class="cr-mode-tab"        onclick="switchCrMode('name')">👤 이름</button>
+        <button class="cr-mode-tab"        onclick="switchCrMode('phone')">📞 전화번호</button>
+        <button class="cr-mode-tab"        onclick="switchCrMode('list')">📋 목록 선택</button>
+      </div>
+      <div id="crSearchBox" class="cr-search-bar">
+        <input id="crInput" type="text" placeholder="계약번호를 입력하세요" onkeydown="if(event.key==='Enter')searchContract()">
+        <button class="cr-search-btn" onclick="searchContract()">🔍 검색</button>
+      </div>
+      <div id="crListBox" style="display:none">
+        <div class="cr-list-filter">
+          <input id="crListFilter" type="text" placeholder="이름·계약번호·건물명으로 필터..." oninput="filterContractList()">
+        </div>
+        <div id="crListCount" class="cr-search-result-count"></div>
+        <div class="cr-list-wrap"><table class="cr-list-table">
+          <thead><tr>
+            <th>계약번호</th><th>임차인명</th><th>건물명/호수</th>
+            <th>계약기간</th><th>계약상태</th><th>등급</th>
+          </tr></thead>
+          <tbody id="crListBody"></tbody>
+        </table></div>
+      </div>
     </div>
     <div id="crResult">
       <div class="cr-empty">계약번호를 입력하고 검색하세요</div>
@@ -976,6 +1008,29 @@ function gvizToObjects(gviz) {
   });
 }
 
+let crMode = 'no';
+
+function switchCrMode(mode) {
+  crMode = mode;
+  document.querySelectorAll('.cr-mode-tab').forEach((btn,i) => {
+    btn.classList.toggle('active', ['no','name','phone','list'][i] === mode);
+  });
+  const searchBox = document.getElementById('crSearchBox');
+  const listBox   = document.getElementById('crListBox');
+  const input     = document.getElementById('crInput');
+  if (mode === 'list') {
+    searchBox.style.display = 'none';
+    listBox.style.display   = '';
+    renderContractListTable('');
+  } else {
+    searchBox.style.display = '';
+    listBox.style.display   = 'none';
+    const ph = { no:'계약번호를 입력하세요', name:'임차인 이름을 입력하세요', phone:'전화번호를 입력하세요 (일부 가능)' };
+    input.placeholder = ph[mode]; input.value = '';
+    input.type = mode === 'no' ? 'number' : 'text';
+  }
+}
+
 async function loadContractData() {
   const el = document.getElementById('crResult');
   el.innerHTML = '<div class="cr-empty">📡 계약 데이터 로딩 중...</div>';
@@ -987,23 +1042,100 @@ async function loadContractData() {
     contractRawData = gvizToObjects(cGviz).filter(r => r['계약번호']);
     paymentRawData  = gvizToObjects(pGviz).filter(r => r['계약번호']);
     crLoaded = true;
-    el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료.<br>계약번호를 입력해 검색하세요.</div>`;
+    el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료.<br>원하는 검색 방법을 선택하세요.</div>`;
   } catch(e) {
     el.innerHTML = `<div class="cr-empty">❌ 데이터 로드 실패: ${e.message}</div>`;
   }
 }
 
 function searchContract() {
-  const no = document.getElementById('crInput').value.trim();
-  if (!no) return;
-  const contract = contractRawData.find(r => String(r['계약번호']).trim() === no);
-  if (!contract) {
+  const q = document.getElementById('crInput').value.trim();
+  if (!q) return;
+  let matches = [];
+  if (crMode === 'no') {
+    matches = contractRawData.filter(r => String(r['계약번호']).trim() === q);
+  } else if (crMode === 'name') {
+    const kw = q.toLowerCase();
+    matches = contractRawData.filter(r =>
+      String(r['임차인명']||'').toLowerCase().includes(kw) ||
+      String(r['임차인']||'').toLowerCase().includes(kw)
+    );
+  } else if (crMode === 'phone') {
+    const kw = q.replace(/[^0-9]/g,'');
+    matches = contractRawData.filter(r =>
+      String(r['임차인휴대폰']||'').replace(/[^0-9]/g,'').includes(kw) ||
+      String(r['임대인연락처']||'').replace(/[^0-9]/g,'').includes(kw)
+    );
+  }
+  if (!matches.length) {
     document.getElementById('crResult').innerHTML =
-      `<div class="cr-empty">⚠️ 계약번호 <b>${no}</b>에 해당하는 계약이 없습니다.</div>`;
+      `<div class="cr-empty">⚠️ 검색 결과가 없습니다.</div>`;
     return;
   }
+  if (matches.length === 1) {
+    selectContractRow(String(matches[0]['계약번호']).trim());
+  } else {
+    renderSearchResultList(matches);
+  }
+}
+
+function renderSearchResultList(matches) {
+  const gradeColor = g => ({A:'#16A34A',B:'#2563A8',C:'#D97706',D:'#DC2626',E:'#7C3AED',F:'#DC2626'}[g]||'#8A9AB5');
+  const rows = matches.map(c => {
+    const g = String(c['연체등급']||'').replace(/등급$/,'').trim();
+    return `<tr onclick="selectContractRow('${String(c['계약번호']).trim()}')">
+      <td><b>${c['계약번호']}</b></td>
+      <td>${c['임차인명']||c['임차인']||'—'}</td>
+      <td>${c['건물명']||'—'} ${c['호수']||''}</td>
+      <td style="font-size:11px;color:#5A6A8A">${c['시작일']||'—'} ~ ${c['종료일']||'—'}</td>
+      <td><span style="font-size:11px;font-weight:700;color:${c['계약상태']==='정상'?'#16A34A':'#DC2626'}">${c['계약상태']||'—'}</span></td>
+      <td><span class="cr-grade-pill" style="background:${gradeColor(g)}22;color:${gradeColor(g)}">${g||'—'}등급</span></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('crResult').innerHTML = `
+    <div class="cr-card">
+      <div class="cr-card-title">🔍 검색 결과 ${matches.length}건 — 행을 클릭하면 상세 레코드가 표시됩니다</div>
+      <div style="overflow-x:auto"><table class="cr-list-table">
+        <thead><tr><th>계약번호</th><th>임차인명</th><th>건물명/호수</th><th>계약기간</th><th>계약상태</th><th>등급</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>`;
+}
+
+function renderContractListTable(filter) {
+  const kw = filter.toLowerCase();
+  const filtered = contractRawData.filter(c =>
+    !kw ||
+    String(c['계약번호']).includes(kw) ||
+    String(c['임차인명']||c['임차인']||'').toLowerCase().includes(kw) ||
+    String(c['건물명']||'').toLowerCase().includes(kw)
+  );
+  document.getElementById('crListCount').textContent = `총 ${filtered.length}건`;
+  const gradeColor = g => ({A:'#16A34A',B:'#2563A8',C:'#D97706',D:'#DC2626',E:'#7C3AED',F:'#DC2626'}[g]||'#8A9AB5');
+  const rows = filtered.slice(0,200).map(c => {
+    const g = String(c['연체등급']||'').replace(/등급$/,'').trim();
+    return `<tr onclick="selectContractRow('${String(c['계약번호']).trim()}')">
+      <td><b>${c['계약번호']}</b></td>
+      <td>${c['임차인명']||c['임차인']||'—'}</td>
+      <td>${c['건물명']||'—'} ${c['호수']||''}</td>
+      <td style="font-size:11px;color:#5A6A8A">${c['시작일']||'—'} ~ ${c['종료일']||'—'}</td>
+      <td><span style="font-size:11px;font-weight:700;color:${c['계약상태']==='정상'?'#16A34A':'#DC2626'}">${c['계약상태']||'—'}</span></td>
+      <td><span class="cr-grade-pill" style="background:${gradeColor(g)}22;color:${gradeColor(g)}">${g||'—'}등급</span></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:#B0BDCE;padding:20px">결과 없음</td></tr>';
+  document.getElementById('crListBody').innerHTML = rows;
+}
+
+function filterContractList() {
+  renderContractListTable(document.getElementById('crListFilter').value);
+}
+
+function selectContractRow(no) {
+  const contract = contractRawData.find(r => String(r['계약번호']).trim() === no);
+  if (!contract) return;
   const payments = paymentRawData.filter(r => String(r['계약번호']).trim() === no);
   renderContractRecord(contract, payments);
+  document.getElementById('crResult').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function fmt(v) { return v || '—'; }
