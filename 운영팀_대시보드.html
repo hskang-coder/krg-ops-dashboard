@@ -834,7 +834,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   .ck-period-btn { padding: 6px 14px; font-size: 12px; }
 }
 </style>
-<!-- v1776823164 -->
+<!-- v1776823188 -->
 </head>
 <body>
 
@@ -3194,6 +3194,24 @@ async function fetchViaProxy() {
 // ■ LOAD DATA
 // ═══════════════════════════════════════════
 async function loadData() {
+  // ── 캐시 즉시 렌더 (이전 데이터가 있으면 0초 로딩) ──────
+  const CACHE_KEY = 'krg_dash_cache_v1';
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const { data, ts } = JSON.parse(cached);
+      if (data && data.length > 0) {
+        allData = data;
+        populateCatFilter(allData);
+        renderDashboard();
+        if (CK_API_URL) ckLoadShared(() => renderCkProgress());
+        else renderCkProgress();
+        const ageMin = Math.round((Date.now() - ts) / 60000);
+        setStatus('ok', `캐시 (${ageMin}분 전)`);
+        setDataStatus('ok', `✅ 캐시 데이터 (${ageMin}분 전 갱신) — ${allData.length}건 · 백그라운드 업데이트 중...`);
+      }
+    }
+  } catch(e) {}
   setStatus('loading', '데이터 로딩 중');
 
   // JSONP 시도 (gviz 직접)
@@ -3266,6 +3284,8 @@ async function loadData() {
       renderCkProgress();
     }
     renderDashboard();
+    // 캐시 저장 (다음 접속 즉시 표시용)
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data: allData, ts: Date.now() })); } catch(e) {}
   } catch (e) {
     setStatus('error', '연결 실패');
     allData = [];
