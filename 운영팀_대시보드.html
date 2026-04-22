@@ -605,6 +605,493 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   .period-tab   { padding: 9px 14px; font-size: 12px; }
   .ck-period-btn { padding: 6px 14px; font-size: 12px; }
 }
+
+/* ═══════════════════════════════════════════
+   연체관리 뷰 — 디자인 v2
+   ═══════════════════════════════════════════ */
+.dlq-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* 헤더 카드 */
+.dlq-header-card {
+  background: linear-gradient(135deg, #1E3A5F 0%, #2563A8 100%);
+  border-radius: 16px;
+  padding: 22px 28px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  color: #fff;
+  box-shadow: 0 4px 24px rgba(37,99,168,0.18);
+}
+.dlq-header-left { flex: 1; min-width: 0; }
+.dlq-header-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 8px;
+}
+.dlq-rate-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.dlq-rate-num { font-size: 36px; font-weight: 900; color: #FCA5A5; line-height: 1; }
+.dlq-rate-label { font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.8); }
+.dlq-rate-sub { font-size: 12px; color: rgba(255,255,255,0.5); }
+.dlq-progress-track {
+  height: 6px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 99px;
+  overflow: hidden;
+  max-width: 360px;
+}
+.dlq-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FCA5A5, #EF4444);
+  border-radius: 99px;
+  transition: width .6s ease;
+}
+.dlq-header-right {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.dlq-stat-pill {
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  padding: 10px 16px;
+  text-align: center;
+  min-width: 90px;
+}
+.dlq-pill-active { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.3); }
+.dlq-pill-ended  { background: rgba(239,68,68,0.15);  border-color: rgba(239,68,68,0.3); }
+.dlq-pill-total  { background: rgba(251,191,36,0.15); border-color: rgba(251,191,36,0.3); }
+.dlq-stat-pill-label { display: block; font-size: 10px; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
+.dlq-stat-pill-num   { display: block; font-size: 22px; font-weight: 800; color: #fff; }
+
+/* 연체일수 구간 바 */
+.dlq-band-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.dlq-band {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #EEF2FA;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.dlq-band-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dlq-band-1 .dlq-band-dot { background: #22C55E; }
+.dlq-band-2 .dlq-band-dot { background: #F59E0B; }
+.dlq-band-3 .dlq-band-dot { background: #F97316; }
+.dlq-band-4 .dlq-band-dot { background: #EF4444; }
+.dlq-band-1 { border-left: 4px solid #22C55E; }
+.dlq-band-2 { border-left: 4px solid #F59E0B; }
+.dlq-band-3 { border-left: 4px solid #F97316; }
+.dlq-band-4 { border-left: 4px solid #EF4444; }
+.dlq-band-num  { font-size: 24px; font-weight: 800; color: #1E293B; line-height: 1; }
+.dlq-band-range{ font-size: 11px; color: #64748B; font-weight: 600; }
+.dlq-band-pct  { font-size: 11px; color: #94A3B8; margin-left: auto; }
+
+/* 중단 패널 */
+.dlq-mid-row {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 14px;
+}
+@media(max-width:900px){ .dlq-mid-row { grid-template-columns: 1fr; } }
+.dlq-pay-panel,
+.dlq-chart-panel {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #EEF2FA;
+  padding: 16px 18px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.dlq-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748B;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.dlq-pay-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border-left: 3px solid transparent;
+}
+.dlq-pay-past   { background: #FEF2F2; border-left-color: #EF4444; }
+.dlq-pay-today  { background: #FFFBEB; border-left-color: #F59E0B; }
+.dlq-pay-future { background: #F0FDF4; border-left-color: #22C55E; }
+.dlq-pay-icon   { font-size: 18px; }
+.dlq-pay-head   { font-size: 11px; font-weight: 700; color: #374151; }
+.dlq-pay-count  { font-size: 20px; font-weight: 800; color: #1E293B; }
+.dlq-pay-desc   { font-size: 10px; color: #94A3B8; }
+
+/* 테이블 패널 */
+.dlq-table-panel {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #EEF2FA;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.dlq-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 10px;
+  border-bottom: 1px solid #F1F5F9;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dlq-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.dlq-chip-sep { width: 1px; height: 16px; background: #E2E8F0; margin: 0 2px; }
+.dlq-chip {
+  background: #F8FAFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 99px;
+  padding: 3px 11px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748B;
+  cursor: pointer;
+  transition: all .15s;
+}
+.dlq-chip:hover { background: #EFF6FF; border-color: #93C5FD; color: #2563A8; }
+.dlq-chip.active { background: #2563A8; color: #fff; border-color: #2563A8; }
+
+/* 테이블 */
+.dlq-tbl-wrap { overflow-x: auto; }
+.dlq-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.dlq-tbl th {
+  background: #F8FAFF;
+  padding: 9px 12px;
+  text-align: left;
+  color: #64748B;
+  font-weight: 700;
+  border-bottom: 1.5px solid #EEF2FA;
+  white-space: nowrap;
+}
+.dlq-tbl td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #F1F5F9;
+  vertical-align: middle;
+}
+.dlq-tbl tr:last-child td { border-bottom: none; }
+.dlq-tbl tr:hover td { background: #FAFBFF; }
+.dlq-no-link { font-weight: 700; color: #2563A8; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.dlq-days-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.dlq-d1 { background: #DCFCE7; color: #166534; }
+.dlq-d2 { background: #FEF3C7; color: #92400E; }
+.dlq-d3 { background: #FFEDD5; color: #9A3412; }
+.dlq-d4 { background: #FEE2E2; color: #991B1B; }
+.dlq-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.dlq-st-active { background: #DCFCE7; color: #166534; }
+.dlq-st-ended  { background: #FEE2E2; color: #991B1B; }
+.dlq-tbl-foot  { padding: 8px 16px; font-size: 11px; color: #94A3B8; background: #FAFBFF; }
+@media(max-width:768px){
+  .dlq-band-row { grid-template-columns: repeat(2,1fr); }
+  .dlq-header-card { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .dlq-header-right { justify-content: flex-start; }
+}
+
+.cr-badge-paid { background: #DCFCE7; color: #16A34A; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+.cr-badge-unpaid { background: #FEE2E2; color: #DC2626; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+.cr-badge-partial { background: #FEF3C7; color: #D97706; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+.cr-badge-purple { background: #F3E8FF; color: #7C3AED; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+.cr-card { background: #fff; border-radius: 12px; border: 1px solid #E2EAF8; box-shadow: 0 2px 8px rgba(30,50,100,0.05); overflow: hidden; }
+.cr-card-title { font-size: 12px; font-weight: 700; color: #5A6A8A; padding: 12px 20px; border-bottom: 1px solid #E8EFF8; display: flex; align-items: center; gap: 6px; }
+
+/* ─── DATE NAV ─────────────────────────────── */
+.date-nav-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 24px; background: rgba(0,0,0,0.10);
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.date-nav-btn {
+  background: rgba(255,255,255,0.10); border: none; cursor: pointer;
+  color: #AACDE8; font-size: 13px; font-weight: 700;
+  width: 28px; height: 28px; border-radius: 6px; transition: all 0.18s;
+  display: flex; align-items: center; justify-content: center;
+}
+.date-nav-btn:hover:not(:disabled) { background: rgba(255,255,255,0.22); color: #fff; }
+.date-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.date-nav-label {
+  color: #FFF; font-size: 13px; font-weight: 700;
+  min-width: 160px; text-align: center;
+}
+.date-nav-today {
+  background: rgba(77,163,232,0.25); border: 1px solid rgba(77,163,232,0.5);
+  border-radius: 12px; cursor: pointer; color: #7EC8F0;
+  font-size: 11px; font-weight: 700; padding: 3px 10px; transition: all 0.18s;
+}
+.date-nav-today:hover { background: rgba(77,163,232,0.45); color: #fff; }
+
+/* ─── CONTENT ─────────────────────────────── */
+.view-content { display: none; }
+.view-content.active { display: block; }
+
+/* ─── DASHBOARD LAYOUT ─────────────────────────────── */
+.dash-inner { max-width: 1400px; margin: 0 auto; padding: 20px 16px 40px; }
+
+.kpi-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-bottom: 16px; }
+@media(max-width:1100px){ .kpi-row{ grid-template-columns: repeat(3,1fr); } }
+@media(max-width:700px) { .kpi-row{ grid-template-columns: repeat(2,1fr); } }
+
+.kpi-card { background: #FFF; border-radius: 12px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1.5px solid var(--border); }
+.kpi-label { font-size: 11px; font-weight: 600; color: #8A9AB5; letter-spacing: 0.5px; margin-bottom: 6px; }
+.kpi-value { font-size: 26px; font-weight: 800; line-height: 1; margin-bottom: 3px; }
+.kpi-sub   { font-size: 11px; color: #A0ADBE; }
+.kpi-0 .kpi-value { color: var(--blue); }
+.kpi-1 .kpi-value { color: var(--purple); }
+.kpi-2 .kpi-value { color: var(--green); }
+.kpi-3 .kpi-value { color: #D97706; }
+.kpi-4 .kpi-value { color: #DC2626; }
+
+.main-grid { display: grid; grid-template-columns: 340px 1fr; gap: 14px; margin-bottom: 14px; }
+@media(max-width:900px){ .main-grid{ grid-template-columns: 1fr; } }
+
+.card { background: #FFF; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1.5px solid var(--border); padding: 18px 20px; }
+.card-title { font-size: 13px; font-weight: 700; color: #1A3A5C; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+.card-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot-blue   { background: var(--blue); }
+.dot-purple { background: var(--purple); }
+.dot-green  { background: var(--green); }
+
+.bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media(max-width:900px){ .bottom-grid{ grid-template-columns: 1fr; } }
+
+.chart-wrap { position: relative; }
+.chart-canvas    { max-height: 240px; }
+.chart-canvas-sm { max-height: 200px; }
+
+.chart-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.legend-item  { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #5A6A8A; }
+.legend-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* 담당자 진척 */
+.person-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.person-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #FFF; flex-shrink: 0; }
+.av-blue   { background: var(--blue); }
+.av-purple { background: var(--purple); }
+.av-green  { background: var(--green); }
+.person-info { flex: 1; }
+.person-name-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+.person-name { font-size: 13px; font-weight: 700; color: #1E2A3A; }
+.pbar-bg   { background: #EEF2FA; border-radius: 6px; height: 7px; overflow: hidden; }
+.pbar-fill { height: 100%; border-radius: 6px; transition: width 0.5s ease; }
+.fill-blue   { background: linear-gradient(90deg, var(--blue),   #4DA3E8); }
+.fill-purple { background: linear-gradient(90deg, var(--purple), #A78BFA); }
+.fill-green  { background: linear-gradient(90deg, var(--green),  #34D399); }
+
+.data-status { background: #F0F7FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 10px 14px; font-size: 11px; color: #1D4ED8; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+.data-status.warn  { background: #FFFBEB; border-color: #FDE68A; color: #92400E; }
+.data-status.error { background: #FEF2F2; border-color: #FECACA; color: #991B1B; }
+
+.mini-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mini-table th { background: #1A3A5C; color: #FFF; padding: 6px 10px; text-align: left; font-size: 11px; font-weight: 600; }
+.mini-table td { padding: 6px 10px; border-bottom: 1px solid #EEF2FA; color: #1E2A3A; }
+.mini-table tr:last-child td { border-bottom: none; }
+.mini-table tr:hover td { background: #F5F8FF; }
+.mini-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 8px; }
+.cat-계약관리 { background:#DBEAFE; color:#1D4ED8; }
+.cat-심사관리 { background:#EDE9FE; color:#6D28D9; }
+.cat-정산관리 { background:#D1FAE5; color:#065F46; }
+.cat-퇴실관리 { background:#FEF3C7; color:#92400E; }
+.cat-연체관리 { background:#FEE2E2; color:#991B1B; }
+.cat-갱신관리 { background:#CCFBF1; color:#115E59; }
+.cat-상담관리 { background:#FCE7F3; color:#9D174D; }
+.cat-기타     { background:#F1F5F9; color:#334155; }
+
+.section-divider { height: 1px; background: #EEF2FA; margin: 14px 0; }
+.no-data { text-align: center; color: #C8D5E8; font-size: 13px; padding: 30px 0; }
+
+/* ─── 파이차트 담당자 필터 ─────────────────────────────── */
+.pie-filter-row { display: flex; gap: 5px; margin-bottom: 12px; flex-wrap: wrap; }
+.pie-filter-btn {
+  background: #F0F4FA; border: 1.5px solid var(--border); border-radius: 20px;
+  cursor: pointer; color: var(--muted); font-size: 11px; font-weight: 700;
+  padding: 4px 13px; transition: all 0.18s; line-height: 1.6;
+}
+.pie-filter-btn:hover { border-color: #B0C4DE; color: var(--blue); }
+.pie-filter-btn.active { background: #1A3A5C; border-color: #1A3A5C; color: #FFF; }
+.pie-filter-btn.pf-blue   { }
+.pie-filter-btn.pf-blue.active   { background: var(--blue);   border-color: var(--blue); }
+.pie-filter-btn.pf-purple.active { background: var(--purple); border-color: var(--purple); }
+.pie-filter-btn.pf-green.active  { background: var(--green);  border-color: var(--green); }
+
+/* ─── CHECKLIST LAYOUT ─────────────────────────────── */
+.ck-inner { max-width: 900px; margin: 0 auto; padding: 20px 16px 60px; }
+
+/* 담당자 컬러 */
+.ck-wrap[data-person="고송미"] { --pcolor: var(--blue);   --pgradient: linear-gradient(90deg,#60A5FA,#2563A8); }
+.ck-wrap[data-person="이지희"] { --pcolor: var(--purple); --pgradient: linear-gradient(90deg,#A78BFA,#7C3AED); }
+.ck-wrap[data-person="강휘수"] { --pcolor: var(--green);  --pgradient: linear-gradient(90deg,#34D399,#059669); }
+
+.ck-period-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.ck-hist-btn {
+  background: #fff; border: 1px solid var(--border); border-radius: 16px;
+  cursor: pointer; color: var(--muted); font-size: 11px; font-weight: 600;
+  padding: 3px 12px; transition: all .15s;
+}
+.ck-hist-btn:hover { background: #F1F5F9; }
+.ck-hist-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.ck-period-btn {
+  background: #fff; border: 2px solid var(--border); border-radius: 24px;
+  cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 700;
+  padding: 7px 20px; transition: all 0.18s;
+}
+.ck-period-btn.active { border-color: var(--pcolor, var(--blue)); color: var(--pcolor, var(--blue)); background: #EBF3FC; }
+.ck-period-btn:not(.active):hover { border-color: #B0C4DE; color: var(--blue); }
+
+.ck-progress-card {
+  background: #fff; border-radius: 14px; border: 1.5px solid var(--border);
+  padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.ck-prog-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.ck-prog-label  { font-size: 13px; font-weight: 700; color: var(--muted); }
+.ck-prog-pct    { font-size: 22px; font-weight: 900; color: var(--pcolor, var(--blue)); }
+.ck-bar-bg      { background: #E8EFF8; border-radius: 999px; height: 10px; overflow: hidden; }
+.ck-bar-fill    { height: 100%; border-radius: 999px; transition: width 0.4s ease; background: var(--pgradient, linear-gradient(90deg,#4DA3E8,#2563A8)); }
+.ck-bar-fill.complete { background: linear-gradient(90deg,#34D399,#059669); }
+.ck-prog-sub    { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+.ck-list { display: flex; flex-direction: column; gap: 8px; }
+.ck-item {
+  background: #fff; border-radius: 12px; border: 1.5px solid var(--border);
+  padding: 14px 16px; display: flex; align-items: flex-start; gap: 14px;
+  cursor: pointer; transition: all 0.18s; user-select: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.ck-item:hover      { border-color: #B0C4DE; box-shadow: 0 2px 8px rgba(37,99,168,0.1); }
+.ck-item.done       { background: #F0FDF4; border-color: #A7F3D0; }
+.ck-box {
+  width: 22px; height: 22px; border-radius: 6px; border: 2px solid #C8D8EC;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  transition: all 0.18s; margin-top: 1px; background: #fff;
+}
+.ck-item.done .ck-box { background: var(--green); border-color: var(--green); }
+.ck-box svg { display: none; }
+.ck-item.done .ck-box svg { display: block; }
+.ck-label-text { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.4; transition: all 0.18s; }
+.ck-item.done .ck-label-text { text-decoration: line-through; color: #6B7280; }
+.ck-time-text { font-size: 11px; color: var(--muted); margin-top: 3px; font-weight: 500; }
+
+/* ─── LOG SUMMARY ─────────────────────────────── */
+.export-btn {
+  background: #1A3A5C; color: #fff; border: none; cursor: pointer;
+  font-size: 11px; font-weight: 700; padding: 5px 12px;
+  border-radius: 7px; transition: background 0.15s; white-space: nowrap;
+}
+.export-btn:hover { background: #2563A8; }
+.log-summary {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  background: #F3F7FF; border: 1px solid #BFDBFE; border-radius: 10px;
+  padding: 10px 14px; margin-bottom: 12px; font-size: 12px;
+}
+.log-sum-item {
+  display: flex; align-items: center; gap: 5px;
+  background: #fff; border-radius: 6px; padding: 4px 10px;
+  border: 1px solid #E2EAF5; font-weight: 600;
+}
+.log-sum-label { color: #8A9AB5; font-weight: 500; }
+.log-sum-val   { color: #1A3A5C; }
+.log-sum-divider { color: #CBD5E1; }
+.log-comment {
+  flex: 1; min-width: 200px; color: #4B5D78; font-size: 11.5px;
+  line-height: 1.6; padding: 4px 10px; background: #EBF3FF;
+  border-radius: 6px; border: 1px solid #BFDBFE;
+}
+.log-analysis-wrap { display: flex; flex-direction: column; gap: 8px; }
+.log-insight-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  background: #F8F3FF; border: 1px solid #DDD6FE; border-radius: 8px;
+  padding: 8px 12px; font-size: 12px;
+}
+.log-insight-label { color: #6D28D9; font-weight: 700; margin-right: 4px; }
+.log-insight-chip {
+  background: #EDE9FE; color: #4C1D95; border-radius: 6px;
+  padding: 3px 10px; font-size: 11px; font-weight: 600;
+}
+.log-suggest-block {
+  background: #F0FDF4; border: 1px solid #A7F3D0; border-radius: 8px;
+  padding: 10px 14px; display: flex; flex-direction: column; gap: 6px;
+}
+.log-suggest-title { font-size: 12px; font-weight: 700; color: #065F46; margin-bottom: 2px; }
+.log-suggest-item {
+  font-size: 11.5px; color: #1F4E3A; line-height: 1.6;
+  display: flex; align-items: flex-start; gap: 4px;
+}
+.log-suggest-item::before { content: "▸"; color: #059669; flex-shrink: 0; margin-top: 1px; }
+.log-suggest-tell { color: #1D4ED8; background: #EFF6FF; border-radius: 5px; padding: 3px 8px; }
+.log-suggest-tell::before { content: ""; }
+
+.ck-empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+.ck-empty-icon { font-size: 40px; margin-bottom: 12px; }
+.ck-empty-text { font-size: 14px; }
+
+.ck-reset-row { display: flex; justify-content: flex-end; margin-top: 12px; }
+.ck-reset-btn {
+  background: none; border: 1.5px solid var(--border); border-radius: 8px;
+  color: var(--muted); font-size: 12px; padding: 6px 14px; cursor: pointer; transition: all 0.18s;
+}
+.ck-reset-btn:hover { border-color: #F87171; color: #DC2626; background: #FFF5F5; }
+
+/* ─── TOAST ─────────────────────────────── */
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: #1A3A5C; color: #FFF; padding: 10px 20px;
+  border-radius: 20px; font-size: 13px; font-weight: 600;
+  opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999;
+}
+.toast.show { opacity: 1; }
+
+@media(max-width:768px){
+  .ck-all-grid { grid-template-columns: 1fr !important; }
+}
+@media(max-width:600px){
+  .person-tab   { padding: 7px 14px; font-size: 12px; }
+  .period-tab   { padding: 9px 14px; font-size: 12px; }
+  .ck-period-btn { padding: 6px 14px; font-size: 12px; }
+}
 </style>
 <!-- v1776817031 -->
 </head>
@@ -635,6 +1122,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <button class="view-tab"        onclick="switchView('checklist')">✅ 체크리스트</button>
     <button class="view-tab"        onclick="switchView('contract')">📋 계약레코드</button>
     <button class="view-tab"        onclick="switchView('payment')">💰 수납 대상</button>
+    <button class="view-tab" onclick="switchView('delinquency')">🚨 연체관리</button>
   </div>
 
   <!-- Person tabs (checklist only) -->
@@ -884,6 +1372,135 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
       <div class="cr-empty">📅 납기일 기간을 설정하고 조회하세요</div>
     </div>
   </div>
+
+  <div id="delinquencyView" class="view-content">
+  <div class="dlq-inner">
+
+    <!-- ══ 헤더 요약 바 ══ -->
+    <div class="dlq-header-card">
+      <div class="dlq-header-left">
+        <div class="dlq-header-title">이달 연체 현황</div>
+        <div class="dlq-rate-row">
+          <span class="dlq-rate-num" id="dlqRatePct">—%</span>
+          <span class="dlq-rate-label">연체율</span>
+          <span class="dlq-rate-sub" id="dlqRateSub"></span>
+        </div>
+        <div class="dlq-progress-track">
+          <div class="dlq-progress-fill" id="dlqProgressFill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="dlq-header-right">
+        <div class="dlq-stat-pill">
+          <span class="dlq-stat-pill-label">전체 계약자</span>
+          <span class="dlq-stat-pill-num" id="dlqTotalContract">—</span>
+        </div>
+        <div class="dlq-stat-pill dlq-pill-active">
+          <span class="dlq-stat-pill-label">계약중 연체</span>
+          <span class="dlq-stat-pill-num" id="dlqActiveCount">—</span>
+        </div>
+        <div class="dlq-stat-pill dlq-pill-ended">
+          <span class="dlq-stat-pill-label">종료후 연체</span>
+          <span class="dlq-stat-pill-num" id="dlqEndedCount">—</span>
+        </div>
+        <div class="dlq-stat-pill dlq-pill-total">
+          <span class="dlq-stat-pill-label">총 연체자</span>
+          <span class="dlq-stat-pill-num" id="dlqTotalDelinq">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 연체일수 구간 바 ══ -->
+    <div class="dlq-band-row">
+      <div class="dlq-band dlq-band-1">
+        <div class="dlq-band-dot"></div>
+        <div class="dlq-band-num" id="dlqB1">—</div>
+        <div class="dlq-band-range">1 ~ 3일</div>
+        <div class="dlq-band-pct" id="dlqB1p">—</div>
+      </div>
+      <div class="dlq-band dlq-band-2">
+        <div class="dlq-band-dot"></div>
+        <div class="dlq-band-num" id="dlqB2">—</div>
+        <div class="dlq-band-range">4 ~ 15일</div>
+        <div class="dlq-band-pct" id="dlqB2p">—</div>
+      </div>
+      <div class="dlq-band dlq-band-3">
+        <div class="dlq-band-dot"></div>
+        <div class="dlq-band-num" id="dlqB3">—</div>
+        <div class="dlq-band-range">16 ~ 30일</div>
+        <div class="dlq-band-pct" id="dlqB3p">—</div>
+      </div>
+      <div class="dlq-band dlq-band-4">
+        <div class="dlq-band-dot"></div>
+        <div class="dlq-band-num" id="dlqB4">—</div>
+        <div class="dlq-band-range">30일 초과</div>
+        <div class="dlq-band-pct" id="dlqB4p">—</div>
+      </div>
+    </div>
+
+    <!-- ══ 중단 패널: 납부예정일 + 차트 ══ -->
+    <div class="dlq-mid-row">
+
+      <!-- 납부예정일 현황 -->
+      <div class="dlq-pay-panel">
+        <div class="dlq-panel-title">납부예정일 현황</div>
+        <div class="dlq-pay-card dlq-pay-past">
+          <div class="dlq-pay-icon">🗓</div>
+          <div>
+            <div class="dlq-pay-head">오늘 이전</div>
+            <div class="dlq-pay-count" id="dlqPayPast">—</div>
+            <div class="dlq-pay-desc">납부일 경과 미납</div>
+          </div>
+        </div>
+        <div class="dlq-pay-card dlq-pay-today">
+          <div class="dlq-pay-icon">📌</div>
+          <div>
+            <div class="dlq-pay-head">오늘</div>
+            <div class="dlq-pay-count" id="dlqPayToday">—</div>
+            <div class="dlq-pay-desc">즉시 확인 필요</div>
+          </div>
+        </div>
+        <div class="dlq-pay-card dlq-pay-future">
+          <div class="dlq-pay-icon">📅</div>
+          <div>
+            <div class="dlq-pay-head">오늘 이후</div>
+            <div class="dlq-pay-count" id="dlqPayFuture">—</div>
+            <div class="dlq-pay-desc">사전 안내 권장</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 분석 차트 -->
+      <div class="dlq-chart-panel">
+        <div class="dlq-panel-title">연체일수 분포</div>
+        <canvas id="dlqBarChart" style="max-height:180px"></canvas>
+      </div>
+
+    </div>
+
+    <!-- ══ 연체자 테이블 ══ -->
+    <div class="dlq-table-panel">
+      <div class="dlq-table-header">
+        <div class="dlq-panel-title" style="margin:0">연체자 목록</div>
+        <div class="dlq-chips" id="dlqChips">
+          <button class="dlq-chip active" data-f="all">전체</button>
+          <button class="dlq-chip" data-f="active">계약중</button>
+          <button class="dlq-chip" data-f="ended">종료</button>
+          <span class="dlq-chip-sep"></span>
+          <button class="dlq-chip" data-f="b1">🟢 1~3일</button>
+          <button class="dlq-chip" data-f="b2">🟡 4~15일</button>
+          <button class="dlq-chip" data-f="b3">🟠 16~30일</button>
+          <button class="dlq-chip" data-f="b4">🔴 30일+</button>
+          <span class="dlq-chip-sep"></span>
+          <button class="dlq-chip" data-f="pay_past">납부일 경과</button>
+          <button class="dlq-chip" data-f="pay_today">납부일 오늘</button>
+          <button class="dlq-chip" data-f="pay_future">납부일 이후</button>
+        </div>
+      </div>
+      <div id="dlqTableResult"><div class="cr-empty">📡 데이터 로딩 중...</div></div>
+    </div>
+
+  </div>
+</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1145,6 +1762,8 @@ function switchView(view) {
   document.getElementById('checklistView').classList.toggle('active', view === 'checklist');
   document.getElementById('contractView').classList.toggle('active', view === 'contract');
   document.getElementById('paymentView').classList.toggle('active', view === 'payment');
+  document.getElementById('delinquencyView').classList.toggle('active', view === 'delinquency');
+  if (view === 'delinquency') renderDelinquency();
   document.getElementById('personTabsRow').style.display = view === 'checklist' ? 'flex' : 'none';
   const titles = { dashboard:'운영팀 대시보드', checklist:'업무 체크리스트', contract:'계약 레코드 관리', payment:'수납 대상 관리' };
   document.getElementById('pageTitle').textContent = titles[view] || '';
@@ -2654,6 +3273,222 @@ async function fetchViaProxy() {
 // ═══════════════════════════════════════════
 // ■ LOAD DATA
 // ═══════════════════════════════════════════
+
+
+// ═══ 연체관리 함수 ═══
+
+function parseKorDateDlq(s) {
+  if (!s) return null;
+  const m = s.match(/(\d{4})[.\-\/\s](\d{1,2})[.\-\/\s](\d{1,2})/);
+  if (m) { const d = new Date(+m[1], +m[2]-1, +m[3]); d.setHours(0,0,0,0); return d; }
+  return null;
+}
+
+function parseContractMgmt(resp) {
+  if (!resp || !resp.table) return {};
+  const { cols, rows } = resp.table;
+  const labels = cols.map(c => (c.label||c.id||'').trim());
+  const fi = n => labels.findIndex(l => l === n || l.includes(n));
+  const noIdx      = fi('계약번호');
+  const kIdx       = 10;   // K열: 계약상태
+  const groupIdx   = fi('그룹') >= 0 ? fi('그룹') : fi('계약그룹');
+  const tenantIdx  = fi('임차인') >= 0 ? fi('임차인') : 44;
+  const phoneIdx   = fi('연락처') >= 0 ? fi('연락처') : 46;
+  const ctypeIdx   = fi('계약종류');
+  if (noIdx < 0) return {};
+  const map = {};
+  (rows||[]).forEach(row => {
+    const c = row.c || [];
+    const cell = i => (i < 0 || i >= c.length || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
+    const no = cell(noIdx);
+    if (!no) return;
+    const st = cell(kIdx);
+    map[no] = {
+      contractStatus: st,          // 정상 / 종료 / etc.
+      group:          cell(groupIdx),
+      tenant:         cell(tenantIdx),
+      phone:          cell(phoneIdx),
+      contractType:   cell(ctypeIdx)
+    };
+  });
+  return map;
+}
+
+function parseIncomeForDlq(resp) {
+  if (!resp || !resp.table) return [];
+  const { cols, rows } = resp.table;
+  const noIdx      = 4;   // E열
+  const typeIdx    = 5;   // F열: 청구유형 (변동관리비 제외)
+  const nameIdx    = 14;  // O열: 임차인명
+  const activeIdx  = 13;  // N열: 계약중
+  const payStIdx   = 19;  // T열: 납부상태
+  const dueDateIdx = 28;  // AC열: 납기일
+  const dlqDaysIdx = 29;  // AD열: 연체일수
+  const result = [];
+  const seen = {};  // 계약번호당 최대 연체일수 1건만
+  (rows||[]).forEach(row => {
+    const c = row.c || [];
+    const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
+    const no = cell(noIdx);
+    if (!no) return;
+    // F열: 변동관리비 제외
+    const fType = cell(typeIdx);
+    if (fType.includes('변동관리비')) return;
+    // AD열: 연체일수 > 0
+    const days = parseInt(cell(dlqDaysIdx)) || 0;
+    if (days <= 0) return;
+    // 같은 계약번호면 연체일수 큰 것으로 유지
+    if (seen[no] && seen[no].dlqDays >= days) return;
+    const rec = {
+      no,
+      chargeType: fType,
+      name:       cell(nameIdx),
+      active:     cell(activeIdx),  // N열
+      payStatus:  cell(payStIdx),
+      dueDate:    cell(dueDateIdx),
+      dlqDays:    days
+    };
+    if (seen[no]) {
+      // 기존 항목 교체
+      const idx = result.findIndex(r => r.no === no);
+      if (idx >= 0) result[idx] = rec;
+    } else {
+      result.push(rec);
+    }
+    seen[no] = rec;
+  });
+  return result;
+}
+
+function parseDailyForPayDate(resp) {
+  if (!resp || !resp.table) return {};
+  const { cols, rows } = resp.table;
+  const labels = cols.map(c => (c.label||c.id||'').trim());
+  const fi = n => labels.findIndex(l => l === n || l.includes(n));
+  const noIdx  = fi('계약번호');
+  const payIdx = 2;   // C열: 납부예정일
+  if (noIdx < 0) return {};
+  const map = {};
+  (rows||[]).forEach(row => {
+    const c = row.c || [];
+    const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
+    const no = cell(noIdx);
+    const pd = cell(payIdx);
+    if (!no || !pd) return;
+    // 같은 계약번호가 여러 행 → 가장 최근(큰) 날짜 유지
+    if (!map[no]) { map[no] = pd; return; }
+    const d1 = parseKorDateDlq(pd), d2 = parseKorDateDlq(map[no]);
+    if (d1 && d2 && d1 > d2) map[no] = pd;
+  });
+  return map;
+}
+
+function renderDelinquencyView() {
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // ① 전체 계약자 수 = gid=1953907648에서 K열="정상"
+  const totalContracts = Object.values(dlqContractMap)
+    .filter(r => r.contractStatus.includes('정상')).length;
+
+  // ② 연체 목록 구성: incomeList를 기반으로 계약 정보 병합
+  const dlqList = dlqIncomeList.map(inc => {
+    const cm = dlqContractMap[inc.no] || {};
+    return {
+      ...inc,
+      contractStatus: cm.contractStatus || '',
+      group:          cm.group || '',
+      tenant:         cm.tenant || inc.name || '',
+      phone:          cm.phone || '',
+      contractType:   cm.contractType || '',
+      payDate:        dlqPayMap[inc.no] || ''
+    };
+  }).filter(r =>
+    // K열: 정상 또는 종료인 것만 (gid=1953907648 기준)
+    r.contractStatus.includes('정상') || r.contractStatus.includes('종료') || !r.contractStatus
+  );
+
+  const activeList = dlqList.filter(r => r.contractStatus.includes('정상'));
+  const endedList  = dlqList.filter(r => r.contractStatus.includes('종료'));
+
+  // ③ 구간별
+  const b1 = dlqList.filter(r => r.dlqDays >= 1  && r.dlqDays <= 3).length;
+  const b2 = dlqList.filter(r => r.dlqDays >= 4  && r.dlqDays <= 15).length;
+  const b3 = dlqList.filter(r => r.dlqDays >= 16 && r.dlqDays <= 30).length;
+  const b4 = dlqList.filter(r => r.dlqDays >  30).length;
+  const total = dlqList.length;
+  const pct   = totalContracts > 0 ? (total / totalContracts * 100).toFixed(1) : '0.0';
+  const pbar  = Math.min(parseFloat(pct), 100);
+
+  // ④ 납부예정일
+  let payPast=0, payToday=0, payFuture=0;
+  dlqList.forEach(r => {
+    const d = parseKorDateDlq(r.payDate);
+    if (!d) return;
+    if      (d < today)                           payPast++;
+    else if (d.getTime() === today.getTime())     payToday++;
+    else                                           payFuture++;
+  });
+
+  // ── DOM 업데이트 ──────────────────────────────────────────
+  const pct100 = (n) => total > 0 ? (n/total*100).toFixed(0)+'%' : '—';
+  document.getElementById('dlqRatePct').textContent     = pct + '%';
+  document.getElementById('dlqRateSub').textContent     = `전체 ${totalContracts}명 중 ${total}명`;
+  document.getElementById('dlqProgressFill').style.width= pbar + '%';
+  document.getElementById('dlqTotalContract').textContent= totalContracts || '—';
+  document.getElementById('dlqActiveCount').textContent  = activeList.length;
+  document.getElementById('dlqEndedCount').textContent   = endedList.length;
+  document.getElementById('dlqTotalDelinq').textContent  = total;
+  document.getElementById('dlqB1').textContent  = b1 + '명';
+  document.getElementById('dlqB1p').textContent = pct100(b1);
+  document.getElementById('dlqB2').textContent  = b2 + '명';
+  document.getElementById('dlqB2p').textContent = pct100(b2);
+  document.getElementById('dlqB3').textContent  = b3 + '명';
+  document.getElementById('dlqB3p').textContent = pct100(b3);
+  document.getElementById('dlqB4').textContent  = b4 + '명';
+  document.getElementById('dlqB4p').textContent = pct100(b4);
+  document.getElementById('dlqPayPast').textContent   = payPast   + '명';
+  document.getElementById('dlqPayToday').textContent  = payToday  + '명';
+  document.getElementById('dlqPayFuture').textContent = payFuture + '명';
+
+  // ── 차트 ──────────────────────────────────────────────────
+  const barCtx = document.getElementById('dlqBarChart').getContext('2d');
+  if (dlqBarInst) dlqBarInst.destroy();
+  dlqBarInst = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: ['1~3일', '4~15일', '16~30일', '30일 초과'],
+      datasets: [{
+        label: '연체자 수',
+        data: [b1, b2, b3, b4],
+        backgroundColor: ['#22C55E','#F59E0B','#F97316','#EF4444'],
+        borderRadius: 6,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#F1F5F9' }, ticks: { font: { size: 11 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+
+  // ── 필터 칩 이벤트 ────────────────────────────────────────
+  document.querySelectorAll('.dlq-chip').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.dlq-chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      dlqActiveFilter = btn.dataset.f;
+      renderDlqTable(dlqList);
+    };
+  });
+
+  // ── 테이블 최초 렌더 ──────────────────────────────────────
+  renderDlqTable(dlqList);
+}
+
 async function loadData() {
   setStatus('loading','데이터 로딩 중');
   const CACHE_KEY = 'krg_dash_cache_v1';
