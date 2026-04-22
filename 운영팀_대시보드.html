@@ -607,88 +607,252 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 }
 
 /* ═══════════════════════════════════════════
-   연체관리 뷰 v2
+   연체관리 뷰 v3
    ═══════════════════════════════════════════ */
-.dlq-inner { max-width:1400px; margin:0 auto; padding:20px 16px 48px; }
-.dlq-loading { text-align:center; padding:60px; color:#6b7280; font-size:16px; }
-.dlq-spin { display:inline-block; animation:spin 1s linear infinite; }
-@keyframes spin { to { transform:rotate(360deg); } }
+.dlq-wrap { padding: 20px 16px 48px; max-width: 1500px; margin: 0 auto; }
 
-/* 헤더 카드 */
-.dlq-header-card {
-  background: linear-gradient(135deg, #1e3a5f 0%, #0f2341 100%);
-  border-radius:16px; padding:28px 32px;
-  display:flex; align-items:center; gap:32px;
-  margin-bottom:24px; color:#fff; flex-wrap:wrap;
+/* ── 연체율 섹션 ── */
+.dlq-rate-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 18px 24px;
+  margin-bottom: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 32px;
 }
-.dlq-header-left { flex:1; min-width:200px; }
-.dlq-header-title { font-size:13px; font-weight:600; opacity:0.75; letter-spacing:.06em; text-transform:uppercase; margin-bottom:12px; }
-.dlq-rate-row { display:flex; align-items:baseline; gap:6px; margin-bottom:12px; }
-.dlq-rate-num { font-size:52px; font-weight:800; line-height:1; color:#60a5fa; }
-.dlq-rate-pct { font-size:28px; font-weight:700; color:#93c5fd; }
-.dlq-rate-label { font-size:14px; color:#93c5fd; margin-left:4px; }
-.dlq-progress-bar { height:6px; background:rgba(255,255,255,.15); border-radius:3px; overflow:hidden; }
-.dlq-progress-fill { height:100%; background:linear-gradient(90deg,#60a5fa,#a78bfa); border-radius:3px; transition:width .6s ease; }
-.dlq-header-pills { display:flex; gap:12px; flex-wrap:wrap; }
-.dlq-pill { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18);
-  border-radius:12px; padding:12px 18px; min-width:100px; text-align:center; backdrop-filter:blur(4px); }
-.dlq-pill-num { font-size:22px; font-weight:800; margin-bottom:4px; }
-.dlq-pill-lbl { font-size:11px; opacity:.75; white-space:nowrap; }
-.dlq-pill-blue .dlq-pill-num  { color:#93c5fd; }
-.dlq-pill-yellow .dlq-pill-num{ color:#fcd34d; }
-.dlq-pill-gray .dlq-pill-num  { color:#d1d5db; }
-.dlq-pill-red .dlq-pill-num   { color:#fca5a5; }
-
-/* 구간 카드 */
-.dlq-seg-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
-@media(max-width:700px){ .dlq-seg-row{ grid-template-columns:repeat(2,1fr); } }
-.dlq-seg-card { background:#fff; border-radius:12px; padding:18px 20px;
-  box-shadow:0 1px 4px rgba(0,0,0,.06); display:flex; flex-direction:column; gap:4px; }
-.dlq-seg-icon  { font-size:20px; margin-bottom:4px; }
-.dlq-seg-count { font-size:32px; font-weight:800; line-height:1; }
-.dlq-seg-label { font-size:12px; color:#6b7280; font-weight:500; }
-
-/* 중단 패널 */
-.dlq-mid-row { display:grid; grid-template-columns:1fr 1.8fr; gap:16px; margin-bottom:24px; }
-@media(max-width:800px){ .dlq-mid-row{ grid-template-columns:1fr; } }
-.dlq-mid-left, .dlq-mid-right {
-  background:#fff; border-radius:12px; padding:20px;
-  box-shadow:0 1px 4px rgba(0,0,0,.06);
+.dlq-rate-left { flex: 1; min-width: 0; }
+.dlq-rate-bar-label { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+.dlq-rate-bar-track {
+  height: 10px;
+  background: #f3f4f6;
+  border-radius: 5px;
+  position: relative;
+  margin-bottom: 4px;
 }
-.dlq-mid-title { font-size:14px; font-weight:700; color:#374151; margin-bottom:14px; }
-.dlq-pay-cards { display:flex; flex-direction:column; gap:10px; }
-.dlq-pay-card { border-radius:10px; padding:12px 16px; display:flex; align-items:center; gap:12px; }
-.dlq-pay-num { font-size:24px; font-weight:800; min-width:44px; }
-.dlq-pay-lbl { font-size:13px; font-weight:500; }
-.dlq-pay-overdue { background:#FEF2F2; } .dlq-pay-overdue .dlq-pay-num { color:#EF4444; } .dlq-pay-overdue .dlq-pay-lbl { color:#991B1B; }
-.dlq-pay-future  { background:#ECFDF5; } .dlq-pay-future .dlq-pay-num  { color:#10B981; } .dlq-pay-future .dlq-pay-lbl  { color:#065F46; }
-.dlq-pay-none    { background:#F3F4F6; } .dlq-pay-none .dlq-pay-num    { color:#6B7280; } .dlq-pay-none .dlq-pay-lbl    { color:#374151; }
+.dlq-rate-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6 0%, #f97316 70%, #ef4444 100%);
+  border-radius: 5px;
+  transition: width 0.9s ease;
+  position: relative;
+}
+.dlq-rate-bar-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+.dlq-rate-bar-threshold {
+  position: absolute;
+  top: -3px;
+  height: 16px;
+  width: 2px;
+  background: #dc2626;
+  border-radius: 1px;
+}
+.dlq-rate-big {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ef4444;
+  margin-top: 6px;
+}
+.dlq-rate-right {
+  max-width: 320px;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.7;
+  flex-shrink: 0;
+}
 
-/* 필터 칩 */
-.dlq-filter-row { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
-.dlq-filter-group { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-.dlq-filter-label { font-size:12px; color:#6b7280; font-weight:600; margin-right:2px; }
-.dlq-chip { padding:5px 12px; border-radius:20px; border:1px solid #e5e7eb;
-  background:#fff; color:#374151; font-size:12px; font-weight:500; cursor:pointer; transition:all .15s; }
-.dlq-chip:hover { background:#f3f4f6; }
-.dlq-chip.active { background:#1e3a5f; color:#fff; border-color:#1e3a5f; }
+/* ── 6개 카드 ── */
+.dlq-cards-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.dlq-stat-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px 12px 12px;
+  text-align: center;
+  border-top: 3px solid #e5e7eb;
+}
+.dlq-stat-card.c-red   { border-top-color: #ef4444; }
+.dlq-stat-card.c-green { border-top-color: #22c55e; }
+.dlq-stat-card.c-orange{ border-top-color: #f97316; }
+.dlq-stat-card.c-yellow{ border-top-color: #eab308; }
+.dlq-stat-card.c-dark  { border-top-color: #dc2626; }
+.dlq-stat-card.c-indigo{ border-top-color: #6366f1; }
+.dlq-stat-icon { font-size: 18px; margin-bottom: 3px; }
+.dlq-stat-label { font-size: 11px; color: #6b7280; margin-bottom: 3px; line-height: 1.3; }
+.dlq-stat-num {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.1;
+}
+.dlq-stat-card.c-red   .dlq-stat-num { color: #dc2626; }
+.dlq-stat-card.c-green .dlq-stat-num { color: #16a34a; }
+.dlq-stat-card.c-orange .dlq-stat-num { color: #ea580c; }
+.dlq-stat-card.c-yellow .dlq-stat-num { color: #ca8a04; }
+.dlq-stat-card.c-dark  .dlq-stat-num { color: #dc2626; }
+.dlq-stat-card.c-indigo .dlq-stat-num { color: #4f46e5; }
+.dlq-stat-sub { font-size: 11px; color: #9ca3af; margin-top: 2px; }
 
-/* 테이블 */
-.dlq-table-wrap { background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.06); }
-.dlq-table { width:100%; border-collapse:collapse; font-size:13px; }
-.dlq-table thead th { background:#f8fafc; padding:11px 14px; text-align:left; font-weight:600; color:#6b7280;
-  font-size:12px; border-bottom:1px solid #e5e7eb; white-space:nowrap; }
-.dlq-table tbody tr { border-bottom:1px solid #f3f4f6; transition:background .1s; }
-.dlq-table tbody tr:hover { background:#f8fafc; }
-.dlq-table tbody td { padding:10px 14px; color:#374151; vertical-align:middle; }
-.dlq-status-badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
-.dlq-status-active { background:#ECFDF5; color:#065F46; }
-.dlq-status-ended  { background:#F3F4F6; color:#6B7280; }
-.dlq-days-badge { display:inline-block; padding:3px 9px; border-radius:20px; font-size:12px; font-weight:700; }
-.dlq-seg-green  { background:#ECFDF5; color:#065F46; }
-.dlq-seg-yellow { background:#FFFBEB; color:#92400E; }
-.dlq-seg-orange { background:#FFF7ED; color:#9A3412; }
-.dlq-seg-red    { background:#FEF2F2; color:#991B1B; }
+/* ── 빨간 배너 ── */
+.dlq-red-banner {
+  background: linear-gradient(135deg, #c0392b, #922b21);
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.dlq-banner-item {
+  padding: 12px 8px;
+  text-align: center;
+  border-right: 1px solid rgba(255,255,255,0.18);
+}
+.dlq-banner-item:last-child { border-right: none; }
+.dlq-banner-lbl { font-size: 11px; color: rgba(255,255,255,0.8); margin-bottom: 5px; }
+.dlq-banner-val { font-size: 17px; font-weight: 700; color: #fff; }
+
+/* ── 납부예정일 ── */
+.dlq-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.dlq-pay-section { margin-bottom: 14px; }
+.dlq-pay-cards-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.dlq-pay-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.dlq-pay-card-ttl {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.dlq-pay-card-ttl.past  { color: #ef4444; }
+.dlq-pay-card-ttl.today { color: #f59e0b; }
+.dlq-pay-card-ttl.future{ color: #22c55e; }
+.dlq-pay-card-num {
+  font-size: 38px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+}
+.dlq-pay-card-desc { font-size: 12px; color: #6b7280; margin-top: 6px; }
+
+/* ── 분석 차트 ── */
+.dlq-chart-section { margin-bottom: 14px; }
+.dlq-charts-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.dlq-chart-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.dlq-chart-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.dlq-chart-ttl { font-size: 13px; font-weight: 600; color: #374151; }
+.dlq-chart-badge {
+  font-size: 11px;
+  background: #f3f4f6;
+  color: #6b7280;
+  border-radius: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.dlq-bs-sel {
+  font-size: 11px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: #374151;
+}
+
+/* ── 테이블 ── */
+.dlq-table-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.dlq-table-hdr {
+  padding: 10px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dlq-table-count { font-size: 12px; color: #6b7280; }
+.dlq-table-link-note { font-size: 11px; color: #6366f1; }
+.dlq-tbl-wrap { overflow-x: auto; }
+.dlq-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dlq-tbl th {
+  background: #f9fafb;
+  padding: 9px 11px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+.dlq-tbl td {
+  padding: 9px 11px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+.dlq-tbl tr:last-child td { border-bottom: none; }
+.dlq-tbl tr:hover td { background: #f0f4ff; cursor: pointer; }
+.dlq-grade { display:inline-block; padding:2px 7px; border-radius:10px; font-size:11px; font-weight:700; }
+.dlq-grade-S,.dlq-grade-S등급 { background:#fef3c7; color:#92400e; }
+.dlq-grade-A,.dlq-grade-A등급 { background:#fee2e2; color:#991b1b; }
+.dlq-grade-B,.dlq-grade-B등급 { background:#fce7f3; color:#9d174d; }
+.dlq-grade-C,.dlq-grade-C등급 { background:#fef9c3; color:#854d0e; }
+.dlq-grade-D,.dlq-grade-D등급 { background:#dcfce7; color:#166534; }
+.dlq-grade-E,.dlq-grade-E등급 { background:#d1fae5; color:#065f46; }
+.dlq-grade-F,.dlq-grade-F등급 { background:#e0e7ff; color:#3730a3; }
+.dlq-days-badge {
+  display:inline-block;
+  padding:2px 7px;
+  border-radius:8px;
+  font-size:11px;
+  font-weight:600;
+}
+.dlq-days-1to3  { background:#dcfce7; color:#166534; }
+.dlq-days-4to15 { background:#fff7ed; color:#9a3412; }
+.dlq-days-16to30{ background:#fef3c7; color:#92400e; }
+.dlq-days-31plus{ background:#fee2e2; color:#991b1b; }
 
 
 </style>
@@ -2752,374 +2916,470 @@ async function fetchViaProxy() {
 
 
 // ═══════════════════════════════════════════
-// ■ 연체관리 — 데이터 파서 & 렌더러
+// ■ 연체관리 v3 — 데이터 파서 & 렌더러
 // ═══════════════════════════════════════════
 
-// gid=1953907648 → 전체 계약자 수 (K열='정상')
+// gid=1953907648 → 연체계약 목록 (K열='정상' & BP열='연체')
 function parseContractMgmt(resp) {
-  if (!resp || !resp.table) return { totalContracts: 0 };
+  if (!resp || !resp.table) return { delinqCount:0, gradeMap:{}, totalDelinqAmt:0, delinqRows:[], bsMap:{} };
   const rows = resp.table.rows || [];
-  let total = 0;
+  let delinqCount = 0;
+  const gradeMap = {};
+  const bsMap = {};
+  let totalDelinqAmt = 0;
+  const delinqRows = [];
   rows.forEach(row => {
     const c = row.c || [];
-    const status = c[10] ? String(c[10].f ?? c[10].v ?? '') : '';
-    if (status === '정상') total++;
-  });
-  return { totalContracts: total };
-}
-
-// gid=131074722 → 연체자 목록 (F열≠'변동관리비', AD열>0, 계약번호 기준 중복제거)
-function parseIncomeForDlq(resp) {
-  if (!resp || !resp.table) return [];
-  const rows = resp.table.rows || [];
-  const map = {};
-  rows.forEach(row => {
-    const c = row.c || [];
-    const 납부종류 = c[5] ? String(c[5].f ?? c[5].v ?? '') : '';
-    if (납부종류 === '변동관리비') return;
-    const adRaw = c[29] ? c[29].v : null;
-    let days = 0;
-    try { days = adRaw != null ? Math.floor(Number(adRaw)) : 0; } catch(e) {}
-    if (days <= 0) return;
-    // 계약번호 정규화 (59516.0 → 59516)
-    const noRaw = c[4] ? String(c[4].f ?? c[4].v ?? '') : '';
-    const no = noRaw.replace(/\.0$/, '').trim();
-    if (!no) return;
-    const 계약상태  = c[13] ? String(c[13].f ?? c[13].v ?? '') : '';
-    const 계약자명  = c[14] ? String(c[14].f ?? c[14].v ?? '') : '';
-    const 건물명    = c[7]  ? String(c[7].f  ?? c[7].v  ?? '') : '';
-    const 납기일    = c[28] ? String(c[28].f ?? c[28].v ?? '') : '';
-    const 미납금액  = c[27] ? Math.round(Number(c[27].v ?? 0)) : 0;
-    // 같은 계약번호 중 연체일수 최대값 유지
-    if (!map[no] || map[no].days < days) {
-      map[no] = { no, 계약상태, 계약자명, 건물명, days, 납기일, 미납금액 };
+    const k   = c[10] ? String(c[10].v ?? '') : '';
+    const bp  = c[67] ? String(c[67].v ?? '') : '';
+    const byG = c[76] ? String(c[76].f ?? c[76].v ?? '') : '';
+    const bs  = c[70] ? String(c[70].f ?? c[70].v ?? '') : '';
+    const amt = c[77] ? Number(c[77].v ?? 0) : 0;
+    const cno = c[0]  ? String(c[0].f  ?? c[0].v  ?? '') : '';
+    const nm  = c[2]  ? String(c[2].v  ?? '') : '';
+    if (k === '정상') {
+      delinqCount++;
+      totalDelinqAmt += amt;
+      gradeMap[byG] = (gradeMap[byG] || 0) + 1;
+      bsMap[bs]     = (bsMap[bs]     || 0) + 1;
+      delinqRows.push({ cno, nm, grade: byG, amt, bs });
     }
   });
-  return Object.values(map);
+  return { delinqCount, gradeMap, totalDelinqAmt, delinqRows, bsMap };
 }
 
-// gid=554798125 → 계약번호 → 최신 납부약속일(입금예정) 매핑
+// gid=131074722 → 수납 데이터 (임대료 연체 분석)
+function parseIncomeForDlqV2(resp) {
+  if (!resp || !resp.table) return { segs:{}, typeBreakdown:{}, activeDelinqAmt:0, endedDelinqAmt:0, totalContracts:0 };
+  const rows = resp.table.rows || [];
+  const activeMap = {}, endedMap = {};
+  const allMap = {};
+  let totalContracts = 0;
+  const allActiveSet = new Set();
+  rows.forEach(row => {
+    const c = row.c || [];
+    const tipo  = c[0]  ? String(c[0].v  ?? '') : '';
+    const f5    = c[5]  ? String(c[5].v  ?? '') : '';
+    const n13   = c[13] ? String(c[13].v ?? '') : '';
+    const ad29  = c[29] ? Number(c[29].v ?? 0) : 0;
+    const cno   = c[4]  ? String(c[4].f  ?? c[4].v ?? '').replace(/\.0$/,'').trim() : '';
+    const amt   = c[27] ? Number(c[27].v ?? 0) : 0;
+    if (f5 !== '임대료' || !cno) return;
+    if (n13 === '계약중') allActiveSet.add(cno);
+    if (ad29 <= 0) return;
+    const key = cno;
+    if (n13 === '계약중') {
+      if (!activeMap[key] || activeMap[key].days < ad29) {
+        activeMap[key] = { days: ad29, tipo, amt };
+      }
+    } else {
+      if (!endedMap[key] || endedMap[key].days < ad29) {
+        endedMap[key] = { days: ad29, tipo, amt };
+      }
+    }
+  });
+  totalContracts = allActiveSet.size;
+  // Segment counts (cumulative)
+  let s1to3=0, s1to15=0, s1to30=0, sOver30=0;
+  let activeDelinqAmt = 0;
+  const typeBreakdown = {};
+  Object.values(activeMap).forEach(v => {
+    if (v.days >= 1 && v.days <= 3)   s1to3++;
+    if (v.days >= 1 && v.days <= 15)  s1to15++;
+    if (v.days >= 1 && v.days <= 30)  s1to30++;
+    if (v.days > 30)                  sOver30++;
+    activeDelinqAmt += v.amt;
+    const t = v.tipo || '기타';
+    typeBreakdown[t] = (typeBreakdown[t] || 0) + 1;
+  });
+  let endedDelinqAmt = 0;
+  Object.values(endedMap).forEach(v => { endedDelinqAmt += v.amt; });
+  return {
+    segs: { s1to3, s1to15, s1to30, sOver30 },
+    typeBreakdown,
+    activeDelinqAmt,
+    endedDelinqAmt,
+    totalContracts,
+    activeDelinqCount: Object.keys(activeMap).length,
+    endedDelinqCount:  Object.keys(endedMap).length
+  };
+}
+
+// gid=554798125 → 납부예정일 현황 (C열)
 function parseDailyForPayDate(resp) {
-  if (!resp || !resp.table) return {};
+  if (!resp || !resp.table) return { past:0, today:0, future:0 };
   const rows = resp.table.rows || [];
-  const map = {}; // contractNo → { dateObj, dateStr }
-  const today = new Date(); today.setHours(0,0,0,0);
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  let past=0, todayCount=0, future=0;
+  // Track unique contracts with a payment date
+  const seen = new Set();
   rows.forEach(row => {
     const c = row.c || [];
-    const noRaw = c[1] ? String(c[1].f ?? c[1].v ?? '') : '';
-    const no = noRaw.replace(/\.0$/, '').trim();
-    if (!no) return;
-    if (!c[2] || !c[2].v) return; // 입금예정 없음
-    // gviz Date: "Date(2026,3,22)" — month is 0-based
-    const dateStr = c[2].f || String(c[2].v);
-    const dm = String(c[2].v).match(/Date\((\d+),(\d+),(\d+)\)/);
-    if (!dm) return;
-    const d = new Date(+dm[1], +dm[2], +dm[3]);
-    // 대응일(col0) 기준 최신 기록 우선
-    const recDate = c[0] && c[0].v ? (() => {
-      const rm = String(c[0].v).match(/Date\((\d+),(\d+),(\d+)\)/);
-      return rm ? new Date(+rm[1], +rm[2], +rm[3]) : new Date(0);
-    })() : new Date(0);
-    if (!map[no] || map[no].recDate < recDate) {
-      map[no] = { dateObj: d, dateStr, recDate };
+    const cno = c[1] ? String(c[1].f ?? c[1].v ?? '') : '';
+    const dateCell = c[2];
+    if (!dateCell || !dateCell.v) return;
+    const dv = String(dateCell.v);
+    let d;
+    const m = dv.match(/Date\((\d+),(\d+),(\d+)\)/);
+    if (m) {
+      d = new Date(+m[1], +m[2], +m[3]);
+    } else if (dateCell.f) {
+      d = new Date(dateCell.f);
     }
+    if (!d || isNaN(d.getTime())) return;
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (seen.has(cno)) return;
+    seen.add(cno);
+    if (ds < todayStr) past++;
+    else if (ds === todayStr) todayCount++;
+    else future++;
   });
-  return map;
+  return { past, today: todayCount, future };
 }
 
-// ─── 렌더러 ─────────────────────────────────────────────────
-let dlqContractTotal = 0;  // 전체 계약자 (정상)
-let dlqList = [];           // 연체자 배열
-let dlqPayMap = {};         // 계약번호 → 납부약속일
+// ── 필터 상태 ──
+let dlqBsFilter = 'all';  // all | 1 | 2 | 3 | 4+
 
-// 필터 상태
-let dlqFilterStatus = 'all';  // all | active | ended
-let dlqFilterSeg   = 'all';   // all | 1-3 | 4-15 | 16-30 | 31+
-let dlqFilterPay   = 'all';   // all | promised | none
+let _dlqContractData = null;
+let _dlqIncomeData   = null;
+let _dlqBarChart     = null;
+let _dlqDonutChart   = null;
 
 async function renderDelinquency() {
   const wrap = document.getElementById('delinquencyView');
   if (!wrap) return;
   const inner = wrap.querySelector('.dlq-inner');
   if (!inner) return;
-  inner.innerHTML = `<div class="dlq-loading"><span class="dlq-spin">⏳</span> 데이터 로딩 중...</div>`;
+  inner.innerHTML = '<div style="padding:60px;text-align:center;color:#6b7280;font-size:14px">⏳ 연체 데이터 로딩 중...</div>';
 
-  const SHEET_ID = typeof window.SHEET_ID !== 'undefined' ? window.SHEET_ID : '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
-  const CONTRACT_GID  = '1953907648';
-  const INCOME_GID    = '131074722';
-  const DAILY_RPT_GID = '554798125';
-
-  function gvizUrl(gid) {
-    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${gid}`;
+  const SHEET2 = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
+  function gvizUrl(gid, range) {
+    const rPart = range ? `&range=${range}&headers=1` : '';
+    return `https://docs.google.com/spreadsheets/d/${SHEET2}/gviz/tq?tqx=out:json&gid=${gid}${rPart}`;
   }
-  function parseGviz(text) {
-    const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
-    return m ? JSON.parse(m[1]) : null;
+  function parseGvizLocal(txt) {
+    const m = txt.match(/setResponse\((\{[\s\S]*?\})\)\s*;?\s*$/);
+    if (!m) {
+      const m2 = txt.match(/google\.visualization\.Query\.setResponse\((\{[\s\S]*\})\)/);
+      if (!m2) throw new Error('gviz parse fail');
+      return JSON.parse(m2[1]);
+    }
+    return JSON.parse(m[1]);
   }
-
   try {
     const [r1, r2, r3] = await Promise.all([
-      fetch(gvizUrl(CONTRACT_GID)).then(r=>r.text()).then(parseGviz),
-      fetch(gvizUrl(INCOME_GID)).then(r=>r.text()).then(parseGviz),
-      fetch(gvizUrl(DAILY_RPT_GID)).then(r=>r.text()).then(parseGviz),
+      fetch(gvizUrl(1953907648)).then(r=>r.text()).then(parseGvizLocal),
+      fetch(gvizUrl(131074722,'A7:AK')).then(r=>r.text()).then(parseGvizLocal),
+      fetch(gvizUrl(554798125)).then(r=>r.text()).then(parseGvizLocal),
     ]);
-
-    const cm = parseContractMgmt(r1);
-    dlqContractTotal = cm.totalContracts;
-    dlqList    = parseIncomeForDlq(r2);
-    dlqPayMap  = parseDailyForPayDate(r3);
-
-    // 필터 초기화
-    dlqFilterStatus = 'all'; dlqFilterSeg = 'all'; dlqFilterPay = 'all';
-    buildDlqUI(inner);
+    _dlqContractData = parseContractMgmt(r1);
+    _dlqIncomeData   = parseIncomeForDlqV2(r2);
+    const payData    = parseDailyForPayDate(r3);
+    buildDlqUI(_dlqContractData, _dlqIncomeData, payData);
   } catch(e) {
-    inner.innerHTML = `<div class="dlq-loading">❌ 데이터 로딩 실패: ${e.message}</div>`;
+    inner.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444">❌ 오류: ${e.message}</div>`;
+    console.error('renderDelinquency error:', e);
   }
 }
 
-function buildDlqUI(inner) {
-  const today = new Date(); today.setHours(0,0,0,0);
+function buildDlqUI(d1, d2, d3) {
+  const wrap = document.getElementById('delinquencyView');
+  if (!wrap) return;
+  const inner = wrap.querySelector('.dlq-inner');
+  if (!inner) return;
 
-  // ── 집계 ────────────────────────────────────────────────
-  const total   = dlqContractTotal;
-  const list    = dlqList;
-  const payMap  = dlqPayMap;
+  // Computed values
+  const delinqCount   = d1.delinqCount;
+  const totalContracts = d2.totalContracts || 1;
+  const rate = totalContracts > 0 ? (delinqCount / totalContracts * 100) : 0;
+  const rateStr = rate.toFixed(1);
+  const barPct = Math.min(rate / 15 * 100, 100).toFixed(1);
+  const threshold = (7 / 15 * 100).toFixed(1);
+  const fmt = n => n >= 10000 ? (n/10000).toFixed(0)+'만' : n.toLocaleString();
+  const fmtW = n => n > 0 ? '₩' + n.toLocaleString() : '₩0';
+  const rateOver = rate > 7;
 
-  const active  = list.filter(r => r.계약상태 === '계약중').length;
-  const ended   = list.filter(r => r.계약상태 !== '계약중').length;
-  const totalDlq = list.length;
-  const rate    = total > 0 ? (totalDlq / total * 100).toFixed(1) : '0.0';
+  // Grade filter for donut
+  const bsOptions = ['all', ...new Set(Object.keys(d1.bsMap))].filter(Boolean);
 
-  const seg = (d) => d<=3?'1-3': d<=15?'4-15': d<=30?'16-30':'31+';
-  const segs = {'1-3':0,'4-15':0,'16-30':0,'31+':0};
-  list.forEach(r => segs[seg(r.days)]++);
+  // 납부약속 note text
+  const rateComment = rateOver
+    ? `이달 정산 대상자 ${totalContracts.toLocaleString()}명 중 ${delinqCount}명이 연체 상태입니다. 연체율을 ${rateStr}%로 관리 기준(7%)을 초과했습니다. 즉각 대응이 필요합니다.`
+    : `이달 정산 대상자 ${totalContracts.toLocaleString()}명 중 ${delinqCount}명이 연체 상태입니다. 연체율 ${rateStr}%로 관리 기준(7%) 이하입니다.`;
 
-  // 납부약속 현황
-  let payTodayOrPast=0, payFuture=0, payNone=0;
-  list.forEach(r => {
-    const p = payMap[r.no];
-    if (!p) { payNone++; return; }
-    if (p.dateObj <= today) payTodayOrPast++;
-    else payFuture++;
-  });
+  // Type breakdown
+  const types = d2.typeBreakdown || {};
+  const 주거 = (types['주거용']||0);
+  const 상업 = (types['상업용']||0);
+  const 기타 = d2.activeDelinqCount - 주거 - 상업;
 
-  const fmt금액 = n => n > 0 ? (n/10000).toFixed(0)+'만' : '-';
-  const segColor = {'1-3':'#10B981','4-15':'#F59E0B','16-30':'#F97316','31+':'#EF4444'};
-  const segBg    = {'1-3':'#ECFDF5','4-15':'#FFFBEB','16-30':'#FFF7ED','31+':'#FEF2F2'};
-
-  // ── 필터 적용 ────────────────────────────────────────────
-  function applyFilter() {
-    let filtered = [...dlqList];
-    if (dlqFilterStatus === 'active') filtered = filtered.filter(r => r.계약상태 === '계약중');
-    if (dlqFilterStatus === 'ended')  filtered = filtered.filter(r => r.계약상태 !== '계약중');
-    if (dlqFilterSeg !== 'all')       filtered = filtered.filter(r => seg(r.days) === dlqFilterSeg);
-    if (dlqFilterPay === 'promised')  filtered = filtered.filter(r => dlqPayMap[r.no]);
-    if (dlqFilterPay === 'none')      filtered = filtered.filter(r => !dlqPayMap[r.no]);
-    filtered.sort((a,b) => b.days - a.days);
-    return filtered;
-  }
-
-  // ── HTML 빌드 ────────────────────────────────────────────
   inner.innerHTML = `
-  <!-- 헤더 카드 -->
-  <div class="dlq-header-card">
-    <div class="dlq-header-left">
-      <div class="dlq-header-title">이달 연체 현황</div>
-      <div class="dlq-rate-row">
-        <span class="dlq-rate-num" id="dlq-rate">${rate}</span>
-        <span class="dlq-rate-pct">%</span>
-        <span class="dlq-rate-label">연체율</span>
-      </div>
-      <div class="dlq-progress-bar">
-        <div class="dlq-progress-fill" style="width:${Math.min(parseFloat(rate),100)}%"></div>
-      </div>
-    </div>
-    <div class="dlq-header-pills">
-      <div class="dlq-pill dlq-pill-blue">
-        <div class="dlq-pill-num">${total.toLocaleString()}</div>
-        <div class="dlq-pill-lbl">전체 계약자</div>
-      </div>
-      <div class="dlq-pill dlq-pill-yellow">
-        <div class="dlq-pill-num">${active}</div>
-        <div class="dlq-pill-lbl">계약중 연체</div>
-      </div>
-      <div class="dlq-pill dlq-pill-gray">
-        <div class="dlq-pill-num">${ended}</div>
-        <div class="dlq-pill-lbl">종료후 연체</div>
-      </div>
-      <div class="dlq-pill dlq-pill-red">
-        <div class="dlq-pill-num">${totalDlq}</div>
-        <div class="dlq-pill-lbl">총 연체자</div>
-      </div>
-    </div>
-  </div>
+  <div class="dlq-wrap">
 
-  <!-- 연체일수 구간 카드 4개 -->
-  <div class="dlq-seg-row">
-    ${[['1-3','1~3일','🟢'],['4-15','4~15일','🟡'],['16-30','16~30일','🟠'],['31+','31일+','🔴']].map(([k,label,icon])=>`
-    <div class="dlq-seg-card" style="border-left:4px solid ${segColor[k]}; background:${segBg[k]}">
-      <div class="dlq-seg-icon">${icon}</div>
-      <div class="dlq-seg-count" style="color:${segColor[k]}">${segs[k]}</div>
-      <div class="dlq-seg-label">${label}</div>
-    </div>`).join('')}
-  </div>
-
-  <!-- 중단 패널 -->
-  <div class="dlq-mid-row">
-    <div class="dlq-mid-left">
-      <div class="dlq-mid-title">📅 납부약속 현황</div>
-      <div class="dlq-pay-cards">
-        <div class="dlq-pay-card dlq-pay-overdue">
-          <div class="dlq-pay-num">${payTodayOrPast}</div>
-          <div class="dlq-pay-lbl">약속일 도래·경과</div>
+    <!-- 연체율 섹션 -->
+    <div class="dlq-rate-section">
+      <div class="dlq-rate-left">
+        <div class="dlq-rate-bar-label">전체 연체자 / 해당 월 정산 대상자</div>
+        <div class="dlq-rate-bar-track">
+          <div class="dlq-rate-bar-fill" id="dlqRateFill" style="width:${barPct}%"></div>
+          <div class="dlq-rate-bar-threshold" style="left:${threshold}%"></div>
         </div>
-        <div class="dlq-pay-card dlq-pay-future">
-          <div class="dlq-pay-num">${payFuture}</div>
-          <div class="dlq-pay-lbl">약속일 남은 건</div>
+        <div class="dlq-rate-bar-ticks"><span>0%</span><span style="color:#dc2626">▲7%</span><span>15%</span></div>
+        <div class="dlq-rate-big" style="color:${rateOver?'#ef4444':'#22c55e'}">연체율 ${rateStr}%</div>
+      </div>
+      <div class="dlq-rate-right">${rateComment}</div>
+    </div>
+
+    <!-- 6개 카드 -->
+    <div class="dlq-cards-row">
+      <div class="dlq-stat-card c-red">
+        <div class="dlq-stat-icon">👥</div>
+        <div class="dlq-stat-label">전체 연체자<br>(계약중)</div>
+        <div class="dlq-stat-num">${delinqCount}명</div>
+        <div class="dlq-stat-sub">₩${fmt(d1.totalDelinqAmt)}</div>
+      </div>
+      <div class="dlq-stat-card c-green">
+        <div class="dlq-stat-icon" style="color:#22c55e">🟢</div>
+        <div class="dlq-stat-label">1일 ~ 3일</div>
+        <div class="dlq-stat-num">${d2.segs.s1to3}명</div>
+        <div class="dlq-stat-sub">${totalContracts>0?(d2.segs.s1to3/totalContracts*100).toFixed(2):'0.00'}%</div>
+      </div>
+      <div class="dlq-stat-card c-orange">
+        <div class="dlq-stat-icon" style="color:#f97316">🟡</div>
+        <div class="dlq-stat-label">15일 이하</div>
+        <div class="dlq-stat-num">${d2.segs.s1to15}명</div>
+        <div class="dlq-stat-sub">${totalContracts>0?(d2.segs.s1to15/totalContracts*100).toFixed(2):'0.00'}%</div>
+      </div>
+      <div class="dlq-stat-card c-yellow">
+        <div class="dlq-stat-icon" style="color:#eab308">🟠</div>
+        <div class="dlq-stat-label">30일 이하</div>
+        <div class="dlq-stat-num">${d2.segs.s1to30}명</div>
+        <div class="dlq-stat-sub">${totalContracts>0?(d2.segs.s1to30/totalContracts*100).toFixed(2):'0.00'}%</div>
+      </div>
+      <div class="dlq-stat-card c-dark">
+        <div class="dlq-stat-icon" style="color:#dc2626">🔴</div>
+        <div class="dlq-stat-label">30일 초과</div>
+        <div class="dlq-stat-num">${d2.segs.sOver30}명</div>
+        <div class="dlq-stat-sub">${totalContracts>0?(d2.segs.sOver30/totalContracts*100).toFixed(2):'0.00'}%</div>
+      </div>
+      <div class="dlq-stat-card c-indigo">
+        <div class="dlq-stat-icon">📅</div>
+        <div class="dlq-stat-label">정산 대상자<br>(추정)</div>
+        <div class="dlq-stat-num">${totalContracts.toLocaleString()}명</div>
+        <div class="dlq-stat-sub">현재 총 계약중</div>
+      </div>
+    </div>
+
+    <!-- 빨간 배너 -->
+    <div class="dlq-red-banner">
+      <div class="dlq-banner-item">
+        <div class="dlq-banner-lbl">계약중 연체금액</div>
+        <div class="dlq-banner-val">${fmtW(d2.activeDelinqAmt)}</div>
+      </div>
+      <div class="dlq-banner-item">
+        <div class="dlq-banner-lbl">종료후 연체금액</div>
+        <div class="dlq-banner-val">${fmtW(d2.endedDelinqAmt)}</div>
+      </div>
+      <div class="dlq-banner-item">
+        <div class="dlq-banner-lbl">주거 연체</div>
+        <div class="dlq-banner-val">${주거}명</div>
+      </div>
+      <div class="dlq-banner-item">
+        <div class="dlq-banner-lbl">상업 연체</div>
+        <div class="dlq-banner-val">${상업}명</div>
+      </div>
+      <div class="dlq-banner-item">
+        <div class="dlq-banner-lbl">기타 연체</div>
+        <div class="dlq-banner-val">${기타 > 0 ? 기타 : (d2.activeDelinqCount - 주거 - 상업)}명</div>
+      </div>
+    </div>
+
+    <!-- 납부예정일 현황 -->
+    <div class="dlq-pay-section">
+      <div class="dlq-section-title">납부예정일 현황</div>
+      <div class="dlq-pay-cards-row">
+        <div class="dlq-pay-card">
+          <div class="dlq-pay-card-ttl past">📅 납부예정일 지남 (오늘 이전)</div>
+          <div class="dlq-pay-card-num" style="color:#ef4444">${d3.past}명</div>
+          <div class="dlq-pay-card-desc">약정 납부일이 이미 지난 연체자</div>
         </div>
-        <div class="dlq-pay-card dlq-pay-none">
-          <div class="dlq-pay-num">${payNone}</div>
-          <div class="dlq-pay-lbl">약속 없음</div>
+        <div class="dlq-pay-card">
+          <div class="dlq-pay-card-ttl today">📅 납부예정일 오늘</div>
+          <div class="dlq-pay-card-num" style="color:#f59e0b">${d3.today}명</div>
+          <div class="dlq-pay-card-desc">오늘 납부 예정 — 즉시 확인 필요</div>
+        </div>
+        <div class="dlq-pay-card">
+          <div class="dlq-pay-card-ttl future">📅 납부예정일 미도래 (오늘 이후)</div>
+          <div class="dlq-pay-card-num" style="color:#22c55e">${d3.future}명</div>
+          <div class="dlq-pay-card-desc">향후 납부 예정 — 사전 안내 권장</div>
         </div>
       </div>
     </div>
-    <div class="dlq-mid-right">
-      <div class="dlq-mid-title">📊 구간별 연체 분포</div>
-      <canvas id="dlqChart" height="130"></canvas>
-    </div>
-  </div>
 
-  <!-- 테이블 필터 칩 -->
-  <div class="dlq-filter-row">
-    <div class="dlq-filter-group">
-      <span class="dlq-filter-label">계약상태</span>
-      ${[['all','전체'],['active','계약중'],['ended','종료/기타']].map(([v,l])=>
-        `<button class="dlq-chip${dlqFilterStatus===v?' active':''}" onclick="dlqSetFilter('status','${v}')">${l}</button>`
-      ).join('')}
+    <!-- 분석 차트 -->
+    <div class="dlq-chart-section">
+      <div class="dlq-section-title">분석 차트</div>
+      <div class="dlq-charts-2col">
+        <div class="dlq-chart-card">
+          <div class="dlq-chart-hdr">
+            <div class="dlq-chart-ttl">📊 구간별 연체 분포 (Outstanding Days)</div>
+            <span class="dlq-chart-badge">계약중</span>
+          </div>
+          <canvas id="dlqBarCanvas" height="160"></canvas>
+        </div>
+        <div class="dlq-chart-card">
+          <div class="dlq-chart-hdr">
+            <div class="dlq-chart-ttl">🎯 연체관리 등급 분포</div>
+            <select class="dlq-bs-sel" id="dlqBsSel" onchange="dlqChangeBsFilter(this.value)">
+              <option value="all">전체 청구수</option>
+              ${Object.keys(d1.bsMap).sort().map(k=>`<option value="${k}">${k}</option>`).join('')}
+            </select>
+          </div>
+          <canvas id="dlqDonutCanvas" height="160"></canvas>
+        </div>
+      </div>
     </div>
-    <div class="dlq-filter-group">
-      <span class="dlq-filter-label">연체구간</span>
-      ${[['all','전체'],['1-3','1~3일'],['4-15','4~15일'],['16-30','16~30일'],['31+','31일+']].map(([v,l])=>
-        `<button class="dlq-chip${dlqFilterSeg===v?' active':''}" onclick="dlqSetFilter('seg','${v}')">${l}</button>`
-      ).join('')}
-    </div>
-    <div class="dlq-filter-group">
-      <span class="dlq-filter-label">납부약속</span>
-      ${[['all','전체'],['promised','약속있음'],['none','약속없음']].map(([v,l])=>
-        `<button class="dlq-chip${dlqFilterPay===v?' active':''}" onclick="dlqSetFilter('pay','${v}')">${l}</button>`
-      ).join('')}
-    </div>
-  </div>
 
-  <!-- 연체자 테이블 -->
-  <div class="dlq-table-wrap">
-    <table class="dlq-table" id="dlqTable">
-      <thead>
-        <tr>
-          <th>계약번호</th><th>계약자명</th><th>건물명</th>
-          <th>계약상태</th><th>연체일수</th><th>납기일</th>
-          <th>미납금액</th><th>납부약속일</th>
-        </tr>
-      </thead>
-      <tbody id="dlqTbody"></tbody>
-    </table>
+    <!-- 연체자 테이블 -->
+    <div class="dlq-table-section">
+      <div class="dlq-table-hdr">
+        <span class="dlq-table-count">연체 계약 <strong>${delinqCount}</strong>건 · 계약레코드 탭에서 계약 상세 확인</span>
+        <span class="dlq-table-link-note">↗ 행 클릭 시 계약레코드 이동</span>
+      </div>
+      <div class="dlq-tbl-wrap">
+        <table class="dlq-tbl">
+          <thead>
+            <tr>
+              <th>계약번호</th><th>임차인명</th><th>연체등급</th><th>연체금액</th><th>청구수</th>
+            </tr>
+          </thead>
+          <tbody id="dlqTbody">
+            ${d1.delinqRows.map(r => {
+              const gc = r.grade.replace('등급','').trim();
+              const daysCls = '';
+              return `<tr onclick="dlqGoToContract('${r.cno}')">
+                <td>${r.cno}</td>
+                <td>${r.nm}</td>
+                <td><span class="dlq-grade dlq-grade-${gc} dlq-grade-${r.grade.replace(' ','')}">${r.grade||'-'}</span></td>
+                <td>${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
+                <td>${r.bs||'-'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
   `;
 
-  // 차트 그리기
-  const ctx = document.getElementById('dlqChart');
-  if (ctx && typeof Chart !== 'undefined') {
-    new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: ['1~3일', '4~15일', '16~30일', '31일+'],
-        datasets: [{
-          label: '연체자 수',
-          data: [segs['1-3'], segs['4-15'], segs['16-30'], segs['31+']],
-          backgroundColor: ['#10B981','#F59E0B','#F97316','#EF4444'],
-          borderRadius: 6,
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        plugins: { legend: { display: false },
-          tooltip: { callbacks: { label: c => ` ${c.raw}명` } } },
-        scales: {
-          x: { beginAtZero: true, grid: { color: '#f0f0f0' } },
-          y: { grid: { display: false } }
+  // Draw charts after DOM is ready
+  setTimeout(() => {
+    drawDlqBarChart(d2.segs);
+    drawDlqDonutChart(d1.gradeMap, 'all');
+  }, 80);
+}
+
+function drawDlqBarChart(segs) {
+  const canvas = document.getElementById('dlqBarCanvas');
+  if (!canvas) return;
+  if (_dlqBarChart) { try { _dlqBarChart.destroy(); } catch(e){} }
+  const ctx = canvas.getContext('2d');
+  const s = segs || {};
+  _dlqBarChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['1~3일', '4~15일', '16~30일', '30일 초과'],
+      datasets: [{
+        label: '연체 건수',
+        data: [s.s1to3||0, (s.s1to15||0)-(s.s1to3||0), (s.s1to30||0)-(s.s1to15||0), s.sOver30||0],
+        backgroundColor: ['#22c55e','#f97316','#eab308','#ef4444'],
+        borderRadius: 4,
+        barThickness: 22,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 12 } } }
+      }
+    }
+  });
+}
+
+function drawDlqDonutChart(gradeMap, bsFilter) {
+  const canvas = document.getElementById('dlqDonutCanvas');
+  if (!canvas) return;
+  if (_dlqDonutChart) { try { _dlqDonutChart.destroy(); } catch(e){} }
+  // Filter by bs if needed
+  let gm = gradeMap;
+  if (bsFilter !== 'all' && _dlqContractData) {
+    gm = {};
+    _dlqContractData.delinqRows
+      .filter(r => r.bs === bsFilter)
+      .forEach(r => { gm[r.grade] = (gm[r.grade]||0) + 1; });
+  }
+  const gradeOrder = ['S등급','A등급','B등급','C등급','D등급','E등급','F등급'];
+  const gradeColors = {
+    'S등급':'#f59e0b','A등급':'#ef4444','B등급':'#f97316',
+    'C등급':'#eab308','D등급':'#22c55e','E등급':'#10b981','F등급':'#6366f1'
+  };
+  const labels = [], data = [], colors = [];
+  gradeOrder.forEach(g => {
+    if (gm[g]) { labels.push(g); data.push(gm[g]); colors.push(gradeColors[g]||'#9ca3af'); }
+  });
+  Object.keys(gm).forEach(g => {
+    if (!gradeOrder.includes(g) && gm[g]) { labels.push(g); data.push(gm[g]); colors.push('#9ca3af'); }
+  });
+  const ctx = canvas.getContext('2d');
+  _dlqDonutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { font: { size: 11 }, padding: 8, boxWidth: 12 }
         }
       }
-    });
-  }
-
-  // 테이블 렌더
-  renderDlqTable(applyFilter());
-}
-
-function renderDlqTable(filtered) {
-  const tbody = document.getElementById('dlqTbody');
-  if (!tbody) return;
-  if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:#9ca3af">해당 조건의 연체자가 없습니다</td></tr>`;
-    return;
-  }
-  const seg = d => d<=3?'1-3': d<=15?'4-15': d<=30?'16-30':'31+';
-  const segCls = {'1-3':'dlq-seg-green','4-15':'dlq-seg-yellow','16-30':'dlq-seg-orange','31+':'dlq-seg-red'};
-  const today = new Date(); today.setHours(0,0,0,0);
-  const fmt금액 = n => n > 0 ? n.toLocaleString()+'원' : '-';
-
-  tbody.innerHTML = filtered.map(r => {
-    const s = seg(r.days);
-    const pay = dlqPayMap[r.no];
-    let payStr = '-';
-    if (pay) {
-      const diff = Math.floor((pay.dateObj - today) / 86400000);
-      const dateLabel = pay.dateStr.replace('년 ','년 ').replace('월 ','월 ').replace('일','일');
-      if (diff < 0) payStr = `<span style="color:#EF4444">${dateLabel} (${Math.abs(diff)}일 초과)</span>`;
-      else if (diff === 0) payStr = `<span style="color:#F97316">${dateLabel} (오늘)</span>`;
-      else payStr = `<span style="color:#10B981">${dateLabel} (D-${diff})</span>`;
     }
-    const statusCls = r.계약상태 === '계약중' ? 'dlq-status-active' : 'dlq-status-ended';
-    return `<tr>
-      <td>${r.no}</td>
-      <td>${r.계약자명 || '-'}</td>
-      <td style="max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.건물명 || '-'}</td>
-      <td><span class="dlq-status-badge ${statusCls}">${r.계약상태}</span></td>
-      <td><span class="dlq-days-badge ${segCls[s]}">${r.days}일</span></td>
-      <td>${r.납기일 || '-'}</td>
-      <td style="text-align:right">${fmt금액(r.미납금액)}</td>
-      <td>${payStr}</td>
-    </tr>`;
-  }).join('');
-}
-
-function dlqSetFilter(type, val) {
-  if (type === 'status') dlqFilterStatus = val;
-  else if (type === 'seg') dlqFilterSeg = val;
-  else if (type === 'pay') dlqFilterPay = val;
-
-  // 칩 UI 업데이트
-  document.querySelectorAll('.dlq-chip').forEach(btn => {
-    const onclick = btn.getAttribute('onclick') || '';
-    const isActive = onclick.includes(`'${val}'`) && onclick.includes(`'${type}'`);
-    if (type === 'status' && onclick.includes("'status'")) btn.classList.toggle('active', isActive);
-    if (type === 'seg'    && onclick.includes("'seg'"))    btn.classList.toggle('active', isActive);
-    if (type === 'pay'    && onclick.includes("'pay'"))    btn.classList.toggle('active', isActive);
   });
-
-  // 테이블 재렌더
-  const list = dlqList;
-  const seg = d => d<=3?'1-3': d<=15?'4-15': d<=30?'16-30':'31+';
-  let filtered = [...list];
-  if (dlqFilterStatus === 'active') filtered = filtered.filter(r => r.계약상태 === '계약중');
-  if (dlqFilterStatus === 'ended')  filtered = filtered.filter(r => r.계약상태 !== '계약중');
-  if (dlqFilterSeg !== 'all')       filtered = filtered.filter(r => seg(r.days) === dlqFilterSeg);
-  if (dlqFilterPay === 'promised')  filtered = filtered.filter(r => dlqPayMap[r.no]);
-  if (dlqFilterPay === 'none')      filtered = filtered.filter(r => !dlqPayMap[r.no]);
-  filtered.sort((a,b) => b.days - a.days);
-  renderDlqTable(filtered);
 }
+
+function dlqChangeBsFilter(val) {
+  dlqBsFilter = val;
+  if (_dlqContractData) drawDlqDonutChart(_dlqContractData.gradeMap, val);
+}
+
+function dlqGoToContract(cno) {
+  // Switch to contractView
+  document.querySelectorAll('.view-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view-content').forEach(v => v.classList.remove('active'));
+  const btn = Array.from(document.querySelectorAll('.view-tab')).find(b => b.textContent.includes('계약레코드'));
+  if (btn) btn.classList.add('active');
+  const view = document.getElementById('contractView');
+  if (view) view.classList.add('active');
+  // Try to populate search
+  setTimeout(() => {
+    const input = document.querySelector('#contractView input[type="text"], #contractView input[type="search"], #crSearch');
+    if (input) {
+      input.value = String(cno).replace(/\.0$/,'').trim();
+      input.dispatchEvent(new Event('input', {bubbles:true}));
+      input.dispatchEvent(new Event('keyup', {bubbles:true}));
+    }
+  }, 100);
+}
+
+
+
 
 
 
