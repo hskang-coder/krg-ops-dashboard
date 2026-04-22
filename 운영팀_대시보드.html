@@ -2321,6 +2321,10 @@ function renderContractRecord(c, payments, responses = []) {
   // 현재 연체중 항목의 최장 연체일
   // ① 납부상태가 '연체중'/'연체' 포함 OR ② 미납금액 > 0 인 항목 모두 검사
   const longestCurrentDelinq = (() => {
+    // gid=131074722 t열=연체중/분납중 기준 ad열 최대값 우선
+    const cnoKey = String(c['계약번호']||'').trim();
+    const fromDlqMap = (window._delinqDaysMap && cnoKey) ? (window._delinqDaysMap[cnoKey] || 0) : 0;
+    if (fromDlqMap > 0) return fromDlqMap;
     const fromStatus = payments
       .filter(p => { const s = String(p['납부상태']||'').trim(); return s.includes('연체') || s.includes('분납'); })
       .reduce((max, p) => Math.max(max, parseInt(p['연체일수']||0)), 0);
@@ -3087,6 +3091,7 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
   const allActiveSet = new Set();
   const contractDetails = {}; // cno → { group, 연체구분, days, amt }
   const amtSumMap = {};
+  const delinqDaysMap = {}; // cno → max ad29 where t19=연체중/분납중
   rows.forEach(row => {
     const c = row.c || [];
     const tipo  = c[0]  ? String(c[0].v  ?? '') : '';
@@ -3099,6 +3104,8 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
     if (!cno) return;                          // e열(계약번호) 없으면 스킵
     // ab열 금액 누산 (f열 전체, n열 삭제·계약 철회 제외, ad>0인 과거 연체분만)
     if (n13 !== '삭제' && n13 !== '계약 철회' && ad29 > 0) amtSumMap[cno] = (amtSumMap[cno] || 0) + amt;
+    // 연체일수 최대값 (t열=연체중/분납중 기준)
+    if ((t19 === '연체중' || t19 === '분납중') && n13 !== '삭제' && n13 !== '계약 철회') delinqDaysMap[cno] = Math.max(delinqDaysMap[cno] || 0, ad29);
     // contractDetails: f=임대료 기준, t열=연체중/분납중 행 중 ad열 최대값
     if (f5 === '임대료' && n13 === '계약중' && (t19 === '연체중' || t19 === '분납중')) {
       if (!contractDetails[cno] || ad29 > contractDetails[cno].days) {
@@ -3149,7 +3156,8 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
     endedDelinqAmt,
     totalContracts,
     activeDelinqCount: Object.keys(activeMap).length,
-    endedDelinqCount:  Object.keys(endedMap).length
+    endedDelinqCount:  Object.keys(endedMap).length,
+    delinqDaysMap
   };
 }
 
@@ -3260,6 +3268,7 @@ async function renderDelinquency() {
     _dlqContractData = parseContractMgmt(r1);
     const dlqV3Data  = parseDelinqV3(r4); // gid=418937767 기준 연체자
     _dlqIncomeData   = parseIncomeForDlqV2(r2, dlqV3Data.dlqCnoSet);
+    window._delinqDaysMap = _dlqIncomeData.delinqDaysMap || {};
     // 납부예정일: gid=418937767 전체 연체자 기준 (계약중 임대료/변동관리비 연체)
     const dlqRowsForPay = [...dlqV3Data.dlqCnoSet].map(cno => ({ cno }));
     const payData    = parseDailyForPayDate(r3, dlqRowsForPay);
