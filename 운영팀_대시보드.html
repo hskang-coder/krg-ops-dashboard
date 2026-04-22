@@ -606,12 +606,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   .ck-period-btn { padding: 6px 14px; font-size: 12px; }
 }
 </style>
-<!-- v1776770227 -->
-<!-- v1776770401 -->
-<!-- v1776770427 -->
-<!-- v1776770859 -->
-<!-- v1776815972 -->
-<!-- v1776816560 -->
+<!-- v1776817031 -->
 </head>
 <body>
 
@@ -2371,8 +2366,15 @@ function renderProgressHistory() {
       const stateKey = `ck_${person}_${type}_${dateKey}`;
       const state = ckSharedState[stateKey];
       if (state) {
-        const total = Object.keys(state).length;
-        const done = Object.values(state).filter(v => v === true).length;
+        // ckSharedState[key] = {person: {taskId: done, ...}} 구조
+        const taskMap = state[person] || state;
+        const taskVals = Object.values(taskMap);
+        // taskVals가 boolean 배열이면 직접 사용, 아니면 첫 번째 값(객체)에서 추출
+        const realVals = (taskVals.length > 0 && typeof taskVals[0] === 'boolean')
+          ? taskVals
+          : Object.values(typeof taskMap === 'object' ? (Object.values(taskMap)[0] || {}) : {});
+        const total = realVals.length;
+        const done = realVals.filter(v => v === true).length;
         const pct = total > 0 ? Math.round(done / total * 100) : 0;
         sum += pct; cnt++;
         const color = pct >= 80 ? '#16A34A' : pct >= 50 ? '#D97706' : '#DC2626';
