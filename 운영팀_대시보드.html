@@ -2725,6 +2725,20 @@ async function loadData() {
 }
 
 
+function setStatus(state, text) {
+  document.getElementById('statusDot').className =
+    `status-dot${state==='loading'?' loading':state==='error'?' error':''}`;
+  document.getElementById('statusText').textContent = text;
+}
+function setDataStatus(type, html) {
+  const el = document.getElementById('dataStatus');
+  el.className = `data-status${type==='error'?' error':type==='warn'?' warn':''}`;
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════
+// ■ DASHBOARD RENDER
+// ═══════════════════════════════════════════
 function renderDashboard() {
   const filtered = filterByPeriod(allData);
   renderKPI(filtered);
