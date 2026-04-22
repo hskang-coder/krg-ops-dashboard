@@ -2961,6 +2961,36 @@ async function fetchViaProxy() {
 // ═══════════════════════════════════════════
 
 // gid=1953907648 → 연체계약 목록 (K열='정상' & BP열='연체')
+
+// gid=418937767 → 전체연체자 카운팅 (bk=정상, aw=임대료납부상태, az=변동관리비납부상태)
+function parseDelinqV3(resp) {
+  if (!resp || !resp.table) return { dlqCnoSet:new Set(), imdaDlqSet:new Set(), byunDlqSet:new Set(), delinqCount:0, imdaCount:0, byunCount:0, totalActive:0 };
+  const rows = resp.table.rows || [];
+  const imdaSet=new Set(), byunSet=new Set(), totalSet=new Set();
+  let totalActive = 0;
+  rows.forEach(row => {
+    const c = row.c || [];
+    const bk  = c[62] ? String(c[62].v ?? '') : ''; // bk열: 계약상태
+    const aw  = c[48] ? String(c[48].v ?? '') : ''; // aw열: 임대료 납부상태
+    const az  = c[51] ? String(c[51].v ?? '') : ''; // az열: 변동관리비 납부상태
+    const cno = c[2]  ? String(c[2].f  ?? c[2].v ?? '').replace(/\.0$/, '').trim() : '';
+    if (!cno || bk !== '정상') return;
+    totalActive++;
+    if (aw === '연체') imdaSet.add(cno);
+    if (az === '연체') byunSet.add(cno);
+    if (aw === '연체' || az === '연체') totalSet.add(cno);
+  });
+  return {
+    dlqCnoSet:   totalSet,
+    imdaDlqSet:  imdaSet,
+    byunDlqSet:  byunSet,
+    delinqCount: totalSet.size,
+    imdaCount:   imdaSet.size,
+    byunCount:   byunSet.size,
+    totalActive
+  };
+}
+
 function parseContractMgmt(resp) {
   if (!resp || !resp.table) return { totalContracts:0, delinqCount:0, gradeMap:{}, totalDelinqAmt:0, delinqRows:[], bsMap:{} };
   const rows = resp.table.rows || [];
@@ -2995,13 +3025,13 @@ function parseContractMgmt(resp) {
 }
 
 // gid=131074722 → 수납 데이터 (임대료 연체 분석)
-function parseIncomeForDlqV2(resp) {
-  if (!resp || !resp.table) return { segs:{}, typeBreakdown:{}, activeDelinqAmt:0, endedDelinqAmt:0, totalContracts:0, dlqCnoSet: new Set() };
+function parseIncomeForDlqV2(resp, extDlqCnoSet) {
+  // extDlqCnoSet: 외부에서 넘어온 연체자 Set (gid=418937767 기준)
+  if (!resp || !resp.table) return { segs:{}, typeBreakdown:{}, activeDelinqAmt:0, endedDelinqAmt:0, totalContracts:0, dlqCnoSet: new Set(), contractDetails:{} };
   const rows = resp.table.rows || [];
   const activeMap = {}, endedMap = {};
   let totalContracts = 0;
   const allActiveSet = new Set();
-  const dlqCnoSet = new Set(); // N=계약중, f=임대료, t=분납중/연체중 기준 연체자 cno
   const contractDetails = {}; // cno → { group, 연체구분, days }
   rows.forEach(row => {
     const c = row.c || [];
@@ -3013,10 +3043,8 @@ function parseIncomeForDlqV2(resp) {
     const cno   = c[4]  ? String(c[4].f  ?? c[4].v ?? '').replace(/\.0$/,'').trim() : '';
     const amt   = c[27] ? Number(c[27].v ?? 0) : 0;
     if (!cno) return;                          // e열(계약번호) 없으면 스킵
-    // 연체자 기준: N=계약중, f=임대료, t=분납중 or 연체중
-    const isDlq = (n13 === '계약중' && f5 === '임대료' && (t19 === '분납중' || t19 === '연체중'));
-    if (isDlq) {
-      dlqCnoSet.add(cno);
+    // contractDetails: f=임대료 기준으로 그룹/연체구분 저장
+    if (f5 === '임대료' && n13 === '계약중') {
       if (!contractDetails[cno] || ad29 > contractDetails[cno].days) {
         contractDetails[cno] = { group: tipo, 연체구분: t19, days: ad29 };
       }
@@ -3024,8 +3052,8 @@ function parseIncomeForDlqV2(resp) {
     if (n13 === '계약중') allActiveSet.add(cno);
     if (ad29 <= 0) return;
     const key = cno;
-    if (isDlq) {
-      // 연체자(분납중/연체중)만 세그먼트 카운팅
+    // 세그먼트: extDlqCnoSet 기준으로 필터 (외부 연체자만)
+    if (n13 === '계약중' && extDlqCnoSet && extDlqCnoSet.has(cno)) {
       if (!activeMap[key] || activeMap[key].days < ad29) {
         activeMap[key] = { days: ad29, tipo, amt };
       }
@@ -3058,7 +3086,6 @@ function parseIncomeForDlqV2(resp) {
     activeDelinqAmt,
     endedDelinqAmt,
     totalContracts,
-    dlqCnoSet,
     activeDelinqCount: Object.keys(activeMap).length,
     endedDelinqCount:  Object.keys(endedMap).length
   };
@@ -3162,35 +3189,39 @@ async function renderDelinquency() {
     return JSON.parse(m[1]);
   }
   try {
-    const [r1, r2, r3] = await Promise.all([
+    const [r1, r2, r3, r4] = await Promise.all([
       fetch(gvizUrl(1953907648)).then(r=>r.text()).then(parseGvizLocal),
       fetch(gvizUrl(131074722,'A7:AK')).then(r=>r.text()).then(parseGvizLocal),
       fetch(gvizUrl(554798125)).then(r=>r.text()).then(parseGvizLocal),
+      fetch(gvizUrl(418937767)).then(r=>r.text()).then(parseGvizLocal),
     ]);
     _dlqContractData = parseContractMgmt(r1);
-    _dlqIncomeData   = parseIncomeForDlqV2(r2);
-    // 연체자 기준: d2.dlqCnoSet (gid=131074722, N=계약중, f=임대료, t=분납중/연체중)
-    const dlqCnoSet  = _dlqIncomeData.dlqCnoSet || new Set();
-    const filteredDelinqRows = (_dlqContractData.delinqRows || []).filter(r =>
-      dlqCnoSet.has(String(r.cno).replace(/\.0$/, '').trim())
-    );
+    const dlqV3Data  = parseDelinqV3(r4); // gid=418937767 기준 연체자
+    _dlqIncomeData   = parseIncomeForDlqV2(r2, dlqV3Data.dlqCnoSet);
+    const filteredDelinqRows = (dlqV3Data.dlqCnoSet.size > 0)
+      ? (_dlqContractData.delinqRows || []).filter(r =>
+          dlqV3Data.dlqCnoSet.has(String(r.cno).replace(/\.0$/, '').trim())
+        )
+      : (_dlqContractData.delinqRows || []);
     const payData    = parseDailyForPayDate(r3, filteredDelinqRows);
-    buildDlqUI(_dlqContractData, _dlqIncomeData, payData);
+    buildDlqUI(_dlqContractData, _dlqIncomeData, payData, dlqV3Data);
   } catch(e) {
     inner.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444">❌ 오류: ${e.message}</div>`;
     console.error('renderDelinquency error:', e);
   }
 }
 
-function buildDlqUI(d1, d2, d3) {
+function buildDlqUI(d1, d2, d3, d4) {
   const wrap = document.getElementById('delinquencyView');
   if (!wrap) return;
   const inner = wrap.querySelector('.dlq-inner');
   if (!inner) return;
 
   // Computed values
-  // 연체자 수: gid=131074722 기준 (N=계약중, f=임대료, t=분납중/연체중, e열 유니크)
-  const delinqCount   = d2.dlqCnoSet ? d2.dlqCnoSet.size : d1.delinqCount;
+  // 연체자 수: gid=418937767 기준 (bk=정상, aw or az=연체)
+  const delinqCount    = d4 ? d4.delinqCount : d1.delinqCount;
+  const imdaCount      = d4 ? d4.imdaCount  : 0;
+  const byunCount      = d4 ? d4.byunCount  : 0;
   const totalContracts = d1.totalContracts || d2.totalContracts || 1;  // 정산대상자: 계약GID 우선
   const rate = totalContracts > 0 ? (delinqCount / totalContracts * 100) : 0;
   const rateStr = rate.toFixed(1);
@@ -3237,7 +3268,10 @@ function buildDlqUI(d1, d2, d3) {
         <div class="dlq-stat-icon">👥</div>
         <div class="dlq-stat-label">전체 연체자<br>(계약중)</div>
         <div class="dlq-stat-num">${delinqCount}명</div>
-        <div class="dlq-stat-sub">₩${fmt(d1.totalDelinqAmt)}</div>
+        <div class="dlq-stat-sub" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+          <span style="background:#fee2e2;color:#dc2626;border-radius:4px;padding:1px 5px;font-size:10px">임대료 ${imdaCount}명</span>
+          <span style="background:#ede9fe;color:#7c3aed;border-radius:4px;padding:1px 5px;font-size:10px">변동관리비 ${byunCount}명</span>
+        </div>
       </div>
       <div class="dlq-stat-card c-green">
         <div class="dlq-stat-icon" style="color:#22c55e">🟢</div>
@@ -3347,11 +3381,11 @@ function buildDlqUI(d1, d2, d3) {
   </div>
   `;
 
-  // 통합 테이블 행 데이터 구성: d2.dlqCnoSet 기준으로 필터
-  const _dlqSet = d2.dlqCnoSet || new Set();
-  const _filteredRows = (d1.delinqRows || []).filter(r =>
-    _dlqSet.has(String(r.cno).replace(/\.0$/, '').trim())
-  );
+  // 통합 테이블 행 데이터 구성: d4.dlqCnoSet (gid=418937767) 기준으로 필터
+  const _dlqSet = (d4 && d4.dlqCnoSet) ? d4.dlqCnoSet : new Set();
+  const _filteredRows = (_dlqSet.size > 0)
+    ? (d1.delinqRows || []).filter(r => _dlqSet.has(String(r.cno).replace(/\.0$/, '').trim()))
+    : (d1.delinqRows || []);
   window._dlqTableRows = _filteredRows.map(r => {
     const det = (d2.contractDetails || {})[r.cno] || { group:'-', 연체구분:'-', days:0 };
     const pay = (d3.payDateMap   || {})[r.cno] || { dateStr:'-', payStatus:null, content:'-' };
