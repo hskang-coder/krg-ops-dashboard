@@ -347,6 +347,40 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .cr-detail-table td { padding: 8px 10px; border-bottom: 1px solid #F0F4F8; }
 .cr-detail-table tr:hover td { background: #F8FAFF; }
 .cr-badge-paid { background: #DCFCE7; color: #16A34A; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+.cr-badge-upcoming { background: #DBEAFE; color: #2563EB; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+
+/* ── Strategy Board ── */
+.sb-wrap { margin: 0 0 18px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+.sb-header-row { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#1e3a5f; flex-wrap:wrap; gap:6px; }
+.sb-title { font-size:14px; font-weight:700; color:#fff; }
+.sb-header-stats { display:flex; gap:5px; flex-wrap:wrap; }
+.sb-stat-pill { padding:2px 9px; border-radius:20px; font-size:11px; font-weight:700; }
+.sb-pill-urgent { background:#fef2f2; color:#dc2626; }
+.sb-pill-warn { background:#fff7ed; color:#ea580c; }
+.sb-pill-evict { background:#fdf2f8; color:#9333ea; }
+.sb-pill-new { background:#fefce8; color:#ca8a04; }
+.sb-pill-done { background:#f0fdf4; color:#16a34a; }
+.sb-progress-wrap { height:5px; background:#e2e8f0; }
+.sb-progress-bar { height:100%; background:linear-gradient(90deg,#22c55e,#16a34a); transition:width .3s; }
+.sb-columns { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#e2e8f0; }
+.sb-col { background:#fff; }
+.sb-col-hdr { padding:7px 12px; background:#f1f5f9; font-size:12px; font-weight:700; color:#1e3a5f; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e2e8f0; }
+.sb-col-cnt { background:#1e3a5f; color:#fff; border-radius:10px; padding:1px 7px; font-size:10px; }
+.sb-col-rows { max-height:300px; overflow-y:auto; }
+.sb-row { display:flex; align-items:flex-start; gap:7px; padding:7px 10px; border-bottom:1px solid #f1f5f9; transition:background .15s; }
+.sb-row:last-child { border-bottom:none; }
+.sb-row:hover { background:#f8fafc; }
+.sb-row-done { opacity:.45; }
+.sb-row-done .sb-nm { text-decoration:line-through; color:#94a3b8; }
+.sb-ck { width:14px; height:14px; cursor:pointer; accent-color:#22c55e; margin-top:3px; flex-shrink:0; }
+.sb-tg { font-size:9px; font-weight:700; padding:2px 6px; border-radius:6px; white-space:nowrap; flex-shrink:0; margin-top:2px; }
+.sb-info { flex:1; min-width:0; }
+.sb-nm { font-size:12px; font-weight:700; color:#1e3a5f; }
+.sb-cno-lbl { font-size:10px; color:#94a3b8; margin-left:4px; font-weight:400; }
+.sb-detail { display:flex; gap:5px; flex-wrap:wrap; margin-top:2px; font-size:11px; align-items:center; }
+.sb-tag-divf { background:#fef3c7; color:#d97706; border-radius:4px; padding:0 4px; font-size:10px; }
+.sb-content-txt { font-size:10px; color:#94a3b8; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px; }
+.sb-tel-lbl { font-size:10px; color:#64748b; white-space:nowrap; flex-shrink:0; margin-top:3px; }
 .cr-badge-unpaid { background: #FEE2E2; color: #DC2626; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
 .cr-badge-partial { background: #FEF3C7; color: #D97706; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
 .cr-badge-purple { background: #F3E8FF; color: #7C3AED; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
@@ -2315,8 +2349,13 @@ function renderContractRecord(c, payments, responses = []) {
   const detailRows = payments.map(p => {
     const status = String(p['납부상태']||'').trim();
     const unpaid = parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0;
+    const dueStr = String(p['납기일']||'').trim();
+    const dueDate = dueStr ? parseKorDate(dueStr) : null;
+    const todayD = new Date(); todayD.setHours(0,0,0,0);
+    if (dueDate) dueDate.setHours(0,0,0,0);
+    const isFutureOrToday = dueDate && dueDate >= todayD;
     const badge  = unpaid > 0
-      ? `<span class="cr-badge-unpaid">연체중</span>`
+      ? (isFutureOrToday ? `<span class="cr-badge-upcoming">납부예정</span>` : `<span class="cr-badge-unpaid">연체중</span>`)
       : status.includes('납부') ? `<span class="cr-badge-paid">납부</span>`
       : `<span class="cr-badge-partial">${status||'—'}</span>`;
     return `<tr>
@@ -3058,8 +3097,8 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
     const cno   = c[4]  ? String(c[4].f  ?? c[4].v ?? '').replace(/\.0$/,'').trim() : '';
     const amt   = c[27] ? Number(c[27].v ?? 0) : 0;
     if (!cno) return;                          // e열(계약번호) 없으면 스킵
-    // ab열 금액 누산 (f열 전체, n열 삭제·계약 철회 제외)
-    if (n13 !== '삭제' && n13 !== '계약 철회') amtSumMap[cno] = (amtSumMap[cno] || 0) + amt;
+    // ab열 금액 누산 (f열 전체, n열 삭제·계약 철회 제외, ad>0인 과거 연체분만)
+    if (n13 !== '삭제' && n13 !== '계약 철회' && ad29 > 0) amtSumMap[cno] = (amtSumMap[cno] || 0) + amt;
     // contractDetails: f=임대료 기준, t열=연체중/분납중 행 중 ad열 최대값
     if (f5 === '임대료' && n13 === '계약중' && (t19 === '연체중' || t19 === '분납중')) {
       if (!contractDetails[cno] || ad29 > contractDetails[cno].days) {
@@ -3370,7 +3409,11 @@ function buildDlqUI(d1, d2, d3, d4) {
       </div>
     </div>
 
-    
+
+    <!-- 전략보드 -->
+    <div id="strategyBoard" class="sb-wrap" style="display:none"></div>
+
+        
     <!-- 연체자 테이블 -->
     <div class="dlq-table-section">
       <div class="dlq-table-header-row">
@@ -3435,6 +3478,7 @@ function buildDlqUI(d1, d2, d3, d4) {
   });
   window._dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all' };
   dlqRenderTableRows();
+  buildStrategyBoard(window._dlqTableRows, d3);
 }
 // ── 연체자 테이블 필터 & 렌더 ──────────────────────────────
 let _dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all' };
@@ -3612,6 +3656,103 @@ async function dlqGoToContract(cno) {
   }
   if (contractRawData && contractRawData.length) selectContractRow(cnoStr);
 }
+
+
+// ── 전략보드 ──────────────────────────────────────────────
+function buildStrategyBoard(rows, payData) {
+  const container = document.getElementById('strategyBoard');
+  if (!container || !rows || !rows.length) return;
+  container.style.display = '';
+
+  const todayKey = (() => { const d = new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
+  const CACHE = 'krg_sb_' + todayKey;
+  let checked = {};
+  try { checked = JSON.parse(localStorage.getItem(CACHE) || '{}'); } catch(e) {}
+  window._sbChecked  = checked;
+  window._sbCache    = CACHE;
+  window._sbAllRows  = rows;
+
+  function getTriage(r) {
+    const d = r.days || 0;
+    if (d > 20) return { code:'evict',  label:'강제퇴실', color:'#9333ea', bg:'#fdf4ff', icon:'🔴' };
+    if (d > 5)  return { code:'warn',   label:'경고구간', color:'#ea580c', bg:'#fff7ed', icon:'🟠' };
+    if (d >= 1) return { code:'target', label:'해결목표', color:'#ca8a04', bg:'#fefce8', icon:'🟡' };
+    return       { code:'future', label:'납부예정', color:'#2563eb', bg:'#eff6ff', icon:'🔵' };
+  }
+
+  function getScore(r) {
+    const t = getTriage(r);
+    const bonus = t.code==='evict'?200: t.code==='warn'?80: t.code==='target'?30:0;
+    const promiseBonus = r.payStatus==='past'?60: r.payStatus==='today'?30:0;
+    return (r.days||0)*2 + (r.amt||0)/100000 + bonus + promiseBonus;
+  }
+
+  const sorted = [...rows].filter(r => (r.days||0) >= 0).sort((a,b) => getScore(b)-getScore(a));
+  const listA  = sorted.filter((_,i) => i%2===0);
+  const listB  = sorted.filter((_,i) => i%2===1);
+
+  const cnt = c => sorted.filter(r => getTriage(r).code===c).length;
+  const evictCnt  = cnt('evict');
+  const warnCnt   = cnt('warn');
+  const targetCnt = cnt('target');
+  const doneCnt   = Object.values(checked).filter(Boolean).length;
+
+  function rowHtml(r) {
+    const t = getTriage(r);
+    const isDone = !!checked[r.cno];
+    const shortC = r.content && r.content!=='-' ? (r.content.length>28?r.content.substring(0,28)+'…':r.content) : '';
+    return '<div class="sb-row' + (isDone?' sb-row-done':'') + '" id="sbr-' + r.cno + '">'
+      + '<input type="checkbox" class="sb-ck"' + (isDone?' checked':'') + ' onchange="sbToggle(\'' + r.cno + '\',this.checked)">'
+      + '<div class="sb-tg" style="background:' + t.bg + ';color:' + t.color + '">' + t.icon + ' ' + t.label + '</div>'
+      + '<div class="sb-info">'
+        + '<div class="sb-nm">' + (r.nm||'-') + '<span class="sb-cno-lbl">' + r.cno + '</span></div>'
+        + '<div class="sb-detail">'
+          + (r.days>0 ? '<span style="color:#ef4444;font-weight:700">' + r.days + '일</span>' : '')
+          + (r.amt>0  ? '<span style="color:#1e40af">₩' + r.amt.toLocaleString() + '</span>' : '')
+          + ((r.연체구분==='연체중'||r.연체구분==='분납중') ? '<span class="sb-tag-divf">' + r.연체구분 + '</span>' : '')
+          + (r.dateStr&&r.dateStr!=='-' ? '<span style="color:#6b7280;font-size:10px">약속 ' + r.dateStr + (r.payStatus==='past'?' ⚠️':'') + '</span>' : '')
+        + '</div>'
+        + (shortC ? '<div class="sb-content-txt">' + shortC + '</div>' : '')
+      + '</div>'
+      + '<div class="sb-tel-lbl">' + (r.tel||'') + '</div>'
+      + '</div>';
+  }
+
+  const pct = sorted.length > 0 ? (doneCnt/sorted.length*100).toFixed(0) : 0;
+
+  container.innerHTML =
+    '<div class="sb-header-row">'
+      + '<div class="sb-title">📋 오늘의 연체 대응 전략보드</div>'
+      + '<div class="sb-header-stats">'
+        + '<span class="sb-stat-pill sb-pill-evict">🔴 강제퇴실 ' + evictCnt + '</span>'
+        + '<span class="sb-stat-pill sb-pill-warn">🟠 경고구간 ' + warnCnt + '</span>'
+        + '<span class="sb-stat-pill sb-pill-new">🟡 해결목표 ' + targetCnt + '</span>'
+        + '<span class="sb-stat-pill sb-pill-done" id="sbDonePill">✅ 완료 ' + doneCnt + '/' + sorted.length + '</span>'
+      + '</div>'
+    + '</div>'
+    + '<div class="sb-progress-wrap"><div class="sb-progress-bar" id="sbProgressBar" style="width:' + pct + '%"></div></div>'
+    + '<div class="sb-columns">'
+      + '<div class="sb-col"><div class="sb-col-hdr">👤 담당자 A <span class="sb-col-cnt">' + listA.length + '명</span></div>'
+        + '<div class="sb-col-rows">' + listA.map(rowHtml).join('') + '</div></div>'
+      + '<div class="sb-col"><div class="sb-col-hdr">👤 담당자 B <span class="sb-col-cnt">' + listB.length + '명</span></div>'
+        + '<div class="sb-col-rows">' + listB.map(rowHtml).join('') + '</div></div>'
+    + '</div>';
+}
+
+function sbToggle(cno, val) {
+  if (!window._sbChecked) window._sbChecked = {};
+  window._sbChecked[cno] = val;
+  try { localStorage.setItem(window._sbCache, JSON.stringify(window._sbChecked)); } catch(e) {}
+  const row = document.getElementById('sbr-' + cno);
+  if (row) row.classList.toggle('sb-row-done', val);
+  const total = (window._sbAllRows||[]).length;
+  const done  = Object.values(window._sbChecked).filter(Boolean).length;
+  const bar   = document.getElementById('sbProgressBar');
+  const pill  = document.getElementById('sbDonePill');
+  if (bar)  bar.style.width = (total>0?(done/total*100).toFixed(0):0)+'%';
+  if (pill) pill.textContent = '✅ 완료 '+done+'/'+total;
+}
+
 
 
 
