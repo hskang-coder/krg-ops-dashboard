@@ -2921,9 +2921,9 @@ async function fetchViaProxy() {
 
 // gid=1953907648 → 연체계약 목록 (K열='정상' & BP열='연체')
 function parseContractMgmt(resp) {
-  if (!resp || !resp.table) return { delinqCount:0, gradeMap:{}, totalDelinqAmt:0, delinqRows:[], bsMap:{} };
+  if (!resp || !resp.table) return { totalContracts:0, delinqCount:0, gradeMap:{}, totalDelinqAmt:0, delinqRows:[], bsMap:{} };
   const rows = resp.table.rows || [];
-  let delinqCount = 0;
+  let totalContracts = 0, delinqCount = 0;
   const gradeMap = {};
   const bsMap = {};
   let totalDelinqAmt = 0;
@@ -2938,14 +2938,17 @@ function parseContractMgmt(resp) {
     const cno = c[0]  ? String(c[0].f  ?? c[0].v  ?? '') : '';
     const nm  = c[2]  ? String(c[2].v  ?? '') : '';
     if (k === '정상') {
-      delinqCount++;
-      totalDelinqAmt += amt;
-      gradeMap[byG] = (gradeMap[byG] || 0) + 1;
-      bsMap[bs]     = (bsMap[bs]     || 0) + 1;
-      delinqRows.push({ cno, nm, grade: byG, amt, bs });
+      totalContracts++;                      // 전체 정상(계약중) 계약자
+      if (bp === '연체') {
+        delinqCount++;                       // 임대료 연체 중인 계약자
+        totalDelinqAmt += amt;
+        gradeMap[byG] = (gradeMap[byG] || 0) + 1;
+        bsMap[bs]     = (bsMap[bs]     || 0) + 1;
+        delinqRows.push({ cno, nm, grade: byG, amt, bs });
+      }
     }
   });
-  return { delinqCount, gradeMap, totalDelinqAmt, delinqRows, bsMap };
+  return { totalContracts, delinqCount, gradeMap, totalDelinqAmt, delinqRows, bsMap };
 }
 
 // gid=131074722 → 수납 데이터 (임대료 연체 분석)
@@ -3091,7 +3094,7 @@ function buildDlqUI(d1, d2, d3) {
 
   // Computed values
   const delinqCount   = d1.delinqCount;
-  const totalContracts = d2.totalContracts || 1;
+  const totalContracts = d1.totalContracts || d2.totalContracts || 1;  // 정산대상자: 계약GID 우선
   const rate = totalContracts > 0 ? (delinqCount / totalContracts * 100) : 0;
   const rateStr = rate.toFixed(1);
   const barPct = Math.min(rate / 15 * 100, 100).toFixed(1);
@@ -3166,7 +3169,7 @@ function buildDlqUI(d1, d2, d3) {
       <div class="dlq-stat-card c-indigo">
         <div class="dlq-stat-icon">📅</div>
         <div class="dlq-stat-label">정산 대상자<br>(추정)</div>
-        <div class="dlq-stat-num">${totalContracts.toLocaleString()}명</div>
+        <div class="dlq-stat-num">${d1.totalContracts.toLocaleString()}명</div>
         <div class="dlq-stat-sub">현재 총 계약중</div>
       </div>
     </div>
