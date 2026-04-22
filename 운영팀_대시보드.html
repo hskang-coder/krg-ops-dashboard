@@ -3584,7 +3584,13 @@ function dlqRenderTableRows() {
     }
     return true;
   });
-  rows.sort((a,b) => (b.days||0) - (a.days||0));
+  const statusOrder = {'계약중':0,'종료(3개월이내)':1,'종료':2};
+  rows.sort((a,b) => {
+    const sa = statusOrder[a.contractStatus||'계약중'] ?? 0;
+    const sb = statusOrder[b.contractStatus||'계약중'] ?? 0;
+    if (sa !== sb) return sa - sb;
+    return (b.days||0) - (a.days||0);
+  });
 
   if (!rows.length) {
     container.innerHTML = '<div style="padding:30px;text-align:center;color:#6b7280;font-size:13px">검색 결과가 없습니다.</div>';
