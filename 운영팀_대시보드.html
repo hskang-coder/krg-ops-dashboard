@@ -1999,6 +1999,9 @@ async function loadPaymentTargets() {
       const vResp = await fetchSheetByGid(VACANCY_GID);
       vacancyRawData = parseVacancySheet(vResp);
     }
+    // gid=554798125 로드 (최신 대응일/내용)
+    const drResp = await fetchSheetByGid(DAILY_RPT_GID);
+    window._ptDailyMap = parseDailyForPt(drResp);
     ptLoaded = true;
     renderPaymentTargets();
   } catch(e) {
@@ -2166,9 +2169,17 @@ function renderPaymentTargets() {
         return '—';
       })()}</td>
       <td style="white-space:nowrap">${r.dueDate||'—'}</td>
+      ${(()=>{
+        const dm = (window._ptDailyMap||{})[r.no] || {};
+        const dateStr = dm.latestDateStr || '—';
+        const content = dm.latestContent || '—';
+        const shortC = content.length > 30 ? content.substring(0,30)+'…' : content;
+        return `<td style="white-space:nowrap;font-size:11px;color:#374151">${dateStr}</td>
+                <td style="font-size:11px;color:#374151;max-width:160px" title="${content.replace(/"/g,'&quot;')}">${shortC}</td>`;
+      })()}
       <td>${tagHtml(x)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="8" style="text-align:center;color:#B0BDCE;padding:24px">해당 조건의 수납 대상이 없습니다.</td></tr>';
+  }).join('') || '<tr><td colspan="10" style="text-align:center;color:#B0BDCE;padding:24px">해당 조건의 수납 대상이 없습니다.</td></tr>';
 
   document.getElementById('ptResult').innerHTML = `
     <div class="cr-card">
@@ -2228,7 +2239,7 @@ function renderPaymentTargets() {
         <thead><tr>
           <th>계약번호</th><th>임차인명</th><th>연락처</th><th>청구횟수</th>
           <th>당월납부상태</th><th>수납대상여부</th>
-          <th>납기일</th><th>수납 대상</th>
+          <th>납기일</th><th>최근 대응일</th><th>최근 대응내용</th><th>수납 대상</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
@@ -3233,6 +3244,31 @@ function parseDailyForPayDate(resp, delinqRows) {
     payDateMap[cno] = { dateStr, payStatus, content };
   });
   return { past, today: todayCount, future, payDateMap };
+}
+
+// gid=554798125 → 계약별 최신 A열(대응일) + D열(대응내용) (전체 계약 대상)
+function parseDailyForPt(resp) {
+  if (!resp || !resp.table) return {};
+  const rows = resp.table.rows || [];
+  const map = {}; // cno → { latestDate, latestDateStr, latestContent }
+  rows.forEach(row => {
+    const c = row.c || [];
+    const cno = c[1] ? String(c[1].f ?? c[1].v ?? '').replace(/\.0$/,'').trim() : '';
+    if (!cno) return;
+    const aCell = c[0];
+    let aDate = null;
+    if (aCell && aCell.v) {
+      const m = String(aCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
+      if (m) aDate = new Date(+m[1], +m[2], +m[3]);
+    }
+    const dContent = c[3] ? String(c[3].v ?? c[3].f ?? '') : '';
+    if (aDate && (!map[cno] || aDate > map[cno].latestDate)) {
+      const mm = String(aDate.getMonth()+1).padStart(2,'0');
+      const dd = String(aDate.getDate()).padStart(2,'0');
+      map[cno] = { latestDate: aDate, latestDateStr: `${aDate.getFullYear()}.${mm}.${dd}`, latestContent: dContent };
+    }
+  });
+  return map;
 }
 
 // ── 필터 상태 ──
