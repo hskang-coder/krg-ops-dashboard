@@ -2968,26 +2968,35 @@ function parseDelinqV3(resp) {
   const rows = resp.table.rows || [];
   const imdaSet=new Set(), byunSet=new Set(), totalSet=new Set();
   let totalActive = 0;
+  const delinqRowMap = {}; // cno → { nm, tel, delinqType }
   rows.forEach(row => {
     const c = row.c || [];
     const bk  = c[62] ? String(c[62].v ?? '') : ''; // bk열: 계약상태
     const aw  = c[48] ? String(c[48].v ?? '') : ''; // aw열: 임대료 납부상태
     const az  = c[51] ? String(c[51].v ?? '') : ''; // az열: 변동관리비 납부상태
     const cno = c[2]  ? String(c[2].f  ?? c[2].v ?? '').replace(/\.0$/, '').trim() : '';
+    const nm  = c[13] ? String(c[13].v ?? '') : '';
+    const tel = c[15] ? String(c[15].f ?? c[15].v ?? '') : '';
     if (!cno || bk !== '정상') return;
     totalActive++;
     if (aw === '연체') imdaSet.add(cno);
     if (az === '연체') byunSet.add(cno);
-    if (aw === '연체' || az === '연체') totalSet.add(cno);
+    if (aw === '연체' || az === '연체') {
+      totalSet.add(cno);
+      const dt = (aw === '연체' && az === '연체') ? '임대료+변동관리비'
+               : (aw === '연체' ? '임대료' : '변동관리비');
+      delinqRowMap[cno] = { nm, tel, delinqType: dt };
+    }
   });
   return {
-    dlqCnoSet:   totalSet,
-    imdaDlqSet:  imdaSet,
-    byunDlqSet:  byunSet,
-    delinqCount: totalSet.size,
-    imdaCount:   imdaSet.size,
-    byunCount:   byunSet.size,
-    totalActive
+    dlqCnoSet:    totalSet,
+    imdaDlqSet:   imdaSet,
+    byunDlqSet:   byunSet,
+    delinqCount:  totalSet.size,
+    imdaCount:    imdaSet.size,
+    byunCount:    byunSet.size,
+    totalActive,
+    delinqRowMap
   };
 }
 
@@ -3360,6 +3369,12 @@ function buildDlqUI(d1, d2, d3, d4) {
       </div>
       <div class="dlq-filter-bar">
         <div class="dlq-filter-group">
+          <span class="dlq-filter-label">연체구분</span>
+          <button class="dlq-filter-btn active" data-group="delinqType" onclick="dlqApplyFilter('delinqType','all',this)">전체</button>
+          <button class="dlq-filter-btn" data-group="delinqType" onclick="dlqApplyFilter('delinqType','임대료',this)">임대료</button>
+          <button class="dlq-filter-btn" data-group="delinqType" onclick="dlqApplyFilter('delinqType','변동관리비',this)">변동관리비</button>
+        </div>
+        <div class="dlq-filter-group">
           <span class="dlq-filter-label">연체일수</span>
           <button class="dlq-filter-btn active" data-group="days" onclick="dlqApplyFilter('days','all',this)">전체</button>
           <button class="dlq-filter-btn" data-group="days" onclick="dlqApplyFilter('days','1to3',this)">1~3일</button>
@@ -3381,25 +3396,38 @@ function buildDlqUI(d1, d2, d3, d4) {
   </div>
   `;
 
-  // 통합 테이블 행 데이터 구성: d4.dlqCnoSet (gid=418937767) 기준으로 필터
+  // 통합 테이블 행 데이터: d4.dlqCnoSet 전체 기준으로 구성 (계약중 연체자 전원 표시)
   const _dlqSet = (d4 && d4.dlqCnoSet) ? d4.dlqCnoSet : new Set();
-  const _filteredRows = (_dlqSet.size > 0)
-    ? (d1.delinqRows || []).filter(r => _dlqSet.has(String(r.cno).replace(/\.0$/, '').trim()))
-    : (d1.delinqRows || []);
-  window._dlqTableRows = _filteredRows.map(r => {
-    const det = (d2.contractDetails || {})[r.cno] || { group:'-', 연체구분:'-', days:0 };
-    const pay = (d3.payDateMap   || {})[r.cno] || { dateStr:'-', payStatus:null, content:'-' };
-    return { ...r, group: det.group, 연체구분: det.연체구분, days: det.days,
-             dateStr: pay.dateStr, payStatus: pay.payStatus, content: pay.content };
+  const _d1Map = {};
+  (d1.delinqRows || []).forEach(r => { _d1Map[String(r.cno).replace(/\.0$/,'').trim()] = r; });
+  window._dlqTableRows = [..._dlqSet].map(cno => {
+    const d1r = _d1Map[cno] || {};
+    const d4r = ((d4 && d4.delinqRowMap) || {})[cno] || {};
+    const det = (d2.contractDetails || {})[cno] || { group:'-', 연체구분:'-', days:0 };
+    const pay = (d3.payDateMap || {})[cno] || { dateStr:'-', payStatus:null, content:'-' };
+    return {
+      cno,
+      nm:         d1r.nm    || d4r.nm    || '-',
+      grade:      d1r.grade || '-',
+      amt:        d1r.amt   || 0,
+      bs:         d1r.bs    || '-',
+      info:       d1r.info  || '-',
+      tel:        d1r.tel   || d4r.tel   || '-',
+      delinqType: d4r.delinqType || '-',
+      group:      det.group,
+      연체구분:    det.연체구분,
+      days:       det.days,
+      dateStr:    pay.dateStr, payStatus: pay.payStatus, content: pay.content
+    };
   });
-  window._dlqFilterState = { days:'all', pay:'all', search:'' };
+  window._dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all' };
   dlqRenderTableRows();
 }
 // ── 연체자 테이블 필터 & 렌더 ──────────────────────────────
-let _dlqFilterState = { days:'all', pay:'all', search:'' };
+let _dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all' };
 
 function dlqApplyFilter(type, val, btn) {
-  if (!window._dlqFilterState) window._dlqFilterState = { days:'all', pay:'all', search:'' };
+  if (!window._dlqFilterState) window._dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all' };
   if (type === 'search') {
     window._dlqFilterState.search = val.toLowerCase();
   } else {
@@ -3415,10 +3443,14 @@ function dlqApplyFilter(type, val, btn) {
 function dlqRenderTableRows() {
   const container = document.getElementById('dlqTableContainer');
   if (!container || !window._dlqTableRows) return;
-  const { days, pay, search } = window._dlqFilterState || {};
+  const { days, pay, search, delinqType } = window._dlqFilterState || {};
   const today = new Date(); today.setHours(0,0,0,0);
 
   let rows = window._dlqTableRows.filter(r => {
+    // 연체구분 필터 (임대료/변동관리비)
+    if (delinqType && delinqType !== 'all') {
+      if (!String(r.delinqType||'').includes(delinqType)) return false;
+    }
     if (days && days !== 'all') {
       const d = r.days || 0;
       if (days === '1to3'   && !(d >= 1 && d <= 3))  return false;
@@ -3448,7 +3480,7 @@ function dlqRenderTableRows() {
     <table class="dlq-tbl">
       <thead><tr>
         <th>계약번호</th><th>그룹</th><th>임차인</th><th>계약정보</th>
-        <th>등급</th><th>연체일수</th><th>연체구분</th><th>연체금액</th>
+        <th>등급</th><th>연체일수</th><th>납부구분</th><th>연체금액</th>
         <th>납부예정일</th><th>연락처</th><th>최근 대응 내용</th>
       </tr></thead>
       <tbody>
@@ -3464,7 +3496,12 @@ function dlqRenderTableRows() {
             <td><span class="dlq-tbl-info">${r.info||'-'}</span></td>
             <td><span class="dlq-grade dlq-grade-${gc}">${r.grade||'-'}</span></td>
             <td><span class="dlq-days-badge dlq-days-${dc}">${r.days||0}일</span></td>
-            <td><span style="font-size:11px;color:${구분색(r.연체구분||'')};">${r.연체구분||'-'}</span></td>
+            <td>${(() => {
+              const dt = r.delinqType||'-';
+              const c1 = dt.includes('임대료') ? '<span style="background:#fee2e2;color:#dc2626;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600">임대료</span>' : '';
+              const c2 = dt.includes('변동관리비') ? '<span style="background:#ede9fe;color:#7c3aed;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600">변동관리비</span>' : '';
+              return '<div style="display:flex;gap:3px;flex-wrap:wrap">'+c1+c2+'</div>' || '-';
+            })()}</td>
             <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
             <td>${r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-'}</td>
             <td class="dlq-tbl-tel">${r.tel||'-'}</td>
