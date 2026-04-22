@@ -834,7 +834,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   .ck-period-btn { padding: 6px 14px; font-size: 12px; }
 }
 </style>
-<!-- v1776823188 -->
+<!-- v1776823457 -->
 </head>
 <body>
 
@@ -3194,7 +3194,9 @@ async function fetchViaProxy() {
 // ■ LOAD DATA
 // ═══════════════════════════════════════════
 async function loadData() {
-  // ── 캐시 즉시 렌더 (이전 데이터가 있으면 0초 로딩) ──────
+  setStatus('loading', '데이터 로딩 중');
+
+  // ── 캐시 즉시 렌더 ──────────────────────────────────────
   const CACHE_KEY = 'krg_dash_cache_v1';
   try {
     const cached = localStorage.getItem(CACHE_KEY);
@@ -3208,94 +3210,66 @@ async function loadData() {
         else renderCkProgress();
         const ageMin = Math.round((Date.now() - ts) / 60000);
         setStatus('ok', `캐시 (${ageMin}분 전)`);
-        setDataStatus('ok', `✅ 캐시 데이터 (${ageMin}분 전 갱신) — ${allData.length}건 · 백그라운드 업데이트 중...`);
+        setDataStatus('ok', `✅ 캐시 — ${allData.length}건 · 새 데이터 로딩 중...`);
       }
     }
   } catch(e) {}
-  setStatus('loading', '데이터 로딩 중');
 
-  // JSONP 시도 (gviz 직접)
-  const tryJSONP = () => fetchSheetJSONP(DAEUNG_GID)
-    .then(resp => {
-      const rows = parseGVizTable(resp);
-      if (!rows.length) throw new Error('빈 데이터');
-      return { rows, src: 'Google Sheets' };
-    });
-
-  // gviz fetch 직접 시도 (JSONP 없이 fetch)
-  const tryGvizFetch = () => {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 8000);
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${DAEUNG_GID}`;
-    return fetch(url, { signal: ctrl.signal })
-      .then(r => { clearTimeout(t); return r.text(); })
-      .then(text => {
-        const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
-        if (!m) throw new Error('파싱 실패');
-        const resp = JSON.parse(m[1]);
-        const rows = parseGVizTable(resp);
-        if (!rows.length) throw new Error('빈 데이터');
-        return { rows, src: 'Sheets(fetch)' };
-      });
-  };
-
-  // Apps Script 프록시 시도
-  const tryProxy = () => fetchViaProxy()
-    .then(data => {
-      const rows = data.map(r => {
-        const d = parseKoreanDate(String(r['일자'] || ''));
-        return {
-          date: String(r['일자'] || ''), dateObj: d,
-          person: String(r['담당자'] || ''),
-          type: String(r['구분'] || ''),
-          tell: parseFloat(String(r['TELL대응'] || '0').replace(/[^0-9.]/g, '')) || 0,
-          work: parseFloat(String(r['업무대응'] || '0').replace(/[^0-9.]/g, '')) || 0,
-          target: String(r['대상구분'] || ''),
-          cat: String(r['업무구분'] || '기타'),
-          sub: String(r['하위구분'] || ''),
-          content: String(r['업무내용'] || '')
-        };
-      }).filter(r => r.dateObj);
-      if (!rows.length) throw new Error('빈 데이터');
-      return { rows, src: 'Apps Script' };
-    });
-
-  // ── 3가지를 동시에 시도, 가장 먼저 성공한 것 사용 ──
-  const raceWithFallback = (attempts) =>
-    new Promise((resolve, reject) => {
-      let remaining = attempts.length;
-      attempts.forEach(fn => {
-        fn().then(resolve).catch(() => {
-          remaining--;
-          if (remaining === 0) reject(new Error('모든 연결 실패'));
-        });
-      });
-    });
-
+  // ── gviz 직접 fetch (range=A7:R, ~1초) ─────────────────
+  const ctrl = new AbortController();
+  const fetchTimer = setTimeout(() => ctrl.abort(), 12000);
   try {
-    const { rows, src } = await raceWithFallback([tryJSONP, tryGvizFetch, tryProxy]);
-    allData = rows;
-    setStatus('ok', `${allData.length}건 로드 완료`);
-    setDataStatus('ok', `✅ ${src} 연결됨 — 총 ${allData.length}건`);
-    populateCatFilter(allData);
-    if (CK_API_URL) {
-      ckLoadShared(() => renderCkProgress());
-    } else {
-      renderCkProgress();
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${DAEUNG_GID}&range=A7:R&headers=1`;
+    const res  = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(fetchTimer);
+    const text = await res.text();
+    const m = text.match(/setResponse\(({[\s\S]+})\)/);
+    if (!m) throw new Error('gviz 파싱 실패');
+    const resp = JSON.parse(m[1]);
+    const rows = parseGVizTable(resp);
+    if (rows.length > 0) {
+      allData = rows;
+      setStatus('ok', `${allData.length}건 로드 완료`);
+      setDataStatus('ok', `✅ Google Sheets 연결됨 — 총 ${allData.length}건`);
+      populateCatFilter(allData);
+      if (CK_API_URL) ckLoadShared(() => renderCkProgress());
+      else renderCkProgress();
+      renderDashboard();
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data: allData, ts: Date.now() })); } catch(e) {}
+      return;
     }
-    renderDashboard();
-    // 캐시 저장 (다음 접속 즉시 표시용)
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data: allData, ts: Date.now() })); } catch(e) {}
-  } catch (e) {
+  } catch(e) {
+    clearTimeout(fetchTimer);
+    console.warn('gviz fetch 실패:', e.message);
+  }
+
+  // ── 폴백: JSONP ─────────────────────────────────────────
+  try {
+    const resp = await fetchSheetJSONP(DAEUNG_GID);
+    const rows = parseGVizTable(resp);
+    if (rows.length > 0) {
+      allData = rows;
+      setStatus('ok', `${allData.length}건 로드 완료`);
+      setDataStatus('ok', `✅ JSONP 연결됨 — 총 ${allData.length}건`);
+      populateCatFilter(allData);
+      if (CK_API_URL) ckLoadShared(() => renderCkProgress());
+      else renderCkProgress();
+      renderDashboard();
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data: allData, ts: Date.now() })); } catch(e) {}
+      return;
+    }
+  } catch(e) { console.warn('JSONP 실패:', e.message); }
+
+  // ── 캐시 데이터도 없고 모든 연결 실패 ──────────────────
+  if (!allData.length) {
     setStatus('error', '연결 실패');
-    allData = [];
     setDataStatus('error',
-      `❌ 연결 실패 — ① 시트를 <b>"링크가 있는 모든 사용자 — 뷰어"</b>로 공개 설정<br>
-       ② Apps Script doGet에 <code>action=getDaeung</code> 핸들러 추가 후 재배포`);
+      '❌ 연결 실패 — 시트를 <b>"링크가 있는 모든 사용자 — 뷰어"</b>로 공개 설정 필요');
     renderCkProgress();
     renderEmpty();
   }
 }
+
 
 function setStatus(state, text) {
   document.getElementById('statusDot').className =
