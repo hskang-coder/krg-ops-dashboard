@@ -2956,18 +2956,16 @@ function parseIncomeForDlqV2(resp) {
   if (!resp || !resp.table) return { segs:{}, typeBreakdown:{}, activeDelinqAmt:0, endedDelinqAmt:0, totalContracts:0 };
   const rows = resp.table.rows || [];
   const activeMap = {}, endedMap = {};
-  const allMap = {};
   let totalContracts = 0;
   const allActiveSet = new Set();
   rows.forEach(row => {
     const c = row.c || [];
     const tipo  = c[0]  ? String(c[0].v  ?? '') : '';
-    const f5    = c[5]  ? String(c[5].v  ?? '') : '';
     const n13   = c[13] ? String(c[13].v ?? '') : '';
     const ad29  = c[29] ? Number(c[29].v ?? 0) : 0;
     const cno   = c[4]  ? String(c[4].f  ?? c[4].v ?? '').replace(/\.0$/,'').trim() : '';
     const amt   = c[27] ? Number(c[27].v ?? 0) : 0;
-    if (f5 !== '임대료' || !cno) return;
+    if (!cno) return;                          // e열(계약번호) 없으면 스킵
     if (n13 === '계약중') allActiveSet.add(cno);
     if (ad29 <= 0) return;
     const key = cno;
