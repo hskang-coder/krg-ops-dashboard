@@ -3106,8 +3106,8 @@ function ckReset() {
 function fetchSheetJSONP(gid) {
   return new Promise((resolve, reject) => {
     const cbName = '_gsCb' + Date.now();
-    const params = new URLSearchParams({ gid, range:'A7:R', headers:'1', tqx:'out:json', callback:cbName });
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?${params}`;
+    const params = new URLSearchParams({ gid, range:'A7:R', headers:'1' });
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json,responseHandler:${cbName}&${params}`;
     let timer = null;
     window[cbName] = function(resp) {
       clearTimeout(timer); delete window[cbName];
@@ -3159,7 +3159,7 @@ function parseGVizTable(resp) {
     const num  = idx => parseFloat(cell(idx).replace(/[^0-9.]/g,''))||0;
     const dateStr = cell(dateIdx), person = cell(personIdx);
     if (!dateStr||!person||person==='null') return;
-    const d = parseKoreanDate(dateStr);
+    const d = parseKorDate(dateStr);
     if (!d) return;
     result.push({ date:dateStr, dateObj:d, person, type:cell(typeIdx),
       tell:num(tellIdx), work:num(workIdx), target:cell(targetIdx),
@@ -3223,7 +3223,7 @@ async function loadData() {
     const res  = await fetch(url, { signal: ctrl.signal });
     clearTimeout(fetchTimer);
     const text = await res.text();
-    const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
+    const m = text.match(/setResponse\(({[\s\S]+})\)/);
     if (!m) throw new Error('gviz 파싱 실패');
     const resp = JSON.parse(m[1]);
     const rows = parseGVizTable(resp);
