@@ -3600,7 +3600,7 @@ function dlqRenderTableRows() {
     <table class="dlq-tbl">
       <thead><tr>
         <th>계약번호</th><th>그룹</th><th>임차인</th><th>계약정보</th>
-        <th>등급</th><th>연체일수</th><th>납부구분</th><th>연체금액</th>
+        <th>등급</th><th>연체일수</th><th>담당자</th><th>대응단계</th><th>납부구분</th><th>연체금액</th>
         <th>납부예정일</th><th>계약상태</th><th>연락처</th><th>최근 대응 내용</th>
       </tr></thead>
       <tbody>
@@ -3616,6 +3616,8 @@ function dlqRenderTableRows() {
             <td><span class="dlq-tbl-info">${r.info||'-'}</span></td>
             <td><span class="dlq-grade dlq-grade-${gc}">${r.grade||'-'}</span></td>
             <td><span class="dlq-days-badge dlq-days-${dc}">${r.days||0}일</span></td>
+            <td><span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:${r.assignee==='A'?'#dbeafe':'#fce7f3'};color:${r.assignee==='A'?'#1d4ed8':'#be185d'}">${r.assignee?'담당 '+r.assignee:'-'}</span></td>
+            <td><span style="font-size:11px;color:#374151;white-space:nowrap">${r.actionStep||'-'}</span></td>
             <td><span style="font-size:11px;font-weight:600;color:${
               r.연체구분==='연체중'?'#ef4444':r.연체구분==='분납중'?'#f59e0b':'#9ca3af'
             }">${(r.연체구분==='연체중'||r.연체구분==='분납중')?r.연체구분:'-'}</span></td>
@@ -3724,83 +3726,46 @@ async function dlqGoToContract(cno) {
 
 // ── 전략보드 ──────────────────────────────────────────────
 function buildStrategyBoard(rows, payData) {
-  const container = document.getElementById('strategyBoard');
-  if (!container || !rows || !rows.length) return;
-  container.style.display = '';
-
-  const todayKey = (() => { const d = new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
-  const CACHE = 'krg_sb_' + todayKey;
-  let checked = {};
-  try { checked = JSON.parse(localStorage.getItem(CACHE) || '{}'); } catch(e) {}
-  window._sbChecked  = checked;
-  window._sbCache    = CACHE;
-  window._sbAllRows  = rows;
-
-  function getTriage(r) {
-    const d = r.days || 0;
-    if (d > 20) return { code:'evict',  label:'강제퇴실', color:'#9333ea', bg:'#fdf4ff', icon:'🔴' };
-    if (d > 5)  return { code:'warn',   label:'경고구간', color:'#ea580c', bg:'#fff7ed', icon:'🟠' };
-    if (d >= 1) return { code:'target', label:'해결목표', color:'#ca8a04', bg:'#fefce8', icon:'🟡' };
-    return       { code:'future', label:'납부예정', color:'#2563eb', bg:'#eff6ff', icon:'🔵' };
-  }
+  // 전략보드 UI 삭제 → 담당자 A/B 배정 + 대응단계를 각 row에 직접 기록
+  if (!rows || !rows.length) return;
 
   function getScore(r) {
-    const t = getTriage(r);
-    const bonus = t.code==='evict'?200: t.code==='warn'?80: t.code==='target'?30:0;
-    const promiseBonus = r.payStatus==='past'?60: r.payStatus==='today'?30:0;
-    return (r.days||0)*2 + (r.amt||0)/100000 + bonus + promiseBonus;
+    const d = r.days || 0;
+    const bonus = d>20?200: d>5?80: d>=1?30:0;
+    const pb = r.payStatus==='past'?60: r.payStatus==='today'?30:0;
+    return d*2 + (r.amt||0)/100000 + bonus + pb;
+  }
+  function actionA(d) {
+    if (d <= 0) return '수납 사전안내';
+    if (d <= 2) return '전화 & 문자대응';
+    if (d < 20) return '현장방문';
+    return '강제퇴거';
+  }
+  function actionB(d) {
+    if (d <= 0) return '-';
+    if (d === 1) return 'KCB 조회';
+    if (d === 2) return '내용증명 문자';
+    if (d < 7)  return '내용 증명';
+    if (d < 20) return '지급명령';
+    return '압류 / 명도';
   }
 
   const sorted = [...rows].filter(r => (r.days||0) >= 0).sort((a,b) => getScore(b)-getScore(a));
-  const listA  = sorted.filter((_,i) => i%2===0);
-  const listB  = sorted.filter((_,i) => i%2===1);
+  const assignMap = {};
+  sorted.forEach((r, i) => {
+    const assignee = (i % 2 === 0) ? 'A' : 'B';
+    const d = r.days || 0;
+    assignMap[r.cno] = { assignee, actionStep: assignee==='A' ? actionA(d) : actionB(d) };
+  });
+  rows.forEach(r => {
+    const a = assignMap[r.cno] || { assignee:'A', actionStep:'-' };
+    r.assignee   = a.assignee;
+    r.actionStep = a.actionStep;
+  });
 
-  const cnt = c => sorted.filter(r => getTriage(r).code===c).length;
-  const evictCnt  = cnt('evict');
-  const warnCnt   = cnt('warn');
-  const targetCnt = cnt('target');
-  const doneCnt   = Object.values(checked).filter(Boolean).length;
-
-  function rowHtml(r) {
-    const t = getTriage(r);
-    const isDone = !!checked[r.cno];
-    const shortC = r.content && r.content!=='-' ? (r.content.length>28?r.content.substring(0,28)+'…':r.content) : '';
-    return '<div class="sb-row' + (isDone?' sb-row-done':'') + '" id="sbr-' + r.cno + '">'
-      + '<input type="checkbox" class="sb-ck"' + (isDone?' checked':'') + ' onchange="sbToggle(\'' + r.cno + '\',this.checked)">'
-      + '<div class="sb-tg" style="background:' + t.bg + ';color:' + t.color + '">' + t.icon + ' ' + t.label + '</div>'
-      + '<div class="sb-info">'
-        + '<div class="sb-nm">' + (r.nm||'-') + '<span class="sb-cno-lbl">' + r.cno + '</span></div>'
-        + '<div class="sb-detail">'
-          + (r.days>0 ? '<span style="color:#ef4444;font-weight:700">' + r.days + '일</span>' : '')
-          + (r.amt>0  ? '<span style="color:#1e40af">₩' + r.amt.toLocaleString() + '</span>' : '')
-          + ((r.연체구분==='연체중'||r.연체구분==='분납중') ? '<span class="sb-tag-divf">' + r.연체구분 + '</span>' : '')
-          + (r.dateStr&&r.dateStr!=='-' ? '<span style="color:#6b7280;font-size:10px">약속 ' + r.dateStr + (r.payStatus==='past'?' ⚠️':'') + '</span>' : '')
-        + '</div>'
-        + (shortC ? '<div class="sb-content-txt">' + shortC + '</div>' : '')
-      + '</div>'
-      + '<div class="sb-tel-lbl">' + (r.tel||'') + '</div>'
-      + '</div>';
-  }
-
-  const pct = sorted.length > 0 ? (doneCnt/sorted.length*100).toFixed(0) : 0;
-
-  container.innerHTML =
-    '<div class="sb-header-row">'
-      + '<div class="sb-title">📋 오늘의 연체 대응 전략보드</div>'
-      + '<div class="sb-header-stats">'
-        + '<span class="sb-stat-pill sb-pill-evict">🔴 강제퇴실 ' + evictCnt + '</span>'
-        + '<span class="sb-stat-pill sb-pill-warn">🟠 경고구간 ' + warnCnt + '</span>'
-        + '<span class="sb-stat-pill sb-pill-new">🟡 해결목표 ' + targetCnt + '</span>'
-        + '<span class="sb-stat-pill sb-pill-done" id="sbDonePill">✅ 완료 ' + doneCnt + '/' + sorted.length + '</span>'
-      + '</div>'
-    + '</div>'
-    + '<div class="sb-progress-wrap"><div class="sb-progress-bar" id="sbProgressBar" style="width:' + pct + '%"></div></div>'
-    + '<div class="sb-columns">'
-      + '<div class="sb-col"><div class="sb-col-hdr">👤 담당자 A <span class="sb-col-cnt">' + listA.length + '명</span></div>'
-        + '<div class="sb-col-rows">' + listA.map(rowHtml).join('') + '</div></div>'
-      + '<div class="sb-col"><div class="sb-col-hdr">👤 담당자 B <span class="sb-col-cnt">' + listB.length + '명</span></div>'
-        + '<div class="sb-col-rows">' + listB.map(rowHtml).join('') + '</div></div>'
-    + '</div>';
+  // 전략보드 div 숨김 유지
+  const container = document.getElementById('strategyBoard');
+  if (container) container.style.display = 'none';
 }
 
 function sbToggle(cno, val) {
