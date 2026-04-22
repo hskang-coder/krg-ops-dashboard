@@ -3223,7 +3223,7 @@ async function loadData() {
     const res  = await fetch(url, { signal: ctrl.signal });
     clearTimeout(fetchTimer);
     const text = await res.text();
-    const m = text.match(/setResponse\(({[\s\S]+})\)/);
+    const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
     if (!m) throw new Error('gviz 파싱 실패');
     const resp = JSON.parse(m[1]);
     const rows = parseGVizTable(resp);
