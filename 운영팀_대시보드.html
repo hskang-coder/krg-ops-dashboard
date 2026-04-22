@@ -2995,14 +2995,13 @@ function parseContractMgmt(resp) {
 }
 
 // gid=131074722 → 수납 데이터 (임대료 연체 분석)
-function parseIncomeForDlqV2(resp, delinqRows) {
-  if (!resp || !resp.table) return { segs:{}, typeBreakdown:{}, activeDelinqAmt:0, endedDelinqAmt:0, totalContracts:0 };
+function parseIncomeForDlqV2(resp) {
+  if (!resp || !resp.table) return { segs:{}, typeBreakdown:{}, activeDelinqAmt:0, endedDelinqAmt:0, totalContracts:0, dlqCnoSet: new Set() };
   const rows = resp.table.rows || [];
   const activeMap = {}, endedMap = {};
   let totalContracts = 0;
   const allActiveSet = new Set();
-  // 66명 연체자 기준 필터
-  const delinqSet = new Set((delinqRows || []).map(r => String(r.cno).replace(/\.0$/, '').trim()));
+  const dlqCnoSet = new Set(); // N=계약중, f=임대료, t=분납중/연체중 기준 연체자 cno
   const contractDetails = {}; // cno → { group, 연체구분, days }
   rows.forEach(row => {
     const c = row.c || [];
@@ -3014,8 +3013,10 @@ function parseIncomeForDlqV2(resp, delinqRows) {
     const cno   = c[4]  ? String(c[4].f  ?? c[4].v ?? '').replace(/\.0$/,'').trim() : '';
     const amt   = c[27] ? Number(c[27].v ?? 0) : 0;
     if (!cno) return;                          // e열(계약번호) 없으면 스킵
-    // f열=임대료일 때: 계약별 최대 연체일수 행 기준으로 그룹/연체구분 저장
-    if (f5 === '임대료' && n13 === '계약중') {
+    // 연체자 기준: N=계약중, f=임대료, t=분납중 or 연체중
+    const isDlq = (n13 === '계약중' && f5 === '임대료' && (t19 === '분납중' || t19 === '연체중'));
+    if (isDlq) {
+      dlqCnoSet.add(cno);
       if (!contractDetails[cno] || ad29 > contractDetails[cno].days) {
         contractDetails[cno] = { group: tipo, 연체구분: t19, days: ad29 };
       }
@@ -3023,14 +3024,12 @@ function parseIncomeForDlqV2(resp, delinqRows) {
     if (n13 === '계약중') allActiveSet.add(cno);
     if (ad29 <= 0) return;
     const key = cno;
-    if (n13 === '계약중') {
-      // 66명 연체자에 속하는 계약만 세그먼트 카운팅
-      if (delinqSet.size === 0 || delinqSet.has(cno)) {
-        if (!activeMap[key] || activeMap[key].days < ad29) {
-          activeMap[key] = { days: ad29, tipo, amt };
-        }
+    if (isDlq) {
+      // 연체자(분납중/연체중)만 세그먼트 카운팅
+      if (!activeMap[key] || activeMap[key].days < ad29) {
+        activeMap[key] = { days: ad29, tipo, amt };
       }
-    } else {
+    } else if (n13 !== '계약중') {
       if (!endedMap[key] || endedMap[key].days < ad29) {
         endedMap[key] = { days: ad29, tipo, amt };
       }
@@ -3059,6 +3058,7 @@ function parseIncomeForDlqV2(resp, delinqRows) {
     activeDelinqAmt,
     endedDelinqAmt,
     totalContracts,
+    dlqCnoSet,
     activeDelinqCount: Object.keys(activeMap).length,
     endedDelinqCount:  Object.keys(endedMap).length
   };
@@ -3168,8 +3168,13 @@ async function renderDelinquency() {
       fetch(gvizUrl(554798125)).then(r=>r.text()).then(parseGvizLocal),
     ]);
     _dlqContractData = parseContractMgmt(r1);
-    _dlqIncomeData   = parseIncomeForDlqV2(r2, _dlqContractData.delinqRows);
-    const payData    = parseDailyForPayDate(r3, _dlqContractData.delinqRows);
+    _dlqIncomeData   = parseIncomeForDlqV2(r2);
+    // 연체자 기준: d2.dlqCnoSet (gid=131074722, N=계약중, f=임대료, t=분납중/연체중)
+    const dlqCnoSet  = _dlqIncomeData.dlqCnoSet || new Set();
+    const filteredDelinqRows = (_dlqContractData.delinqRows || []).filter(r =>
+      dlqCnoSet.has(String(r.cno).replace(/\.0$/, '').trim())
+    );
+    const payData    = parseDailyForPayDate(r3, filteredDelinqRows);
     buildDlqUI(_dlqContractData, _dlqIncomeData, payData);
   } catch(e) {
     inner.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444">❌ 오류: ${e.message}</div>`;
@@ -3184,7 +3189,8 @@ function buildDlqUI(d1, d2, d3) {
   if (!inner) return;
 
   // Computed values
-  const delinqCount   = d1.delinqCount;
+  // 연체자 수: gid=131074722 기준 (N=계약중, f=임대료, t=분납중/연체중, e열 유니크)
+  const delinqCount   = d2.dlqCnoSet ? d2.dlqCnoSet.size : d1.delinqCount;
   const totalContracts = d1.totalContracts || d2.totalContracts || 1;  // 정산대상자: 계약GID 우선
   const rate = totalContracts > 0 ? (delinqCount / totalContracts * 100) : 0;
   const rateStr = rate.toFixed(1);
@@ -3341,8 +3347,12 @@ function buildDlqUI(d1, d2, d3) {
   </div>
   `;
 
-  // 통합 테이블 행 데이터 구성
-  window._dlqTableRows = (d1.delinqRows || []).map(r => {
+  // 통합 테이블 행 데이터 구성: d2.dlqCnoSet 기준으로 필터
+  const _dlqSet = d2.dlqCnoSet || new Set();
+  const _filteredRows = (d1.delinqRows || []).filter(r =>
+    _dlqSet.has(String(r.cno).replace(/\.0$/, '').trim())
+  );
+  window._dlqTableRows = _filteredRows.map(r => {
     const det = (d2.contractDetails || {})[r.cno] || { group:'-', 연체구분:'-', days:0 };
     const pay = (d3.payDateMap   || {})[r.cno] || { dateStr:'-', payStatus:null, content:'-' };
     return { ...r, group: det.group, 연체구분: det.연체구분, days: det.days,
