@@ -834,7 +834,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   .ck-period-btn { padding: 6px 14px; font-size: 12px; }
 }
 </style>
-<!-- v1776823024 -->
+<!-- v1776823164 -->
 </head>
 <body>
 
@@ -3194,64 +3194,87 @@ async function fetchViaProxy() {
 // ■ LOAD DATA
 // ═══════════════════════════════════════════
 async function loadData() {
-  setStatus('loading','데이터 로딩 중');
-  // 전체 최대 50초 안전 타임아웃 (무한 로딩 방지)
-  const safeTimer = setTimeout(() => {
-    if (document.getElementById('statusText').textContent === '데이터 로딩 중') {
-      setStatus('error','연결 시간 초과');
-      allData = [];
+  setStatus('loading', '데이터 로딩 중');
+
+  // JSONP 시도 (gviz 직접)
+  const tryJSONP = () => fetchSheetJSONP(DAEUNG_GID)
+    .then(resp => {
+      const rows = parseGVizTable(resp);
+      if (!rows.length) throw new Error('빈 데이터');
+      return { rows, src: 'Google Sheets' };
+    });
+
+  // gviz fetch 직접 시도 (JSONP 없이 fetch)
+  const tryGvizFetch = () => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${DAEUNG_GID}`;
+    return fetch(url, { signal: ctrl.signal })
+      .then(r => { clearTimeout(t); return r.text(); })
+      .then(text => {
+        const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
+        if (!m) throw new Error('파싱 실패');
+        const resp = JSON.parse(m[1]);
+        const rows = parseGVizTable(resp);
+        if (!rows.length) throw new Error('빈 데이터');
+        return { rows, src: 'Sheets(fetch)' };
+      });
+  };
+
+  // Apps Script 프록시 시도
+  const tryProxy = () => fetchViaProxy()
+    .then(data => {
+      const rows = data.map(r => {
+        const d = parseKoreanDate(String(r['일자'] || ''));
+        return {
+          date: String(r['일자'] || ''), dateObj: d,
+          person: String(r['담당자'] || ''),
+          type: String(r['구분'] || ''),
+          tell: parseFloat(String(r['TELL대응'] || '0').replace(/[^0-9.]/g, '')) || 0,
+          work: parseFloat(String(r['업무대응'] || '0').replace(/[^0-9.]/g, '')) || 0,
+          target: String(r['대상구분'] || ''),
+          cat: String(r['업무구분'] || '기타'),
+          sub: String(r['하위구분'] || ''),
+          content: String(r['업무내용'] || '')
+        };
+      }).filter(r => r.dateObj);
+      if (!rows.length) throw new Error('빈 데이터');
+      return { rows, src: 'Apps Script' };
+    });
+
+  // ── 3가지를 동시에 시도, 가장 먼저 성공한 것 사용 ──
+  const raceWithFallback = (attempts) =>
+    new Promise((resolve, reject) => {
+      let remaining = attempts.length;
+      attempts.forEach(fn => {
+        fn().then(resolve).catch(() => {
+          remaining--;
+          if (remaining === 0) reject(new Error('모든 연결 실패'));
+        });
+      });
+    });
+
+  try {
+    const { rows, src } = await raceWithFallback([tryJSONP, tryGvizFetch, tryProxy]);
+    allData = rows;
+    setStatus('ok', `${allData.length}건 로드 완료`);
+    setDataStatus('ok', `✅ ${src} 연결됨 — 총 ${allData.length}건`);
+    populateCatFilter(allData);
+    if (CK_API_URL) {
+      ckLoadShared(() => renderCkProgress());
+    } else {
       renderCkProgress();
-      renderEmpty();
     }
-  }, 50000);
-  // 1) JSONP
-  try {
-    const resp = await fetchSheetJSONP(DAEUNG_GID);
-    allData = parseGVizTable(resp);
-    if (allData.length > 0) {
-      setStatus('ok', `${allData.length}건 로드 완료`);
-      setDataStatus('ok', `✅ Google Sheets 연결됨 — 총 ${allData.length}건`);
-      populateCatFilter(allData);
-      // 공유 체크리스트 상태 로드 후 진척도 렌더
-      if (CK_API_URL) {
-        ckLoadShared(() => renderCkProgress());
-      } else {
-        renderCkProgress();
-      }
-      clearTimeout(safeTimer); renderDashboard(); return;
-    }
-  } catch(e1) { console.warn('JSONP 실패:', e1.message); }
-  // 2) Proxy
-  try {
-    const rows = await fetchViaProxy();
-    allData = rows.map(r => {
-      const d = parseKoreanDate(String(r['일자']||''));
-      return { date:String(r['일자']||''), dateObj:d, person:String(r['담당자']||''),
-        type:String(r['구분']||''), tell:parseFloat(String(r['TELL대응']||'0').replace(/[^0-9.]/g,''))||0,
-        work:parseFloat(String(r['업무대응']||'0').replace(/[^0-9.]/g,''))||0,
-        target:String(r['대상구분']||''), cat:String(r['업무구분']||'기타'),
-        sub:String(r['하위구분']||''), content:String(r['업무내용']||'') };
-    }).filter(r => r.dateObj);
-    if (allData.length > 0) {
-      setStatus('ok', `${allData.length}건 로드 완료`);
-      setDataStatus('ok', `✅ Apps Script 연결됨 — 총 ${allData.length}건`);
-      populateCatFilter(allData);
-      if (CK_API_URL) {
-        ckLoadShared(() => renderCkProgress());
-      } else {
-        renderCkProgress();
-      }
-      clearTimeout(safeTimer); renderDashboard(); return;
-    }
-  } catch(e2) { console.warn('Proxy 실패:', e2.message); }
-  // 3) 실패
-  clearTimeout(safeTimer);
-  setStatus('error','연결 실패');
-  allData = [];
-  setDataStatus('error',
-    `❌ 연결 실패 — ① 시트를 <b>"링크가 있는 모든 사용자 — 뷰어"</b>로 공개 설정<br>
-     ② Apps Script doGet에 <code>action=getDaeung</code> 핸들러 추가 후 재배포`);
-  renderCkProgress(); renderEmpty();
+    renderDashboard();
+  } catch (e) {
+    setStatus('error', '연결 실패');
+    allData = [];
+    setDataStatus('error',
+      `❌ 연결 실패 — ① 시트를 <b>"링크가 있는 모든 사용자 — 뷰어"</b>로 공개 설정<br>
+       ② Apps Script doGet에 <code>action=getDaeung</code> 핸들러 추가 후 재배포`);
+    renderCkProgress();
+    renderEmpty();
+  }
 }
 
 function setStatus(state, text) {
