@@ -480,6 +480,13 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .ck-wrap[data-person="강휘수"] { --pcolor: var(--green);  --pgradient: linear-gradient(90deg,#34D399,#059669); }
 
 .ck-period-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.ck-hist-btn {
+  background: #fff; border: 1px solid var(--border); border-radius: 16px;
+  cursor: pointer; color: var(--muted); font-size: 11px; font-weight: 600;
+  padding: 3px 12px; transition: all .15s;
+}
+.ck-hist-btn:hover { background: #F1F5F9; }
+.ck-hist-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .ck-period-btn {
   background: #fff; border: 2px solid var(--border); border-radius: 24px;
   cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 700;
@@ -604,6 +611,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 <!-- v1776770427 -->
 <!-- v1776770859 -->
 <!-- v1776815972 -->
+<!-- v1776816560 -->
 </head>
 <body>
 
@@ -698,6 +706,16 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
       <div class="card">
         <div class="card-title"><span class="card-dot dot-blue"></span>담당자별 업무 진척</div>
         <div id="checklistProgressSection"></div>
+        <!-- 진척 이력 -->
+        <div style="margin:10px 0 4px;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:11px;color:#8A9AB5;font-weight:600">&#128197; 진척 이력</span>
+          <div style="display:flex;gap:4px">
+            <button class="ck-hist-btn active" onclick="switchHistView('daily',this)">일별</button>
+            <button class="ck-hist-btn" onclick="switchHistView('weekly',this)">주별</button>
+            <button class="ck-hist-btn" onclick="switchHistView('monthly',this)">월별</button>
+          </div>
+        </div>
+        <div id="progressHistorySection"></div>
         <div class="section-divider"></div>
         <div class="card-title" style="margin-top:4px"><span class="card-dot dot-green"></span>구분별 대응 건수</div>
         <div class="chart-wrap">
@@ -2265,6 +2283,113 @@ function renderCkProgress() {
   document.getElementById('kpi-check-sub').textContent =
     `평균 완료율 (${currentPeriod==='daily'?'오늘':currentPeriod==='weekly'?'이번 주':'이번 달'})`;
   section.innerHTML = html;
+  renderProgressHistory();
+}
+
+
+// ───────────────────────────────────────────
+// ■ PROGRESS HISTORY — 진척 이력 (일별/주별/월별)
+// ───────────────────────────────────────────
+let histViewType = 'daily';
+
+function switchHistView(type, btn) {
+  histViewType = type;
+  document.querySelectorAll('.ck-hist-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderProgressHistory();
+}
+
+function formatHistKey(key, type) {
+  try {
+    if (type === 'daily') {
+      const [y, m, d] = key.split('-').map(Number);
+      const dt = new Date(y, m-1, d);
+      const days = ['일','월','화','수','목','금','토'];
+      return `${m}/${d}(${days[dt.getDay()]})`;
+    }
+    if (type === 'weekly') {
+      const parts = key.split('-W');
+      return parts.length === 2 ? `${parts[0]}년 ${parseInt(parts[1])}주` : key;
+    }
+    const parts = key.split('-');
+    return parts.length >= 2 ? `${parts[0]}년 ${parseInt(parts[1])}월` : key;
+  } catch(e) { return key; }
+}
+
+function renderProgressHistory() {
+  const section = document.getElementById('progressHistorySection');
+  if (!section) return;
+  if (!ckStateLoaded) {
+    section.innerHTML = '<div style="font-size:11px;color:#8A9AB5;padding:6px 0">...로딩 중...</div>';
+    return;
+  }
+
+  // ckSharedState 키 패턴: ck_{person}_{period}_{dateKey}
+  // period = daily|weekly|monthly
+  // dateKey = 2025-04-21 | 2025-W17 | 2025-04
+  const type = histViewType;
+  const periodRe = new RegExp('^ck_(.+)_(daily|weekly|monthly)_(.+)$');
+
+  // 해당 타입의 날짜키와 담당자 수집
+  const dateSet = new Set();
+  const personSet = new Set();
+
+  Object.keys(ckSharedState).forEach(k => {
+    const m = k.match(periodRe);
+    if (m && m[2] === type) {
+      dateSet.add(m[3]);
+      personSet.add(m[1]);
+    }
+  });
+
+  if (dateSet.size === 0) {
+    section.innerHTML = '<div style="font-size:11px;color:#8A9AB5;padding:6px 0">이력 없음</div>';
+    return;
+  }
+
+  const sortedDates = [...dateSet].sort().reverse().slice(0, 20);
+  const persons = [...personSet].sort();
+
+  // 테이블 생성
+  let t = '<div style="overflow-x:auto;margin-top:4px">';
+  t += '<table style="width:100%;border-collapse:collapse;font-size:10px">';
+  t += '<thead><tr style="background:#F8FAFF">';
+  t += '<th style="padding:4px 6px;text-align:left;color:#8A9AB5;font-weight:600;border-bottom:1px solid #EEF2FA">날짜</th>';
+  persons.forEach(p => {
+    t += `<th style="padding:4px 6px;text-align:center;color:#8A9AB5;font-weight:600;border-bottom:1px solid #EEF2FA">${p}</th>`;
+  });
+  t += '<th style="padding:4px 6px;text-align:center;color:#8A9AB5;font-weight:600;border-bottom:1px solid #EEF2FA">평균</th>';
+  t += '</tr></thead><tbody>';
+
+  sortedDates.forEach((dateKey, di) => {
+    const bg = di % 2 === 0 ? '#fff' : '#F8FAFF';
+    t += `<tr style="background:${bg}">`;
+    t += `<td style="padding:3px 6px;color:#334155;font-weight:600;border-bottom:1px solid #EEF2FA">${formatHistKey(dateKey, type)}</td>`;
+
+    let sum = 0, cnt = 0;
+    persons.forEach(person => {
+      const stateKey = `ck_${person}_${type}_${dateKey}`;
+      const state = ckSharedState[stateKey];
+      if (state) {
+        const total = Object.keys(state).length;
+        const done = Object.values(state).filter(v => v === true).length;
+        const pct = total > 0 ? Math.round(done / total * 100) : 0;
+        sum += pct; cnt++;
+        const color = pct >= 80 ? '#16A34A' : pct >= 50 ? '#D97706' : '#DC2626';
+        t += `<td style="padding:3px 6px;text-align:center;border-bottom:1px solid #EEF2FA;color:${color};font-weight:700">${pct}%</td>`;
+      } else {
+        t += '<td style="padding:3px 6px;text-align:center;border-bottom:1px solid #EEF2FA;color:#CBD5E1">—</td>';
+      }
+    });
+
+    const avg = cnt > 0 ? Math.round(sum / cnt) : 0;
+    const avgColor = avg >= 80 ? '#16A34A' : avg >= 50 ? '#D97706' : '#DC2626';
+    t += `<td style="padding:3px 6px;text-align:center;border-bottom:1px solid #EEF2FA;color:${avgColor};font-weight:700">${cnt > 0 ? avg + '%' : '—'}</td>`;
+    t += '</tr>';
+  });
+
+  t += '</tbody></table></div>';
+  section.innerHTML = t;
 }
 
 // ═══════════════════════════════════════════
