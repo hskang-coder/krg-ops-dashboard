@@ -3496,12 +3496,9 @@ function dlqRenderTableRows() {
             <td><span class="dlq-tbl-info">${r.info||'-'}</span></td>
             <td><span class="dlq-grade dlq-grade-${gc}">${r.grade||'-'}</span></td>
             <td><span class="dlq-days-badge dlq-days-${dc}">${r.days||0}일</span></td>
-            <td>${(() => {
-              const dt = r.delinqType||'-';
-              const c1 = dt.includes('임대료') ? '<span style="background:#fee2e2;color:#dc2626;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600">임대료</span>' : '';
-              const c2 = dt.includes('변동관리비') ? '<span style="background:#ede9fe;color:#7c3aed;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600">변동관리비</span>' : '';
-              return '<div style="display:flex;gap:3px;flex-wrap:wrap">'+c1+c2+'</div>' || '-';
-            })()}</td>
+            <td><span style="font-size:11px;font-weight:600;color:${
+              r.연체구분==='연체중'?'#ef4444':r.연체구분==='분납중'?'#f59e0b':r.연체구분==='연체납부'?'#6b7280':'#9ca3af'
+            }">${r.연체구분||'-'}</span></td>
             <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
             <td>${r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-'}</td>
             <td class="dlq-tbl-tel">${r.tel||'-'}</td>
