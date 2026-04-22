@@ -3273,6 +3273,7 @@ function parseDailyForPayDate(resp, delinqRows) {
   delinqSet.forEach(cno => {
     const d       = contractLatestDate[cno];
     const content = contractLatestContent[cno]?.content || '-';
+    const aDate   = contractLatestContent[cno]?.date || null;
     let dateStr = '-', payStatus = null;
     if (d) {
       d.setHours(0,0,0,0);
@@ -3283,7 +3284,13 @@ function parseDailyForPayDate(resp, delinqRows) {
       else if (d.getTime() === todayTime){ payStatus = 'today';  todayCount++; }
       else                               { payStatus = 'future'; future++; }
     }
-    payDateMap[cno] = { dateStr, payStatus, content };
+    let actionDateStr = '-';
+    if (aDate) {
+      const am = String(aDate.getMonth()+1).padStart(2,'0');
+      const ad = String(aDate.getDate()).padStart(2,'0');
+      actionDateStr = `${aDate.getFullYear()}.${am}.${ad}`;
+    }
+    payDateMap[cno] = { dateStr, payStatus, content, actionDateStr };
   });
   return { past, today: todayCount, future, payDateMap };
 }
@@ -3573,7 +3580,7 @@ function buildDlqUI(d1, d2, d3, d4) {
       group:      det.group,
       연체구분:    det.연체구분,
       days:       det.days,
-      dateStr:    pay.dateStr, payStatus: pay.payStatus, content: pay.content,
+      dateStr:    pay.dateStr, payStatus: pay.payStatus, content: pay.content, actionDateStr: pay.actionDateStr || '-',
       contractStatus: '계약중'
     };
   });
@@ -3609,7 +3616,7 @@ function buildDlqUI(d1, d2, d3, d4) {
       group:      det.group || r.grade || '-',
       연체구분:    det.연체구분 || '-',
       days:       dlqDays,
-      dateStr:    pay.dateStr, payStatus: pay.payStatus, content: pay.content,
+      dateStr:    pay.dateStr, payStatus: pay.payStatus, content: pay.content, actionDateStr: pay.actionDateStr || '-',
       contractStatus
     };
   }).filter(Boolean);
@@ -3685,7 +3692,7 @@ function dlqRenderTableRows() {
       <thead><tr>
         <th>계약번호</th><th>그룹</th><th>임차인</th><th>계약정보</th>
         <th>등급</th><th>연체일수</th><th>담당자</th><th>대응단계</th><th>납부구분</th><th>연체금액</th>
-        <th>납부예정일</th><th>계약상태</th><th>연락처</th><th>최근 대응 내용</th>
+        <th>납부예정일</th><th>계약상태</th><th>연락처</th><th>대응일</th><th>최근 대응 내용</th>
       </tr></thead>
       <tbody>
         ${rows.map(r => {
@@ -3715,6 +3722,7 @@ function dlqRenderTableRows() {
             <td>${r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-'}</td>
             <td><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:${(r.contractStatus||'계약중')==='계약중'?'#dbeafe':(r.contractStatus==='종료(3개월이내)'?'#fef3c7':'#f3f4f6')};color:${(r.contractStatus||'계약중')==='계약중'?'#1d4ed8':(r.contractStatus==='종료(3개월이내)'?'#d97706':'#6b7280')}">${r.contractStatus||'계약중'}</span></td>
             <td class="dlq-tbl-tel">${r.tel||'-'}</td>
+            <td style="white-space:nowrap;font-size:11px;color:#374151">${r.actionDateStr&&r.actionDateStr!=='-'?r.actionDateStr:'—'}</td>
             <td class="dlq-tbl-content" title="${(r.content||'').replace(/"/g,'&quot;')}">${shortContent}</td>
           </tr>`;
         }).join('')}
