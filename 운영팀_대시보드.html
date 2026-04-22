@@ -3595,22 +3595,20 @@ function dlqChangeBsFilter(val) {
 }
 
 function dlqGoToContract(cno) {
-  // Switch to contractView
-  document.querySelectorAll('.view-tab').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.view-content').forEach(v => v.classList.remove('active'));
-  const btn = Array.from(document.querySelectorAll('.view-tab')).find(b => b.textContent.includes('계약레코드'));
-  if (btn) btn.classList.add('active');
-  const view = document.getElementById('contractView');
-  if (view) view.classList.add('active');
-  // Try to populate search
-  setTimeout(() => {
-    const input = document.querySelector('#contractView input[type="text"], #contractView input[type="search"], #crSearch');
-    if (input) {
-      input.value = String(cno).replace(/\.0$/,'').trim();
-      input.dispatchEvent(new Event('input', {bubbles:true}));
-      input.dispatchEvent(new Event('keyup', {bubbles:true}));
+  const cnoStr = String(cno).replace(/\.0$/, '').trim();
+  // 1. 계약관리 탭으로 전환
+  switchView('contract');
+  // 2. contractRawData 로드 여부 확인 후 selectContractRow 직접 호출
+  const tryOpen = () => {
+    if (contractRawData && contractRawData.length) {
+      selectContractRow(cnoStr);
+    } else {
+      loadContractData().then(() => {
+        setTimeout(() => selectContractRow(cnoStr), 200);
+      }).catch(() => {});
     }
-  }, 100);
+  };
+  setTimeout(tryOpen, 150);
 }
 
 
