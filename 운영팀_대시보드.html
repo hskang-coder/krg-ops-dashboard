@@ -3049,13 +3049,14 @@ function parseDelinqV3(resp) {
 }
 
 function parseContractMgmt(resp) {
-  if (!resp || !resp.table) return { totalContracts:0, delinqCount:0, gradeMap:{}, totalDelinqAmt:0, delinqRows:[], bsMap:{} };
+  if (!resp || !resp.table) return { totalContracts:0, delinqCount:0, gradeMap:{}, totalDelinqAmt:0, delinqRows:[], bsMap:{}, terminatedDelinqRows:[] };
   const rows = resp.table.rows || [];
   let totalContracts = 0, delinqCount = 0;
   const gradeMap = {};
   const bsMap = {};
   let totalDelinqAmt = 0;
   const delinqRows = [];
+  const terminatedDelinqRows = []; // k≠'정상' && bp='연체'
   rows.forEach(row => {
     const c = row.c || [];
     const k   = c[10] ? String(c[10].v ?? '') : '';
@@ -3076,9 +3077,14 @@ function parseContractMgmt(resp) {
         bsMap[bs]     = (bsMap[bs]     || 0) + 1;
         delinqRows.push({ cno, nm, grade: byG, amt, bs, info, tel });
       }
+    } else if (bp === '연체' && cno) {
+      // 종료 계약자 중 연체 상태 (퇴실일: Z열=c[25])
+      const exitRaw = c[25] ? (c[25].f != null ? c[25].f : c[25].v) : null;
+      const exitDateStr = exitRaw != null ? String(exitRaw) : '';
+      terminatedDelinqRows.push({ cno, nm, grade: byG, amt, bs, info, tel, exitDateStr });
     }
   });
-  return { totalContracts, delinqCount, gradeMap, totalDelinqAmt, delinqRows, bsMap };
+  return { totalContracts, delinqCount, gradeMap, totalDelinqAmt, delinqRows, bsMap, terminatedDelinqRows };
 }
 
 // gid=131074722 → 수납 데이터 (임대료 연체 분석)
@@ -3454,6 +3460,13 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-filter-btn" data-group="pay" onclick="dlqApplyFilter('pay','today',this)">오늘</button>
           <button class="dlq-filter-btn" data-group="pay" onclick="dlqApplyFilter('pay','future',this)">오늘 이후</button>
         </div>
+        <div class="dlq-filter-group">
+          <span class="dlq-filter-label">계약상태</span>
+          <button class="dlq-filter-btn active" data-group="contractStatus" onclick="dlqApplyFilter('contractStatus','all',this)">전체</button>
+          <button class="dlq-filter-btn" data-group="contractStatus" onclick="dlqApplyFilter('contractStatus','계약중',this)">계약중</button>
+          <button class="dlq-filter-btn" data-group="contractStatus" onclick="dlqApplyFilter('contractStatus','종료',this)">종료</button>
+          <button class="dlq-filter-btn" data-group="contractStatus" onclick="dlqApplyFilter('contractStatus','종료(3개월이내)',this)">종료 3개월이내</button>
+        </div>
       </div>
       <div id="dlqTableContainer"></div>
     </div>
@@ -3465,7 +3478,7 @@ function buildDlqUI(d1, d2, d3, d4) {
   const _dlqSet = (d4 && d4.dlqCnoSet) ? d4.dlqCnoSet : new Set();
   const _d1Map = {};
   (d1.delinqRows || []).forEach(r => { _d1Map[String(r.cno).replace(/\.0$/,'').trim()] = r; });
-  window._dlqTableRows = [..._dlqSet].map(cno => {
+  const activeRows = [..._dlqSet].map(cno => {
     const d1r = _d1Map[cno] || {};
     const d4r = ((d4 && d4.delinqRowMap) || {})[cno] || {};
     const det = (d2.contractDetails || {})[cno] || { group:'-', 연체구분:'-', days:0 };
@@ -3482,15 +3495,53 @@ function buildDlqUI(d1, d2, d3, d4) {
       group:      det.group,
       연체구분:    det.연체구분,
       days:       det.days,
-      dateStr:    pay.dateStr, payStatus: pay.payStatus, content: pay.content
+      dateStr:    pay.dateStr, payStatus: pay.payStatus, content: pay.content,
+      contractStatus: '계약중'
     };
   });
-  window._dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all' };
+  // 종료 연체자: d1.terminatedDelinqRows (k≠'정상', bp='연체')
+  const _today90 = new Date(); _today90.setHours(0,0,0,0);
+  const terminatedRows = (d1.terminatedDelinqRows || []).map(r => {
+    const cno = String(r.cno).replace(/\.0$/,'').trim();
+    if (_dlqSet.has(cno)) return null; // 이미 계약중 목록에 있으면 중복 제외
+    const det = (d2.contractDetails || {})[cno] || { group:'-', 연체구분:'-', days:0 };
+    const pay = (d3.payDateMap || {})[cno] || { dateStr:'-', payStatus:null, content:'-' };
+    // 퇴실일 기준 3개월(90일) 이내 여부
+    let contractStatus = '종료';
+    if (r.exitDateStr) {
+      try {
+        const ex = parseKorDate(r.exitDateStr);
+        if (ex) {
+          ex.setHours(0,0,0,0);
+          const diffDays = (_today90 - ex) / 86400000;
+          if (diffDays >= 0 && diffDays <= 90) contractStatus = '종료(3개월이내)';
+        }
+      } catch(e2) {}
+    }
+    const dlqDays = (window._delinqDaysMap && window._delinqDaysMap[cno]) || det.days || 0;
+    return {
+      cno,
+      nm:         r.nm    || '-',
+      grade:      r.grade || '-',
+      amt:        det.amt != null ? det.amt : (r.amt || 0),
+      bs:         r.bs    || '-',
+      info:       r.info  || '-',
+      tel:        r.tel   || '-',
+      delinqType: '-',
+      group:      det.group || r.grade || '-',
+      연체구분:    det.연체구분 || '-',
+      days:       dlqDays,
+      dateStr:    pay.dateStr, payStatus: pay.payStatus, content: pay.content,
+      contractStatus
+    };
+  }).filter(Boolean);
+  window._dlqTableRows = [...activeRows, ...terminatedRows];
+  window._dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all', contractStatus:'all' };
   dlqRenderTableRows();
   buildStrategyBoard(window._dlqTableRows, d3);
 }
 // ── 연체자 테이블 필터 & 렌더 ──────────────────────────────
-let _dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all' };
+let _dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all', contractStatus:'all' };
 
 function dlqApplyFilter(type, val, btn) {
   if (!window._dlqFilterState) window._dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all' };
@@ -3509,7 +3560,7 @@ function dlqApplyFilter(type, val, btn) {
 function dlqRenderTableRows() {
   const container = document.getElementById('dlqTableContainer');
   if (!container || !window._dlqTableRows) return;
-  const { days, pay, search, delinqType } = window._dlqFilterState || {};
+  const { days, pay, search, delinqType, contractStatus } = window._dlqFilterState || {};
   const today = new Date(); today.setHours(0,0,0,0);
 
   let rows = window._dlqTableRows.filter(r => {
@@ -3527,6 +3578,9 @@ function dlqRenderTableRows() {
     if (pay && pay !== 'all' && r.payStatus !== pay) return false;
     if (search) {
       if (!(`${r.cno} ${r.nm}`.toLowerCase().includes(search))) return false;
+    }
+    if (contractStatus && contractStatus !== 'all') {
+      if ((r.contractStatus || '계약중') !== contractStatus) return false;
     }
     return true;
   });
@@ -3547,7 +3601,7 @@ function dlqRenderTableRows() {
       <thead><tr>
         <th>계약번호</th><th>그룹</th><th>임차인</th><th>계약정보</th>
         <th>등급</th><th>연체일수</th><th>납부구분</th><th>연체금액</th>
-        <th>납부예정일</th><th>연락처</th><th>최근 대응 내용</th>
+        <th>납부예정일</th><th>계약상태</th><th>연락처</th><th>최근 대응 내용</th>
       </tr></thead>
       <tbody>
         ${rows.map(r => {
@@ -3567,6 +3621,7 @@ function dlqRenderTableRows() {
             }">${(r.연체구분==='연체중'||r.연체구분==='분납중')?r.연체구분:'-'}</span></td>
             <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
             <td>${r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-'}</td>
+            <td><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:${(r.contractStatus||'계약중')==='계약중'?'#dbeafe':(r.contractStatus==='종료(3개월이내)'?'#fef3c7':'#f3f4f6')};color:${(r.contractStatus||'계약중')==='계약중'?'#1d4ed8':(r.contractStatus==='종료(3개월이내)'?'#d97706':'#6b7280')}">${r.contractStatus||'계약중'}</span></td>
             <td class="dlq-tbl-tel">${r.tel||'-'}</td>
             <td class="dlq-tbl-content" title="${(r.content||'').replace(/"/g,'&quot;')}">${shortContent}</td>
           </tr>`;
