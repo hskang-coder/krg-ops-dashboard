@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KRG 개런티즈 운영팀</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -2010,6 +2011,22 @@ async function loadPaymentTargets() {
   }
 }
 
+function downloadPtExcel() {
+  const data = window._ptDisplayRows;
+  if (!data || !data.length) { alert('다운로드할 데이터가 없습니다.'); return; }
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 시도해 주세요.'); return; }
+  const ws = XLSX.utils.json_to_sheet(data);
+  // 컬럼 너비 설정
+  ws['!cols'] = [
+    {wch:10},{wch:16},{wch:14},{wch:8},{wch:12},
+    {wch:12},{wch:12},{wch:12},{wch:30},{wch:10}
+  ];
+  const wb = XLSX.utils.book_new();
+  const today = (() => { const d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
+  XLSX.utils.book_append_sheet(wb, ws, '수납관리');
+  XLSX.writeFile(wb, `수납관리_${today}.xlsx`);
+}
+
 function renderPaymentTargets() {
   const from  = document.getElementById('ptDateFrom').value;
   const to    = document.getElementById('ptDateTo').value;
@@ -2181,9 +2198,37 @@ function renderPaymentTargets() {
     </tr>`;
   }).join('') || '<tr><td colspan="10" style="text-align:center;color:#B0BDCE;padding:24px">해당 조건의 수납 대상이 없습니다.</td></tr>';
 
+  window._ptDisplayRows = display.map(x => {
+    const { r, vacancy } = x;
+    const dm = (window._ptDailyMap||{})[r.no] || {};
+    const catLabel = (() => {
+      const s = r.payStatus || '';
+      if (s.includes('정상납부')) return '—';
+      if (x.cat === '전월연체') return '전월연체자';
+      if (x.cat === '첫납부')   return '첫납부자';
+      return '—';
+    })();
+    const tagLabel = x.cat in { 전월연체:1, 첫납부:1, 계약중:1 } ? x.cat : '—';
+    return {
+      '계약번호': r.no,
+      '임차인명': x.name,
+      '연락처': x.phone,
+      '청구횟수': vacancy.billCount ? String(vacancy.billCount).replace(/회+$/,'')+'회' : '—',
+      '당월납부상태': r.payStatus || '—',
+      '수납대상여부': catLabel,
+      '납기일': r.dueDate || '—',
+      '최근 대응일': dm.latestDateStr || '—',
+      '최근 대응내용': dm.latestContent || '—',
+      '수납 대상': tagLabel
+    };
+  });
+
   document.getElementById('ptResult').innerHTML = `
     <div class="cr-card">
-      <div class="cr-card-title">💰 수납 대상 ${counts['전체']}건 (${from} ~ ${to})</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px 0">
+        <div class="cr-card-title" style="margin:0">💰 수납 대상 ${counts['전체']}건 (${from} ~ ${to})</div>
+        <button onclick="downloadPtExcel()" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">⬇️ 엑셀 다운로드</button>
+      </div>
       <div style="padding:16px 20px 8px">
         <!-- 상단: 총수납대상 / 수납관리대상 -->
         <div style="display:flex;gap:0;margin-bottom:14px">
