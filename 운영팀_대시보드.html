@@ -834,7 +834,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   .ck-period-btn { padding: 6px 14px; font-size: 12px; }
 }
 </style>
-<!-- v1776822674 -->
+<!-- v1776823024 -->
 </head>
 <body>
 
@@ -3128,7 +3128,7 @@ function fetchSheetJSONP(gid) {
         if (script.parentNode) script.parentNode.removeChild(script);
         reject(new Error('요청 시간 초과'));
       }
-    }, 20000);
+    }, 10000);  // 10초 후 폴백
   });
 }
 
@@ -3172,11 +3172,22 @@ function parseGVizTable(resp) {
 // ■ APPS SCRIPT PROXY
 // ═══════════════════════════════════════════
 async function fetchViaProxy() {
-  const res = await fetch(APPS_SCRIPT_URL + '?action=getDaeung', { mode:'cors' });
-  if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
-  const json = await res.json();
-  if (!json.data) throw new Error('프록시 데이터 없음');
-  return json.data;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000); // 15초 타임아웃
+  try {
+    const res = await fetch(APPS_SCRIPT_URL + '?action=getDaeung', {
+      mode: 'cors',
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
+    const json = await res.json();
+    if (!json.data) throw new Error('프록시 데이터 없음');
+    return json.data;
+  } catch (e) {
+    clearTimeout(timer);
+    throw e;
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -3184,6 +3195,15 @@ async function fetchViaProxy() {
 // ═══════════════════════════════════════════
 async function loadData() {
   setStatus('loading','데이터 로딩 중');
+  // 전체 최대 50초 안전 타임아웃 (무한 로딩 방지)
+  const safeTimer = setTimeout(() => {
+    if (document.getElementById('statusText').textContent === '데이터 로딩 중') {
+      setStatus('error','연결 시간 초과');
+      allData = [];
+      renderCkProgress();
+      renderEmpty();
+    }
+  }, 50000);
   // 1) JSONP
   try {
     const resp = await fetchSheetJSONP(DAEUNG_GID);
@@ -3198,7 +3218,7 @@ async function loadData() {
       } else {
         renderCkProgress();
       }
-      renderDashboard(); return;
+      clearTimeout(safeTimer); renderDashboard(); return;
     }
   } catch(e1) { console.warn('JSONP 실패:', e1.message); }
   // 2) Proxy
@@ -3221,10 +3241,11 @@ async function loadData() {
       } else {
         renderCkProgress();
       }
-      renderDashboard(); return;
+      clearTimeout(safeTimer); renderDashboard(); return;
     }
   } catch(e2) { console.warn('Proxy 실패:', e2.message); }
   // 3) 실패
+  clearTimeout(safeTimer);
   setStatus('error','연결 실패');
   allData = [];
   setDataStatus('error',
