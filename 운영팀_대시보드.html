@@ -3007,33 +3007,42 @@ function parseIncomeForDlqV2(resp) {
 }
 
 // gid=554798125 → 납부예정일 현황 (C열)
-function parseDailyForPayDate(resp) {
+function parseDailyForPayDate(resp, delinqRows) {
+  // delinqRows: gid=1953907648에서 k=정상, bp=연체인 계약 목록
   if (!resp || !resp.table) return { past:0, today:0, future:0 };
   const rows = resp.table.rows || [];
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  let past=0, todayCount=0, future=0;
-  // Track unique contracts with a payment date
-  const seen = new Set();
+
+  // 연체 계약번호 set 구성
+  const delinqSet = new Set((delinqRows || []).map(r => String(r.cno).replace(/\.0$/,'').trim()));
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const todayTime = today.getTime();
+
+  // 계약별 최신 납부예정일(입금예정, c열=col2) 계산
+  const contractLatestDate = {};
   rows.forEach(row => {
     const c = row.c || [];
-    const cno = c[1] ? String(c[1].f ?? c[1].v ?? '') : '';
+    const cno = c[1] ? String(c[1].f ?? c[1].v ?? '').replace(/\.0$/,'').trim() : '';
+    if (!delinqSet.has(cno)) return;
     const dateCell = c[2];
     if (!dateCell || !dateCell.v) return;
-    const dv = String(dateCell.v);
-    let d;
-    const m = dv.match(/Date\((\d+),(\d+),(\d+)\)/);
-    if (m) {
-      d = new Date(+m[1], +m[2], +m[3]);
-    } else if (dateCell.f) {
-      d = new Date(dateCell.f);
+    const m = String(dateCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
+    if (!m) return;
+    const d = new Date(+m[1], +m[2], +m[3]);
+    if (!contractLatestDate[cno] || d > contractLatestDate[cno]) {
+      contractLatestDate[cno] = d;
     }
-    if (!d || isNaN(d.getTime())) return;
-    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    if (seen.has(cno)) return;
-    seen.add(cno);
-    if (ds < todayStr) past++;
-    else if (ds === todayStr) todayCount++;
+  });
+
+  // 연체 계약 기준으로 지남/오늘/미도래 카운팅
+  let past=0, todayCount=0, future=0;
+  delinqSet.forEach(cno => {
+    const d = contractLatestDate[cno];
+    if (!d) return;
+    d.setHours(0,0,0,0);
+    if (d.getTime() < todayTime) past++;
+    else if (d.getTime() === todayTime) todayCount++;
     else future++;
   });
   return { past, today: todayCount, future };
@@ -3076,7 +3085,7 @@ async function renderDelinquency() {
     ]);
     _dlqContractData = parseContractMgmt(r1);
     _dlqIncomeData   = parseIncomeForDlqV2(r2);
-    const payData    = parseDailyForPayDate(r3);
+    const payData    = parseDailyForPayDate(r3, _dlqContractData.delinqRows);
     buildDlqUI(_dlqContractData, _dlqIncomeData, payData);
   } catch(e) {
     inner.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444">❌ 오류: ${e.message}</div>`;
@@ -3218,30 +3227,7 @@ function buildDlqUI(d1, d2, d3) {
       </div>
     </div>
 
-    <!-- 분석 차트 -->
-    <div class="dlq-chart-section">
-      <div class="dlq-section-title">분석 차트</div>
-      <div class="dlq-charts-2col">
-        <div class="dlq-chart-card">
-          <div class="dlq-chart-hdr">
-            <div class="dlq-chart-ttl">📊 구간별 연체 분포 (Outstanding Days)</div>
-            <span class="dlq-chart-badge">계약중</span>
-          </div>
-          <canvas id="dlqBarCanvas" height="160"></canvas>
-        </div>
-        <div class="dlq-chart-card">
-          <div class="dlq-chart-hdr">
-            <div class="dlq-chart-ttl">🎯 연체관리 등급 분포</div>
-            <select class="dlq-bs-sel" id="dlqBsSel" onchange="dlqChangeBsFilter(this.value)">
-              <option value="all">전체 청구수</option>
-              ${Object.keys(d1.bsMap).sort().map(k=>`<option value="${k}">${k}</option>`).join('')}
-            </select>
-          </div>
-          <canvas id="dlqDonutCanvas" height="160"></canvas>
-        </div>
-      </div>
-    </div>
-
+    
     <!-- 연체자 테이블 -->
     <div class="dlq-table-section">
       <div class="dlq-table-hdr">
@@ -3275,11 +3261,6 @@ function buildDlqUI(d1, d2, d3) {
   </div>
   `;
 
-  // Draw charts after DOM is ready
-  setTimeout(() => {
-    drawDlqBarChart(d2.segs);
-    drawDlqDonutChart(d1.gradeMap, 'all');
-  }, 80);
 }
 
 function drawDlqBarChart(segs) {
