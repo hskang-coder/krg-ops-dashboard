@@ -2995,12 +2995,14 @@ function parseContractMgmt(resp) {
 }
 
 // gid=131074722 → 수납 데이터 (임대료 연체 분석)
-function parseIncomeForDlqV2(resp) {
+function parseIncomeForDlqV2(resp, delinqRows) {
   if (!resp || !resp.table) return { segs:{}, typeBreakdown:{}, activeDelinqAmt:0, endedDelinqAmt:0, totalContracts:0 };
   const rows = resp.table.rows || [];
   const activeMap = {}, endedMap = {};
   let totalContracts = 0;
   const allActiveSet = new Set();
+  // 66명 연체자 기준 필터
+  const delinqSet = new Set((delinqRows || []).map(r => String(r.cno).replace(/\.0$/, '').trim()));
   const contractDetails = {}; // cno → { group, 연체구분, days }
   rows.forEach(row => {
     const c = row.c || [];
@@ -3022,8 +3024,11 @@ function parseIncomeForDlqV2(resp) {
     if (ad29 <= 0) return;
     const key = cno;
     if (n13 === '계약중') {
-      if (!activeMap[key] || activeMap[key].days < ad29) {
-        activeMap[key] = { days: ad29, tipo, amt };
+      // 66명 연체자에 속하는 계약만 세그먼트 카운팅
+      if (delinqSet.size === 0 || delinqSet.has(cno)) {
+        if (!activeMap[key] || activeMap[key].days < ad29) {
+          activeMap[key] = { days: ad29, tipo, amt };
+        }
       }
     } else {
       if (!endedMap[key] || endedMap[key].days < ad29) {
@@ -3163,7 +3168,7 @@ async function renderDelinquency() {
       fetch(gvizUrl(554798125)).then(r=>r.text()).then(parseGvizLocal),
     ]);
     _dlqContractData = parseContractMgmt(r1);
-    _dlqIncomeData   = parseIncomeForDlqV2(r2);
+    _dlqIncomeData   = parseIncomeForDlqV2(r2, _dlqContractData.delinqRows);
     const payData    = parseDailyForPayDate(r3, _dlqContractData.delinqRows);
     buildDlqUI(_dlqContractData, _dlqIncomeData, payData);
   } catch(e) {
