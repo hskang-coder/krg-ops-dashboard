@@ -732,6 +732,11 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   padding-bottom: 6px;
   border-bottom: 1px solid #e5e7eb;
 }
+.dlq-section-title.no-border {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
 .dlq-pay-section { margin-bottom: 14px; }
 .dlq-pay-cards-row {
   display: grid;
@@ -3364,15 +3369,18 @@ function buildDlqUI(d1, d2, d3, d4) {
     <!-- 연체자 테이블 -->
     <div class="dlq-table-section">
       <div class="dlq-table-header-row">
-        <div class="dlq-section-title">연체자 현황</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="dlq-section-title no-border">연체자 현황</div>
+          <span style="background:#1e40af;color:#fff;border-radius:10px;padding:2px 9px;font-size:12px;font-weight:700">${delinqCount}명</span>
+        </div>
         <input id="dlqSearchInput" type="text" class="dlq-search-input" placeholder="이름 또는 계약번호 검색..." oninput="dlqApplyFilter('search',this.value,null)">
       </div>
       <div class="dlq-filter-bar">
         <div class="dlq-filter-group">
           <span class="dlq-filter-label">연체구분</span>
-          <button class="dlq-filter-btn active" data-group="delinqType" onclick="dlqApplyFilter('delinqType','all',this)">전체</button>
-          <button class="dlq-filter-btn" data-group="delinqType" onclick="dlqApplyFilter('delinqType','임대료',this)">임대료</button>
-          <button class="dlq-filter-btn" data-group="delinqType" onclick="dlqApplyFilter('delinqType','변동관리비',this)">변동관리비</button>
+          <button class="dlq-filter-btn active" data-group="delinqType" onclick="dlqApplyFilter('delinqType','all',this)">전체 ${delinqCount}</button>
+          <button class="dlq-filter-btn" data-group="delinqType" onclick="dlqApplyFilter('delinqType','임대료',this)">임대료 ${imdaCount}</button>
+          <button class="dlq-filter-btn" data-group="delinqType" onclick="dlqApplyFilter('delinqType','변동관리비',this)">변동관리비 ${byunCount}</button>
         </div>
         <div class="dlq-filter-group">
           <span class="dlq-filter-label">연체일수</span>
