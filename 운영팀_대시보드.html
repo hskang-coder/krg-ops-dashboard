@@ -3212,12 +3212,9 @@ async function renderDelinquency() {
     _dlqContractData = parseContractMgmt(r1);
     const dlqV3Data  = parseDelinqV3(r4); // gid=418937767 기준 연체자
     _dlqIncomeData   = parseIncomeForDlqV2(r2, dlqV3Data.dlqCnoSet);
-    const filteredDelinqRows = (dlqV3Data.dlqCnoSet.size > 0)
-      ? (_dlqContractData.delinqRows || []).filter(r =>
-          dlqV3Data.dlqCnoSet.has(String(r.cno).replace(/\.0$/, '').trim())
-        )
-      : (_dlqContractData.delinqRows || []);
-    const payData    = parseDailyForPayDate(r3, filteredDelinqRows);
+    // 납부예정일: gid=418937767 전체 연체자 기준 (계약중 임대료/변동관리비 연체)
+    const dlqRowsForPay = [...dlqV3Data.dlqCnoSet].map(cno => ({ cno }));
+    const payData    = parseDailyForPayDate(r3, dlqRowsForPay);
     buildDlqUI(_dlqContractData, _dlqIncomeData, payData, dlqV3Data);
   } catch(e) {
     inner.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444">❌ 오류: ${e.message}</div>`;
