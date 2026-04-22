@@ -3060,8 +3060,8 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
     if (!cno) return;                          // e열(계약번호) 없으면 스킵
     // ab열 금액 누산 (f열 전체, n열 삭제·계약 철회 제외)
     if (n13 !== '삭제' && n13 !== '계약 철회') amtSumMap[cno] = (amtSumMap[cno] || 0) + amt;
-    // contractDetails: f=임대료 기준으로 그룹/연체구분 저장
-    if (f5 === '임대료' && n13 === '계약중') {
+    // contractDetails: f=임대료 기준, t열=연체중/분납중 행 중 ad열 최대값
+    if (f5 === '임대료' && n13 === '계약중' && (t19 === '연체중' || t19 === '분납중')) {
       if (!contractDetails[cno] || ad29 > contractDetails[cno].days) {
         contractDetails[cno] = { group: tipo, 연체구분: t19, days: ad29 };
       }
