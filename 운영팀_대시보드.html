@@ -3046,7 +3046,8 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
   const activeMap = {}, endedMap = {};
   let totalContracts = 0;
   const allActiveSet = new Set();
-  const contractDetails = {}; // cno → { group, 연체구분, days }
+  const contractDetails = {}; // cno → { group, 연체구분, days, amt }
+  const amtSumMap = {};
   rows.forEach(row => {
     const c = row.c || [];
     const tipo  = c[0]  ? String(c[0].v  ?? '') : '';
@@ -3057,6 +3058,8 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
     const cno   = c[4]  ? String(c[4].f  ?? c[4].v ?? '').replace(/\.0$/,'').trim() : '';
     const amt   = c[27] ? Number(c[27].v ?? 0) : 0;
     if (!cno) return;                          // e열(계약번호) 없으면 스킵
+    // ab열 금액 누산 (f열 전체, n열 삭제·계약 철회 제외)
+    if (n13 !== '삭제' && n13 !== '계약 철회') amtSumMap[cno] = (amtSumMap[cno] || 0) + amt;
     // contractDetails: f=임대료 기준으로 그룹/연체구분 저장
     if (f5 === '임대료' && n13 === '계약중') {
       if (!contractDetails[cno] || ad29 > contractDetails[cno].days) {
@@ -3077,6 +3080,11 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
       }
     }
   });
+  // ab열 합산 금액을 contractDetails에 저장
+  Object.keys(amtSumMap).forEach(cno => {
+    if (!contractDetails[cno]) contractDetails[cno] = { group: '-', 연체구분: '-', days: 0 };
+    contractDetails[cno].amt = amtSumMap[cno] || 0;
+  });
   totalContracts = allActiveSet.size;
   // Segment counts (cumulative)
   let s1to3=0, s1to15=0, s1to30=0, sOver30=0;
@@ -3087,10 +3095,11 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
     if (v.days >= 1 && v.days <= 15)  s1to15++;
     if (v.days >= 1 && v.days <= 30)  s1to30++;
     if (v.days > 30)                  sOver30++;
-    activeDelinqAmt += v.amt;
     const t = v.tipo || '기타';
     typeBreakdown[t] = (typeBreakdown[t] || 0) + 1;
   });
+  // activeDelinqAmt: 연체자(activeMap) 기준 ab열 합산
+  Object.keys(activeMap).forEach(cno => { activeDelinqAmt += amtSumMap[cno] || 0; });
   let endedDelinqAmt = 0;
   Object.values(endedMap).forEach(v => { endedDelinqAmt += v.amt; });
   return {
@@ -3413,7 +3422,7 @@ function buildDlqUI(d1, d2, d3, d4) {
       cno,
       nm:         d1r.nm    || d4r.nm    || '-',
       grade:      d1r.grade || '-',
-      amt:        d1r.amt   || 0,
+      amt:        det.amt   || d1r.amt   || 0,
       bs:         d1r.bs    || '-',
       info:       d1r.info  || '-',
       tel:        d1r.tel   || d4r.tel   || '-',
@@ -3501,8 +3510,8 @@ function dlqRenderTableRows() {
             <td><span class="dlq-grade dlq-grade-${gc}">${r.grade||'-'}</span></td>
             <td><span class="dlq-days-badge dlq-days-${dc}">${r.days||0}일</span></td>
             <td><span style="font-size:11px;font-weight:600;color:${
-              r.연체구분==='연체중'?'#ef4444':r.연체구분==='분납중'?'#f59e0b':r.연체구분==='연체납부'?'#6b7280':'#9ca3af'
-            }">${r.연체구분||'-'}</span></td>
+              r.연체구분==='연체중'?'#ef4444':r.연체구분==='분납중'?'#f59e0b':'#9ca3af'
+            }">${(r.연체구분==='연체중'||r.연체구분==='분납중')?r.연체구분:'-'}</span></td>
             <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
             <td>${r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-'}</td>
             <td class="dlq-tbl-tel">${r.tel||'-'}</td>
@@ -3594,21 +3603,14 @@ function dlqChangeBsFilter(val) {
   if (_dlqContractData) drawDlqDonutChart(_dlqContractData.gradeMap, val);
 }
 
-function dlqGoToContract(cno) {
+async function dlqGoToContract(cno) {
   const cnoStr = String(cno).replace(/\.0$/, '').trim();
-  // 1. 계약관리 탭으로 전환
   switchView('contract');
-  // 2. contractRawData 로드 여부 확인 후 selectContractRow 직접 호출
-  const tryOpen = () => {
-    if (contractRawData && contractRawData.length) {
-      selectContractRow(cnoStr);
-    } else {
-      loadContractData().then(() => {
-        setTimeout(() => selectContractRow(cnoStr), 200);
-      }).catch(() => {});
-    }
-  };
-  setTimeout(tryOpen, 150);
+  const start = Date.now();
+  while (!(contractRawData && contractRawData.length) && Date.now() - start < 10000) {
+    await new Promise(r => setTimeout(r, 100));
+  }
+  if (contractRawData && contractRawData.length) selectContractRow(cnoStr);
 }
 
 
