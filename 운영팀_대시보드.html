@@ -855,6 +855,38 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-days-31plus{ background:#fee2e2; color:#991b1b; }
 
 
+
+/* 연체자 테이블 필터 & 테이블 스타일 */
+.dlq-table-header-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.dlq-search-input { padding:6px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; width:260px; outline:none; }
+.dlq-search-input:focus { border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,.15); }
+.dlq-filter-bar { display:flex; gap:16px; flex-wrap:wrap; align-items:center; padding:10px 14px; background:#f8fafc; border-radius:8px; margin-bottom:12px; border:1px solid #e2e8f0; }
+.dlq-filter-group { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.dlq-filter-label { font-size:12px; color:#6b7280; font-weight:600; white-space:nowrap; }
+.dlq-filter-btn { padding:4px 10px; border:1px solid #d1d5db; background:#fff; border-radius:14px; font-size:12px; cursor:pointer; color:#374151; transition:all .15s; white-space:nowrap; }
+.dlq-filter-btn:hover { border-color:#3b82f6; color:#3b82f6; }
+.dlq-filter-btn.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
+.dlq-tbl { width:100%; border-collapse:collapse; font-size:12px; min-width:900px; }
+.dlq-tbl thead tr { background:#f1f5f9; }
+.dlq-tbl th { padding:9px 10px; text-align:left; font-weight:600; color:#475569; font-size:11px; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+.dlq-tbl-row { border-bottom:1px solid #f1f5f9; transition:background .12s; }
+.dlq-tbl-row:hover { background:#eff6ff; cursor:pointer; }
+.dlq-tbl td { padding:8px 10px; color:#374151; vertical-align:middle; }
+.dlq-tbl-cno { color:#3b82f6; font-weight:600; }
+.dlq-tbl-group { font-size:11px; color:#6b7280; background:#f3f4f6; padding:2px 6px; border-radius:4px; }
+.dlq-tbl-nm { font-weight:500; }
+.dlq-tbl-info { font-size:11px; color:#6b7280; }
+.dlq-tbl-amt { font-weight:500; color:#374151; white-space:nowrap; }
+.dlq-tbl-tel { color:#6b7280; font-size:11px; }
+.dlq-tbl-content { max-width:200px; color:#6b7280; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dlq-days-badge { display:inline-block; padding:2px 7px; border-radius:10px; font-size:11px; font-weight:600; }
+.dlq-days-low  { background:#dcfce7; color:#166534; }
+.dlq-days-mid  { background:#fef9c3; color:#854d0e; }
+.dlq-days-high { background:#ffedd5; color:#9a3412; }
+.dlq-days-crit { background:#fee2e2; color:#991b1b; }
+.dlq-pay-date-badge { font-size:11px; font-weight:600; }
+.dlq-tbl-count { padding:8px 14px; font-size:12px; color:#9ca3af; text-align:right; }
+
 </style>
 <!-- v1776817031 -->
 </head>
@@ -1071,6 +1103,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         <button class="cr-mode-tab"        onclick="switchCrMode('tenant')">👤 임차인 이름</button>
         <button class="cr-mode-tab"        onclick="switchCrMode('landlord')">🏢 임대인 이름</button>
         <button class="cr-mode-tab"        onclick="switchCrMode('phone')">📞 전화번호</button>
+        <button class="cr-mode-tab"        onclick="switchCrMode('addr')">🏠 주소 검색</button>
         <button class="cr-mode-tab"        onclick="switchCrMode('list')">📋 목록 선택</button>
       </div>
       <div id="crSearchBox" class="cr-search-bar">
@@ -1481,7 +1514,7 @@ let crMode = 'no';
 function switchCrMode(mode) {
   crMode = mode;
   document.querySelectorAll('.cr-mode-tab').forEach((btn,i) => {
-    btn.classList.toggle('active', ['no','tenant','landlord','phone','list'][i] === mode);
+    btn.classList.toggle('active', ['no','tenant','landlord','phone','addr','list'][i] === mode);
   });
   const searchBox = document.getElementById('crSearchBox');
   const listBox   = document.getElementById('crListBox');
@@ -1493,7 +1526,7 @@ function switchCrMode(mode) {
   } else {
     searchBox.style.display = '';
     listBox.style.display   = 'none';
-    const ph = { no:'계약번호를 입력하세요', tenant:'임차인 이름 2글자 이상 입력하세요', landlord:'임대인 이름 2글자 이상 입력하세요', phone:'전화번호를 입력하세요 (일부 가능)' };
+    const ph = { no:'계약번호를 입력하세요', tenant:'임차인 이름 2글자 이상 입력하세요', landlord:'임대인 이름 2글자 이상 입력하세요', phone:'전화번호를 입력하세요 (일부 가능)', addr:'주소를 입력하세요 (일부 입력 가능)' };
     input.placeholder = ph[mode]; input.value = '';
     input.type = 'text';
   }
@@ -1739,6 +1772,14 @@ function searchContract() {
       String(r['임차인휴대폰']||'').replace(/[^0-9]/g,'').includes(kw) ||
       String(r['임대인연락처']||'').replace(/[^0-9]/g,'').includes(kw) ||
       String(r['긴급연락처']||'').replace(/[^0-9]/g,'').includes(kw)
+    );
+  } else if (crMode === 'addr') {
+    const kw = q.toLowerCase();
+    matches = contractRawData.filter(r =>
+      String(r['계약지주소']||'').toLowerCase().includes(kw) ||
+      String(r['건물명']||'').toLowerCase().includes(kw) ||
+      String(r['임대인주소']||'').toLowerCase().includes(kw) ||
+      String(r['주소임차인']||'').toLowerCase().includes(kw)
     );
   }
 
@@ -2935,8 +2976,10 @@ function parseContractMgmt(resp) {
     const byG = c[76] ? String(c[76].f ?? c[76].v ?? '') : '';
     const bs  = c[70] ? String(c[70].f ?? c[70].v ?? '') : '';
     const amt = c[77] ? Number(c[77].v ?? 0) : 0;
-    const cno = c[0]  ? String(c[0].f  ?? c[0].v  ?? '') : '';
-    const nm  = c[2]  ? String(c[2].v  ?? '') : '';
+    const cno  = c[0]  ? String(c[0].f  ?? c[0].v  ?? '') : '';
+    const nm   = c[2]  ? String(c[2].v  ?? '') : '';
+    const info = c[14] ? String(c[14].v ?? '') : '';   // 계약정보(단독/공동/연대)
+    const tel  = c[46] ? String(c[46].v ?? '') : '';   // 임차인 휴대폰
     if (k === '정상') {
       totalContracts++;                      // 전체 정상(계약중) 계약자
       if (bp === '연체') {
@@ -2944,7 +2987,7 @@ function parseContractMgmt(resp) {
         totalDelinqAmt += amt;
         gradeMap[byG] = (gradeMap[byG] || 0) + 1;
         bsMap[bs]     = (bsMap[bs]     || 0) + 1;
-        delinqRows.push({ cno, nm, grade: byG, amt, bs });
+        delinqRows.push({ cno, nm, grade: byG, amt, bs, info, tel });
       }
     }
   });
@@ -2958,14 +3001,23 @@ function parseIncomeForDlqV2(resp) {
   const activeMap = {}, endedMap = {};
   let totalContracts = 0;
   const allActiveSet = new Set();
+  const contractDetails = {}; // cno → { group, 연체구분, days }
   rows.forEach(row => {
     const c = row.c || [];
     const tipo  = c[0]  ? String(c[0].v  ?? '') : '';
+    const f5    = c[5]  ? String(c[5].v  ?? '') : '';   // f열: 납부종류
+    const t19   = c[19] ? String(c[19].v ?? '') : '';   // t열: 연체구분
     const n13   = c[13] ? String(c[13].v ?? '') : '';
     const ad29  = c[29] ? Number(c[29].v ?? 0) : 0;
     const cno   = c[4]  ? String(c[4].f  ?? c[4].v ?? '').replace(/\.0$/,'').trim() : '';
     const amt   = c[27] ? Number(c[27].v ?? 0) : 0;
     if (!cno) return;                          // e열(계약번호) 없으면 스킵
+    // f열=임대료일 때: 계약별 최대 연체일수 행 기준으로 그룹/연체구분 저장
+    if (f5 === '임대료' && n13 === '계약중') {
+      if (!contractDetails[cno] || ad29 > contractDetails[cno].days) {
+        contractDetails[cno] = { group: tipo, 연체구분: t19, days: ad29 };
+      }
+    }
     if (n13 === '계약중') allActiveSet.add(cno);
     if (ad29 <= 0) return;
     const key = cno;
@@ -2997,6 +3049,7 @@ function parseIncomeForDlqV2(resp) {
   Object.values(endedMap).forEach(v => { endedDelinqAmt += v.amt; });
   return {
     segs: { s1to3, s1to15, s1to30, sOver30 },
+    contractDetails,
     typeBreakdown,
     activeDelinqAmt,
     endedDelinqAmt,
@@ -3009,7 +3062,7 @@ function parseIncomeForDlqV2(resp) {
 // gid=554798125 → 납부예정일 현황 (C열)
 function parseDailyForPayDate(resp, delinqRows) {
   // delinqRows: gid=1953907648에서 k=정상, bp=연체인 계약 목록
-  if (!resp || !resp.table) return { past:0, today:0, future:0 };
+  if (!resp || !resp.table) return { past:0, today:0, future:0, payDateMap:{} };
   const rows = resp.table.rows || [];
 
   // 연체 계약번호 set 구성
@@ -3019,33 +3072,59 @@ function parseDailyForPayDate(resp, delinqRows) {
   today.setHours(0,0,0,0);
   const todayTime = today.getTime();
 
-  // 계약별 최신 납부예정일(입금예정, c열=col2) 계산
-  const contractLatestDate = {};
+  // 계약별 최신 납부예정일(col2) + 최신 대응내용(col3, 최근 대응일 col0 기준)
+  const contractLatestDate    = {};
+  const contractLatestContent = {};
   rows.forEach(row => {
     const c = row.c || [];
     const cno = c[1] ? String(c[1].f ?? c[1].v ?? '').replace(/\.0$/,'').trim() : '';
     if (!delinqSet.has(cno)) return;
+
+    // 납부예정일 (col2)
     const dateCell = c[2];
-    if (!dateCell || !dateCell.v) return;
-    const m = String(dateCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
-    if (!m) return;
-    const d = new Date(+m[1], +m[2], +m[3]);
-    if (!contractLatestDate[cno] || d > contractLatestDate[cno]) {
-      contractLatestDate[cno] = d;
+    if (dateCell?.v) {
+      const m = String(dateCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
+      if (m) {
+        const d = new Date(+m[1], +m[2], +m[3]);
+        if (!contractLatestDate[cno] || d > contractLatestDate[cno]) {
+          contractLatestDate[cno] = d;
+        }
+      }
+    }
+
+    // 최근 대응내용 (col3) - 대응일(col0) 기준 최신
+    const daeungCell = c[0];
+    if (daeungCell?.v) {
+      const m = String(daeungCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
+      if (m) {
+        const dDate = new Date(+m[1], +m[2], +m[3]);
+        const txt   = c[3] ? String(c[3].v ?? '') : '';
+        if (!contractLatestContent[cno] || dDate > contractLatestContent[cno].date) {
+          contractLatestContent[cno] = { date: dDate, content: txt };
+        }
+      }
     }
   });
 
-  // 연체 계약 기준으로 지남/오늘/미도래 카운팅
+  // 지남/오늘/미도래 카운팅 + payDateMap 생성
   let past=0, todayCount=0, future=0;
+  const payDateMap = {};
   delinqSet.forEach(cno => {
-    const d = contractLatestDate[cno];
-    if (!d) return;
-    d.setHours(0,0,0,0);
-    if (d.getTime() < todayTime) past++;
-    else if (d.getTime() === todayTime) todayCount++;
-    else future++;
+    const d       = contractLatestDate[cno];
+    const content = contractLatestContent[cno]?.content || '-';
+    let dateStr = '-', payStatus = null;
+    if (d) {
+      d.setHours(0,0,0,0);
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      dateStr = `${mm}.${dd}`;
+      if (d.getTime() < todayTime)      { payStatus = 'past';   past++; }
+      else if (d.getTime() === todayTime){ payStatus = 'today';  todayCount++; }
+      else                               { payStatus = 'future'; future++; }
+    }
+    payDateMap[cno] = { dateStr, payStatus, content };
   });
-  return { past, today: todayCount, future };
+  return { past, today: todayCount, future, payDateMap };
 }
 
 // ── 필터 상태 ──
@@ -3230,37 +3309,124 @@ function buildDlqUI(d1, d2, d3) {
     
     <!-- 연체자 테이블 -->
     <div class="dlq-table-section">
-      <div class="dlq-table-hdr">
-        <span class="dlq-table-count">연체 계약 <strong>${delinqCount}</strong>건 · 계약레코드 탭에서 계약 상세 확인</span>
-        <span class="dlq-table-link-note">↗ 행 클릭 시 계약레코드 이동</span>
+      <div class="dlq-table-header-row">
+        <div class="dlq-section-title">연체자 현황</div>
+        <input id="dlqSearchInput" type="text" class="dlq-search-input" placeholder="이름 또는 계약번호 검색..." oninput="dlqApplyFilter('search',this.value,null)">
       </div>
-      <div class="dlq-tbl-wrap">
-        <table class="dlq-tbl">
-          <thead>
-            <tr>
-              <th>계약번호</th><th>임차인명</th><th>연체등급</th><th>연체금액</th><th>청구수</th>
-            </tr>
-          </thead>
-          <tbody id="dlqTbody">
-            ${d1.delinqRows.map(r => {
-              const gc = r.grade.replace('등급','').trim();
-              const daysCls = '';
-              return `<tr onclick="dlqGoToContract('${r.cno}')">
-                <td>${r.cno}</td>
-                <td>${r.nm}</td>
-                <td><span class="dlq-grade dlq-grade-${gc} dlq-grade-${r.grade.replace(' ','')}">${r.grade||'-'}</span></td>
-                <td>${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
-                <td>${r.bs||'-'}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
+      <div class="dlq-filter-bar">
+        <div class="dlq-filter-group">
+          <span class="dlq-filter-label">연체일수</span>
+          <button class="dlq-filter-btn active" data-group="days" onclick="dlqApplyFilter('days','all',this)">전체</button>
+          <button class="dlq-filter-btn" data-group="days" onclick="dlqApplyFilter('days','1to3',this)">1~3일</button>
+          <button class="dlq-filter-btn" data-group="days" onclick="dlqApplyFilter('days','4to15',this)">15일이하</button>
+          <button class="dlq-filter-btn" data-group="days" onclick="dlqApplyFilter('days','16to30',this)">30일이하</button>
+          <button class="dlq-filter-btn" data-group="days" onclick="dlqApplyFilter('days','over30',this)">30일초과</button>
+        </div>
+        <div class="dlq-filter-group">
+          <span class="dlq-filter-label">납부예정일</span>
+          <button class="dlq-filter-btn active" data-group="pay" onclick="dlqApplyFilter('pay','all',this)">전체</button>
+          <button class="dlq-filter-btn" data-group="pay" onclick="dlqApplyFilter('pay','past',this)">오늘 이전</button>
+          <button class="dlq-filter-btn" data-group="pay" onclick="dlqApplyFilter('pay','today',this)">오늘</button>
+          <button class="dlq-filter-btn" data-group="pay" onclick="dlqApplyFilter('pay','future',this)">오늘 이후</button>
+        </div>
       </div>
+      <div id="dlqTableContainer"></div>
     </div>
 
   </div>
   `;
 
+  // 통합 테이블 행 데이터 구성
+  window._dlqTableRows = (d1.delinqRows || []).map(r => {
+    const det = (d2.contractDetails || {})[r.cno] || { group:'-', 연체구분:'-', days:0 };
+    const pay = (d3.payDateMap   || {})[r.cno] || { dateStr:'-', payStatus:null, content:'-' };
+    return { ...r, group: det.group, 연체구분: det.연체구분, days: det.days,
+             dateStr: pay.dateStr, payStatus: pay.payStatus, content: pay.content };
+  });
+  window._dlqFilterState = { days:'all', pay:'all', search:'' };
+  dlqRenderTableRows();
+}
+// ── 연체자 테이블 필터 & 렌더 ──────────────────────────────
+let _dlqFilterState = { days:'all', pay:'all', search:'' };
+
+function dlqApplyFilter(type, val, btn) {
+  if (!window._dlqFilterState) window._dlqFilterState = { days:'all', pay:'all', search:'' };
+  if (type === 'search') {
+    window._dlqFilterState.search = val.toLowerCase();
+  } else {
+    window._dlqFilterState[type] = val;
+    if (btn) {
+      document.querySelectorAll(`.dlq-filter-btn[data-group="${type}"]`).forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+  }
+  dlqRenderTableRows();
+}
+
+function dlqRenderTableRows() {
+  const container = document.getElementById('dlqTableContainer');
+  if (!container || !window._dlqTableRows) return;
+  const { days, pay, search } = window._dlqFilterState || {};
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  let rows = window._dlqTableRows.filter(r => {
+    if (days && days !== 'all') {
+      const d = r.days || 0;
+      if (days === '1to3'   && !(d >= 1 && d <= 3))  return false;
+      if (days === '4to15'  && !(d >= 1 && d <= 15)) return false;
+      if (days === '16to30' && !(d >= 1 && d <= 30)) return false;
+      if (days === 'over30' && !(d > 30))             return false;
+    }
+    if (pay && pay !== 'all' && r.payStatus !== pay) return false;
+    if (search) {
+      if (!(`${r.cno} ${r.nm}`.toLowerCase().includes(search))) return false;
+    }
+    return true;
+  });
+  rows.sort((a,b) => (b.days||0) - (a.days||0));
+
+  if (!rows.length) {
+    container.innerHTML = '<div style="padding:30px;text-align:center;color:#6b7280;font-size:13px">검색 결과가 없습니다.</div>';
+    return;
+  }
+
+  const gradeClass = g => g.includes('S')?'s':g.includes('A')?'a':g.includes('B')?'b':g.includes('C')?'c':g.includes('D')?'d':g.includes('E')?'e':'f';
+  const dayClass   = d => d<=3?'low':d<=15?'mid':d<=30?'high':'crit';
+  const 구분색     = t => t==='분납중'?'#f59e0b':t==='연체중'?'#ef4444':t==='연체납부'?'#6b7280':'#9ca3af';
+
+  container.innerHTML = `
+  <div style="overflow-x:auto">
+    <table class="dlq-tbl">
+      <thead><tr>
+        <th>계약번호</th><th>그룹</th><th>임차인</th><th>계약정보</th>
+        <th>등급</th><th>연체일수</th><th>연체구분</th><th>연체금액</th>
+        <th>납부예정일</th><th>연락처</th><th>최근 대응 내용</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => {
+          const gc = gradeClass(r.grade||'');
+          const dc = dayClass(r.days||0);
+          const payColor = r.payStatus==='past'?'#ef4444':r.payStatus==='today'?'#f59e0b':'#22c55e';
+          const shortContent = (r.content||'-').length > 40 ? (r.content||'-').substring(0,40)+'…' : (r.content||'-');
+          return `<tr class="dlq-tbl-row" onclick="dlqGoToContract('${r.cno}')">
+            <td><span class="dlq-tbl-cno">${r.cno}</span></td>
+            <td><span class="dlq-tbl-group">${r.group||'-'}</span></td>
+            <td class="dlq-tbl-nm">${r.nm||'-'}</td>
+            <td><span class="dlq-tbl-info">${r.info||'-'}</span></td>
+            <td><span class="dlq-grade dlq-grade-${gc}">${r.grade||'-'}</span></td>
+            <td><span class="dlq-days-badge dlq-days-${dc}">${r.days||0}일</span></td>
+            <td><span style="font-size:11px;color:${구분색(r.연체구분||'')};">${r.연체구분||'-'}</span></td>
+            <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
+            <td>${r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-'}</td>
+            <td class="dlq-tbl-tel">${r.tel||'-'}</td>
+            <td class="dlq-tbl-content" title="${(r.content||'').replace(/"/g,'&quot;')}">${shortContent}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+  <div class="dlq-tbl-count">${rows.length}건 / 전체 ${window._dlqTableRows.length}건</div>
+  `;
 }
 
 function drawDlqBarChart(segs) {
