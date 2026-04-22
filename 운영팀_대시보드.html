@@ -3712,7 +3712,7 @@ function dlqRenderTableRows() {
               : `<span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:${r.assignee==='A'?'#dbeafe':'#fce7f3'};color:${r.assignee==='A'?'#1d4ed8':'#be185d'}">${r.assignee?'담당 '+r.assignee:'-'}</span>`
             }</td>
             <td>${(r.days||0)===1
-              ? '<span style="font-size:11px;font-weight:600;color:#1d4ed8;white-space:nowrap">A: 전화 &amp; 문자대응</span><br><span style="font-size:11px;font-weight:600;color:#be185d;white-space:nowrap">B: KCB 조회</span>'
+              ? '<span style="font-size:11px;font-weight:600;color:#1d4ed8;white-space:nowrap">A: 전화 &amp; 문자대응 (D+1)</span><br><span style="font-size:11px;font-weight:600;color:#be185d;white-space:nowrap">B: KCB 조회 (D+1)</span>'
               : `<span style="font-size:11px;color:#374151;white-space:nowrap">${r.actionStep||'-'}</span>`
             }</td>
             <td><span style="font-size:11px;font-weight:600;color:${
@@ -3834,18 +3834,19 @@ function buildStrategyBoard(rows, payData) {
     return d*2 + (r.amt||0)/100000 + bonus + pb;
   }
   function actionA(d) {
-    if (d <= 0) return '수납 사전안내';
-    if (d <= 2) return '전화 & 문자대응';
-    if (d < 20) return '현장방문';
-    return '강제퇴거';
+    if (d <= 0)  return '수납 사전안내 (D-1,2)';
+    if (d === 1) return '전화 & 문자대응 (D+1)';
+    if (d === 2) return '전화 & 문자대응 (D+2)';
+    if (d < 20)  return '현장방문 (D+3~)';
+    return '강제퇴실 진행 (D+20~)';
   }
   function actionB(d) {
-    if (d <= 0) return '-';
-    if (d === 1) return 'KCB 조회';
-    if (d === 2) return '내용증명 문자';
-    if (d < 7)  return '내용 증명';
-    if (d < 20) return '지급명령';
-    return '압류 / 명도';
+    if (d <= 0)  return '-';
+    if (d === 1) return 'KCB 조회 (D+1)';
+    if (d === 2) return '내용증명 예고 문자 (D+2)';
+    if (d < 7)   return '내용 증명 (D+3~6)';
+    if (d < 32)  return '지급명령(전자소송) (D+7~31)';
+    return '명도진행 판단 (D+32~)';
   }
 
   const sorted = [...rows].filter(r => (r.days||0) >= 0).sort((a,b) => getScore(b)-getScore(a));
