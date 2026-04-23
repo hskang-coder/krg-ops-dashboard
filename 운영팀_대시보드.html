@@ -5104,21 +5104,18 @@ function cG_buildTerms() {
     ['제16조','(손해배상)','일방 당사자는 자신의 책임 있는 사유로 본 계약의 의무사항을 준수하지 못하여 상대방에게 손해가 발생한 경우, 상대방에 대하여 그 손해 일체를 배상할 책임이 있다.'],
     ['제17조','(합의관할)','본 계약에 따른 분쟁이 발생할 경우 당사자들 간 합의에 의해 해결하되, 합의에 의한 해결이 불가능할 경우 "갑"의 본점소재지 관할법원을 전속적 합의관할법원으로 하여 소송으로 해결한다.']
   ];
-  var pages = '';
-  for (var i = 0; i < arts.length; i += 3) {
-    var chunk = arts.slice(i, i + 3);
-    var html = '<div class="cG-page"><div class="cG-trm-h">개런티즈 서비스 계약서 약관</div>';
-    for (var j = 0; j < chunk.length; j++) {
-      var a = chunk[j];
-      var lines = a[2].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n');
-      html += '<div class="cG-art"><h3>' + a[0] + ' ' + a[1] + '</h3>';
-      for (var k = 0; k < lines.length; k++) html += '<p>' + lines[k] + '</p>';
-      html += '</div>';
-    }
+  // 조항 전체를 자연스럽게 흐르도록 단일 컨테이너 사용
+  var html = '<div style="padding:13mm 15mm;break-before:page;page-break-before:always">'
+    + '<div class="cG-trm-h">개런티즈 서비스 계약서 약관</div>';
+  for (var i = 0; i < arts.length; i++) {
+    var a = arts[i];
+    var lines = a[2].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n');
+    html += '<div class="cG-art" style="break-inside:avoid;page-break-inside:avoid"><h3>' + a[0] + ' ' + a[1] + '</h3>';
+    for (var k = 0; k < lines.length; k++) html += '<p>' + lines[k] + '</p>';
     html += '</div>';
-    pages += html;
   }
-  return pages;
+  html += '</div>';
+  return html;
 }
 
 // ── 메인 HTML 빌더 ────────────────────────────────────────
@@ -5155,7 +5152,7 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '.p1title{font-size:21pt;font-weight:700;color:#1B3976;letter-spacing:-0.5px}'
     + '.ref-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}'
     + '.ref-lbl{font-size:8.5pt;font-weight:700;background:#1B3976;color:#fff;padding:5px 12px;border-radius:4px;white-space:nowrap}'
-    + '.ref-tbl{border-collapse:collapse}.ref-tbl td{border:1.5px solid #1B3976;width:19px;height:23px;text-align:center;font-size:8pt;font-weight:700;color:#1B3976}'
+    + '.ref-tbl{border-collapse:collapse;width:100%;table-layout:fixed}.ref-tbl td{border:1.5px solid #1B3976;height:23px;text-align:center;font-size:8pt;font-weight:700;color:#1B3976}'
     + '.it{width:100%;border-collapse:collapse;margin-bottom:9px;font-size:8.5pt}'
     + '.it th,.it td{border:1px solid #d1d5db;padding:5px 7px;vertical-align:middle}'
     + '.it .thd{background:#1B3976;color:#fff;font-weight:700;width:82px}'
@@ -5193,10 +5190,11 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '<div class="p1h"><div class="p1logo">K</div><div class="p1title">개런티즈 계약서</div></div>'
     + '<div class="ref-row"><div class="ref-lbl">증빙번호</div>'
     + '<table class="ref-tbl"><tr>' + refCells + '</tr></table></div>'
-    + '<table class="it">'
+    + '<table class="it" style="table-layout:fixed">'
+    + '<colgroup><col style="width:13%"><col style="width:37%"><col style="width:13%"><col style="width:37%"></colgroup>'
     + '<tr><th class="thd">용도</th><td class="hl">' + (d.useType||'주거용') + '</td><th class="thd">임대차계약기간</th><td colspan="3">' + startDate + ' 부터 ~ ' + endDate + ' 까지 (' + (d.duration||'') + ')</td></tr>'
     + '<tr><th class="thd">계약건물주소</th><td colspan="5" class="hl">' + (d.address||'') + '</td></tr>'
-    + '<tr><th class="thd">상세주소</th><td colspan="3" class="hl">' + (d.buildingName||'') + '</td><td colspan="2" style="text-align:right" class="hl">' + (d.roomNo||'') + '</td></tr>'
+    + '<tr><th class="thd">상세주소</th><td colspan="3" class="hl" style="border-right:none">' + (d.buildingName||'') + '</td><td colspan="2" class="hl" style="text-align:right;border-left:none">' + (d.roomNo||'') + '</td></tr>'
     + '<tr><th class="thd">계약정보</th><td>' + (d.contractInfo||'') + '</td><th class="thd">계약조건</th><td colspan="3"></td></tr>'
     + '<tr><th>①월세</th><td class="hl">' + cG_fmtKRW(d.rent) + '</td><th>②고정관리비</th><td colspan="3" class="hl">' + cG_fmtKRW(d.mgmtFee) + '</td></tr>'
     + '<tr><th>임대료(①＋②)</th><td class="hl">' + cG_fmtKRW(d.totalRent) + '</td><th>③서비스수수료/월</th><td colspan="2" class="hl">' + cG_fmtKRW(d.serviceFee) + (vatNote?' '+vatNote:'') + '</td><td></td></tr>'
@@ -5303,7 +5301,7 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '<div class="ck-item"><div class="ck-num">3</div><div class="ck-chk"></div><div>계약기간 동안 임대료의 10% 서비스수수료가 발생합니다.<div class="ck-sub">예시: 임대료 60만원 → 분할납부 매월 6만원 / 일시납 만 72만원(입주 전 납부, 갱신 시(매년) 서비스수수료가 재청구됩니다.)</div></div></div>'
     + '<div class="ck-item"><div class="ck-num">4</div><div class="ck-chk"></div><div>분할(12개월 무이자) 서비스수수료 선택 시, 중도 퇴실하면 잔여 수수료 전액을 일시납으로 납부해야 합니다.<div class="ck-sub">⚠ 입주일과 무관하게 잔여 기간 전액 일시 납부 적용</div></div></div>'
     + '<div class="ck-item"><div class="ck-num">5</div><div class="ck-chk"></div><div>계약자는 중도퇴실 시, 계약해지가 완료(후임세입자 입주 또는 임대인 합의)까지 임대료 납부 책임이 있으며, 중개보수료·원상회복·공과금 등 퇴실 정산이 완료되지 않을 시 계약해지되지 않습니다.<div class="ck-sub">⚠ 후임 세입자 미확보 시 책임 기간이 연장될 수 있음</div></div></div>'
-    + '<div style="background:#1B3976;color:#fff;text-align:center;padding:11px;border-radius:6px;margin-top:12px;font-size:9pt;font-weight:600">📊 Google Sheets에 저장</div>'
+    + ''
     + '<div style="margin-top:18px;font-size:12pt;font-weight:700;text-align:center;color:#1B3976">기타 공동계약자</div>'
     + '<div class="sig-box" style="margin-top:10px"><div class="sig-ttl" style="background:#374151">공동명의계약인2</div>'
     + '<div style="display:grid;grid-template-columns:1fr 80px">'
