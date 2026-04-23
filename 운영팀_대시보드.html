@@ -3464,8 +3464,8 @@ function parseDailyForPayDate(resp, delinqRows) {
       }
     }
 
-    // C열(납부예정일) - Date() 또는 한국어 날짜 문자열 파싱
-    const dateCell = c[2];
+    // D열(납부예정일) - Date() 또는 한국어 날짜 문자열 파싱
+    const dateCell = c[3];
     if (dateCell && (dateCell.v || dateCell.f)) {
       let d = null;
       const vStr = String(dateCell.f || dateCell.v || '');
@@ -3492,7 +3492,7 @@ function parseDailyForPayDate(resp, delinqRows) {
       const m = String(daeungCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
       if (m) {
         const dDate = new Date(+m[1], +m[2], +m[3]);
-        const txt   = c[3] ? String(c[3].v ?? '') : '';
+        const txt   = c[4] ? String(c[4].v ?? '') : '';
         if (!contractLatestContent[cno] || dDate > contractLatestContent[cno].date) {
           contractLatestContent[cno] = { date: dDate, content: txt };
         }
@@ -3544,7 +3544,7 @@ function parseDailyForPt(resp) {
       const m = String(aCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
       if (m) aDate = new Date(+m[1], +m[2], +m[3]);
     }
-    const dContent = c[3] ? String(c[3].v ?? c[3].f ?? '') : '';
+    const dContent = c[4] ? String(c[4].v ?? c[4].f ?? '') : '';
     if (aDate && (!map[cno] || aDate > map[cno].latestDate)) {
       const mm = String(aDate.getMonth()+1).padStart(2,'0');
       const dd = String(aDate.getDate()).padStart(2,'0');
