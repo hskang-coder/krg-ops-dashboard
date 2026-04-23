@@ -837,6 +837,12 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   line-height: 1;
 }
 .dlq-pay-card-desc { font-size: 12px; color: #6b7280; margin-top: 6px; }
+.dlq-pay-card { cursor:pointer; transition:box-shadow .15s,border-color .15s; }
+.dlq-pay-card:hover { box-shadow:0 4px 18px rgba(0,0,0,.1); }
+.dlq-pay-card.active-past   { border-color:#ef4444!important; box-shadow:0 0 0 2.5px #ef4444!important; }
+.dlq-pay-card.active-today  { border-color:#f59e0b!important; box-shadow:0 0 0 2.5px #f59e0b!important; }
+.dlq-pay-card.active-future { border-color:#22c55e!important; box-shadow:0 0 0 2.5px #22c55e!important; }
+.dlq-pay-card-btn { font-size:11px; font-weight:600; padding:5px 14px; border-radius:6px; border:none; cursor:pointer; margin-top:10px; display:inline-block; }
 
 /* ── 분석 차트 ── */
 .dlq-chart-section { margin-bottom: 14px; }
@@ -2115,6 +2121,20 @@ function buildStrategyCards() {
           '담당자 즉시 배정 요청')}
       </div>
     </div>`;
+}
+
+function dlqApplyPayFilter(key) {
+  if (!window._dlqFilterState) window._dlqFilterState = {};
+  const current = window._dlqFilterState.payFilter || 'all';
+  const next = (current === key) ? 'all' : key;
+  window._dlqFilterState.payFilter = next;
+  // 카드 활성화 표시
+  ['past','today','future'].forEach(k => {
+    const el = document.getElementById('payCard-' + k);
+    if (el) { el.classList.remove('active-past','active-today','active-future'); if (next === k) el.classList.add('active-' + k); }
+  });
+  dlqRenderTableRows();
+  if (next !== 'all') setTimeout(() => { document.getElementById('dlqTableContainer')?.scrollIntoView({behavior:'smooth',block:'start'}); }, 100);
 }
 
 function dlqApplyStrategyFilter(key) {
@@ -3725,20 +3745,23 @@ function buildDlqUI(d1, d2, d3, d4) {
     <div class="dlq-pay-section">
       <div class="dlq-section-title">납부예정일 현황</div>
       <div class="dlq-pay-cards-row">
-        <div class="dlq-pay-card">
+        <div class="dlq-pay-card" id="payCard-past" onclick="dlqApplyPayFilter('past')">
           <div class="dlq-pay-card-ttl past">📅 납부예정일 지남 (오늘 이전)</div>
           <div class="dlq-pay-card-num" style="color:#ef4444">${d3.past}명</div>
           <div class="dlq-pay-card-desc">약정 납부일이 이미 지난 연체자</div>
+          <button class="dlq-pay-card-btn" style="background:#fee2e2;color:#dc2626">→ 연체자 현황 보기</button>
         </div>
-        <div class="dlq-pay-card">
+        <div class="dlq-pay-card" id="payCard-today" onclick="dlqApplyPayFilter('today')">
           <div class="dlq-pay-card-ttl today">📅 납부예정일 오늘</div>
           <div class="dlq-pay-card-num" style="color:#f59e0b">${d3.today}명</div>
           <div class="dlq-pay-card-desc">오늘 납부 예정 — 즉시 확인 필요</div>
+          <button class="dlq-pay-card-btn" style="background:#fef3c7;color:#d97706">→ 연체자 현황 보기</button>
         </div>
-        <div class="dlq-pay-card">
+        <div class="dlq-pay-card" id="payCard-future" onclick="dlqApplyPayFilter('future')">
           <div class="dlq-pay-card-ttl future">📅 납부예정일 미도래 (오늘 이후)</div>
           <div class="dlq-pay-card-num" style="color:#22c55e">${d3.future}명</div>
           <div class="dlq-pay-card-desc">향후 납부 예정 — 사전 안내 권장</div>
+          <button class="dlq-pay-card-btn" style="background:#dcfce7;color:#16a34a">→ 연체자 현황 보기</button>
         </div>
       </div>
     </div>
@@ -3885,7 +3908,7 @@ function dlqApplyFilter(type, val, btn) {
 function dlqRenderTableRows() {
   const container = document.getElementById('dlqTableContainer');
   if (!container || !window._dlqTableRows) return;
-  const { days, pay, search, delinqType, contractStatus, strategyFilter } = window._dlqFilterState || {};
+  const { days, pay, search, delinqType, contractStatus, strategyFilter, payFilter } = window._dlqFilterState || {};
   const today = new Date(); today.setHours(0,0,0,0);
 
   let rows = window._dlqTableRows.filter(r => {
@@ -3906,6 +3929,9 @@ function dlqRenderTableRows() {
     }
     if (contractStatus && contractStatus !== 'all') {
       if ((r.contractStatus || '계약중') !== contractStatus) return false;
+    }
+    if (payFilter && payFilter !== 'all') {
+      if ((r.payStatus || '') !== payFilter) return false;
     }
     if (strategyFilter && strategyFilter !== 'all') {
       const cs = r.contractStatus || '계약중';
