@@ -3939,12 +3939,16 @@ let _dlqIncomeData   = null;
 let _dlqBarChart     = null;
 let _dlqDonutChart   = null;
 
+// ── 연체 데이터 캐시 (5분 TTL) ─────────────────────────
+window._dlqRawCache = null;
+var DLQ_CACHE_TTL   = 5 * 60 * 1000; // 5분
+var DLQ_BG_REFRESH  = 2 * 60 * 1000; // 2분 이상이면 백그라운드 갱신
+
 async function renderDelinquency() {
   const wrap = document.getElementById('delinquencyView');
   if (!wrap) return;
   const inner = wrap.querySelector('.dlq-inner');
   if (!inner) return;
-  inner.innerHTML = '<div style="padding:60px;text-align:center;color:#6b7280;font-size:14px">⏳ 연체 데이터 로딩 중...</div>';
 
   const SHEET2 = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
   function gvizUrl(gid, range) {
@@ -3960,6 +3964,42 @@ async function renderDelinquency() {
     }
     return JSON.parse(m[1]);
   }
+  function applyRaw(r1, r2, r3, r4) {
+    _dlqContractData = parseContractMgmt(r1);
+    const dlqV3Data  = parseDelinqV3(r4);
+    _dlqIncomeData   = parseIncomeForDlqV2(r2, dlqV3Data.dlqCnoSet);
+    window._delinqDaysMap = _dlqIncomeData.delinqDaysMap || {};
+    const termCnos = (_dlqContractData.terminatedDelinqRows || [])
+      .map(r => ({ cno: String(r.cno).replace(/\.0$/,'').trim() }));
+    const dlqRowsForPay = [
+      ...[...dlqV3Data.dlqCnoSet].map(cno => ({ cno })),
+      ...termCnos
+    ];
+    const payData = parseDailyForPayDate(r3, dlqRowsForPay);
+    buildDlqUI(_dlqContractData, _dlqIncomeData, payData, dlqV3Data);
+  }
+
+  // ── 캐시 확인 ──────────────────────────────────────────
+  const _now = Date.now();
+  const _cache = window._dlqRawCache;
+  if (_cache && (_now - _cache.ts) < DLQ_CACHE_TTL) {
+    applyRaw(_cache.r1, _cache.r2, _cache.r3, _cache.r4);
+    // 캐시가 2분 이상 됐으면 백그라운드에서 조용히 갱신
+    if ((_now - _cache.ts) > DLQ_BG_REFRESH) {
+      Promise.all([
+        fetch(gvizUrl(1953907648)).then(r=>r.text()).then(parseGvizLocal),
+        fetch(gvizUrl(131074722,'A7:AK')).then(r=>r.text()).then(parseGvizLocal),
+        fetch(gvizUrl(554798125)).then(r=>r.text()).then(parseGvizLocal),
+        fetch(gvizUrl(418937767)).then(r=>r.text()).then(parseGvizLocal),
+      ]).then(([r1,r2,r3,r4]) => {
+        window._dlqRawCache = { r1, r2, r3, r4, ts: Date.now() };
+      }).catch(() => {});
+    }
+    return;
+  }
+
+  // ── 최초 또는 만료 시 전체 로딩 ───────────────────────
+  inner.innerHTML = '<div style="padding:60px;text-align:center;color:#6b7280;font-size:14px">⏳ 연체 데이터 로딩 중...</div>';
   try {
     const [r1, r2, r3, r4] = await Promise.all([
       fetch(gvizUrl(1953907648)).then(r=>r.text()).then(parseGvizLocal),
@@ -3967,26 +4007,13 @@ async function renderDelinquency() {
       fetch(gvizUrl(554798125)).then(r=>r.text()).then(parseGvizLocal),
       fetch(gvizUrl(418937767)).then(r=>r.text()).then(parseGvizLocal),
     ]);
-    _dlqContractData = parseContractMgmt(r1);
-    const dlqV3Data  = parseDelinqV3(r4); // gid=418937767 기준 연체자
-    _dlqIncomeData   = parseIncomeForDlqV2(r2, dlqV3Data.dlqCnoSet);
-    window._delinqDaysMap = _dlqIncomeData.delinqDaysMap || {};
-    // 납부예정일: gid=418937767 전체 연체자 기준 (계약중 임대료/변동관리비 연체)
-    // 종료(3개월이내) 연체자도 포함하여 대응일/납부예정일/최근대응내용 조회
-    const termCnos = (_dlqContractData.terminatedDelinqRows || [])
-      .map(r => ({ cno: String(r.cno).replace(/\.0$/,'').trim() }));
-    const dlqRowsForPay = [
-      ...[...dlqV3Data.dlqCnoSet].map(cno => ({ cno })),
-      ...termCnos
-    ];
-    const payData    = parseDailyForPayDate(r3, dlqRowsForPay);
-    buildDlqUI(_dlqContractData, _dlqIncomeData, payData, dlqV3Data);
+    window._dlqRawCache = { r1, r2, r3, r4, ts: Date.now() };
+    applyRaw(r1, r2, r3, r4);
   } catch(e) {
     inner.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444">❌ 오류: ${e.message}</div>`;
     console.error('renderDelinquency error:', e);
   }
 }
-
 function buildDlqUI(d1, d2, d3, d4) {
   const wrap = document.getElementById('delinquencyView');
   if (!wrap) return;
