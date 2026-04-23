@@ -3934,7 +3934,13 @@ async function renderDelinquency() {
     _dlqIncomeData   = parseIncomeForDlqV2(r2, dlqV3Data.dlqCnoSet);
     window._delinqDaysMap = _dlqIncomeData.delinqDaysMap || {};
     // 납부예정일: gid=418937767 전체 연체자 기준 (계약중 임대료/변동관리비 연체)
-    const dlqRowsForPay = [...dlqV3Data.dlqCnoSet].map(cno => ({ cno }));
+    // 종료(3개월이내) 연체자도 포함하여 대응일/납부예정일/최근대응내용 조회
+    const termCnos = (_dlqContractData.terminatedDelinqRows || [])
+      .map(r => ({ cno: String(r.cno).replace(/\.0$/,'').trim() }));
+    const dlqRowsForPay = [
+      ...[...dlqV3Data.dlqCnoSet].map(cno => ({ cno })),
+      ...termCnos
+    ];
     const payData    = parseDailyForPayDate(r3, dlqRowsForPay);
     buildDlqUI(_dlqContractData, _dlqIncomeData, payData, dlqV3Data);
   } catch(e) {
