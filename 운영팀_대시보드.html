@@ -2154,136 +2154,160 @@ function dlqUpdateSelInfo() {
   if (info) info.textContent = n > 0 ? n + '명 선택됨' : '체크박스로 연체자 선택 후 발행';
 }
 
-function dlqGenerateDoc(type) {
-  const sel = Array.from(window._dlqSelectedCnos);
+async function dlqGenerateDoc(type) {
+  var sel = Array.from(window._dlqSelectedCnos);
   if (!sel.length) { alert('연체자를 먼저 체크박스로 선택해주세요.'); return; }
-  const rows = (window._dlqTableRows || []).filter(r => sel.includes(String(r.cno)));
+  var rows = (window._dlqTableRows||[]).filter(function(r){ return sel.includes(String(r.cno)); });
   if (!rows.length) { alert('선택된 연체자 데이터를 찾을 수 없습니다.'); return; }
 
-  if (type === 'notice') {
-    const html = buildDlqNoticeHtml(rows);
-    const win = window.open('', '_blank', 'width=900,height=900,scrollbars=yes');
+  if (type !== 'notice') { alert('준비 중입니다. ('+type+')'); return; }
+
+  var loader = document.createElement('div');
+  loader.id = 'dlqDocLoader';
+  loader.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center';
+  loader.innerHTML = '<div style="background:#fff;padding:24px 36px;border-radius:12px;font-size:14px;color:#1e3a8a;font-weight:600">📄 문서 생성 중...</div>';
+  document.body.appendChild(loader);
+
+  try {
+    var contractDetails = {};
+    for (var i=0; i<rows.length; i++) {
+      var r = rows[i];
+      var cno = String(r.cno);
+      var cr = (contractRawData||[]).find(function(c){ return String(c['계약번호']).trim() === cno; });
+      if (cr) {
+        contractDetails[cno] = { addr: [cr['계약지주소'], cr['건물명'], cr['호수']].filter(Boolean).join(' / ') };
+      } else {
+        var data = await fetchContractForPdf(cno);
+        if (data) contractDetails[cno] = { addr: [data.address, data.buildingName, data.roomNo].filter(Boolean).join(' / ') };
+      }
+    }
+    var html = buildDlqNoticeHtml(rows, contractDetails);
+    var win = window.open('', '_blank', 'width=920,height=900,scrollbars=yes');
     if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
     win.document.write(html);
     win.document.close();
-  } else {
-    alert('준비 중입니다. ('+type+')');
+  } catch(e2) {
+    alert('오류: ' + e2.message);
+  } finally {
+    var el = document.getElementById('dlqDocLoader');
+    if (el) el.remove();
   }
 }
 
-// ── 연체독촉안내문 HTML 빌더 ──────────────────────────────
-function buildDlqNoticeHtml(rows) {
+function buildDlqNoticeHtml(rows, contractDetails) {
   var now = new Date();
   var yy = now.getFullYear();
   var mo = String(now.getMonth()+1).padStart(2,'0');
   var dd = String(now.getDate()).padStart(2,'0');
   var hh = String(now.getHours()).padStart(2,'0');
-  var mm2 = String(now.getMinutes()).padStart(2,'0');
+  var mi = String(now.getMinutes()).padStart(2,'0');
   var todayKo = yy + '. ' + parseInt(mo) + '. ' + parseInt(dd);
-
-  function getAddr(cno) {
-    var cr = (contractRawData||[]).find(function(c){ return String(c['계약번호']).trim() === String(cno).trim(); });
-    if (!cr) return '';
-    var addr = String(cr['계약지주소']||'').trim();
-    var bld  = String(cr['건물명']||'').trim();
-    var rm   = String(cr['호수']||'').trim();
-    return addr + (bld?' / '+bld:'') + (rm?' / '+rm:'');
-  }
 
   function fmtKRW(n) { return '₩' + Math.round(n||0).toLocaleString('ko-KR'); }
 
-  function refNo(cno) {
-    return yy+mo+dd + '-' + hh+mm2 + String(cno);
-  }
-
-  function refCells(cno) {
-    var s = refNo(cno);
-    var cells = '';
-    for (var i=0; i<s.length; i++) cells += '<td>'+s[i]+'</td>';
-    return cells;
-  }
+  function refNo(cno) { return yy+mo+dd+'-'+hh+mi+String(cno); }
 
   function startDate(days) {
     var d = new Date(now);
-    d.setDate(d.getDate() - (days||0));
+    d.setDate(d.getDate()-(days||0));
     return d.getFullYear() + '. ' + (d.getMonth()+1) + '. ' + d.getDate();
   }
 
   var css = '*{box-sizing:border-box;margin:0;padding:0}'
-    + 'body{font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;font-size:10pt;color:#1a1a1a;background:#f0f2f5;line-height:1.6}'
-    + '.notice-page{width:210mm;min-height:297mm;padding:18mm 20mm;background:#fff;position:relative}'
-    + '@media screen{.notice-page{margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.12)}.no-print{display:block!important}}'
-    + '@media print{@page{size:A4 portrait;margin:0}body{background:#fff}.notice-page{margin:0;box-shadow:none;padding:18mm 20mm;width:100%;min-height:0}.no-print{display:none!important}}'
-    + '.notice-page~.notice-page{break-before:page;page-break-before:always}'
-    + '.print-btn{position:fixed;top:16px;right:16px;background:#1e3a8a;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;z-index:999}'
-    + '.logo-row{display:flex;align-items:center;gap:14px;margin-bottom:28px}'
-    + '.logo-box{width:44px;height:44px;background:#1e3a8a;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;font-style:italic}'
-    + '.doc-title{font-size:22pt;font-weight:700;color:#1a1a1a;letter-spacing:-0.5px}'
-    + '.ref-row{display:flex;align-items:center;gap:12px;margin-bottom:22px}'
-    + '.ref-label{font-size:9.5pt;font-weight:700;white-space:nowrap}'
-    + '.ref-tbl{border-collapse:collapse;background:#fde047}'
-    + '.ref-tbl td{border:1.5px solid #1a1a1a;width:19px;height:24px;text-align:center;font-size:9pt;font-weight:700}'
-    + '.addr-table{width:100%;border-collapse:collapse;margin-bottom:24px}'
-    + '.addr-table td{padding:6px 0;font-size:10.5pt}'
-    + '.addr-label{font-weight:700;width:50px}'
-    + '.addr-value{background:#fde047;padding:5px 10px;font-weight:500}'
-    + 'hr{border:none;border-top:1.5px solid #1a1a1a;margin:22px 0}'
-    + '.body-text{font-size:10pt;line-height:1.9;margin-bottom:14px}'
-    + '.highlight{background:#fde047;font-weight:700;padding:1px 3px}'
-    + '.footer{font-size:9.5pt;line-height:1.9}'
-    + '.footer-row{display:flex;gap:0}'
-    + '.footer-label{font-weight:700;min-width:110px}'
-    + '.notice{font-size:9pt;color:#374151;margin-top:16px;font-style:normal}'
-    + '.seal-area{display:inline-flex;align-items:center;gap:8px}';
+    + 'body{font-family:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:10pt;color:#1a1a1a;background:#eef0f4;line-height:1.7}'
+    + '.np{width:210mm;padding:0;background:#fff;position:relative}'
+    + '@media screen{.np{margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.15)}.np+.np{margin-top:24px}.no-print{display:block!important}}'
+    + '@media print{@page{size:A4 portrait;margin:0}body{background:#fff}.np{margin:0;box-shadow:none;width:100%}.np~.np{break-before:page;page-break-before:always}.no-print{display:none!important}}'
+    + '.print-btn{position:fixed;top:16px;right:16px;background:#1a1a1a;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;z-index:999}'
+    + '.hdr{background:#1a1a1a;color:#fff;padding:20px 28px 22px}'
+    + '.hdr-inner{display:flex;justify-content:space-between;align-items:flex-end}'
+    + '.hdr-left{}'
+    + '.hdr-sub{font-size:9pt;font-weight:400;opacity:.75;margin-bottom:6px;letter-spacing:1px}'
+    + '.hdr-title{font-size:19pt;font-weight:700;letter-spacing:-0.5px}'
+    + '.hdr-right{text-align:right;font-size:8.5pt;opacity:.8}'
+    + '.hdr-ref-label{font-size:7.5pt;opacity:.65;margin-bottom:4px}'
+    + '.hdr-ref-num{font-size:9pt;font-weight:600;letter-spacing:1px;border:1px solid rgba(255,255,255,.4);padding:3px 10px;border-radius:4px}'
+    + '.body{padding:22px 28px}'
+    + '.warn-box{border:1.5px solid #e53e3e;border-radius:6px;padding:14px 18px;margin-bottom:20px;background:#fff5f5}'
+    + '.warn-title{color:#c53030;font-size:10pt;font-weight:700;margin-bottom:6px}'
+    + '.warn-text{color:#c53030;font-size:9.5pt;line-height:1.65}'
+    + '.info-tbl{width:100%;border-collapse:collapse;margin-bottom:20px}'
+    + '.info-tbl tr{border-bottom:1px solid #e8ecf0}'
+    + '.info-tbl tr:first-child{border-top:1px solid #e8ecf0}'
+    + '.info-tbl td{padding:9px 8px;font-size:9.5pt;vertical-align:middle}'
+    + '.info-lbl{color:#6b7280;font-weight:600;width:110px;white-space:nowrap}'
+    + '.info-val{color:#1a1a1a;font-weight:500}'
+    + '.info-val.red{color:#c53030;font-weight:700}'
+    + '.divider{border:none;border-top:1.5px solid #e8ecf0;margin:18px 0}'
+    + '.para{font-size:9.5pt;line-height:1.8;margin-bottom:12px;color:#333}'
+    + '.notice-txt{font-size:8.5pt;color:#6b7280;margin-top:14px;padding-top:10px;border-top:1px solid #e8ecf0}'
+    + '.action-box{background:#f8f9fa;border-radius:6px;padding:14px 18px;margin:16px 0}'
+    + '.action-title{font-size:9.5pt;font-weight:700;color:#1a1a1a;margin-bottom:10px}'
+    + '.action-item{font-size:9pt;color:#374151;padding:4px 0;display:flex;gap:8px}'
+    + '.action-dot{color:#1a1a1a;font-weight:700}'
+    + '.footer{padding:16px 28px;border-top:1.5px solid #e8ecf0;display:flex;justify-content:space-between;align-items:flex-end;margin-top:4px}'
+    + '.footer-left{font-size:9pt;color:#6b7280}'
+    + '.footer-right{text-align:right;font-size:9pt}'
+    + '.footer-company{font-size:10.5pt;font-weight:700;color:#1a1a1a}'
+    + '.footer-tel{font-size:8.5pt;color:#6b7280;margin-top:2px}';
 
   var pages = '';
   rows.forEach(function(r) {
-    var addr = getAddr(r.cno);
+    var cno = String(r.cno);
+    var addr = (contractDetails[cno] && contractDetails[cno].addr) || '조회 불가';
     var sDate = startDate(r.days||0);
-    var refStr = refNo(r.cno);
-    var cells = refCells(r.cno);
 
-    pages += '<div class="notice-page">'
-      // 로고 + 제목
-      + '<div class="logo-row">'
-      + '<div class="logo-box">K</div>'
-      + '<div class="doc-title">월세 납부 독촉 및 연체 안내문</div>'
+    pages += '<div class="np">'
+      // 헤더
+      + '<div class="hdr"><div class="hdr-inner">'
+      + '<div class="hdr-left">'
+      + '<div class="hdr-sub">긴급 독촉</div>'
+      + '<div class="hdr-title">월세 납부 독촉 및 연체 안내문</div>'
       + '</div>'
-      // 발행번호
-      + '<div class="ref-row">'
-      + '<span class="ref-label">발행번호</span>'
-      + '<table class="ref-tbl"><tr>' + cells + '</tr></table>'
+      + '<div class="hdr-right">'
+      + '<div class="hdr-ref-label">발행번호</div>'
+      + '<div class="hdr-ref-num">' + refNo(cno) + '</div>'
       + '</div>'
-      // 수신 / 주소
-      + '<table class="addr-table">'
-      + '<tr><td class="addr-label">수신:</td><td class="addr-value">' + (r.nm||'') + '</td></tr>'
-      + '<tr><td class="addr-label">주소:</td><td class="addr-value">' + addr + '</td></tr>'
-      + '</table>'
+      + '</div></div>'
       // 본문
-      + '<div class="body-text">고객님의 건강과 행복을 기원드립니다.</div>'
-      + '<div class="body-text">'
-      + '현재 <span class="highlight">' + (r.nm||'') + '</span> 님께서는 '
-      + '<span class="highlight">' + sDate + '</span> 부터 '
-      + '<span class="highlight">' + (r.days||0) + '</span> 일 이상&nbsp;'
-      + '<span class="highlight">' + fmtKRW(r.amt) + '</span> 원의 월세를 체납중이며 이는 명백한 계약 위반입니다.'
+      + '<div class="body">'
+      // 경고 박스
+      + '<div class="warn-box">'
+      + '<div class="warn-title">⚠ 경고 — 임대료 체납: 즉각 조치 필요</div>'
+      + '<div class="warn-text">귀하의 임대료 체납으로 인하여 법적 절차가 개시될 수 있으며, 이의 제기는 법적 효력이 없습니다.</div>'
       + '</div>'
-      + '<div class="body-text">여러 번의 안내를 위해 문자 및 전화를 시도했음에도 불구하고 연결이 되지 않아 내용증명 발송 전 부득이 하게<br>'
-      + '방문 및 체납통지서를 발송합니다. 이 통지서를 받으신 후에도 월세납부 및 연락이 되지 않으실 경우에는<br>'
-      + '연9%의 지연손해금청구와 함께 강력한 법적 절차로 이어 집니다. 이후 모든 법적 절차는 사전 통보 없이<br>'
-      + '즉시 착수되며, 이로 인해 발생하는 모든 소송 비용 및 손해배상금은 귀하에게 전가됩니다.</div>'
-      + '<div class="body-text">본 독촉장 확인 후 빠른 월세지불을 요청 드리며 부득이한 사정이 있는 경우에는 빠르게 연락 주시어<br>'
-      + '불필요한 법적 절차 없이 원만히 해결되기를 바랍니다.</div>'
-      + '<div class="body-text">개런티즈의 모든 임직원은 고객님과의 신뢰를 바탕으로 성숙한 임대문화를 만들어가기 위해 최선을 다해서<br>'
-      + '노력하고 있습니다.<br>고객님의 많은 협조 부탁드리겠습니다</div>'
-      + '<div class="notice">※ 본 안내문은 법적 고지를 포함하며, 향후 분쟁 발생 시 증빙자료로 활용됩니다</div>'
-      + '<hr>'
+      // 정보 테이블
+      + '<table class="info-tbl">'
+      + '<tr><td class="info-lbl">수신</td><td class="info-val">' + (r.nm||'') + '</td></tr>'
+      + '<tr><td class="info-lbl">주소</td><td class="info-val">' + addr + '</td></tr>'
+      + '<tr><td class="info-lbl">연체 시작일</td><td class="info-val red">' + sDate + '</td></tr>'
+      + '<tr><td class="info-lbl">연체 일수</td><td class="info-val red">' + (r.days||0) + '일 이상</td></tr>'
+      + '<tr><td class="info-lbl">연체 금액</td><td class="info-val red">' + fmtKRW(r.amt) + '</td></tr>'
+      + '</table>'
+      + '<hr class="divider">'
+      // 본문
+      + '<div class="para">고객님의 건강과 행복을 기원드립니다.</div>'
+      + '<div class="para">현재 귀하께서는 <strong>' + sDate + '</strong>부터 <strong>' + (r.days||0) + '일 이상 ' + fmtKRW(r.amt) + '</strong> 원의 월세를 체납 중이며 이는 명백한 계약 위반입니다.</div>'
+      + '<div class="para">여러 번의 안내를 위해 문자 및 전화를 시도했음에도 불구하고 연결이 되지 않아 내용증명 발송 전 부득이하게 방문 및 체납통지서를 발송합니다. 이 통지서를 받으신 후에도 월세납부 및 연락이 되지 않으실 경우에는 연 9%의 지연손해금 청구와 함께 강력한 법적 절차로 이어집니다. 이후 모든 법적 절차는 사전 통보 없이 즉시 착수되며, 이로 인해 발생하는 모든 소송 비용 및 손해배상금은 귀하에게 전가됩니다.</div>'
+      + '<div class="para">본 독촉장 확인 후 빠른 월세 지불을 요청 드리며 부득이한 사정이 있는 경우에는 빠르게 연락 주시어 불필요한 법적 절차 없이 원만히 해결되기를 바랍니다.</div>'
+      // 이행사항 박스
+      + '<div class="action-box">'
+      + '<div class="action-title">임차인 이행 의무 사항</div>'
+      + '<div class="action-item"><span class="action-dot">•</span><span>체납 월세 전액 즉시 납부</span></div>'
+      + '<div class="action-item"><span class="action-dot">•</span><span>담당자 연락처로 납부 계획 즉시 통보</span></div>'
+      + '<div class="action-item"><span class="action-dot">•</span><span>납부 후 입금 확인증 제출</span></div>'
+      + '</div>'
+      + '<div class="notice-txt">※ 본 안내문은 법적 고지를 포함하며, 향후 분쟁 발생 시 증빙자료로 활용됩니다.</div>'
+      + '</div>'
       // 푸터
       + '<div class="footer">'
-      + '<div class="footer-row"><span class="footer-label">발행일:</span><span>' + todayKo + '&nbsp;&nbsp;&nbsp;&nbsp;(연체 금액은 발행일 기준)</span></div>'
-      + '<div class="footer-row" style="margin-top:8px"><span class="footer-label">계좌정보:</span><span>신한은행 - 계좌번호: 140-012-419494 - 예금주: 한국임대보증 주식회사</span></div>'
-      + '<div class="footer-row" style="margin-top:8px"><span class="footer-label">담당자 연락처:</span><span>010-9715-8064</span></div>'
-      + '<div class="footer-row" style="margin-top:8px"><span class="footer-label">발신인:</span><span class="seal-area">케이알지그룹㈜</span></div>'
-      + '<div class="footer-row" style="margin-top:4px"><span class="footer-label">주소:</span><span>충남 천안시 동남구 목천읍 천정1길 227-14</span></div>'
+      + '<div class="footer-left">발행일: ' + todayKo + '<br>(연체 금액은 발행일 기준)<br><br>계좌: 신한은행 140-012-419494<br>예금주: 한국임대보증 주식회사</div>'
+      + '<div class="footer-right">'
+      + '<div style="font-size:8pt;color:#9ca3af;margin-bottom:4px">발행인</div>'
+      + '<div class="footer-company">케이알지그룹주식회사 법무팀</div>'
+      + '<div class="footer-tel">Tel. 010-9715-8064</div>'
+      + '<div class="footer-tel" style="margin-top:2px">충남 천안시 동남구 목천읍 천정1길 227-14</div>'
+      + '</div>'
       + '</div>'
       + '</div>';
   });
@@ -2291,11 +2315,11 @@ function buildDlqNoticeHtml(rows) {
   return '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
     + '<title>월세 납부 독촉 및 연체 안내문</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">'
-    + '<style>' + css + '</style></head><body>'
+    + '<style>'+css+'</style></head><body>'
     + '<button class="print-btn no-print" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>'
-    + pages
-    + '</body></html>';
+    + pages + '</body></html>';
 }
+
 
 function dlqApplyPayFilter(key) {
   if (!window._dlqFilterState) window._dlqFilterState = {};
