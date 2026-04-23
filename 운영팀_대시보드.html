@@ -5276,39 +5276,69 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '<div class="fee-note">*첫 서비스 수수료 납입기한은 임대차계약 시작일의 3영업일 전까지</div>'
     + '<div class="fee-note">*퇴실할 때 남은 계약기간의 수수료를 일괄 지급한다.</div></div>'
     // 갑→을→병 세로 배치 (1페이지 압축)
-    + '<div style="break-inside:avoid;page-break-inside:avoid;margin-top:8px">'
-    // ── 갑 ──
-    + '<div style="border:2px solid #1e3a8a;border-radius:6px;padding:7px 10px;margin-bottom:5px">'
+    // ── 갑만 1페이지에 표시 ──
+    + '<div style="margin-top:8px">'
+    + '<div style="border:2px solid #1e3a8a;border-radius:6px;padding:7px 10px">'
     + '<div class="sig-ttl" style="background:#1e3a8a">케이알지그룹(주)(갑)</div>'
     + '<div style="display:grid;grid-template-columns:1fr 60px;margin-top:4px">'
-    + '<table class="sg-tbl" style="font-size:7.5pt">'
+    + '<table class="sg-tbl" style="font-size:8pt">'
     + '<colgroup><col style="width:22%"><col></colgroup>'
-    + '<tr><td class="sg-lbl" style="padding:2px 6px">주소</td><td style="padding:2px 6px">충남 천안시 동남구 목천읍 천정1길 227-14</td></tr>'
-    + '<tr><td class="sg-lbl" style="padding:2px 6px">연락처</td><td style="padding:2px 6px">02-6933-0099</td></tr>'
-    + '<tr><td class="sg-lbl" style="padding:2px 6px">이름(법인명)</td><td style="padding:2px 6px">케이알지그룹 주식회사</td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:4px 7px">주소</td><td style="padding:4px 7px">충남 천안시 동남구 목천읍 천정1길 227-14</td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:4px 7px">연락처</td><td style="padding:4px 7px">02-6933-0099</td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:4px 7px">이름(법인명)</td><td style="padding:4px 7px">케이알지그룹 주식회사</td></tr>'
     + '</table>'
-    + '<div style="text-align:center;font-size:7.5pt;color:#6b7280;padding-top:4px;border-left:1px dashed #c0c0c0;margin-left:4px">서명<br>혹은 인</div>'
-    + '</div></div>'
-    // ── 을 ──
-    + '<div style="border:2px solid #5b21b6;border-radius:6px;padding:7px 10px;margin-bottom:5px">'
+    + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:6px;border-left:1px dashed #c0c0c0;margin-left:5px">서명<br>혹은 인</div>'
+    + '</div></div></div>'
+    + '</div>';  // cG-page 끝
+
+  // ── Page 2: 을 + 병 + 체크리스트 + 기타 공동계약자 ──────
+  var p_parties = '<div class="cG-page">'
+    // 을
+    + '<div style="border:2px solid #5b21b6;border-radius:6px;padding:7px 10px;margin-bottom:7px">'
     + '<div class="sig-ttl" style="background:#5b21b6">계약인1(을)</div>'
     + '<div style="display:grid;grid-template-columns:1fr 60px;margin-top:4px">'
-    + '<table class="sg-tbl" style="font-size:7.5pt">'
+    + '<table class="sg-tbl" style="font-size:8pt">'
     + '<colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>'
-    + '<tr><td class="sg-lbl" style="padding:2px 6px">주소</td><td colspan="3" style="border:1px dashed #c0c0c0;padding:2px 6px">' + (d.tenantAddr||'') + '</td></tr>'
-    + '<tr><td class="sg-lbl" style="padding:2px 6px">연락처</td><td style="border:1px dashed #c0c0c0;padding:2px 6px">' + (d.tenantPhone||'') + '</td>'
-    +   '<td class="sg-lbl" style="padding:2px 6px">국적</td><td style="border:1px dashed #c0c0c0;padding:2px 6px">' + (d.natType||'내국인') + ' ' + (d.nationality||'한국') + '</td></tr>'
-    + '<tr><td class="sg-lbl" style="padding:2px 6px">주민등록번호</td><td style="border:1px dashed #c0c0c0;padding:2px 6px">*******</td>'
-    +   '<td class="sg-lbl" style="padding:2px 6px">긴급연락처</td><td style="border:1px dashed #c0c0c0;padding:2px 6px">' + (d.emergPhone||'') + '</td></tr>'
-    + '<tr><td class="sg-lbl" style="padding:2px 6px" rowspan="2">이름(법인명)</td><td rowspan="2" style="border:1px dashed #c0c0c0;padding:2px 6px;font-weight:600">' + (d.tenantName||'') + '</td>'
-    +   '<td class="sg-lbl" style="padding:2px 6px">관계</td><td style="border:1px dashed #c0c0c0;padding:2px 6px">' + emergRel + '</td></tr>'
-    + '<tr><td class="sg-lbl" style="padding:2px 6px">이름</td><td style="border:1px dashed #c0c0c0;padding:2px 6px">' + emergName + '</td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">주소</td><td colspan="3" style="border:1px dashed #c0c0c0;padding:3px 7px">' + (d.tenantAddr||'') + '</td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">' + (d.tenantPhone||'') + '</td>'
+    +   '<td class="sg-lbl" style="padding:3px 7px">국적</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">' + (d.natType||'내국인') + ' ' + (d.nationality||'한국') + '</td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">주민등록번호</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">*******</td>'
+    +   '<td class="sg-lbl" style="padding:3px 7px">긴급연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">' + (d.emergPhone||'') + '</td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px" rowspan="2">이름(법인명)</td><td rowspan="2" style="border:1px dashed #c0c0c0;padding:3px 7px;font-weight:600">' + (d.tenantName||'') + '</td>'
+    +   '<td class="sg-lbl" style="padding:3px 7px">관계</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">' + emergRel + '</td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">이름</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">' + emergName + '</td></tr>'
     + '</table>'
-    + '<div style="text-align:center;font-size:7.5pt;color:#6b7280;padding-top:4px;border-left:1px dashed #c0c0c0;margin-left:4px">서명<br>혹은 인</div>'
+    + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:6px;border-left:1px dashed #c0c0c0;margin-left:5px">서명<br>혹은 인</div>'
     + '</div></div>'
-    // ── 병 ──
+    // 병
     + cG_buildCoParty(hasCoParty, coTitle, d)
-    + '</div>'  // break-inside wrapper 끝
+    // 체크리스트
+    + '<div class="ck-hdr" style="margin-top:14px">'
+    + '<div style="display:flex;align-items:center"><span style="font-size:8.5pt;opacity:.8">KRG GROUP · GUARANTEEZ SERVICE</span><span style="margin-left:auto;font-size:8pt;opacity:.8">버전 1.0 / 2026년 기준</span></div>'
+    + '<div style="font-size:13pt;font-weight:700;margin-top:4px">개런티즈 서비스</div>'
+    + '<div style="font-size:13pt;font-weight:700">계약 확인 체크리스트</div>'
+    + '<div style="background:rgba(255,255,255,.25);display:inline-block;padding:3px 10px;border-radius:4px;font-size:8pt;margin-top:6px">계약 체결 전 필수 확인</div></div>'
+    + '<div style="font-size:8pt;color:#6b7280;margin-bottom:8px">아래 계약중요사항을 확인한 후 각 항목에 체크하세요.</div>'
+    + '<div class="ck-item"><div class="ck-num">1</div><div class="ck-chk"></div><div>임대료 + 서비스수수료는 차월부터 개런티즈에서 발행하는 가상계좌로, 지정된 납기일까지 납부합니다.<br>납기일은 입주일 기준이 아닌 입주일 -3일입니다.</div></div>'
+    + '<div class="ck-item"><div class="ck-num">2</div><div class="ck-chk"></div><div>본 계약은 보증금을 대체하는 서비스로, 퇴실청소비를 입주 후 1개월 이내 개런티즈에서 발행하는 가상계좌로 입금합니다.</div></div>'
+    + '<div class="ck-item"><div class="ck-num">3</div><div class="ck-chk"></div><div>계약기간 동안 임대료의 10% 서비스수수료가 발생합니다.<div class="ck-sub">예시: 임대료 60만원 → 분할납부 매월 6만원 / 일시납 만 72만원(입주 전 납부, 갱신 시(매년) 서비스수수료가 재청구됩니다.)</div></div></div>'
+    + '<div class="ck-item"><div class="ck-num">4</div><div class="ck-chk"></div><div>분할(12개월 무이자) 서비스수수료 선택 시, 중도 퇴실하면 잔여 수수료 전액을 일시납으로 납부해야 합니다.<div class="ck-sub">⚠ 입주일과 무관하게 잔여 기간 전액 일시 납부 적용</div></div></div>'
+    + '<div class="ck-item"><div class="ck-num">5</div><div class="ck-chk"></div><div>계약자는 중도퇴실 시, 계약해지가 완료(후임세입자 입주 또는 임대인 합의)까지 임대료 납부 책임이 있으며, 중개보수료·원상회복·공과금 등 퇴실 정산이 완료되지 않을 시 계약해지되지 않습니다.<div class="ck-sub">⚠ 후임 세입자 미확보 시 책임 기간이 연장될 수 있음</div></div></div>'
+    // 기타 공동계약자
+    + '<div style="margin-top:16px;font-size:11pt;font-weight:700;text-align:center;color:#1B3976">기타 공동계약자</div>'
+    + '<div style="border:2px solid #4b5563;border-radius:6px;padding:7px 10px;margin-top:8px">'
+    + '<div class="sig-ttl" style="background:#4b5563">공동명의계약인</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 60px;margin-top:4px">'
+    + '<table class="sg-tbl" style="font-size:8pt">'
+    + '<colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">주소</td><td colspan="3" style="border:1px dashed #c0c0c0;padding:3px 7px;height:20px"></td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td><td class="sg-lbl" style="padding:3px 7px">국적</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">내국인</td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">주민등록번호</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td><td class="sg-lbl" style="padding:3px 7px">긴급연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px" rowspan="2">이름(법인명)</td><td rowspan="2" style="border:1px dashed #c0c0c0;padding:3px 7px"></td><td class="sg-lbl" style="padding:3px 7px">관계</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">이름</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
+    + '</table>'
+    + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:6px;border-left:1px dashed #c0c0c0;margin-left:5px">서명<br>혹은 인</div>'
+    + '</div></div>'
     + '</div>';
 
   // ── Page 2: 개인정보 수집/제공 동의서 ─────────────────
@@ -5433,7 +5463,7 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">'
     + '<style>' + css + '</style></head><body>'
     + '<button class="print-btn no-print" onclick="window.print()">🖨️ PDF 저장 / 인쇄</button>'
-    + p1 + p2 + p3 + p4
+    + p1 + p_parties + p2 + p3
     + cG_buildTerms()
     + autoScaleScript
     + '</body></html>';
