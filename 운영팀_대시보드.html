@@ -3452,14 +3452,36 @@ function parseDailyForPayDate(resp, delinqRows) {
     const cno = c[1] ? String(c[1].f ?? c[1].v ?? '').replace(/\.0$/,'').trim() : '';
     if (!delinqSet.has(cno)) return;
 
-    // 납부예정일 (col2)
+    // A열(대응일) 파싱 - 최신 기준 키
+    const aCell = c[0];
+    let aDate = null;
+    if (aCell && aCell.v) {
+      const ma = String(aCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
+      if (ma) aDate = new Date(+ma[1], +ma[2], +ma[3]);
+      if (!aDate) {
+        const ma2 = String(aCell.f || aCell.v || '').match(/(\d{4})[년.\s]+(\d{1,2})[월.\s]+(\d{1,2})/);
+        if (ma2) aDate = new Date(+ma2[1], +ma2[2]-1, +ma2[3]);
+      }
+    }
+
+    // C열(납부예정일) - Date() 또는 한국어 날짜 문자열 파싱
     const dateCell = c[2];
-    if (dateCell?.v) {
-      const m = String(dateCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
-      if (m) {
-        const d = new Date(+m[1], +m[2], +m[3]);
-        if (!contractLatestDate[cno] || d > contractLatestDate[cno]) {
-          contractLatestDate[cno] = d;
+    if (dateCell && (dateCell.v || dateCell.f)) {
+      let d = null;
+      const vStr = String(dateCell.f || dateCell.v || '');
+      // Date() 형식
+      const m1 = String(dateCell.v || '').match(/Date\((\d+),(\d+),(\d+)\)/);
+      if (m1) d = new Date(+m1[1], +m1[2], +m1[3]);
+      // 한국어 형식: "YYYY년 M월 D일"
+      if (!d) {
+        const m2 = vStr.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
+        if (m2) d = new Date(+m2[1], +m2[2]-1, +m2[3]);
+      }
+      if (d) {
+        // A열 기준 가장 최신 대응 행의 C열 값 사용
+        const prev = contractLatestDate[cno];
+        if (!prev || !prev.aDate || (aDate && aDate >= prev.aDate)) {
+          contractLatestDate[cno] = { date: d, aDate: aDate };
         }
       }
     }
@@ -3482,7 +3504,8 @@ function parseDailyForPayDate(resp, delinqRows) {
   let past=0, todayCount=0, future=0;
   const payDateMap = {};
   delinqSet.forEach(cno => {
-    const d       = contractLatestDate[cno];
+    const entry   = contractLatestDate[cno];
+    const d       = entry ? entry.date : null;  // 실제 납부예정일 Date 객체
     const content = contractLatestContent[cno]?.content || '-';
     const aDate   = contractLatestContent[cno]?.date || null;
     let dateStr = '-', payStatus = null;
