@@ -3940,8 +3940,8 @@ function dlqRenderTableRows() {
     <table class="dlq-tbl">
       <thead><tr>
         <th>계약번호</th><th>그룹</th><th>계약정보</th>
-        <th>연체일수</th><th>납부구분</th><th>임차인</th><th>계약상태</th>
-        <th>연체금액</th><th>연락처</th><th>대응일</th><th>납부예정일</th><th>최근 대응 내용</th>
+        <th>연체일수</th><th>납부구분</th><th>계약상태</th><th>임차인</th>
+        <th>연락처</th><th>연체금액</th><th>대응일</th><th>납부예정일</th><th>최근 대응 내용</th>
       </tr></thead>
       <tbody>
         ${rows.map(r => {
@@ -3957,10 +3957,10 @@ function dlqRenderTableRows() {
             <td><span style="font-size:11px;font-weight:600;color:${
               r.연체구분==='연체중'?'#ef4444':r.연체구분==='분납중'?'#f59e0b':'#9ca3af'
             }">${(r.연체구분==='연체중'||r.연체구분==='분납중')?r.연체구분:'-'}</span></td>
-            <td class="dlq-tbl-nm">${r.nm||'-'}</td>
             <td><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:${(r.contractStatus||'계약중')==='계약중'?'#dbeafe':(r.contractStatus==='종료(3개월이내)'?'#fef3c7':'#f3f4f6')};color:${(r.contractStatus||'계약중')==='계약중'?'#1d4ed8':(r.contractStatus==='종료(3개월이내)'?'#d97706':'#6b7280')}">${r.contractStatus||'계약중'}</span></td>
-            <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
+            <td class="dlq-tbl-nm">${r.nm||'-'}</td>
             <td class="dlq-tbl-tel">${r.tel||'-'}</td>
+            <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
             <td style="white-space:nowrap;font-size:11px;color:#374151">${r.actionDateStr&&r.actionDateStr!=='-'?r.actionDateStr:'—'}</td>
             <td>${r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-'}</td>
             <td class="dlq-tbl-content" style="min-width:200px;white-space:normal;line-height:1.5">${shortContent}</td>
