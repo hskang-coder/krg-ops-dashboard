@@ -3940,7 +3940,7 @@ function dlqRenderTableRows() {
     <table class="dlq-tbl">
       <thead><tr>
         <th>계약번호</th><th>그룹</th><th>계약정보</th>
-        <th>등급</th><th>연체일수</th><th>담당자</th><th>대응단계</th><th>납부구분</th><th>임차인</th><th>계약상태</th>
+        <th>연체일수</th><th>납부구분</th><th>임차인</th><th>계약상태</th>
         <th>연체금액</th><th>연락처</th><th>대응일</th><th>납부예정일</th><th>최근 대응 내용</th>
       </tr></thead>
       <tbody>
@@ -3948,21 +3948,12 @@ function dlqRenderTableRows() {
           const gc = gradeClass(r.grade||'');
           const dc = dayClass(r.days||0);
           const payColor = r.payStatus==='past'?'#ef4444':r.payStatus==='today'?'#f59e0b':'#22c55e';
-          const shortContent = (r.content||'-').length > 40 ? (r.content||'-').substring(0,40)+'…' : (r.content||'-');
+          const shortContent = r.content||'-';
           return `<tr class="dlq-tbl-row" onclick="dlqGoToContract('${r.cno}')">
             <td><span class="dlq-tbl-cno">${r.cno}</span></td>
             <td><span class="dlq-tbl-group">${r.group||'-'}</span></td>
             <td><span class="dlq-tbl-info">${r.info||'-'}</span></td>
-            <td><span class="dlq-grade dlq-grade-${gc}">${r.grade||'-'}</span></td>
             <td><span class="dlq-days-badge dlq-days-${dc}">${r.days||0}일</span></td>
-            <td>${(r.days||0)===1
-              ? '<span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;background:#dbeafe;color:#1d4ed8;margin-right:3px">담당 A</span><span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;background:#fce7f3;color:#be185d">담당 B</span>'
-              : `<span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:${r.assignee==='A'?'#dbeafe':'#fce7f3'};color:${r.assignee==='A'?'#1d4ed8':'#be185d'}">${r.assignee?'담당 '+r.assignee:'-'}</span>`
-            }</td>
-            <td>${(r.days||0)===1
-              ? '<span style="font-size:11px;font-weight:600;color:#1d4ed8;white-space:nowrap">A: 전화 &amp; 문자대응 (D+1)</span><br><span style="font-size:11px;font-weight:600;color:#be185d;white-space:nowrap">B: KCB 조회 (D+1)</span>'
-              : `<span style="font-size:11px;color:#374151;white-space:nowrap">${r.actionStep||'-'}</span>`
-            }</td>
             <td><span style="font-size:11px;font-weight:600;color:${
               r.연체구분==='연체중'?'#ef4444':r.연체구분==='분납중'?'#f59e0b':'#9ca3af'
             }">${(r.연체구분==='연체중'||r.연체구분==='분납중')?r.연체구분:'-'}</span></td>
@@ -3972,7 +3963,7 @@ function dlqRenderTableRows() {
             <td class="dlq-tbl-tel">${r.tel||'-'}</td>
             <td style="white-space:nowrap;font-size:11px;color:#374151">${r.actionDateStr&&r.actionDateStr!=='-'?r.actionDateStr:'—'}</td>
             <td>${r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-'}</td>
-            <td class="dlq-tbl-content" title="${(r.content||'').replace(/"/g,'&quot;')}">${shortContent}</td>
+            <td class="dlq-tbl-content" style="min-width:200px;white-space:normal;line-height:1.5">${shortContent}</td>
           </tr>`;
         }).join('')}
       </tbody>
