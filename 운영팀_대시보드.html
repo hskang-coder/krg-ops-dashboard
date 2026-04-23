@@ -881,6 +881,12 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 }
 
 /* ── 테이블 ── */
+.dlq-doc-btns { display:flex; gap:8px; flex-wrap:wrap; padding:10px 14px 12px; background:#f8faff; border-bottom:1px solid #e8edf5; }
+.dlq-doc-btn { background:#fff; border:1.5px solid #d1d5db; color:#374151; padding:7px 15px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:all .15s; display:flex; align-items:center; gap:5px; white-space:nowrap; }
+.dlq-doc-btn:hover { border-color:#1e3a8a; color:#1e3a8a; background:#eef2ff; }
+.dlq-doc-btn.disabled-btn { opacity:.4; cursor:not-allowed; }
+.dlq-sel-info { font-size:12px; color:#6366f1; font-weight:700; padding:7px 4px; display:flex; align-items:center; }
+.dlq-cb { width:15px; height:15px; cursor:pointer; accent-color:#1e3a8a; }
 .dlq-table-section {
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -2121,6 +2127,174 @@ function buildStrategyCards() {
           '담당자 즉시 배정 요청')}
       </div>
     </div>`;
+}
+
+// ── 연체 증빙 발행 ──────────────────────────────────────
+window._dlqSelectedCnos = new Set();
+
+function dlqToggleSelect(cno, checked) {
+  if (checked) window._dlqSelectedCnos.add(String(cno));
+  else window._dlqSelectedCnos.delete(String(cno));
+  dlqUpdateSelInfo();
+}
+
+function dlqSelectAll(checked) {
+  document.querySelectorAll('.dlq-row-cb').forEach(cb => {
+    cb.checked = checked;
+    const cno = cb.value;
+    if (checked) window._dlqSelectedCnos.add(String(cno));
+    else window._dlqSelectedCnos.delete(String(cno));
+  });
+  dlqUpdateSelInfo();
+}
+
+function dlqUpdateSelInfo() {
+  const n = window._dlqSelectedCnos.size;
+  const info = document.getElementById('dlqSelInfo');
+  if (info) info.textContent = n > 0 ? n + '명 선택됨' : '체크박스로 연체자 선택 후 발행';
+}
+
+function dlqGenerateDoc(type) {
+  const sel = Array.from(window._dlqSelectedCnos);
+  if (!sel.length) { alert('연체자를 먼저 체크박스로 선택해주세요.'); return; }
+  const rows = (window._dlqTableRows || []).filter(r => sel.includes(String(r.cno)));
+  if (!rows.length) { alert('선택된 연체자 데이터를 찾을 수 없습니다.'); return; }
+
+  if (type === 'notice') {
+    const html = buildDlqNoticeHtml(rows);
+    const win = window.open('', '_blank', 'width=900,height=900,scrollbars=yes');
+    if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
+    win.document.write(html);
+    win.document.close();
+  } else {
+    alert('준비 중입니다. ('+type+')');
+  }
+}
+
+// ── 연체독촉안내문 HTML 빌더 ──────────────────────────────
+function buildDlqNoticeHtml(rows) {
+  var now = new Date();
+  var yy = now.getFullYear();
+  var mo = String(now.getMonth()+1).padStart(2,'0');
+  var dd = String(now.getDate()).padStart(2,'0');
+  var hh = String(now.getHours()).padStart(2,'0');
+  var mm2 = String(now.getMinutes()).padStart(2,'0');
+  var todayKo = yy + '. ' + parseInt(mo) + '. ' + parseInt(dd);
+
+  function getAddr(cno) {
+    var cr = (contractRawData||[]).find(function(c){ return String(c['계약번호']).trim() === String(cno).trim(); });
+    if (!cr) return '';
+    var addr = String(cr['계약지주소']||'').trim();
+    var bld  = String(cr['건물명']||'').trim();
+    var rm   = String(cr['호수']||'').trim();
+    return addr + (bld?' / '+bld:'') + (rm?' / '+rm:'');
+  }
+
+  function fmtKRW(n) { return '₩' + Math.round(n||0).toLocaleString('ko-KR'); }
+
+  function refNo(cno) {
+    return yy+mo+dd + '-' + hh+mm2 + String(cno);
+  }
+
+  function refCells(cno) {
+    var s = refNo(cno);
+    var cells = '';
+    for (var i=0; i<s.length; i++) cells += '<td>'+s[i]+'</td>';
+    return cells;
+  }
+
+  function startDate(days) {
+    var d = new Date(now);
+    d.setDate(d.getDate() - (days||0));
+    return d.getFullYear() + '. ' + (d.getMonth()+1) + '. ' + d.getDate();
+  }
+
+  var css = '*{box-sizing:border-box;margin:0;padding:0}'
+    + 'body{font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;font-size:10pt;color:#1a1a1a;background:#f0f2f5;line-height:1.6}'
+    + '.notice-page{width:210mm;min-height:297mm;padding:18mm 20mm;background:#fff;position:relative}'
+    + '@media screen{.notice-page{margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.12)}.no-print{display:block!important}}'
+    + '@media print{@page{size:A4 portrait;margin:0}body{background:#fff}.notice-page{margin:0;box-shadow:none;padding:18mm 20mm;width:100%;min-height:0}.no-print{display:none!important}}'
+    + '.notice-page~.notice-page{break-before:page;page-break-before:always}'
+    + '.print-btn{position:fixed;top:16px;right:16px;background:#1e3a8a;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;z-index:999}'
+    + '.logo-row{display:flex;align-items:center;gap:14px;margin-bottom:28px}'
+    + '.logo-box{width:44px;height:44px;background:#1e3a8a;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;font-style:italic}'
+    + '.doc-title{font-size:22pt;font-weight:700;color:#1a1a1a;letter-spacing:-0.5px}'
+    + '.ref-row{display:flex;align-items:center;gap:12px;margin-bottom:22px}'
+    + '.ref-label{font-size:9.5pt;font-weight:700;white-space:nowrap}'
+    + '.ref-tbl{border-collapse:collapse;background:#fde047}'
+    + '.ref-tbl td{border:1.5px solid #1a1a1a;width:19px;height:24px;text-align:center;font-size:9pt;font-weight:700}'
+    + '.addr-table{width:100%;border-collapse:collapse;margin-bottom:24px}'
+    + '.addr-table td{padding:6px 0;font-size:10.5pt}'
+    + '.addr-label{font-weight:700;width:50px}'
+    + '.addr-value{background:#fde047;padding:5px 10px;font-weight:500}'
+    + 'hr{border:none;border-top:1.5px solid #1a1a1a;margin:22px 0}'
+    + '.body-text{font-size:10pt;line-height:1.9;margin-bottom:14px}'
+    + '.highlight{background:#fde047;font-weight:700;padding:1px 3px}'
+    + '.footer{font-size:9.5pt;line-height:1.9}'
+    + '.footer-row{display:flex;gap:0}'
+    + '.footer-label{font-weight:700;min-width:110px}'
+    + '.notice{font-size:9pt;color:#374151;margin-top:16px;font-style:normal}'
+    + '.seal-area{display:inline-flex;align-items:center;gap:8px}';
+
+  var pages = '';
+  rows.forEach(function(r) {
+    var addr = getAddr(r.cno);
+    var sDate = startDate(r.days||0);
+    var refStr = refNo(r.cno);
+    var cells = refCells(r.cno);
+
+    pages += '<div class="notice-page">'
+      // 로고 + 제목
+      + '<div class="logo-row">'
+      + '<div class="logo-box">K</div>'
+      + '<div class="doc-title">월세 납부 독촉 및 연체 안내문</div>'
+      + '</div>'
+      // 발행번호
+      + '<div class="ref-row">'
+      + '<span class="ref-label">발행번호</span>'
+      + '<table class="ref-tbl"><tr>' + cells + '</tr></table>'
+      + '</div>'
+      // 수신 / 주소
+      + '<table class="addr-table">'
+      + '<tr><td class="addr-label">수신:</td><td class="addr-value">' + (r.nm||'') + '</td></tr>'
+      + '<tr><td class="addr-label">주소:</td><td class="addr-value">' + addr + '</td></tr>'
+      + '</table>'
+      // 본문
+      + '<div class="body-text">고객님의 건강과 행복을 기원드립니다.</div>'
+      + '<div class="body-text">'
+      + '현재 <span class="highlight">' + (r.nm||'') + '</span> 님께서는 '
+      + '<span class="highlight">' + sDate + '</span> 부터 '
+      + '<span class="highlight">' + (r.days||0) + '</span> 일 이상&nbsp;'
+      + '<span class="highlight">' + fmtKRW(r.amt) + '</span> 원의 월세를 체납중이며 이는 명백한 계약 위반입니다.'
+      + '</div>'
+      + '<div class="body-text">여러 번의 안내를 위해 문자 및 전화를 시도했음에도 불구하고 연결이 되지 않아 내용증명 발송 전 부득이 하게<br>'
+      + '방문 및 체납통지서를 발송합니다. 이 통지서를 받으신 후에도 월세납부 및 연락이 되지 않으실 경우에는<br>'
+      + '연9%의 지연손해금청구와 함께 강력한 법적 절차로 이어 집니다. 이후 모든 법적 절차는 사전 통보 없이<br>'
+      + '즉시 착수되며, 이로 인해 발생하는 모든 소송 비용 및 손해배상금은 귀하에게 전가됩니다.</div>'
+      + '<div class="body-text">본 독촉장 확인 후 빠른 월세지불을 요청 드리며 부득이한 사정이 있는 경우에는 빠르게 연락 주시어<br>'
+      + '불필요한 법적 절차 없이 원만히 해결되기를 바랍니다.</div>'
+      + '<div class="body-text">개런티즈의 모든 임직원은 고객님과의 신뢰를 바탕으로 성숙한 임대문화를 만들어가기 위해 최선을 다해서<br>'
+      + '노력하고 있습니다.<br>고객님의 많은 협조 부탁드리겠습니다</div>'
+      + '<div class="notice">※ 본 안내문은 법적 고지를 포함하며, 향후 분쟁 발생 시 증빙자료로 활용됩니다</div>'
+      + '<hr>'
+      // 푸터
+      + '<div class="footer">'
+      + '<div class="footer-row"><span class="footer-label">발행일:</span><span>' + todayKo + '&nbsp;&nbsp;&nbsp;&nbsp;(연체 금액은 발행일 기준)</span></div>'
+      + '<div class="footer-row" style="margin-top:8px"><span class="footer-label">계좌정보:</span><span>신한은행 - 계좌번호: 140-012-419494 - 예금주: 한국임대보증 주식회사</span></div>'
+      + '<div class="footer-row" style="margin-top:8px"><span class="footer-label">담당자 연락처:</span><span>010-9715-8064</span></div>'
+      + '<div class="footer-row" style="margin-top:8px"><span class="footer-label">발신인:</span><span class="seal-area">케이알지그룹㈜</span></div>'
+      + '<div class="footer-row" style="margin-top:4px"><span class="footer-label">주소:</span><span>충남 천안시 동남구 목천읍 천정1길 227-14</span></div>'
+      + '</div>'
+      + '</div>';
+  });
+
+  return '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
+    + '<title>월세 납부 독촉 및 연체 안내문</title>'
+    + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">'
+    + '<style>' + css + '</style></head><body>'
+    + '<button class="print-btn no-print" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>'
+    + pages
+    + '</body></html>';
 }
 
 function dlqApplyPayFilter(key) {
@@ -3775,6 +3949,14 @@ function buildDlqUI(d1, d2, d3, d4) {
 
     <!-- 연체자 테이블 -->
     <div class="dlq-table-section">
+      <!-- 증빙 발행 버튼 -->
+      <div class="dlq-doc-btns">
+        <button class="dlq-doc-btn" id="dlqDocBtn1" onclick="dlqGenerateDoc('notice')">📄 연체독촉안내문</button>
+        <button class="dlq-doc-btn" id="dlqDocBtn2" onclick="dlqGenerateDoc('civil')">📄 내용증명 (민사)</button>
+        <button class="dlq-doc-btn" id="dlqDocBtn3" onclick="dlqGenerateDoc('civil_criminal')">📄 내용증명 (민사&형사)</button>
+        <button class="dlq-doc-btn" id="dlqDocBtn4" onclick="dlqGenerateDoc('sms')">📄 내용증명 문자 발송</button>
+        <span class="dlq-sel-info" id="dlqSelInfo">체크박스로 연체자 선택 후 발행</span>
+      </div>
       <div class="dlq-table-header-row">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="dlq-section-title no-border">연체자 현황</div>
@@ -3965,6 +4147,7 @@ function dlqRenderTableRows() {
   <div style="overflow-x:auto">
     <table class="dlq-tbl">
       <thead><tr>
+        <th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>
         <th>계약번호</th><th>그룹</th><th>계약정보</th>
         <th>연체일수</th><th>납부구분</th><th>계약상태</th><th>임차인</th>
         <th>연락처</th><th>연체금액</th><th>대응일</th><th>납부예정일</th><th>최근 대응 내용</th>
@@ -3976,6 +4159,9 @@ function dlqRenderTableRows() {
           const payColor = r.payStatus==='past'?'#ef4444':r.payStatus==='today'?'#f59e0b':'#22c55e';
           const shortContent = r.content||'-';
           return `<tr class="dlq-tbl-row" onclick="dlqGoToContract('${r.cno}')">
+            <td onclick="event.stopPropagation()" style="text-align:center;padding:4px">
+              <input type="checkbox" class="dlq-cb dlq-row-cb" value="${r.cno}" onchange="dlqToggleSelect('${r.cno}',this.checked)">
+            </td>
             <td><span class="dlq-tbl-cno">${r.cno}</span></td>
             <td><span class="dlq-tbl-group">${r.group||'-'}</span></td>
             <td><span class="dlq-tbl-info">${r.info||'-'}</span></td>
