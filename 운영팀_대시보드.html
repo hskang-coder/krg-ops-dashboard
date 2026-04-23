@@ -216,6 +216,35 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .sr-status-pill { font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; border: 1px solid transparent; background: #F0F4F8; color: #5A6A8A; transition: all .15s; }
 .sr-status-pill.active { color: #fff !important; }
 .sr-status-pill:not(.active):hover { background: #E2EAF8; }
+/* ── 전략 요약 카드 (Strategy Cards) ── */
+.sb2-wrap { margin:16px 0 4px; }
+.sb2-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+@media(max-width:900px){.sb2-grid{grid-template-columns:repeat(2,1fr);}}
+.sb2-card { background:#fff; border-radius:12px; border:1.5px solid #f0f0f0; padding:16px 18px 14px; position:relative; cursor:pointer; transition:box-shadow .15s,border-color .15s; }
+.sb2-card:hover { box-shadow:0 4px 18px rgba(0,0,0,.09); }
+.sb2-card.sb2-active { box-shadow:0 0 0 2.5px #1d4ed8!important; border-color:#1d4ed8; }
+.sb2-border-red  { border-top:3.5px solid #ef4444; }
+.sb2-border-orng { border-top:3.5px solid #f97316; }
+.sb2-border-pink { border-top:3.5px solid #ec4899; }
+.sb2-border-yell { border-top:3.5px solid #f59e0b; }
+.sb2-border-blue { border-top:3.5px solid #3b82f6; }
+.sb2-border-gray { border-top:3.5px solid #9ca3af; }
+.sb2-badge { position:absolute; top:12px; right:14px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; }
+.sb2-urg  { background:#fee2e2; color:#dc2626; }
+.sb2-warn { background:#fef3c7; color:#d97706; }
+.sb2-info { background:#f3f4f6; color:#6b7280; }
+.sb2-title { font-size:11px; font-weight:700; color:#6b7280; margin-bottom:3px; }
+.sb2-num  { font-size:30px; font-weight:900; margin:2px 0 1px; line-height:1.1; }
+.sb2-sub  { font-size:11px; color:#9ca3af; margin-bottom:6px; }
+.sb2-desc { font-size:11px; color:#374151; line-height:1.55; margin-bottom:12px; min-height:36px; }
+.sb2-btn  { font-size:11px; font-weight:600; padding:5px 12px; border-radius:6px; border:none; cursor:pointer; display:inline-block; }
+.sb2-btn:hover { opacity:.8; }
+.sb2-btn-red  { background:#fee2e2; color:#dc2626; }
+.sb2-btn-orng { background:#ffedd5; color:#ea580c; }
+.sb2-btn-pink { background:#fce7f3; color:#db2777; }
+.sb2-btn-yell { background:#fef3c7; color:#d97706; }
+.sb2-btn-blue { background:#dbeafe; color:#1d4ed8; }
+.sb2-btn-gray { background:#f3f4f6; color:#374151; }
 /* ── 수납 대상 뷰 ── */
 .pt-wrap { padding: 16px; max-width: 1200px; margin: 0 auto; }
 .pt-filter-panel { background: #fff; border-radius: 12px; border: 1px solid #E2EAF8; padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(30,50,100,0.05); }
@@ -2011,6 +2040,129 @@ async function loadPaymentTargets() {
   }
 }
 
+function buildStrategyCards() {
+  const container = document.getElementById('dlqStrategyCards');
+  if (!container) return;
+  const rows  = window._dlqTableRows || [];
+  const active = rows.filter(r => (r.contractStatus||'계약중') === '계약중');
+  const total  = active.length;
+  const pct = n => total ? Math.round(n/total*100) : 0;
+  const fmtW = n => n>=10000?(n/10000).toFixed(0)+'만원':n.toLocaleString()+'원';
+
+  const c = {
+    legal:      active.filter(r => (r.days||0) >= 20).length,
+    overdue:    active.filter(r => r.payStatus === 'past').length,
+    highAmt:    active.filter(r => (r.amt||0) >= 1000000).length,
+    partial:    active.filter(r => r.연체구분 === '분납중').length,
+    terminated: rows.filter(r => (r.contractStatus||'계약중') !== '계약중').length,
+    noRecord:   active.filter(r => !r.actionDateStr || r.actionDateStr === '-').length,
+  };
+  const highAmtRows = active.filter(r => (r.amt||0) >= 1000000);
+  const avgAmt = highAmtRows.length ? Math.round(highAmtRows.reduce((s,r)=>s+(r.amt||0),0)/highAmtRows.length) : 0;
+
+  const sf = (window._dlqFilterState||{}).strategyFilter || 'all';
+
+  const card = (key, borderCls, badgeCls, btnCls, urgency, icon, title, num, sub, desc, btnTxt) => {
+    const isActive = sf === key;
+    return `<div class="sb2-card ${borderCls}${isActive?' sb2-active':''}" onclick="dlqApplyStrategyFilter('${isActive?'all':key}')">
+      <span class="sb2-badge ${badgeCls}">${urgency}</span>
+      <div class="sb2-title">${icon} ${title}</div>
+      <div class="sb2-num" style="color:${isActive?'#1d4ed8':badgeCls==='sb2-urg'?'#dc2626':badgeCls==='sb2-warn'?'#d97706':'#374151'}">${num}명</div>
+      <div class="sb2-sub">${sub}</div>
+      <div class="sb2-desc">${desc}</div>
+      <button class="sb2-btn ${btnCls}" onclick="event.stopPropagation();dlqApplyStrategyFilter('${isActive?'all':key}')">→ ${btnTxt}</button>
+    </div>`;
+  };
+
+  container.innerHTML = `
+    <div class="sb2-wrap">
+      <div style="font-size:11px;color:#9ca3af;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+        <span style="font-size:14px">⚡</span> 실시간 산출 · 연체관리 시트 기준
+        ${sf!=='all'?'<span style="margin-left:8px;font-size:11px;font-weight:600;color:#1d4ed8;cursor:pointer" onclick="dlqApplyStrategyFilter(\'all\')">✕ 필터 초기화</span>':''}
+      </div>
+      <div class="sb2-grid">
+        ${card('legal','sb2-border-red','sb2-urg','sb2-btn-red','긴급','⚠️','즉각 법적 대응',c.legal,
+          '전체 계약중 연체자의 '+pct(c.legal)+'%',
+          '즉각적인 법적 조치(내용증명·지급명령) 또는 CB 등록이 필요한 최우선 대응 대상',
+          '내용증명 발송 즉시 검토')}
+        ${card('overdue','sb2-border-orng','sb2-urg','sb2-btn-orng','긴급','📅','납부일 초과 미납',c.overdue,
+          '오늘 기준 납부일 초과',
+          '약정 납부일이 이미 지났으나 미납 상태. 즉시 연락 및 입금 확인 또는 재협의 필요',
+          '즉시 연락 및 입금 확인')}
+        ${card('highAmt','sb2-border-pink','sb2-urg','sb2-btn-pink','긴급','💰','고액 연체 (100만원+)',c.highAmt,
+          '평균 연체액 ₩'+fmtW(avgAmt),
+          '고액 연체자는 분납 협의 또는 보증서 청구로 빠른 회수 가능. 우선순위 접촉 대상',
+          '분납 협의 또는 보증 청구')}
+        ${card('partial','sb2-border-yell','sb2-warn','sb2-btn-yell','주의','📋','분납 진행 중',c.partial,
+          '전체의 '+pct(c.partial)+'%',
+          '분납 약속 이행 여부를 주 1회 점검. 미이행 시 즉시 연체 처리로 전환',
+          '주간 이행 확인 필수')}
+        ${card('terminated','sb2-border-blue','sb2-warn','sb2-btn-blue','주의','🏠','퇴실/종료 연체',c.terminated,
+          '퇴실상태(종료) 포함',
+          '퇴실 상태 연체는 임대인 직접 협상이 어렵고 보증보험 청구 경로 활용이 효과적',
+          '보증보험사 청구 검토')}
+        ${card('noRecord','sb2-border-gray','sb2-info','sb2-btn-gray','참고','📌','대응기록 없음',c.noRecord,
+          '전체의 '+pct(c.noRecord)+'%',
+          '대응 기록이 없는 연체자는 담당자 배정 및 초기 접촉 이력 즉시 등록 필요',
+          '담당자 즉시 배정 요청')}
+      </div>
+    </div>`;
+}
+
+function dlqApplyStrategyFilter(key) {
+  if (!window._dlqFilterState) window._dlqFilterState = {};
+  window._dlqFilterState.strategyFilter = key || 'all';
+  dlqRenderTableRows();
+  buildStrategyCards();
+  if (key && key !== 'all') {
+    setTimeout(() => {
+      document.getElementById('dlqTableContainer')?.scrollIntoView({behavior:'smooth',block:'start'});
+    }, 100);
+  }
+}
+
+function downloadDlqExcel() {
+  const rows = window._dlqTableRows;
+  if (!rows || !rows.length) { alert('다운로드할 데이터가 없습니다.'); return; }
+  if (typeof XLSX === 'undefined') { alert('라이브러리 로딩 중입니다. 잠시 후 다시 시도해 주세요.'); return; }
+  const sf = (window._dlqFilterState||{}).strategyFilter || 'all';
+  const cs = (window._dlqFilterState||{}).contractStatus || 'all';
+  const search = ((window._dlqFilterState||{}).search || '').toLowerCase();
+  const days = (window._dlqFilterState||{}).days || 'all';
+  const pay = (window._dlqFilterState||{}).pay || 'all';
+  const statusOrder = {'계약중':0,'종료(3개월이내)':1,'종료':2};
+  let filtered = [...rows].filter(r => {
+    if (cs !== 'all' && (r.contractStatus||'계약중') !== cs) return false;
+    if (days !== 'all') { const d=r.days||0; if(days==='1to3'&&!(d>=1&&d<=3))return false; if(days==='4to15'&&!(d>=1&&d<=15))return false; if(days==='16to30'&&!(d>=1&&d<=30))return false; if(days==='over30'&&!(d>30))return false; }
+    if (pay !== 'all' && r.payStatus !== pay) return false;
+    if (search && !(`${r.cno} ${r.nm}`).toLowerCase().includes(search)) return false;
+    if (sf !== 'all') {
+      const rcs = r.contractStatus||'계약중';
+      if (sf==='legal'&&(rcs!=='계약중'||(r.days||0)<20)) return false;
+      if (sf==='overdue'&&(rcs!=='계약중'||r.payStatus!=='past')) return false;
+      if (sf==='highAmt'&&(rcs!=='계약중'||(r.amt||0)<1000000)) return false;
+      if (sf==='partial'&&(rcs!=='계약중'||r.연체구분!=='분납중')) return false;
+      if (sf==='terminated'&&rcs==='계약중') return false;
+      if (sf==='noRecord'&&(rcs!=='계약중'||(r.actionDateStr&&r.actionDateStr!=='-'))) return false;
+    }
+    return true;
+  });
+  filtered.sort((a,b) => { const sa=statusOrder[a.contractStatus||'계약중']??0,sb=statusOrder[b.contractStatus||'계약중']??0; return sa!==sb?sa-sb:(b.days||0)-(a.days||0); });
+  const data = filtered.map(r => ({
+    '계약번호':r.cno,'그룹':r.group||'-','임차인':r.nm||'-','계약정보':r.info||'-',
+    '등급':r.grade||'-','연체일수':r.days||0,'담당자':r.assignee||'-','대응단계':r.actionStep||'-',
+    '납부구분':(r.연체구분==='연체중'||r.연체구분==='분납중')?r.연체구분:'-',
+    '연체금액':r.amt||0,'납부예정일':r.dateStr||'-','계약상태':r.contractStatus||'계약중',
+    '연락처':r.tel||'-','대응일':r.actionDateStr||'-','최근 대응 내용':r.content||'-'
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [{wch:10},{wch:8},{wch:12},{wch:10},{wch:6},{wch:8},{wch:7},{wch:20},{wch:8},{wch:12},{wch:10},{wch:12},{wch:14},{wch:10},{wch:35}];
+  const wb = XLSX.utils.book_new();
+  const today = (()=>{const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');})();
+  XLSX.utils.book_append_sheet(wb, ws, '연체자현황');
+  XLSX.writeFile(wb, `연체자현황_${today}.xlsx`);
+}
+
 function downloadPtExcel() {
   const data = window._ptDisplayRows;
   if (!data || !data.length) { alert('다운로드할 데이터가 없습니다.'); return; }
@@ -3513,7 +3665,9 @@ function buildDlqUI(d1, d2, d3, d4) {
     <!-- 전략보드 -->
     <div id="strategyBoard" class="sb-wrap" style="display:none"></div>
 
-        
+    <!-- 전략 요약 카드 -->
+    <div id="dlqStrategyCards"></div>
+
     <!-- 연체자 테이블 -->
     <div class="dlq-table-section">
       <div class="dlq-table-header-row">
@@ -3521,7 +3675,10 @@ function buildDlqUI(d1, d2, d3, d4) {
           <div class="dlq-section-title no-border">연체자 현황</div>
           <span style="background:#1e40af;color:#fff;border-radius:10px;padding:2px 9px;font-size:12px;font-weight:700">${imdaCount}명</span>
         </div>
-        <input id="dlqSearchInput" type="text" class="dlq-search-input" style="align-self:center" placeholder="이름 또는 계약번호 검색..." oninput="dlqApplyFilter('search',this.value,null)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <input id="dlqSearchInput" type="text" class="dlq-search-input" placeholder="이름 또는 계약번호 검색..." oninput="dlqApplyFilter('search',this.value,null)">
+          <button onclick="downloadDlqExcel()" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ 엑셀</button>
+        </div>
       </div>
       <div class="dlq-filter-bar">
         <div class="dlq-filter-group">
@@ -3621,12 +3778,13 @@ function buildDlqUI(d1, d2, d3, d4) {
     };
   }).filter(Boolean);
   window._dlqTableRows = [...activeRows, ...terminatedRows];
-  window._dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all', contractStatus:'all' };
+  window._dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all', contractStatus:'all', strategyFilter:'all' };
   dlqRenderTableRows();
+  buildStrategyCards();
   buildStrategyBoard(window._dlqTableRows, d3);
 }
 // ── 연체자 테이블 필터 & 렌더 ──────────────────────────────
-let _dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all', contractStatus:'all' };
+let _dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all', contractStatus:'all', strategyFilter:'all' };
 
 function dlqApplyFilter(type, val, btn) {
   if (!window._dlqFilterState) window._dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all' };
@@ -3645,7 +3803,7 @@ function dlqApplyFilter(type, val, btn) {
 function dlqRenderTableRows() {
   const container = document.getElementById('dlqTableContainer');
   if (!container || !window._dlqTableRows) return;
-  const { days, pay, search, delinqType, contractStatus } = window._dlqFilterState || {};
+  const { days, pay, search, delinqType, contractStatus, strategyFilter } = window._dlqFilterState || {};
   const today = new Date(); today.setHours(0,0,0,0);
 
   let rows = window._dlqTableRows.filter(r => {
@@ -3666,6 +3824,15 @@ function dlqRenderTableRows() {
     }
     if (contractStatus && contractStatus !== 'all') {
       if ((r.contractStatus || '계약중') !== contractStatus) return false;
+    }
+    if (strategyFilter && strategyFilter !== 'all') {
+      const cs = r.contractStatus || '계약중';
+      if (strategyFilter === 'legal')      { if (cs !== '계약중' || (r.days||0) < 20) return false; }
+      else if (strategyFilter === 'overdue')    { if (cs !== '계약중' || r.payStatus !== 'past') return false; }
+      else if (strategyFilter === 'highAmt')    { if (cs !== '계약중' || (r.amt||0) < 1000000) return false; }
+      else if (strategyFilter === 'partial')    { if (cs !== '계약중' || r.연체구분 !== '분납중') return false; }
+      else if (strategyFilter === 'terminated') { if (cs === '계약중') return false; }
+      else if (strategyFilter === 'noRecord')   { if (cs !== '계약중' || (r.actionDateStr && r.actionDateStr !== '-')) return false; }
     }
     return true;
   });
