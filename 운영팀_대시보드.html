@@ -205,6 +205,9 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .cr-contract-pdf-btn { background: #fff; color: #1B3976; border: 2px solid #1B3976; cursor: pointer; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; transition: all .2s; }
 .cr-contract-pdf-btn:hover:not(:disabled) { background: #1B3976; color: #fff; }
 .cr-contract-pdf-btn:disabled { opacity: .35; cursor: not-allowed; }
+.cr-back-btn { display:none; align-items:center; gap:6px; background:#f1f5f9; color:#475569; border:1.5px solid #cbd5e1; cursor:pointer; padding:7px 14px; border-radius:8px; font-size:13px; font-weight:600; white-space:nowrap; margin-bottom:10px; }
+.cr-back-btn:hover { background:#e2e8f0; }
+.cr-back-btn.visible { display:flex; }
 .cr-empty { text-align: center; color: #B0BDCE; padding: 60px 0; font-size: 14px; }
 .cr-list-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .cr-list-table th { background: #1A3A5C; color: #fff; padding: 9px 12px; font-weight: 700; text-align: left; font-size: 11px; position: sticky; top: 0; }
@@ -1197,6 +1200,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         </table></div>
       </div>
     </div>
+    <button id="crBackBtn" class="cr-back-btn" onclick="crGoBack()">← 이전 페이지로 돌아가기</button>
     <div id="crResult">
       <div class="cr-empty">계약번호를 입력하고 검색하세요</div>
     </div>
@@ -2320,7 +2324,7 @@ function renderPaymentTargets() {
   };
   const rows = display.map(x => {
     const { r, vacancy, contract } = x;
-    return `<tr onclick="selectContractRow('${r.no}');switchView('contract')">
+    return `<tr onclick="crNavFromView('${r.no}','payment')">
       <td><b>${r.no}</b></td>
       <td>${x.name}</td>
       <td style="color:#5A6A8A;font-size:11px">${x.phone}</td>
@@ -2452,8 +2456,34 @@ function parseKorDate(str) {
   return null;
 }
 
+// ── 이전 페이지로 돌아가기 ──────────────────────────────
+window._crPrevView = null;
+function crGoBack() {
+  var prev = window._crPrevView;
+  window._crPrevView = null;
+  var btn = document.getElementById('crBackBtn');
+  if (btn) btn.classList.remove('visible');
+  if (prev) switchView(prev);
+}
+function crNavFromView(no, fromView) {
+  window._crPrevView = fromView;
+  selectContractRow(no);
+  switchView('contract');
+}
+
 function selectContractRow(no) {
   window._crCurrentNo = no;
+  // 돌아가기 버튼 표시 여부
+  var btn = document.getElementById('crBackBtn');
+  if (btn) {
+    var labels = { payment:'← 수납관리로 돌아가기', dlq:'← 연체관리로 돌아가기' };
+    if (window._crPrevView && labels[window._crPrevView]) {
+      btn.textContent = labels[window._crPrevView];
+      btn.classList.add('visible');
+    } else {
+      btn.classList.remove('visible');
+    }
+  }
   var pdfBtn = document.getElementById('crContractPdfBtn');
   if (pdfBtn) { pdfBtn.disabled = false; pdfBtn.title = '계약서 발행 (계약번호: ' + no + ')'; }
   const contract = contractRawData.find(r => String(r['계약번호']).trim() === no);
@@ -3987,6 +4017,7 @@ function dlqChangeBsFilter(val) {
 
 async function dlqGoToContract(cno) {
   const cnoStr = String(cno).replace(/\.0$/, '').trim();
+  window._crPrevView = 'dlq';
   switchView('contract');
   const start = Date.now();
   while (!(contractRawData && contractRawData.length) && Date.now() - start < 10000) {
