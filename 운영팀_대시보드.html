@@ -1011,9 +1011,9 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 
   <!-- Period tabs -->
   <div class="period-tabs">
-    <button class="period-tab active" onclick="switchPeriod('daily')">데일리</button>
-    <button class="period-tab"        onclick="switchPeriod('weekly')">위클리</button>
-    <button class="period-tab"        onclick="switchPeriod('monthly')">먼슬리</button>
+    <button class="period-tab active" onclick="switchPeriod('daily')">Daily</button>
+    <button class="period-tab"        onclick="switchPeriod('weekly')">Weekly</button>
+    <button class="period-tab"        onclick="switchPeriod('monthly')">Monthly</button>
   </div>
 
   <!-- Date navigation -->
@@ -3032,7 +3032,7 @@ function renderProgressHistory() {
 function renderCkAll() {
   const wrap = document.getElementById('ckWrap');
   wrap.dataset.person = '전체';
-  const pLabelMap = { daily:'데일리', weekly:'위클리', monthly:'먼슬리' };
+  const pLabelMap = { daily:'Daily', weekly:'Weekly', monthly:'Monthly' };
   const periods   = ['daily','weekly','monthly'];
   const pColors   = { '고송미':'#2563A8', '이지희':'#7C3AED', '강휘수':'#059669' };
   const pBg       = { '고송미':'#EFF6FF',  '이지희':'#F5F3FF',  '강휘수':'#F0FDF4'  };
@@ -3041,7 +3041,7 @@ function renderCkAll() {
   // 기간 탭
   document.getElementById('ckPeriodRow').innerHTML = periods.map((p, i) => {
     return `<button class="ck-period-btn${currentPeriod===p?' active':''}"
-              onclick="switchPeriod('${p}')">${['데일리','위클리','먼슬리'][i]}</button>`;
+              onclick="switchPeriod('${p}')">${['Daily','Weekly','Monthly'][i]}</button>`;
   }).join('');
 
   // 3인 병렬 카드
@@ -3113,7 +3113,7 @@ function renderCkFull() {
   wrap.dataset.person = currentPerson;
 
   const periods = ['daily','weekly','monthly'];
-  const pLabels = ['데일리','위클리','먼슬리'];
+  const pLabels = ['Daily','Weekly','Monthly'];
   const periodRowEl = document.getElementById('ckPeriodRow');
   periodRowEl.innerHTML = periods.map((p, i) => {
     const tasks = TASKS[currentPerson][p] || [];
@@ -3132,7 +3132,7 @@ function renderCkFull() {
   const total = tasks.length;
   const pct   = total === 0 ? 0 : Math.round(done/total*100);
 
-  const pLabelMap = { daily:'데일리', weekly:'위클리', monthly:'먼슬리' };
+  const pLabelMap = { daily:'Daily', weekly:'Weekly', monthly:'Monthly' };
 
   let bodyHtml = '';
   if (total === 0) {
@@ -3196,7 +3196,7 @@ function ckToggle(taskId) {
 }
 
 function ckReset() {
-  const labels = { daily:'데일리', weekly:'위클리', monthly:'먼슬리' };
+  const labels = { daily:'Daily', weekly:'Weekly', monthly:'Monthly' };
   if (!confirm(`${currentPerson}의 ${labels[currentPeriod]} 체크리스트를 초기화할까요?`)) return;
   localStorage.removeItem(storageKey(currentPerson, currentPeriod));
   renderCkFull();
@@ -4599,7 +4599,7 @@ function exportLogToCSV() {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  const periodLabel = currentPeriod==='daily'?'데일리':currentPeriod==='weekly'?'위클리':'먼슬리';
+  const periodLabel = currentPeriod==='daily'?'Daily':currentPeriod==='weekly'?'Weekly':'Monthly';
   const personLabel = currentLogPerson==='all'?'전체':currentLogPerson;
   const catLabel    = currentLogCat==='all'?'전체':currentLogCat;
   a.href = url; a.download = `KRG_대응내역_${periodLabel}_${personLabel}_${catLabel}.csv`;
