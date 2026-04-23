@@ -5271,7 +5271,8 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '<td>서비스수수료확인 (인)</td></tr></table>'
     + '<div class="fee-note">*첫 서비스 수수료 납입기한은 임대차계약 시작일의 3영업일 전까지</div>'
     + '<div class="fee-note">*퇴실할 때 남은 계약기간의 수수료를 일괄 지급한다.</div></div>'
-    // 갑
+    // 갑+을+병 전체: 반드시 같은 페이지에 유지
+    + '<div style="break-inside:avoid;page-break-inside:avoid">'
     + '<div class="sig-box" style="border:2px solid #1e3a8a;margin-top:10px">'
     + '<div class="sig-ttl" style="background:#1e3a8a">케이알지그룹(주)(갑)</div>'
     + '<div style="display:grid;grid-template-columns:1fr 70px;margin-top:6px">'
@@ -5301,6 +5302,7 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:8px;border-left:1px dashed #c0c0c0;margin-left:6px">서명<br>혹은 인</div>'
     + '</div></div>'
     + cG_buildCoParty(hasCoParty, coTitle, d)
+    + '</div>'  // break-inside wrapper 닫기
     + '</div>';
 
   // ── Page 2: 개인정보 수집/제공 동의서 ─────────────────
@@ -5372,14 +5374,19 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '<div class="ck-item"><div class="ck-num">5</div><div class="ck-chk"></div><div>계약자는 중도퇴실 시, 계약해지가 완료(후임세입자 입주 또는 임대인 합의)까지 임대료 납부 책임이 있으며, 중개보수료·원상회복·공과금 등 퇴실 정산이 완료되지 않을 시 계약해지되지 않습니다.<div class="ck-sub">⚠ 후임 세입자 미확보 시 책임 기간이 연장될 수 있음</div></div></div>'
     + ''
     + '<div style="margin-top:18px;font-size:12pt;font-weight:700;text-align:center;color:#1B3976">기타 공동계약자</div>'
-    + '<div class="sig-box" style="margin-top:10px"><div class="sig-ttl" style="background:#374151">공동명의계약인2</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 80px">'
-    + '<table style="width:100%;border-collapse:collapse;font-size:8.5pt">'
-    + '<tr><td style="width:82px;font-weight:600;padding:3px 6px">주소</td><td style="padding:3px 6px;height:22px"></td></tr>'
-    + '<tr><td style="font-weight:600;padding:3px 6px">연락처</td><td style="padding:3px 6px"></td></tr>'
-    + '<tr><td style="font-weight:600;padding:3px 6px">주민등록번호</td><td style="padding:3px 6px"></td></tr>'
-    + '<tr><td style="font-weight:600;padding:3px 6px">이름(법인명)</td><td style="padding:3px 6px"></td></tr>'
-    + '</table><div style="text-align:right;font-size:8pt;color:#6b7280;padding-top:10px">서명 혹은 인</div></div></div>'
+    + '<div class="sig-box" style="border:2px solid #4b5563;margin-top:10px;break-inside:avoid;page-break-inside:avoid">'
+    + '<div class="sig-ttl" style="background:#4b5563">공동명의계약인</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 70px;margin-top:6px">'
+    + '<table class="sg-tbl">'
+    + '<colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>'
+    + '<tr><td class="sg-lbl">주소</td><td colspan="3" style="height:22px"></td></tr>'
+    + '<tr><td class="sg-lbl">연락처</td><td></td><td class="sg-lbl">국적</td><td>내국인</td></tr>'
+    + '<tr><td class="sg-lbl">주민등록번호</td><td></td><td class="sg-lbl">긴급연락처</td><td></td></tr>'
+    + '<tr><td class="sg-lbl" rowspan="2">이름(법인명)</td><td rowspan="2" style="border:1px dashed #c0c0c0;padding:4px 7px"></td><td class="sg-lbl">관계</td><td></td></tr>'
+    + '<tr><td class="sg-lbl">이름</td><td></td></tr>'
+    + '</table>'
+    + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:8px;border-left:1px dashed #c0c0c0;margin-left:6px">서명<br>혹은 인</div>'
+    + '</div></div>'
     + '</div>';
 
   // ── 최종 조합 ──────────────────────────────────────────
