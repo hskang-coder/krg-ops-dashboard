@@ -5391,6 +5391,39 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '</div>';
 
   // ── 최종 조합 ──────────────────────────────────────────
+  // 1페이지 자동 스케일 스크립트
+  var autoScaleScript = '<script>'
+    + 'window.addEventListener("load", function() {'
+    + '  var page = document.querySelector(".cG-page");'
+    + '  if (!page) return;'
+    + '  var pxPerMm = 96 / 25.4;'
+    + '  var availH = (297 - 26) * pxPerMm;'  // 271mm 가용 높이
+    + '  var contentH = page.scrollHeight;'
+    + '  if (contentH > availH) {'
+    + '    var scale = (availH / contentH) * 0.98;'
+    + '    scale = Math.max(0.72, Math.min(1, scale));'  // 최소 72% 보장
+    + '    page.style.transformOrigin = "top left";'
+    + '    page.style.transform = "scale(" + scale.toFixed(3) + ")";'
+    + '    page.style.marginBottom = Math.round(contentH * (scale - 1)) + "px";'
+    + '    page.style.minHeight = "auto";'
+    + '  }'
+    + '  window.addEventListener("beforeprint", function() {'
+    + '    var pg = document.querySelector(".cG-page");'
+    + '    if (!pg) return;'
+    + '    var aH = (297 - 26) * (96/25.4);'
+    + '    var cH = pg.scrollHeight;'
+    + '    if (cH > aH) {'
+    + '      var sc = (aH / cH) * 0.98;'
+    + '      sc = Math.max(0.72, Math.min(1, sc));'
+    + '      pg.style.transformOrigin = "top left";'
+    + '      pg.style.transform = "scale(" + sc.toFixed(3) + ")";'
+    + '      pg.style.marginBottom = Math.round(cH * (sc - 1)) + "px";'
+    + '      pg.style.minHeight = "auto";'
+    + '    }'
+    + '  });'
+    + '});'
+    + '<\/script>';
+
   return '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
     + '<title>개런티즈 계약서 - ' + d.contractNo + '</title>'
     + '<link rel="preconnect" href="https://fonts.googleapis.com">'
@@ -5399,6 +5432,7 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '<button class="print-btn no-print" onclick="window.print()">🖨️ PDF 저장 / 인쇄</button>'
     + p1 + p2 + p3 + p4
     + cG_buildTerms()
+    + autoScaleScript
     + '</body></html>';
 }
 
