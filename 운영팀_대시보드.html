@@ -5057,30 +5057,36 @@ function cG_buildCoParty(hasCoParty, coTitle, d) {
     coEmergRel  = (cep[0] || '').trim();
     coEmergName = (cep[1] || '').trim();
   }
-  var inner = '<div style="display:grid;grid-template-columns:1fr 80px;gap:5px">'
-    + '<table style="width:100%;border-collapse:collapse;font-size:8.5pt">';
+  var title  = hasCoParty ? coTitle : '공동계약인(병)';
+  var rows   = '';
   if (hasCoParty) {
-    inner += '<tr><td style="width:82px;font-weight:600;padding:3px 6px">주소</td><td style="padding:3px 6px" colspan="3">' + (d.coAddr || '') + '</td></tr>'
-      + '<tr><td style="font-weight:600;padding:3px 6px">연락처</td><td style="padding:3px 6px">' + (d.coPhone || '') + '</td>'
-      + '<td style="width:52px;font-weight:600;padding:3px 6px">국적</td><td style="padding:3px 6px">내국인 한국</td></tr>'
-      + '<tr><td style="font-weight:600;padding:3px 6px">주민등록번호</td><td style="padding:3px 6px">*******</td><td colspan="2"></td></tr>'
-      + '<tr><td style="font-weight:600;padding:3px 6px">이름(법인명)</td><td style="padding:3px 6px;font-weight:600">' + (d.coName || '') + '</td>'
-      + '<td style="font-weight:600;padding:3px 6px">긴급연락처</td>'
-      + '<td style="padding:3px 6px">' + (d.coEmergPhone || '') + '<br><small style="color:#6b7280">관계 ' + coEmergRel + ' 이름 ' + coEmergName + '</small></td></tr>';
+    rows += '<tr><td class="sg-lbl">주소</td><td colspan="3">' + (d.coAddr||'') + '</td></tr>'
+      + '<tr><td class="sg-lbl">연락처</td><td>' + (d.coPhone||'') + '</td>'
+      +   '<td class="sg-lbl">국적</td><td>내국인 한국</td></tr>'
+      + '<tr><td class="sg-lbl">주민등록번호</td><td>*******</td>'
+      +   '<td class="sg-lbl">긴급연락처</td><td>' + (d.coEmergPhone||'') + '</td></tr>'
+      + '<tr><td class="sg-lbl" rowspan="2">이름(법인명)</td><td rowspan="2" style="border:1px dashed #c0c0c0;padding:4px 7px;font-weight:600">' + (d.coName||'') + '</td>'
+      +   '<td class="sg-lbl">관계</td><td>' + coEmergRel + '</td></tr>'
+      + '<tr><td class="sg-lbl">이름</td><td>' + coEmergName + '</td></tr>';
   } else {
-    inner += '<tr><td style="width:82px;font-weight:600;padding:3px 6px">주소</td><td style="padding:3px 6px;height:22px" colspan="3"></td></tr>'
-      + '<tr><td style="font-weight:600;padding:3px 6px">연락처</td><td style="padding:3px 6px"></td>'
-      + '<td style="width:52px;font-weight:600;padding:3px 6px">국적</td><td style="padding:3px 6px">내국인 한국</td></tr>'
-      + '<tr><td style="font-weight:600;padding:3px 6px">주민등록번호</td><td colspan="3" style="padding:3px 6px"></td></tr>'
-      + '<tr><td style="font-weight:600;padding:3px 6px">이름(법인명)</td><td></td>'
-      + '<td style="font-weight:600;padding:3px 6px">긴급연락처</td>'
-      + '<td style="padding:3px 6px"><small style="color:#6b7280">관계 &nbsp; 이름</small></td></tr>';
+    rows += '<tr><td class="sg-lbl">주소</td><td colspan="3" style="height:22px"></td></tr>'
+      + '<tr><td class="sg-lbl">연락처</td><td></td>'
+      +   '<td class="sg-lbl">국적</td><td>내국인 한국</td></tr>'
+      + '<tr><td class="sg-lbl">주민등록번호</td><td></td>'
+      +   '<td class="sg-lbl">긴급연락처</td><td></td></tr>'
+      + '<tr><td class="sg-lbl" rowspan="2">이름(법인명)</td><td rowspan="2" style="border:1px dashed #c0c0c0;padding:4px 7px"></td>'
+      +   '<td class="sg-lbl">관계</td><td></td></tr>'
+      + '<tr><td class="sg-lbl">이름</td><td></td></tr>';
   }
-  inner += '</table><div style="text-align:right;font-size:8pt;color:#6b7280;padding-top:10px">서명 혹은 인</div></div>';
-  return '<div style="border:1.5px solid #e5e7eb;border-radius:7px;padding:9px 13px;margin-top:7px">'
-    + '<div style="font-size:8.5pt;font-weight:700;color:#fff;background:#d97706;padding:4px 12px;border-radius:4px;display:inline-block;margin-bottom:7px">'
-    + (hasCoParty ? coTitle : '공동계약인(병)') + '</div>'
-    + inner + '</div>';
+  return '<div class="sig-box" style="border:2px solid #b45309;margin-top:7px;break-inside:avoid;page-break-inside:avoid">'
+    + '<div class="sig-ttl" style="background:#b45309">' + title + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 70px;margin-top:6px">'
+    + '<table class="sg-tbl">'
+    + '<colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>'
+    + rows
+    + '</table>'
+    + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:8px;border-left:1px dashed #c0c0c0;margin-left:6px">서명<br>혹은 인</div>'
+    + '</div></div>';
 }
 
 // ── 약관 (제1조~제17조) ───────────────────────────────────
@@ -5104,18 +5110,22 @@ function cG_buildTerms() {
     ['제16조','(손해배상)','일방 당사자는 자신의 책임 있는 사유로 본 계약의 의무사항을 준수하지 못하여 상대방에게 손해가 발생한 경우, 상대방에 대하여 그 손해 일체를 배상할 책임이 있다.'],
     ['제17조','(합의관할)','본 계약에 따른 분쟁이 발생할 경우 당사자들 간 합의에 의해 해결하되, 합의에 의한 해결이 불가능할 경우 "갑"의 본점소재지 관할법원을 전속적 합의관할법원으로 하여 소송으로 해결한다.']
   ];
-  // 조항 전체를 자연스럽게 흐르도록 단일 컨테이너 사용
-  var html = '<div style="padding:13mm 15mm;break-before:page;page-break-before:always">'
-    + '<div class="cG-trm-h">개런티즈 서비스 계약서 약관</div>';
-  for (var i = 0; i < arts.length; i++) {
-    var a = arts[i];
-    var lines = a[2].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n');
-    html += '<div class="cG-art" style="break-inside:avoid;page-break-inside:avoid"><h3>' + a[0] + ' ' + a[1] + '</h3>';
-    for (var k = 0; k < lines.length; k++) html += '<p>' + lines[k] + '</p>';
-    html += '</div>';
+  // 약관: 2조씩 페이지 배치, 가독성 우선
+  var pages = '';
+  for (var i = 0; i < arts.length; i += 2) {
+    var chunk = arts.slice(i, i + 2);
+    var pg = '<div class="cG-page"><div class="cG-trm-h">개런티즈 서비스 계약서 약관</div>';
+    for (var j = 0; j < chunk.length; j++) {
+      var a = chunk[j];
+      var lines = a[2].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n');
+      pg += '<div class="cG-art" style="break-inside:avoid;page-break-inside:avoid;margin-bottom:22px"><h3>' + a[0] + ' ' + a[1] + '</h3>';
+      for (var k = 0; k < lines.length; k++) pg += '<p style="margin-bottom:5px;line-height:1.85">' + lines[k] + '</p>';
+      pg += '</div>';
+    }
+    pg += '</div>';
+    pages += pg;
   }
-  html += '</div>';
-  return html;
+  return pages;
 }
 
 // ── 메인 HTML 빌더 ────────────────────────────────────────
@@ -5164,8 +5174,11 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '.fee-ttl{font-size:9.5pt;font-weight:700;background:#1B3976;color:#fff;padding:4px 13px;border-radius:4px;display:inline-block;margin-bottom:9px}'
     + '.fee-amt{font-size:11pt;font-weight:700;color:#1B3976}'
     + '.fee-note{font-size:7.5pt;color:#6b7280;margin-top:4px}'
-    + '.sig-box{border:1.5px solid #e5e7eb;border-radius:7px;padding:9px 13px;margin-top:7px}'
-    + '.sig-ttl{font-size:8.5pt;font-weight:700;color:#fff;padding:4px 12px;border-radius:4px;display:inline-block;margin-bottom:7px}'
+    + '.sig-box{border-radius:7px;padding:9px 13px;margin-top:7px}'
+    + '.sig-ttl{font-size:8.5pt;font-weight:700;color:#fff;padding:5px 14px;border-radius:4px 4px 0 0;display:inline-block;margin-bottom:0;letter-spacing:.3px}'
+    + '.sg-tbl{width:100%;border-collapse:collapse;font-size:8.5pt}'
+    + '.sg-tbl td{border:1px dashed #c0c0c0;padding:4px 7px;vertical-align:middle}'
+    + '.sg-lbl{background:#f5f6fa;font-weight:600;color:#374151;white-space:nowrap;width:22%}'
     + '.cs-ttl{font-size:15pt;font-weight:700;color:#1B3976;text-align:center;margin-bottom:6px}'
     + '.cs-sub{font-size:7.5pt;color:#555;text-align:center;line-height:1.6;margin-bottom:14px}'
     + '.cs-sec{border:1px solid #d1d5db;border-radius:6px;margin-bottom:9px;overflow:hidden}'
@@ -5181,9 +5194,9 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '.ck-chk{width:14px;height:14px;border:1.5px solid #9ca3af;border-radius:2px;flex-shrink:0;margin-top:2px}'
     + '.ck-sub{background:#fef3c7;border-left:3px solid #f59e0b;padding:4px 8px;margin-top:5px;font-size:7.5pt;border-radius:0 4px 4px 0}'
     + '.cG-trm-h{font-size:11pt;font-weight:700;color:#1B3976;margin-bottom:14px;padding-bottom:7px;border-bottom:2px solid #1B3976}'
-    + '.cG-art{margin-bottom:14px;font-size:8pt;line-height:1.75}'
-    + '.cG-art h3{font-size:8.5pt;font-weight:700;color:#1B3976;margin-bottom:5px}'
-    + '.cG-art p{margin-bottom:4px;padding-left:4px}';
+    + '.cG-art{margin-bottom:20px;font-size:9pt;line-height:1.85}'
+    + '.cG-art h3{font-size:10pt;font-weight:700;color:#1B3976;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #e5e7eb}'
+    + '.cG-art p{margin-bottom:5px;padding-left:6px;color:#1a1a1a}';
 
   // ── Page 1: 메인 계약서 ────────────────────────────────
   var p1 = '<div class="cG-page">'
@@ -5260,25 +5273,34 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '<div class="fee-note">*첫 서비스 수수료 납입기한은 임대차계약 시작일의 3영업일 전까지</div>'
     + '<div class="fee-note">*퇴실할 때 남은 계약기간의 수수료를 일괄 지급한다.</div></div>'
     // 갑
-    + '<div class="sig-box"><div class="sig-ttl" style="background:#1B3976">케이알지그룹(주)(갑)</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 80px">'
-    + '<table style="width:100%;border-collapse:collapse;font-size:8.5pt">'
-    + '<tr><td style="width:82px;font-weight:600;padding:3px 6px">주소</td><td style="padding:3px 6px">충남 천안시 동남구 목천읍 천정1길 227-14</td></tr>'
-    + '<tr><td style="font-weight:600;padding:3px 6px">연락처</td><td style="padding:3px 6px">02-6933-0099</td></tr>'
-    + '<tr><td style="font-weight:600;padding:3px 6px">이름(법인명)</td><td style="padding:3px 6px">케이알지그룹 주식회사</td></tr>'
-    + '</table><div style="text-align:right;font-size:8pt;color:#6b7280;padding-top:10px">서명 혹은 인</div></div></div>'
+    + '<div class="sig-box" style="border:2px solid #1e3a8a;margin-top:10px">'
+    + '<div class="sig-ttl" style="background:#1e3a8a">케이알지그룹(주)(갑)</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 70px;margin-top:6px">'
+    + '<table class="sg-tbl">'
+    + '<colgroup><col style="width:22%"><col style="width:78%"></colgroup>'
+    + '<tr><td class="sg-lbl">주소</td><td>충남 천안시 동남구 목천읍 천정1길 227-14</td></tr>'
+    + '<tr><td class="sg-lbl">연락처</td><td>02-6933-0099</td></tr>'
+    + '<tr><td class="sg-lbl">이름(법인명)</td><td>케이알지그룹 주식회사</td></tr>'
+    + '</table>'
+    + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:8px;border-left:1px dashed #c0c0c0;margin-left:6px">서명<br>혹은 인</div>'
+    + '</div></div>'
     // 을
-    + '<div class="sig-box"><div class="sig-ttl" style="background:#374151">계약인1(을)</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 80px">'
-    + '<table style="width:100%;border-collapse:collapse;font-size:8.5pt">'
-    + '<tr><td style="width:82px;font-weight:600;padding:3px 6px">주소</td><td style="padding:3px 6px" colspan="3">' + (d.tenantAddr||'') + '</td></tr>'
-    + '<tr><td style="font-weight:600;padding:3px 6px">연락처</td><td style="padding:3px 6px">' + (d.tenantPhone||'') + '</td>'
-    + '<td style="width:52px;font-weight:600;padding:3px 6px">국적</td><td style="padding:3px 6px">' + (d.natType||'내국인') + ' ' + (d.nationality||'한국') + '</td></tr>'
-    + '<tr><td style="font-weight:600;padding:3px 6px">주민등록번호</td><td style="padding:3px 6px">*******</td><td colspan="2"></td></tr>'
-    + '<tr><td style="font-weight:600;padding:3px 6px">이름(법인명)</td><td style="padding:3px 6px;font-weight:600">' + (d.tenantName||'') + '</td>'
-    + '<td style="font-weight:600;padding:3px 6px">긴급연락처</td>'
-    + '<td style="padding:3px 6px">' + (d.emergPhone||'') + '<br><small style="color:#6b7280">관계 ' + emergRel + ' 이름 ' + emergName + '</small></td></tr>'
-    + '</table><div style="text-align:right;font-size:8pt;color:#6b7280;padding-top:10px">서명 혹은 인</div></div></div>'
+    + '<div class="sig-box" style="border:2px solid #5b21b6;margin-top:7px">'
+    + '<div class="sig-ttl" style="background:#5b21b6">계약인1(을)</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 70px;margin-top:6px">'
+    + '<table class="sg-tbl">'
+    + '<colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>'
+    + '<tr><td class="sg-lbl">주소</td><td colspan="3">' + (d.tenantAddr||'') + '</td></tr>'
+    + '<tr><td class="sg-lbl">연락처</td><td>' + (d.tenantPhone||'') + '</td>'
+    +   '<td class="sg-lbl">국적</td><td>' + (d.natType||'내국인') + ' ' + (d.nationality||'한국') + '</td></tr>'
+    + '<tr><td class="sg-lbl">주민등록번호</td><td>*******</td>'
+    +   '<td class="sg-lbl">긴급연락처</td><td>' + (d.emergPhone||'') + '</td></tr>'
+    + '<tr><td class="sg-lbl" rowspan="2">이름(법인명)</td><td rowspan="2" style="border:1px dashed #c0c0c0;padding:4px 7px;font-weight:600">' + (d.tenantName||'') + '</td>'
+    +   '<td class="sg-lbl">관계</td><td>' + emergRel + '</td></tr>'
+    + '<tr><td class="sg-lbl">이름</td><td>' + emergName + '</td></tr>'
+    + '</table>'
+    + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:8px;border-left:1px dashed #c0c0c0;margin-left:6px">서명<br>혹은 인</div>'
+    + '</div></div>'
     + cG_buildCoParty(hasCoParty, coTitle, d)
     + '</div>';
 
