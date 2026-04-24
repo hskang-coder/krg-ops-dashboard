@@ -1645,20 +1645,19 @@ function findColIdx(labels, keywords, fallbackIdx) {
 
 // 연체관리(Daily Report) 시트 파서
 // 컬럼: 대응일(A=0) | 계약번호(B=1) | 입금예정일(C=2) | 청구서명(D=3) | 단계(E=4) | 대응 상세내용(F=5)
+// 연체관리(Daily Report) 시트 파서
+// 실제 시트 컬럼: A=대응일(0) | B=계약번호(1) | C=입금인(2) | D=입금예정(3) | E=대응 상세내용(4) | F=담당자(5)
 function parseDailyReport(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
   const labels = cols.map(c => (c.label||c.id||'').trim());
-  // 헤더 매칭 + 절대 위치 fallback (헤더 사라져도 안전)
-  const dateIdx    = findColIdx(labels, ['대응일','일자','날짜'],     0);
-  const noIdx      = findColIdx(labels, ['계약번호','계약'],          1);
-  const payDateIdx = findColIdx(labels, ['입금예정','납기일','납부예정'], 2);
-  const billIdx    = findColIdx(labels, ['청구서명','청구'],          3);
-  const contentIdx = findColIdx(labels, ['대응 상세','대응상세','내용'], 5);
-  const stepIdx    = 4; // E열 (0-based) = 단계 (절대 고정)
-  return (rows||[]).map(row => {
-    const c = row.c || [];
-    const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
+  // 헤더 매칭 + 절대 위치 fallback (헤더 사라지거나 필터 걸려도 안전)
+  const dateIdx    = findColIdx(labels, ['대응일','일자','날짜'],         0);  // A열
+  const noIdx      = findColIdx(labels, ['계약번호','계약'],              1);  // B열
+  const payDateIdx = findColIdx(labels, ['입금예정','납기일','납부예정'],   3);  // D열
+  const contentIdx = findColIdx(labels, ['대응 상세','대응상세','대응내용','내용'], 4);  // E열
+  const billIdx    = findColIdx(labels, ['청구서명','청구'],            -1);  // 시트에 없음
+  const stepIdx    = findColIdx(labels, ['단계','step'],                -1);  // 시트에 없음
     const no = cell(noIdx);
     if (!no || !cell(dateIdx)) return null;
     return {
