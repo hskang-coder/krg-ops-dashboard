@@ -2645,6 +2645,13 @@ function renderPaymentTargets() {
     if (toD   && d > toD)   return false;
     return true;
   });
+  // 계약상태 '삭제' / '계약철회' / '종료' 제외 (사용자 요청)
+  list = list.filter(r => {
+    const contract = contractRawData.find(c => String(c['계약번호']||'').trim() === r.no);
+    if (!contract) return true; // 계약 정보 없으면 통과
+    const cs = String(contract['계약상태']||'').trim();
+    return !cs.includes('삭제') && !cs.includes('계약철회') && !cs.includes('종료');
+  });
   // 계약번호 기준 중복 제거 (납기일 최신 1건만 유지)
   const seenNos = new Map();
   list.forEach(r => {
@@ -3160,7 +3167,7 @@ function renderContractRecord(c, payments, responses = []) {
       </div>
       <div class="cr-info-section">
         <div class="cr-info-title">금액 정보</div>
-        <div class="cr-field"><span class="cr-field-label">보증금</span><span class="cr-field-val">${fmtMoney(vacancyInfo.deposit||c['보증금(원)'])}<span style="color:#8A9AB5;font-weight:500;margin-left:10px;font-size:11px">/ 원상회복담보금 ${fmtMoney(vacancyInfo.depositRecov)}</span></span></div>
+        <div class="cr-field"><span class="cr-field-label">보증금</span><span class="cr-field-val">${fmtMoney(vacancyInfo.deposit||c['보증금(원)'])}<span style="color:#8A9AB5;font-weight:500;margin-left:36px;font-size:11px">/ 원상회복담보금 ${fmtMoney(vacancyInfo.depositRecov)}</span></span></div>
         <div class="cr-field"><span class="cr-field-label">월세</span><span class="cr-field-val">${fmtMoney(c['월세'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">관리비</span><span class="cr-field-val">${fmtMoney(c['관리비'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">부가세</span><span class="cr-field-val">${fmtMoney(c['부가세'])}</span></div>
@@ -3171,7 +3178,7 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-field"><span class="cr-field-label">임대인(갑)</span><span class="cr-field-val">${fmt(c['임대인명'])}${(()=>{const p=fmt(c['임대인연락처']);return p&&p!=='-'?` <span style="color:#5A6A8A;font-weight:500;margin-left:4px">(${p})</span>`:'';})()}</span></div>
         <div class="cr-field"><span class="cr-field-label">임대인 계좌정보</span><span class="cr-field-val" style="font-size:11px">${(landlordAccountMap[String(c['계약번호']||'').trim()]||'-')}</span></div>
         <div class="cr-field"><span class="cr-field-label">계약자1(을)</span><span class="cr-field-val">${fmt(vacancyInfo.tenantNameC||c['임차인'])}${(()=>{const p=fmt(c['임차인휴대폰']);return p&&p!=='-'?` <span style="color:#5A6A8A;font-weight:500;margin-left:4px">(${p})</span>`:'';})()}</span></div>
-        ${(()=>{const t=String(vacancyInfo.coType||'').trim();const n=fmt(vacancyInfo.coName);const p=fmt(vacancyInfo.coPhone);if(!t||!n||n==='-')return '';const ph=p&&p!=='-'?` <span style="color:#5A6A8A;font-weight:500;margin-left:4px">(${p})</span>`:'';if(t.includes('공동전차인'))return `<div class="cr-field"><span class="cr-field-label">계약자2(을)</span><span class="cr-field-val">${n}${ph}</span></div>`;if(t.includes('연대보증인'))return `<div class="cr-field"><span class="cr-field-label">연대보증인(병)</span><span class="cr-field-val">${n}${ph}</span></div>`;return '';})()}
+        ${(()=>{const t=String(vacancyInfo.coType||'').trim();const n=fmt(vacancyInfo.coName);const p=fmt(vacancyInfo.coPhone);const ph=p&&p!=='-'?` <span style="color:#5A6A8A;font-weight:500;margin-left:4px">(${p})</span>`:'';const val=(n&&n!=='-')?`${n}${ph}`:'<span style="color:#B0BDCE">—</span>';if(t.includes('공동전차인'))return `<div class="cr-field"><span class="cr-field-label">계약자2(을)</span><span class="cr-field-val">${val}</span></div>`;return `<div class="cr-field"><span class="cr-field-label">연대보증인(병)</span><span class="cr-field-val">${val}</span></div>`;})()}
         <div class="cr-field"><span class="cr-field-label">긴급연락처</span><span class="cr-field-val">${fmt(c['긴급연락처'])}</span></div>
       </div>
       <div class="cr-info-section">
