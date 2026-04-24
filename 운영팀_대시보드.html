@@ -2069,6 +2069,7 @@ function parseIncomeSheet(resp) {
   const typeIdx    = findColIdx(labels, ['계약종류','종류'],          -1);
   const condIdx    = findColIdx(labels, ['납부조건','납부방법','조건'], -1);
   const payStatusIdx = 19; // T열 (0-based) = 납부상태 (절대 고정)
+  const contractStatusIdx = 13; // N열 (0-based) = 계약상태 (계약중/종료/삭제/계약 철회/입주예정)
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
@@ -2081,7 +2082,8 @@ function parseIncomeSheet(resp) {
       dueDateRaw: c[dueDateIdx] ? (c[dueDateIdx].v || '') : '',
       contractType: cell(typeIdx),
       payCondition: cell(condIdx),
-      payStatus:  cell(payStatusIdx)
+      payStatus:  cell(payStatusIdx),
+      contractStatus: cell(contractStatusIdx)
     };
   }).filter(Boolean);
 }
@@ -2645,13 +2647,9 @@ function renderPaymentTargets() {
     if (toD   && d > toD)   return false;
     return true;
   });
-  // 계약상태 '삭제' / '계약철회' / '종료' 제외 (사용자 요청)
-  list = list.filter(r => {
-    const contract = contractRawData.find(c => String(c['계약번호']||'').trim() === r.no);
-    if (!contract) return true; // 계약 정보 없으면 통과
-    const cs = String(contract['계약상태']||'').trim();
-    return !cs.includes('삭제') && !cs.includes('계약철회') && !cs.includes('종료');
-  });
+  // 수납관리는 gid=131074722 N열 값이 '계약중'인 경우만 출력 (사용자 요청)
+  // 삭제/종료/계약 철회/입주예정 등은 모두 제외
+  list = list.filter(r => String(r.contractStatus||'').trim() === '계약중');
   // 계약번호 기준 중복 제거 (납기일 최신 1건만 유지)
   const seenNos = new Map();
   list.forEach(r => {
