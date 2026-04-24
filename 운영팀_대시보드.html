@@ -2329,12 +2329,7 @@ function buildDlqNoticeHtml(rows, contractDetails) {
     + '<title>월세 납부 독촉 및 연체 안내문</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">'
     + '<style>'+css+'</style></head><body>'
-    + '<div class="dl-btns no-print" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:999">'
-    + '<button onclick="window.print()" style="background:#1a1a1a;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖨️ 인쇄 / PDF 저장</button>'
-    + '<button class="jpg-btn" onclick="downloadAsJpg()" style="background:#0d9488;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖼️ JPG 저장</button>'
-    + '</div>'
-    + '<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>'
-    + '<script>function downloadAsJpg(){var pages=document.querySelectorAll(".np");if(!pages.length){alert("저장할 페이지가 없습니다.");return;}if(typeof html2canvas==="undefined"){alert("html2canvas 로딩 중입니다. 1~2초 후 다시 시도하세요.");return;}var btn=document.querySelector(".jpg-btn");var original=btn?btn.textContent:"";if(btn){btn.disabled=true;btn.textContent="\u23F3 \uBCC0\uD658 \uC911...";}var title=(document.title||"document").replace(/[^a-z0-9\uAC00-\uD7AF\-_]/gi,"_");var idx=0;function next(){if(idx>=pages.length){if(btn){btn.disabled=false;btn.textContent=original;}return;}html2canvas(pages[idx],{scale:2,useCORS:true,backgroundColor:"#ffffff",logging:false}).then(function(canvas){var suffix=pages.length>1?"_"+(idx+1):"";var link=document.createElement("a");link.download=title+suffix+".jpg";link.href=canvas.toDataURL("image/jpeg",0.95);document.body.appendChild(link);link.click();document.body.removeChild(link);idx++;setTimeout(next,400);}).catch(function(e){console.error(e);alert("JPG 저장 중 오류: "+e.message);if(btn){btn.disabled=false;btn.textContent=original;}});}next();}<\/script>'
+    + '<button class="print-btn no-print" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>'
     + pages + '</body></html>';
 }
 
@@ -2446,12 +2441,7 @@ function buildDlqSmsNoticeHtml(rows, contractDetails) {
     + '<title>민사소송 예정 통보</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">'
     + '<style>'+css+'</style></head><body>'
-    + '<div class="dl-btns no-print" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:999">'
-    + '<button onclick="window.print()" style="background:#1a1a1a;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖨️ 인쇄 / PDF 저장</button>'
-    + '<button class="jpg-btn" onclick="downloadAsJpg()" style="background:#0d9488;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖼️ JPG 저장</button>'
-    + '</div>'
-    + '<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>'
-    + '<script>function downloadAsJpg(){var pages=document.querySelectorAll(".np");if(!pages.length){alert("저장할 페이지가 없습니다.");return;}if(typeof html2canvas==="undefined"){alert("html2canvas 로딩 중입니다. 1~2초 후 다시 시도하세요.");return;}var btn=document.querySelector(".jpg-btn");var original=btn?btn.textContent:"";if(btn){btn.disabled=true;btn.textContent="\u23F3 \uBCC0\uD658 \uC911...";}var title=(document.title||"document").replace(/[^a-z0-9\uAC00-\uD7AF\-_]/gi,"_");var idx=0;function next(){if(idx>=pages.length){if(btn){btn.disabled=false;btn.textContent=original;}return;}html2canvas(pages[idx],{scale:2,useCORS:true,backgroundColor:"#ffffff",logging:false}).then(function(canvas){var suffix=pages.length>1?"_"+(idx+1):"";var link=document.createElement("a");link.download=title+suffix+".jpg";link.href=canvas.toDataURL("image/jpeg",0.95);document.body.appendChild(link);link.click();document.body.removeChild(link);idx++;setTimeout(next,400);}).catch(function(e){console.error(e);alert("JPG 저장 중 오류: "+e.message);if(btn){btn.disabled=false;btn.textContent=original;}});}next();}<\/script>'
+    + '<button class="print-btn no-print" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>'
     + pages + '</body></html>';
 }
 
