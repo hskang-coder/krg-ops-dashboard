@@ -1732,6 +1732,7 @@ function parseVacancySheet(resp) {
   const coTypeIdx       = 14; // O열 (0-based) = 공동전차인/연대보증인 구분
   const coNameIdx       = 51; // AZ열 (0-based) = 계약자2/연대보증인 이름
   const coPhoneIdx      = 52; // BA열 (0-based) = 계약자2/연대보증인 연락처
+  const tenantNameCIdx  = 2;  // C열 (0-based) = 임차인명 (계약자1)
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -1757,7 +1758,8 @@ function parseVacancySheet(resp) {
       depositRecov: cell(depositRecovIdx), // AF열: 원상회복담보금
       coType:       cell(coTypeIdx),       // O열: 공동전차인/연대보증인 구분
       coName:       cell(coNameIdx),       // AZ열: 계약자2/연대보증인 이름
-      coPhone:      cell(coPhoneIdx)       // BA열: 계약자2/연대보증인 연락처
+      coPhone:      cell(coPhoneIdx),      // BA열: 계약자2/연대보증인 연락처
+      tenantNameC:  cell(tenantNameCIdx)   // C열: 임차인명 (계약자1)
     };
   }).filter(Boolean);
 }
@@ -3168,7 +3170,7 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-info-title">계약자 정보</div>
         <div class="cr-field"><span class="cr-field-label">임대인(갑)</span><span class="cr-field-val">${fmt(c['임대인명'])}${(()=>{const p=fmt(c['임대인연락처']);return p&&p!=='-'?` <span style="color:#5A6A8A;font-weight:500;margin-left:4px">(${p})</span>`:'';})()}</span></div>
         <div class="cr-field"><span class="cr-field-label">임대인 계좌정보</span><span class="cr-field-val" style="font-size:11px">${(landlordAccountMap[String(c['계약번호']||'').trim()]||'-')}</span></div>
-        <div class="cr-field"><span class="cr-field-label">계약자1(을)</span><span class="cr-field-val">${fmt(c['임차인'])}${(()=>{const p=fmt(c['임차인휴대폰']);return p&&p!=='-'?` <span style="color:#5A6A8A;font-weight:500;margin-left:4px">(${p})</span>`:'';})()}</span></div>
+        <div class="cr-field"><span class="cr-field-label">계약자1(을)</span><span class="cr-field-val">${fmt(vacancyInfo.tenantNameC||c['임차인'])}${(()=>{const p=fmt(c['임차인휴대폰']);return p&&p!=='-'?` <span style="color:#5A6A8A;font-weight:500;margin-left:4px">(${p})</span>`:'';})()}</span></div>
         ${(()=>{const t=String(vacancyInfo.coType||'').trim();const n=fmt(vacancyInfo.coName);const p=fmt(vacancyInfo.coPhone);if(!t||!n||n==='-')return '';const ph=p&&p!=='-'?` <span style="color:#5A6A8A;font-weight:500;margin-left:4px">(${p})</span>`:'';if(t.includes('공동전차인'))return `<div class="cr-field"><span class="cr-field-label">계약자2(을)</span><span class="cr-field-val">${n}${ph}</span></div>`;if(t.includes('연대보증인'))return `<div class="cr-field"><span class="cr-field-label">연대보증인(병)</span><span class="cr-field-val">${n}${ph}</span></div>`;return '';})()}
         <div class="cr-field"><span class="cr-field-label">긴급연락처</span><span class="cr-field-val">${fmt(c['긴급연락처'])}</span></div>
       </div>
