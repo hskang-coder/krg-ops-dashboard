@@ -1624,19 +1624,38 @@ function switchCrMode(mode) {
   }
 }
 
+// ══════════════════════════════════════════════════
+// ▶ 시트 컬럼 매핑 헬퍼 (헤더 의존 제거 + 절대 위치 fallback)
+// ══════════════════════════════════════════════════
+// 사용법: findColIdx(labels, ['일자','날짜'], 1)
+//   1) 헤더 라벨에서 키워드 검색 (오타/다른 명칭 허용)
+//   2) 못 찾으면 절대 컬럼 인덱스(fallback) 반환
+//   3) fallback이 음수/undefined면 -1 반환 (해당 필드 빈 값 처리)
+// 시트의 행/열이 변경되더라도 안전하게 동작
+function findColIdx(labels, keywords, fallbackIdx) {
+  if (labels && Array.isArray(keywords)) {
+    for (const kw of keywords) {
+      const i = labels.findIndex(l => l && l.includes(kw));
+      if (i !== -1) return i;
+    }
+  }
+  if (typeof fallbackIdx === 'number' && fallbackIdx >= 0) return fallbackIdx;
+  return -1;
+}
+
 // 연체관리(Daily Report) 시트 파서
-// 컬럼: 대응일 | 계약번호 | 입금예정일 | 청구서명 | 대응 상세내용
+// 컬럼: 대응일(A=0) | 계약번호(B=1) | 입금예정일(C=2) | 청구서명(D=3) | 단계(E=4) | 대응 상세내용(F=5)
 function parseDailyReport(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
   const labels = cols.map(c => (c.label||c.id||'').trim());
-  const fi = name => labels.findIndex(l => l.includes(name));
-  const dateIdx    = fi('대응일');
-  const noIdx      = fi('계약번호');
-  const payDateIdx = fi('입금예정');
-  const billIdx    = fi('청구서명');
-  const contentIdx = fi('대응 상세');
-  const stepIdx    = 4; // E열 (0-based) = 단계
+  // 헤더 매칭 + 절대 위치 fallback (헤더 사라져도 안전)
+  const dateIdx    = findColIdx(labels, ['대응일','일자','날짜'],     0);
+  const noIdx      = findColIdx(labels, ['계약번호','계약'],          1);
+  const payDateIdx = findColIdx(labels, ['입금예정','납기일','납부예정'], 2);
+  const billIdx    = findColIdx(labels, ['청구서명','청구'],          3);
+  const contentIdx = findColIdx(labels, ['대응 상세','대응상세','내용'], 5);
+  const stepIdx    = 4; // E열 (0-based) = 단계 (절대 고정)
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
@@ -1654,17 +1673,26 @@ function parseDailyReport(resp) {
 }
 
 // 구 파서 (대응관리 시트용 — 대시보드 메인에서 사용)
+// 시트 표준 컬럼 위치 (헤더 사라져도 동작):
+//   B=일자(1), C=시작, D=종료, F=구분(5), G=담당자(6), H=TELL분(7), I=업무분(8),
+//   J=계약번호(9), K=대상구분(10), L=연락처(11), M=업무구분(12), N=하위구분(13), O=업무내용(14)
 function parseDaeungFull(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
   const labels = cols.map(c => (c.label||c.id||'').trim());
-  const fi = name => labels.findIndex(l => l.includes(name));
-  const dateIdx  = fi('일자'), typeIdx = fi('구분'), personIdx = fi('담당자');
-  const tellIdx  = fi('TELL대응'), workIdx = fi('업무대응');
-  const noIdx    = fi('계약번호'), targetIdx = fi('대상구분');
-  const contactIdx = fi('연락자'), catIdx = fi('업무구분');
-  const subIdx   = fi('하위구분'), contentIdx = fi('업무내용');
-  const nextIdx  = fi('다음업무'), jinIdx = fi('업무진척');
+  const dateIdx    = findColIdx(labels, ['일자','날짜'],          1);
+  const typeIdx    = findColIdx(labels, ['구분','종류'],          5);
+  const personIdx  = findColIdx(labels, ['담당자','대응자'],      6);
+  const tellIdx    = findColIdx(labels, ['TELL대응','Tell대응','TELL'], 7);
+  const workIdx    = findColIdx(labels, ['업무대응','업무시간'],  8);
+  const noIdx      = findColIdx(labels, ['계약번호','계약'],      9);
+  const targetIdx  = findColIdx(labels, ['대상구분','대상'],     10);
+  const contactIdx = findColIdx(labels, ['연락자','연락처'],     11);
+  const catIdx     = findColIdx(labels, ['업무구분','카테고리'], 12);
+  const subIdx     = findColIdx(labels, ['하위구분','세부'],     13);
+  const contentIdx = findColIdx(labels, ['업무내용','내용'],     14);
+  const nextIdx    = findColIdx(labels, ['다음업무'],            15);
+  const jinIdx     = findColIdx(labels, ['업무진척'],            16);
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
@@ -1686,10 +1714,10 @@ function parseVacancySheet(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
   const labels = cols.map(c => (c.label||c.id||'').trim());
-  const fi = name => labels.findIndex(l => l.includes(name));
-  const noIdx       = fi('계약번호');
-  const statusIdx   = fi('공실상태');   // BN열(65)
-  const exitDateIdx = fi('실제퇴실일'); // BO열(66) — '퇴실일'은 Z열이므로 정확히 매칭
+  // 헤더 + 절대 위치 fallback (시트 헤더 사라져도 안전)
+  const noIdx       = findColIdx(labels, ['계약번호','계약'],         0);  // A열 추정
+  const statusIdx   = findColIdx(labels, ['공실상태'],               65); // BN열
+  const exitDateIdx = findColIdx(labels, ['실제퇴실일'],             66); // BO열 ('퇴실일'은 Z열이라 부분매칭 회피)
   const jIdx          = 9;  // J열 (0-based index 9) = 중도퇴실
   const landlordIdx   = 39; // AO열 (0-based) = 임대인명
   const tenantIdx     = 44; // AT열 (0-based) = 임차인(이름/연락처)
@@ -2000,13 +2028,13 @@ function parseIncomeSheet(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
   const labels = cols.map(c => (c.label||c.id||'').trim());
-  const fi = name => labels.findIndex(l => l.includes(name));
-  const noIdx      = 4;  // E열 (0-based) = 계약번호
-  const nameIdx    = 14; // O열 (0-based) = 임차인명
-  const dueDateIdx = 28; // AC열 (0-based) = 납기일
-  const typeIdx    = fi('계약종류');
-  const condIdx    = fi('납부조건') >= 0 ? fi('납부조건') : fi('납부방법');
-  const payStatusIdx = 19; // T열 (0-based) = 납부상태
+  // 헤더 + 절대 위치 fallback (시트 헤더 사라져도 안전)
+  const noIdx      = 4;  // E열 (0-based) = 계약번호 (절대 고정)
+  const nameIdx    = 14; // O열 (0-based) = 임차인명 (절대 고정)
+  const dueDateIdx = 28; // AC열 (0-based) = 납기일 (절대 고정)
+  const typeIdx    = findColIdx(labels, ['계약종류','종류'],          -1);
+  const condIdx    = findColIdx(labels, ['납부조건','납부방법','조건'], -1);
+  const payStatusIdx = 19; // T열 (0-based) = 납부상태 (절대 고정)
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
@@ -3592,26 +3620,34 @@ function fetchSheetJSONP(gid) {
   });
 }
 
+// 메인 대응내역 시트 파서 — 헤더 의존 제거 + 절대 위치 fallback
+// 시트 표준 컬럼: B=일자(1), F=구분(5), G=담당자(6), H=TELL분(7), I=업무분(8),
+//                K=대상구분(10), M=업무구분(12), N=하위구분(13), O=업무내용(14)
 function parseGVizTable(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
   const labels = cols.map(c => (c.label||c.id||'').trim());
-  const find = (...names) => {
-    for (const n of names) {
-      const i = labels.findIndex(l => l.includes(n));
-      if (i !== -1) return i;
-    }
-    return -1;
-  };
-  const dateIdx    = find('일자');
-  const typeIdx    = find('구분');
-  const personIdx  = find('담당자');
-  const tellIdx    = find('TELL대응','Tell대응','TELL');
-  const workIdx    = find('업무대응');
-  const targetIdx  = find('대상구분');
-  const catIdx     = find('업무구분');
-  const subIdx     = find('하위구분');
-  const contentIdx = find('업무내용');
+
+  const dateIdx    = findColIdx(labels, ['일자','날짜'],          1);
+  const typeIdx    = findColIdx(labels, ['구분','종류'],          5);
+  const personIdx  = findColIdx(labels, ['담당자','대응자'],      6);
+  const tellIdx    = findColIdx(labels, ['TELL대응','Tell대응','TELL','전화시간'], 7);
+  const workIdx    = findColIdx(labels, ['업무대응','업무시간'],  8);
+  const targetIdx  = findColIdx(labels, ['대상구분','대상'],     10);
+  const catIdx     = findColIdx(labels, ['업무구분','카테고리'], 12);
+  const subIdx     = findColIdx(labels, ['하위구분','세부'],     13);
+  const contentIdx = findColIdx(labels, ['업무내용','내용'],     14);
+
+  // 디버그: 매핑 모드 기록 (window.__sheetMapDebug 로 확인 가뉥)
+  try {
+    const headerHit = labels.some(l => l && (l.includes('일자') || l.includes('담당자')));
+    window.__sheetMapDebug = {
+      mode: headerHit ? 'header' : 'fallback',
+      labels: labels.slice(0,18),
+      indexes: { date: dateIdx, type: typeIdx, person: personIdx, tell: tellIdx, work: workIdx, target: targetIdx, cat: catIdx, sub: subIdx, content: contentIdx }
+    };
+  } catch(e) {}
+
   const result = [];
   (rows||[]).forEach(row => {
     const c = row.c || [];
@@ -4593,11 +4629,12 @@ async function loadData() {
     }
   } catch(e) {}
 
-  // ── 1순위: gviz 직접 fetch (range=A7:R, ~1초) ──────────
+  // ── 1순위: gviz 직접 fetch (range=A:R, headers=0, ~1초) ──────────
+  // 시트 헤더 위치/유무에 의존하지 않도록 전체 행 받음. 안내문 행은 파서가 자동 무시.
   const ctrl = new AbortController();
   const fetchTimer = setTimeout(() => ctrl.abort(), 12000);
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${DAEUNG_GID}&range=A7:R&headers=1`;
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${DAEUNG_GID}&range=A:R&headers=0`;
     const res  = await fetch(url, { signal: ctrl.signal });
     clearTimeout(fetchTimer);
     const text = await res.text();
