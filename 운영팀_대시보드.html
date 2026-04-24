@@ -1074,16 +1074,6 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
       <div class="card">
         <div class="card-title"><span class="card-dot dot-blue"></span>담당자별 업무 진척</div>
         <div id="checklistProgressSection"></div>
-        <!-- 진척 이력 -->
-        <div style="margin:10px 0 4px;display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:11px;color:#8A9AB5;font-weight:600">&#128197; 진척 이력</span>
-          <div style="display:flex;gap:4px">
-            <button class="ck-hist-btn active" onclick="switchHistView('daily',this)">일별</button>
-            <button class="ck-hist-btn" onclick="switchHistView('weekly',this)">주별</button>
-            <button class="ck-hist-btn" onclick="switchHistView('monthly',this)">월별</button>
-          </div>
-        </div>
-        <div id="progressHistorySection"></div>
         <div class="section-divider"></div>
         <div class="card-title" style="margin-top:4px"><span class="card-dot dot-green"></span>구분별 대응 건수</div>
         <div class="chart-wrap">
@@ -1452,13 +1442,18 @@ function filterByPeriod(data) {
 }
 
 function getPeriodKey(period) {
-  const d = new Date();
-  if (period === 'daily')  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  // periodOffset(날짜 네비게이션 ◀▶) 적용된 날짜 사용 — 진척바가 일자 변경에 반응하도록
+  if (period === 'daily') {
+    const d = getOffsetDay();
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
   if (period === 'weekly') {
+    const d = getWeekStart();
     const jan1 = new Date(d.getFullYear(),0,1);
     const w = Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7);
     return `${d.getFullYear()}-W${pad(w)}`;
   }
+  const d = getMonthStart();
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
 }
 
