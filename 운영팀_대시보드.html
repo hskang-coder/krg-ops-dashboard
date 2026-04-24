@@ -1658,6 +1658,9 @@ function parseDailyReport(resp) {
   const contentIdx = findColIdx(labels, ['대응 상세','대응상세','대응내용','내용'], 4);  // E열
   const billIdx    = findColIdx(labels, ['청구서명','청구'],            -1);  // 시트에 없음
   const stepIdx    = findColIdx(labels, ['단계','step'],                -1);  // 시트에 없음
+  return (rows||[]).map(row => {
+    const c = row.c || [];
+    const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
     const no = cell(noIdx);
     if (!no || !cell(dateIdx)) return null;
     return {
