@@ -1555,7 +1555,7 @@ function switchView(view) {
         if (noEl) {
           const no = noEl.textContent.trim();
           const responses = daeungRawData.filter(r => String(r.no).trim() === no)
-            .sort((a, b) => a.date < b.date ? 1 : -1);
+            .sort((a, b) => cG_dateNum(b.date) - cG_dateNum(a.date));
           updateResponseSection(no, responses);
         }
       }).catch(() => { daeungRawData = []; });
@@ -1628,6 +1628,14 @@ function switchCrMode(mode) {
 //   2) 못 찾으면 절대 컬럼 인덱스(fallback) 반환
 //   3) fallback이 음수/undefined면 -1 반환 (해당 필드 빈 값 처리)
 // 시트의 행/열이 변경되거나 헤더가 사라져도 안전하게 동작
+function cG_dateNum(s) {
+  // Convert date string like '2026. 4. 23' or '2026년 4월 23일' to numeric YYYYMMDD for proper sorting
+  if (!s) return 0;
+  var m = String(s).match(/(\d{4})[.년\s\-/]+(\d{1,2})[.월\s\-/]+(\d{1,2})/);
+  if (!m) return 0;
+  return parseInt(m[1], 10) * 10000 + parseInt(m[2], 10) * 100 + parseInt(m[3], 10);
+}
+
 function findColIdx(labels, keywords, fallbackIdx) {
   if (labels && Array.isArray(keywords)) {
     for (const kw of keywords) {
@@ -1771,7 +1779,7 @@ async function loadContractData() {
       if (noEl) {
         const no = noEl.textContent.trim();
         const responses = daeungRawData.filter(r => String(r.no).trim() === no)
-          .sort((a, b) => a.date < b.date ? 1 : -1);
+          .sort((a, b) => cG_dateNum(b.date) - cG_dateNum(a.date));
         updateResponseSection(no, responses);
       }
       // 안내 텍스트 업데이트
@@ -1795,7 +1803,7 @@ async function loadContractData() {
         if (c) {
           const payments  = paymentRawData.filter(p => String(p['계약번호']||'').trim() === no);
           const responses = daeungRawData.filter(r => String(r.no).trim() === no)
-            .sort((a, b) => a.date < b.date ? 1 : -1);
+            .sort((a, b) => cG_dateNum(b.date) - cG_dateNum(a.date));
           renderContractRecord(c, payments, responses);
         }
       }
@@ -2903,7 +2911,7 @@ function selectContractRow(no) {
   if (!contract) return;
   const payments  = paymentRawData.filter(r => String(r['계약번호']).trim() === no);
   const responses = daeungRawData.filter(r => String(r.no).trim() === no)
-    .sort((a, b) => a.date < b.date ? 1 : -1); // 최신순
+    .sort((a, b) => cG_dateNum(b.date) - cG_dateNum(a.date)); // 최신순
   renderContractRecord(contract, payments, responses);
   document.getElementById('contractView').scrollIntoView({behavior:'smooth', block:'start'});
   // daeungRawData 미로드 시 백그라운드 로드 후 대응내역 업데이트
@@ -2912,7 +2920,7 @@ function selectContractRow(no) {
       daeungRawData = parseDailyReport(dResp);
       const updatedResponses = daeungRawData
         .filter(r => String(r.no).trim() === no)
-        .sort((a, b) => a.date < b.date ? 1 : -1);
+        .sort((a, b) => cG_dateNum(b.date) - cG_dateNum(a.date));
       updateResponseSection(no, updatedResponses);
     }).catch(() => { daeungRawData = []; });
   }
