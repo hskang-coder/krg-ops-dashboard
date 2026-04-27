@@ -5930,7 +5930,10 @@ function buildGuaranteezContractHtml(d, specialNotes) {
   var contractDate  = cG_fmtDate(d.contractDate);
   var depositLabel  = (d.depositRecov > 0) ? '원상회복 담보금' : '보증금';
   var depositAmt    = (d.depositRecov > 0) ? d.depositRecov : d.deposit;
-  var monthlyTotal  = (d.totalRent || 0) + (d.serviceFee || 0);
+  // 월납부금액: payCondition(S열)이 '분할' 또는 '수수료별도'일 때만 AL(serviceFee) 포함
+  // 그 외 (일시납/단기일시납/비용포함/수수료포함 등): AK(totalRent)만
+  var includeSvcFee = (d.payCondition === '분할' || d.payCondition === '수수료별도');
+  var monthlyTotal  = (d.totalRent || 0) + (includeSvcFee ? (d.serviceFee || 0) : 0);
   var specialClause = cG_specialClause(d.payCondition, d.contractInfo, specialNotes);
   var hasCoParty    = !!(d.coName && d.coName !== '-' && d.coName.trim());
   var coTitle       = (d.contractInfo === '공동전차인') ? '계약인2(을)' : '공동계약인(병)';
