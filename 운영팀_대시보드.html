@@ -5934,7 +5934,11 @@ function buildGuaranteezContractHtml(d, specialNotes) {
   var specialClause = cG_specialClause(d.payCondition, d.contractInfo, specialNotes);
   var hasCoParty    = !!(d.coName && d.coName !== '-' && d.coName.trim());
   var coTitle       = (d.contractInfo === '공동전차인') ? '계약인2(을)' : '공동계약인(병)';
-  var vatNote       = (d.vat > 0) ? '(부가세 포함)' : '';
+  // 부가세 포함 표기: 상업용 계약서일 때만 표시 (주거용은 무관)
+  var isCommercial  = String(d.useType||'').indexOf('상업') >= 0;
+  var vatNote       = (isCommercial && d.vat > 0) ? '(부가세 포함)' : '';
+  // 월세 표시값: AH(rent) + AI(vat) 합계
+  var rentDisplay   = (d.rent || 0) + (d.vat || 0);
   var emergRel = '', emergName = '';
   if (d.emergInfo) { var ep = d.emergInfo.split(','); emergRel = (ep[0]||'').trim(); emergName = (ep[1]||'').trim(); }
 
@@ -6034,7 +6038,7 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '</tr>'
     + '<tr>'
     +   '<th style="background:#f0f4ff;color:#374151;font-weight:600;padding:5px 7px;border:1px solid #d1d5db">①월세</th>'
-    +   '<td style="padding:5px 7px;border:1px solid #d1d5db;color:#1B3976;font-weight:600">' + cG_fmtKRW(d.rent) + '</td>'
+    +   '<td style="padding:5px 7px;border:1px solid #d1d5db;color:#1B3976;font-weight:600">' + cG_fmtKRW(rentDisplay) + (vatNote ? ' ' + vatNote : '') + '</td>'
     +   '<th style="background:#f0f4ff;color:#374151;font-weight:600;padding:5px 7px;border:1px solid #d1d5db">②고정관리비</th>'
     +   '<td style="padding:5px 7px;border:1px solid #d1d5db;color:#1B3976;font-weight:600">' + cG_fmtKRW(d.mgmtFee) + '</td>'
     + '</tr>'
