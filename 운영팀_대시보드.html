@@ -2972,6 +2972,12 @@ function fmtMoney(v) {
   return '₩' + n.toLocaleString('ko-KR');
 }
 
+// 보증금/원상회복 등 빈값을 ₩0으로 표시하는 헬퍼 (— 대신)
+function fmtMoneyZ(v) {
+  const n = parseFloat(String(v||'').replace(/[^0-9.-]/g,''));
+  return '₩' + (isNaN(n) ? 0 : n).toLocaleString('ko-KR');
+}
+
 const TL_PROCESSES = {
   0:'정상',1:'①[D1] 연체사실통지',2:'②[D2] 연체독촉',
   3:'③[D3] 연체경고',4:'④[D4] 납부촉구',5:'⑤[D5] 법적조치예고',
@@ -3183,7 +3189,7 @@ function renderContractRecord(c, payments, responses = []) {
       </div>
       <div class="cr-info-section">
         <div class="cr-info-title">금액 정보</div>
-        <div class="cr-field"><span class="cr-field-label">보증금/원상회복</span><span class="cr-field-val" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="flex:1"><span style="color:#6B7280;font-size:10px;font-weight:700;margin-right:4px">보증금</span>${fmtMoney(__vacRow.deposit || c['보증금(원)'])}</span><span style="color:#D1D5DB">|</span><span style="flex:1"><span style="color:#6B7280;font-size:10px;font-weight:700;margin-right:4px">원상회복</span>${fmtMoney(__vacRow.depositRecov)}</span></span></div>
+        <div class="cr-field"><span class="cr-field-label">보증금/원상회복</span><span class="cr-field-val" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1;text-align:left"><span style="color:#6B7280;font-size:10px;font-weight:700;margin-right:6px">보증금</span>${fmtMoneyZ(__vacRow.deposit || c['보증금(원)'])}</span><span style="color:#D1D5DB;font-weight:600">/</span><span style="flex:1;text-align:right"><span style="color:#6B7280;font-size:10px;font-weight:700;margin-right:6px">원상회복담보금</span>${fmtMoneyZ(__vacRow.depositRecov)}</span></span></div>
         <div class="cr-field"><span class="cr-field-label">월세</span><span class="cr-field-val">${fmtMoney(c['월세'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">관리비</span><span class="cr-field-val">${fmtMoney(c['관리비'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">부가세</span><span class="cr-field-val">${fmtMoney(c['부가세'])}</span></div>
