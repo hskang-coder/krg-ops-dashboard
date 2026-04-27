@@ -3926,15 +3926,15 @@ function parseDailyForPayDate(resp, delinqRows) {
   today.setHours(0,0,0,0);
   const todayTime = today.getTime();
 
-  // 계약별 최신 납부예정일(col2) + 최신 대응내용(col3, 최근 대응일 col0 기준)
-  const contractLatestDate    = {};
-  const contractLatestContent = {};
+  // [v17] A열(대응일) 최신 행의 A/D/E를 함께 매칭 (행 단위 묶음)
+  // D열이 비어있으면 '긴급대응필요'로 표시
+  const contractLatestRow = {};
   rows.forEach(row => {
     const c = row.c || [];
     const cno = c[1] ? String(c[1].f ?? c[1].v ?? '').replace(/\.0$/,'').trim() : '';
     if (!delinqSet.has(cno)) return;
 
-    // A열(대응일) 파싱 - 최신 기준 키
+    // A열(대응일) 파싱
     const aCell = c[0];
     let aDate = null;
     if (aCell && aCell.v) {
@@ -3945,51 +3945,39 @@ function parseDailyForPayDate(resp, delinqRows) {
         if (ma2) aDate = new Date(+ma2[1], +ma2[2]-1, +ma2[3]);
       }
     }
+    if (!aDate) return; // 대응일 없는 행 무시
 
-    // D열(납부예정일) - Date() 또는 한국어 날짜 문자열 파싱
+    // 가장 최신 대응일 행만 유지
+    const prev = contractLatestRow[cno];
+    if (prev && prev.aDate && aDate < prev.aDate) return;
+
+    // D열(입금예정일) 파싱 — 같은 행에서
     const dateCell = c[3];
+    let payDate = null;
     if (dateCell && (dateCell.v || dateCell.f)) {
-      let d = null;
       const vStr = String(dateCell.f || dateCell.v || '');
-      // Date() 형식
       const m1 = String(dateCell.v || '').match(/Date\((\d+),(\d+),(\d+)\)/);
-      if (m1) d = new Date(+m1[1], +m1[2], +m1[3]);
-      // 한국어 형식: "YYYY년 M월 D일"
-      if (!d) {
+      if (m1) payDate = new Date(+m1[1], +m1[2], +m1[3]);
+      if (!payDate) {
         const m2 = vStr.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
-        if (m2) d = new Date(+m2[1], +m2[2]-1, +m2[3]);
-      }
-      if (d) {
-        // A열 기준 가장 최신 대응 행의 C열 값 사용
-        const prev = contractLatestDate[cno];
-        if (!prev || !prev.aDate || (aDate && aDate >= prev.aDate)) {
-          contractLatestDate[cno] = { date: d, aDate: aDate };
-        }
+        if (m2) payDate = new Date(+m2[1], +m2[2]-1, +m2[3]);
       }
     }
 
-    // 최근 대응내용 (col3) - 대응일(col0) 기준 최신
-    const daeungCell = c[0];
-    if (daeungCell?.v) {
-      const m = String(daeungCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
-      if (m) {
-        const dDate = new Date(+m[1], +m[2], +m[3]);
-        const txt   = c[4] ? String(c[4].v ?? '') : '';
-        if (!contractLatestContent[cno] || dDate > contractLatestContent[cno].date) {
-          contractLatestContent[cno] = { date: dDate, content: txt };
-        }
-      }
-    }
+    // E열(대응내용) — 같은 행에서
+    const content = c[4] ? String(c[4].f || c[4].v || '') : '';
+
+    contractLatestRow[cno] = { aDate, payDate, content };
   });
 
   // 지남/오늘/미도래 카운팅 + payDateMap 생성
   let past=0, todayCount=0, future=0;
   const payDateMap = {};
   delinqSet.forEach(cno => {
-    const entry   = contractLatestDate[cno];
-    const d       = entry ? entry.date : null;  // 실제 납부예정일 Date 객체
-    const content = contractLatestContent[cno]?.content || '-';
-    const aDate   = contractLatestContent[cno]?.date || null;
+    const entry = contractLatestRow[cno];
+    const aDate = entry ? entry.aDate : null;
+    const d     = entry ? entry.payDate : null;
+    const content = entry ? entry.content : '-';
     let dateStr = '-', payStatus = null;
     if (d) {
       d.setHours(0,0,0,0);
@@ -3999,6 +3987,10 @@ function parseDailyForPayDate(resp, delinqRows) {
       if (d.getTime() < todayTime)      { payStatus = 'past';   past++; }
       else if (d.getTime() === todayTime){ payStatus = 'today';  todayCount++; }
       else                               { payStatus = 'future'; future++; }
+    } else if (entry) {
+      // 대응일은 있지만 입금예정일이 비어있음 → 긴급대응필요
+      dateStr = '긴급대응필요';
+      payStatus = 'urgent';
     }
     let actionDateStr = '-';
     if (aDate) {
@@ -4493,7 +4485,7 @@ function dlqRenderTableRows() {
         ${rows.map(r => {
           const gc = gradeClass(r.grade||'');
           const dc = dayClass(r.days||0);
-          const payColor = r.payStatus==='past'?'#ef4444':r.payStatus==='today'?'#f59e0b':'#22c55e';
+          const payColor = r.payStatus==='past'?'#ef4444':r.payStatus==='today'?'#f59e0b':r.payStatus==='urgent'?'#dc2626':'#22c55e';
           const shortContent = r.content||'-';
           return `<tr class="dlq-tbl-row" onclick="dlqGoToContract('${r.cno}')">
             <td onclick="event.stopPropagation()" style="text-align:center;padding:4px">
