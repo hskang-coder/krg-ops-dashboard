@@ -2034,6 +2034,7 @@ function parseIncomeSheet(resp) {
   const labels = cols.map(c => (c.label||c.id||'').trim());
   // 헤더 + 절대 위치 fallback (시트 헤더 사라져도 안전)
   const noIdx      = 4;  // E열 (0-based) = 계약번호 (절대 고정)
+  const statusIdx  = 13; // N열 (0-based) = 계약상태 (계약중/삭제/철회/종료) — 절대 고정
   const nameIdx    = 14; // O열 (0-based) = 임차인명 (절대 고정)
   const dueDateIdx = 28; // AC열 (0-based) = 납기일 (절대 고정)
   const typeIdx    = findColIdx(labels, ['계약종류','종류'],          -1);
@@ -2046,6 +2047,7 @@ function parseIncomeSheet(resp) {
     if (!no) return null;
     return {
       no,
+      contractStatus: cell(statusIdx),  // N열: 계약중/삭제/철회/종료
       name:       cell(nameIdx),
       dueDate:    cell(dueDateIdx),
       dueDateRaw: c[dueDateIdx] ? (c[dueDateIdx].v || '') : '',
@@ -2616,8 +2618,11 @@ function renderPaymentTargets() {
   const toD   = to   ? parseLocalDate(to)   : null;
   const fmtMon = v => { const n = parseFloat(String(v).replace(/[^0-9.-]/g,''))||0; return n ? '₩'+n.toLocaleString() : '—'; };
 
-  // ── 1단계: 날짜·종류·연체 필터 ──
+  // ── 1단계: 계약상태(N열)·날짜·종류·연체 필터 ──
+  // 회귀 테스트 케이스: 51633(이하람, N열=삭제) — 결과 리스트에 포함되면 안 됨
   let list = incomeRawData.filter(r => {
+    // 계약상태가 '계약중' 외의 값이면 제외 (삭제/철회/종료 등)
+    if (String(r.contractStatus||'').trim() !== '계약중') return false;
     if (!r.dueDate) return false;
     const d = parseKorDate(r.dueDate);
     if (!d) return false;
