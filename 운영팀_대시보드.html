@@ -1749,6 +1749,8 @@ function parseVacancySheet(resp) {
   const landlordPhoneIdx= 41;// AP열 = 임대인 연락처
   const coNameIdx     = 51; // AZ열 = 공동인(을2/병) 이름
   const coPhoneIdx    = 52; // BA열 = 공동인(을2/병) 연락처
+  const emergPhoneIdx = 49; // AX열 = 긴급연락처(연락처)
+  const emergInfoIdx  = 50; // AY열 = 긴급연락처(관계,이름)
   const landlordIdx   = 39; // AO열 (0-based) = 임대인명
   const tenantIdx     = 44; // AT열 (0-based) = 임차인(이름/연락처)
   const inspectTypeIdx= 57; // BF열 (0-based) = 심사구분
@@ -1779,6 +1781,8 @@ function parseVacancySheet(resp) {
       landlordPhone: cell(landlordPhoneIdx), // AP열: 임대인 연락처
       coName:       cell(coNameIdx),      // AZ열: 공동인 이름
       coPhone:      cell(coPhoneIdx),     // BA열: 공동인 연락처
+      emergPhone:   cell(emergPhoneIdx),  // AX열: 긴급연락처(연락처)
+      emergInfo:    cell(emergInfoIdx),   // AY열: 긴급연락처(관계,이름)
       landlordName: cell(landlordIdx),   // AO열: 임대인명
       inspectType:  cell(inspectTypeIdx),// BF열: 심사구분
       rent:         cell(rentIdx),       // AK열: 임대료
@@ -3203,7 +3207,7 @@ function renderContractRecord(c, payments, responses = []) {
         ${__vacRow.contractInfo === '공동전차인'
           ? `<div class="cr-field"><span class="cr-field-label">계약자2(을)</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmt(__vacRow.coPhone)+')</span>':''}</span></div>`
           : `<div class="cr-field"><span class="cr-field-label">연대보증인(병)</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmt(__vacRow.coPhone)+')</span>':''}</span></div>`}
-        <div class="cr-field"><span class="cr-field-label">긴급연락처</span><span class="cr-field-val">${fmt(c['긴급연락처'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">긴급연락처(관계)</span><span class="cr-field-val">${fmt(__vacRow.emergPhone || c['긴급연락처'])}${__vacRow.emergInfo ? ' <span style="color:#6B7280">('+fmt(String(__vacRow.emergInfo).split(',')[0].trim())+')</span>' : ''}</span></div>
       </div>
       <div class="cr-info-section">
         <div class="cr-info-title">담당 / 부동산</div>
