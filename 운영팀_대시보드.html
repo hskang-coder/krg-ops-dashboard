@@ -3194,8 +3194,9 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-field"><span class="cr-field-label">임대인(갑)</span><span class="cr-field-val">${fmt(c['임대인명'])} ${c['임대인연락처']?'<span style="color:#6B7280">('+fmt(c['임대인연락처'])+')</span>':''}</span></div>
         <div class="cr-field"><span class="cr-field-label">수분양자 정산계좌</span><span class="cr-field-val" style="font-family:monospace;font-size:11px">${fmt(landlordAccountMap[String(c['계약번호']||'').trim()])}</span></div>
         <div class="cr-field"><span class="cr-field-label">계약자1(을)</span><span class="cr-field-val">${fmt(__vacRow.tenant1Name || c['임차인'])} ${c['임차인휴대폰']?'<span style="color:#6B7280">('+fmt(c['임차인휴대폰'])+')</span>':''}</span></div>
-        ${__vacRow.contractInfo === '공동전차인' ? `<div class="cr-field"><span class="cr-field-label">계약자2(을)</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmt(__vacRow.coPhone)+')</span>':''}</span></div>` : ''}
-        ${__vacRow.contractInfo === '연대보증인' ? `<div class="cr-field"><span class="cr-field-label">연대보증인(병)</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmt(__vacRow.coPhone)+')</span>':''}</span></div>` : ''}
+        ${__vacRow.contractInfo === '공동전차인'
+          ? `<div class="cr-field"><span class="cr-field-label">계약자2(을)</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmt(__vacRow.coPhone)+')</span>':''}</span></div>`
+          : `<div class="cr-field"><span class="cr-field-label">연대보증인(병)</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmt(__vacRow.coPhone)+')</span>':''}</span></div>`}
         <div class="cr-field"><span class="cr-field-label">긴급연락처</span><span class="cr-field-val">${fmt(c['긴급연락처'])}</span></div>
       </div>
       <div class="cr-info-section">
