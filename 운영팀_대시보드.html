@@ -4063,6 +4063,10 @@ async function renderDelinquency() {
   }
   function applyRaw(r1, r2, r3, r4) {
     _dlqContractData = parseContractMgmt(r1);
+    // [v18+ 회귀] vacancyRawData도 r1으로 채움 (연체관리 테이블의 공실상태 컬럼용)
+    if (typeof parseVacancySheet === 'function') {
+      try { vacancyRawData = parseVacancySheet(r1); } catch(e) { console.warn('parseVacancySheet in dlq:', e); }
+    }
     const dlqV3Data  = parseDelinqV3(r4);
     _dlqIncomeData   = parseIncomeForDlqV2(r2, dlqV3Data.dlqCnoSet);
     window._delinqDaysMap = _dlqIncomeData.delinqDaysMap || {};
