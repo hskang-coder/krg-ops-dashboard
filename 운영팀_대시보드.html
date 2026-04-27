@@ -2619,7 +2619,7 @@ function downloadDlqExcel() {
     '계약번호':r.cno,'그룹':r.group||'-','임차인':r.nm||'-','계약정보':r.info||'-',
     '등급':r.grade||'-','연체일수':r.days||0,'담당자':r.assignee||'-','대응단계':r.actionStep||'-',
     '납부구분':(r.연체구분==='연체중'||r.연체구분==='분납중')?r.연체구분:'-',
-    '연체금액':r.amt||0,'납부예정일':r.dateStr||'-','계약상태':r.contractStatus||'계약중',
+    '연체금액':r.amt||0,'입금예정일':r.dateStr||'-','계약상태':r.contractStatus||'계약중',
     '연락처':r.tel||'-','대응일':r.actionDateStr||'-','최근 대응 내용':r.content||'-'
   }));
   const ws = XLSX.utils.json_to_sheet(data);
@@ -4239,7 +4239,7 @@ function buildDlqUI(d1, d2, d3, d4) {
     <!-- 납부예정일 현황 -->
     <div class="dlq-pay-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div class="dlq-section-title" style="margin:0">납부예정일 현황</div>
+        <div class="dlq-section-title" style="margin:0">입금예정일 현황</div>
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:11px;color:#9ca3af;font-weight:600">기준:</span>
           <button class="pay-cf-btn active" id="payCf-active" onclick="dlqSetPayCardFilter('active')">계약중</button>
@@ -4249,19 +4249,19 @@ function buildDlqUI(d1, d2, d3, d4) {
       </div>
       <div class="dlq-pay-cards-row">
         <div class="dlq-pay-card" id="payCard-past" onclick="dlqApplyPayFilter('past')">
-          <div class="dlq-pay-card-ttl past">📅 납부예정일 지남 (오늘 이전)</div>
+          <div class="dlq-pay-card-ttl past">📅 입금예정일 지남 (오늘 이전)</div>
           <div class="dlq-pay-card-num" id="payCardNum-past" style="color:#ef4444">${d3.past}명</div>
           <div class="dlq-pay-card-desc">약정 납부일이 이미 지난 연체자</div>
           <button class="dlq-pay-card-btn" style="background:#fee2e2;color:#dc2626">→ 연체자 현황 보기</button>
         </div>
         <div class="dlq-pay-card" id="payCard-today" onclick="dlqApplyPayFilter('today')">
-          <div class="dlq-pay-card-ttl today">📅 납부예정일 오늘</div>
+          <div class="dlq-pay-card-ttl today">📅 입금예정일 오늘</div>
           <div class="dlq-pay-card-num" id="payCardNum-today" style="color:#f59e0b">${d3.today}명</div>
           <div class="dlq-pay-card-desc">오늘 납부 예정 — 즉시 확인 필요</div>
           <button class="dlq-pay-card-btn" style="background:#fef3c7;color:#d97706">→ 연체자 현황 보기</button>
         </div>
         <div class="dlq-pay-card" id="payCard-future" onclick="dlqApplyPayFilter('future')">
-          <div class="dlq-pay-card-ttl future">📅 납부예정일 미도래 (오늘 이후)</div>
+          <div class="dlq-pay-card-ttl future">📅 입금예정일 미도래 (오늘 이후)</div>
           <div class="dlq-pay-card-num" id="payCardNum-future" style="color:#22c55e">${d3.future}명</div>
           <div class="dlq-pay-card-desc">향후 납부 예정 — 사전 안내 권장</div>
           <button class="dlq-pay-card-btn" style="background:#dcfce7;color:#16a34a">→ 연체자 현황 보기</button>
@@ -4312,7 +4312,7 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-filter-btn" data-group="days" onclick="dlqApplyFilter('days','over30',this)">30일초과</button>
         </div>
         <div class="dlq-filter-group">
-          <span class="dlq-filter-label">납부예정일</span>
+          <span class="dlq-filter-label">입금예정일</span>
           <button class="dlq-filter-btn active" data-group="pay" onclick="dlqApplyFilter('pay','all',this)">전체</button>
           <button class="dlq-filter-btn" data-group="pay" onclick="dlqApplyFilter('pay','past',this)">오늘 이전</button>
           <button class="dlq-filter-btn" data-group="pay" onclick="dlqApplyFilter('pay','today',this)">오늘</button>
@@ -4487,7 +4487,7 @@ function dlqRenderTableRows() {
         <th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>
         <th>계약번호</th><th>그룹</th><th>계약정보</th>
         <th>연체일수</th><th>납부구분</th><th>계약상태</th><th>공실상태</th><th>임차인</th>
-        <th>연락처</th><th>연체금액</th><th>대응일</th><th>납부예정일</th><th>최근 대응 내용</th>
+        <th>연락처</th><th>연체금액</th><th>대응일</th><th>입금예정일</th><th>최근 대응 내용</th>
       </tr></thead>
       <tbody>
         ${rows.map(r => {
