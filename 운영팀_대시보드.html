@@ -1282,6 +1282,7 @@ let paymentRawData   = [];
 let daeungRawData    = [];
 let vacancyRawData   = []; // 공실현황 시트 (계약번호 → 공실상태, 퇴실일)
 let incomeRawData    = []; // 입금내역 시트 (수납 대상용)
+let landlordAccountMap = {}; // 계약번호 → 임대인 정산계좌 (gid=418937767 DH열)
 let ptLoaded         = false; // 수납 대상 데이터 로드 여부
 let crLoaded         = false;
 let srMatches        = [];      // 현재 검색 결과 전체 (상태 필터용)
@@ -1714,6 +1715,24 @@ function parseDaeungFull(resp) {
 }
 
 // GID=1953907648 시트 파싱 (계약번호, BN=공실상태, BO=퇴실일, J열=중도퇴실 관련)
+// gid=418937767 시트에서 계약번호별 임대인 정산계좌(DH열, idx 111) 매핑 로드
+// C열(idx 2)이 계약번호
+async function loadLandlordAccounts() {
+  try {
+    const resp = await fetchSheetByGid('418937767');
+    if (!resp || !resp.table) return;
+    const rows = resp.table.rows || [];
+    const map = {};
+    rows.forEach(row => {
+      const c = row.c || [];
+      const no = c[2] ? String(c[2].f != null ? c[2].f : c[2].v != null ? c[2].v : '').trim() : '';
+      const acct = c[111] ? String(c[111].f != null ? c[111].f : c[111].v != null ? c[111].v : '').trim() : '';
+      if (no && acct) map[no] = acct;
+    });
+    landlordAccountMap = map;
+  } catch(e) { console.warn('loadLandlordAccounts failed:', e); }
+}
+
 function parseVacancySheet(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
@@ -1723,6 +1742,13 @@ function parseVacancySheet(resp) {
   const statusIdx   = findColIdx(labels, ['공실상태'],               65); // BN열
   const exitDateIdx = findColIdx(labels, ['실제퇴실일'],             66); // BO열 ('퇴실일'은 Z열이라 부분매칭 회피)
   const jIdx          = 9;  // J열 (0-based index 9) = 중도퇴실
+  const tenant1NameIdx = 2;  // C열 = 계약자1(을) 이름 (실 임차인명)
+  const contractInfoIdx= 14; // O열 = 계약구분 (단독/공동전차인/연대보증인)
+  const depositRecovIdx= 31; // AF열 = 원상회복담보금
+  const depositIdx     = 32; // AG열 = 보증금
+  const landlordPhoneIdx= 41;// AP열 = 임대인 연락처
+  const coNameIdx     = 51; // AZ열 = 공동인(을2/병) 이름
+  const coPhoneIdx    = 52; // BA열 = 공동인(을2/병) 연락처
   const landlordIdx   = 39; // AO열 (0-based) = 임대인명
   const tenantIdx     = 44; // AT열 (0-based) = 임차인(이름/연락처)
   const inspectTypeIdx= 57; // BF열 (0-based) = 심사구분
@@ -1746,6 +1772,13 @@ function parseVacancySheet(resp) {
       jValue:       cell(jIdx),        // J열: 중도퇴실 관련 값
       tenantName:   cell(tenantIdx),      // AT열: 임차인 이름
       tenantPhone:  cell(tenantPhoneIdx), // AU열: 임차인 연락처
+      tenant1Name:  cell(tenant1NameIdx), // C열: 계약자1(을) 이름
+      contractInfo: cell(contractInfoIdx),// O열: 계약구분
+      deposit:      cell(depositIdx),     // AG열: 보증금
+      depositRecov: cell(depositRecovIdx),// AF열: 원상회복담보금
+      landlordPhone: cell(landlordPhoneIdx), // AP열: 임대인 연락처
+      coName:       cell(coNameIdx),      // AZ열: 공동인 이름
+      coPhone:      cell(coPhoneIdx),     // BA열: 공동인 연락처
       landlordName: cell(landlordIdx),   // AO열: 임대인명
       inspectType:  cell(inspectTypeIdx),// BF열: 심사구분
       rent:         cell(rentIdx),       // AK열: 임대료
@@ -1793,6 +1826,7 @@ async function loadContractData() {
       }
     });
     // 공실현황 시트 (GID=1953907648) 백그라운드 로드
+    loadLandlordAccounts(); // 임대인 정산계좌 매핑 백그라운드 로드
     fetchSheetByGid(VACANCY_GID).then(vResp => {
       vacancyRawData = parseVacancySheet(vResp);
       // 이미 계약 레코드가 열려 있으면 공실현황 반영하여 재렌더링
@@ -2948,6 +2982,8 @@ const TL_PROCESSES = {
 };
 
 function renderContractRecord(c, payments, responses = []) {
+  // vacancyRawData에서 매칭 행 찾기 (없으면 빈 객체)
+  const __vacRow = (Array.isArray(vacancyRawData) ? vacancyRawData.find(v => String(v.no).trim() === String(c['계약번호']||'').trim()) : null) || {};
   const gradeRaw  = String(c['연체등급']||'').trim();
   const grade     = gradeRaw.replace(/등급$/,'').trim() || '—';
   const gradeClass= {A:'cr-grade-A',B:'cr-grade-B',C:'cr-grade-C',D:'cr-grade-D',E:'cr-grade-E',F:'cr-grade-D'}[grade] || 'cr-grade-D';
@@ -3147,7 +3183,7 @@ function renderContractRecord(c, payments, responses = []) {
       </div>
       <div class="cr-info-section">
         <div class="cr-info-title">금액 정보</div>
-        <div class="cr-field"><span class="cr-field-label">보증금</span><span class="cr-field-val">${fmtMoney(c['보증금(원)'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">보증금/원상회복</span><span class="cr-field-val" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="flex:1"><span style="color:#6B7280;font-size:10px;font-weight:700;margin-right:4px">보증금</span>${fmtMoney(__vacRow.deposit || c['보증금(원)'])}</span><span style="color:#D1D5DB">|</span><span style="flex:1"><span style="color:#6B7280;font-size:10px;font-weight:700;margin-right:4px">원상회복</span>${fmtMoney(__vacRow.depositRecov)}</span></span></div>
         <div class="cr-field"><span class="cr-field-label">월세</span><span class="cr-field-val">${fmtMoney(c['월세'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">관리비</span><span class="cr-field-val">${fmtMoney(c['관리비'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">부가세</span><span class="cr-field-val">${fmtMoney(c['부가세'])}</span></div>
@@ -3155,10 +3191,11 @@ function renderContractRecord(c, payments, responses = []) {
       </div>
       <div class="cr-info-section">
         <div class="cr-info-title">계약자 정보</div>
-        <div class="cr-field"><span class="cr-field-label">임대인(갑)</span><span class="cr-field-val">${fmt(c['임대인명'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">임대인 연락처</span><span class="cr-field-val">${fmt(c['임대인연락처'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">임차인(을)</span><span class="cr-field-val">${fmt(c['임차인'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">임차인 연락처</span><span class="cr-field-val">${fmt(c['임차인휴대폰'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">임대인(갑)</span><span class="cr-field-val">${fmt(c['임대인명'])} ${c['임대인연락처']?'<span style="color:#6B7280">('+fmt(c['임대인연락처'])+')</span>':''}</span></div>
+        <div class="cr-field"><span class="cr-field-label">수분양자 정산계좌</span><span class="cr-field-val" style="font-family:monospace;font-size:11px">${fmt(landlordAccountMap[String(c['계약번호']||'').trim()])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">계약자1(을)</span><span class="cr-field-val">${fmt(__vacRow.tenant1Name || c['임차인'])} ${c['임차인휴대폰']?'<span style="color:#6B7280">('+fmt(c['임차인휴대폰'])+')</span>':''}</span></div>
+        ${__vacRow.contractInfo === '공동전차인' ? `<div class="cr-field"><span class="cr-field-label">계약자2(을)</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmt(__vacRow.coPhone)+')</span>':''}</span></div>` : ''}
+        ${__vacRow.contractInfo === '연대보증인' ? `<div class="cr-field"><span class="cr-field-label">연대보증인(병)</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmt(__vacRow.coPhone)+')</span>':''}</span></div>` : ''}
         <div class="cr-field"><span class="cr-field-label">긴급연락처</span><span class="cr-field-val">${fmt(c['긴급연락처'])}</span></div>
       </div>
       <div class="cr-info-section">
