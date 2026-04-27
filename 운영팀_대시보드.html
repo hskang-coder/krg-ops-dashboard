@@ -2150,7 +2150,7 @@ function buildStrategyCards() {
     highAmt:    active.filter(r => (r.amt||0) >= 1000000).length,
     partial:    active.filter(r => r.연체구분 === '분납중').length,
     terminated: rows.filter(r => (r.contractStatus||'계약중') !== '계약중').length,
-    noRecord:   active.filter(r => !r.actionDateStr || r.actionDateStr === '-').length,
+    noRecord:   active.filter(r => r.payStatus === 'urgent').length,  // 대응일은 있으나 입금예정일이 없는 대상자
   };
   const highAmtRows = active.filter(r => (r.amt||0) >= 1000000);
   const avgAmt = highAmtRows.length ? Math.round(highAmtRows.reduce((s,r)=>s+(r.amt||0),0)/highAmtRows.length) : 0;
@@ -2196,10 +2196,10 @@ function buildStrategyCards() {
           '퇴실상태(종료) 포함',
           '퇴실 상태 연체는 임대인 직접 협상이 어렵고 보증보험 청구 경로 활용이 효과적',
           '보증보험사 청구 검토')}
-        ${card('noRecord','sb2-border-gray','sb2-info','sb2-btn-gray','참고','📌','대응기록 없음',c.noRecord,
+        ${card('noRecord','sb2-border-gray','sb2-info','sb2-btn-gray','참고','📌','입금예정일 없음',c.noRecord,
           '전체의 '+pct(c.noRecord)+'%',
-          '대응 기록이 없는 연체자는 담당자 배정 및 초기 접촉 이력 즉시 등록 필요',
-          '담당자 즉시 배정 요청')}
+          '대응일은 있으나 입금예정일이 비어있는 대상자 — 즉시 입금 약속 확정 필요',
+          '입금예정일 확정 요청')}
       </div>
     </div>`;
 }
@@ -2610,7 +2610,7 @@ function downloadDlqExcel() {
       if (sf==='highAmt'&&(rcs!=='계약중'||(r.amt||0)<1000000)) return false;
       if (sf==='partial'&&(rcs!=='계약중'||r.연체구분!=='분납중')) return false;
       if (sf==='terminated'&&rcs==='계약중') return false;
-      if (sf==='noRecord'&&(rcs!=='계약중'||(r.actionDateStr&&r.actionDateStr!=='-'))) return false;
+      if (sf==='noRecord'&&(rcs!=='계약중'||r.payStatus!=='urgent')) return false;  // 입금예정일 없음
     }
     return true;
   });
@@ -4451,7 +4451,7 @@ function dlqRenderTableRows() {
       else if (strategyFilter === 'highAmt')    { if (cs !== '계약중' || (r.amt||0) < 1000000) return false; }
       else if (strategyFilter === 'partial')    { if (cs !== '계약중' || r.연체구분 !== '분납중') return false; }
       else if (strategyFilter === 'terminated') { if (cs === '계약중') return false; }
-      else if (strategyFilter === 'noRecord')   { if (cs !== '계약중' || (r.actionDateStr && r.actionDateStr !== '-')) return false; }
+      else if (strategyFilter === 'noRecord')   { if (cs !== '계약중' || r.payStatus !== 'urgent') return false; }  // 입금예정일 없음
     }
     return true;
   });
