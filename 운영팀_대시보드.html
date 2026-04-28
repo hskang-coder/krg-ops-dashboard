@@ -3063,8 +3063,16 @@ function renderContractRecord(c, payments, responses = []) {
   // 중도퇴실 표시값: J열 + BO열
   const midExitDisplay = [vacancyJValue, actualExitDate].filter(Boolean).join('  ');
 
-  // ── 입금 상세 테이블 ──
-  const detailRows = payments.map(p => {
+  // ── 입금 상세 테이블 (납기일 기준 내림차순: 최신일자 위) ──
+  const sortedPayments = [...payments].sort((a, b) => {
+    const da = parseKorDate(String(a['납기일']||''));
+    const db = parseKorDate(String(b['납기일']||''));
+    if (!da && !db) return 0;
+    if (!da) return 1;  // 날짜 없으면 뒤로
+    if (!db) return -1;
+    return db - da;     // 최신 먼저
+  });
+  const detailRows = sortedPayments.map(p => {
     const status = String(p['납부상태']||'').trim();
     const unpaid = parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0;
     const dueStr = String(p['납기일']||'').trim();
