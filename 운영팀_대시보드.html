@@ -1283,6 +1283,9 @@ let daeungRawData    = [];
 let vacancyRawData   = []; // 공실현황 시트 (계약번호 → 공실상태, 퇴실일)
 let incomeRawData    = []; // 입금내역 시트 (수납 대상용)
 let landlordAccountMap = {}; // 계약번호 → 임대인 정산계좌 (gid=418937767 DH열)
+// [v26] 도장 이미지 placeholder — 사용자가 base64 데이터 URL을 채우면 내용증명서에 표시됨
+// 사용 예: window.__krgSealDataUrl = 'data:image/png;base64,iVBORw0KG...';
+window.__krgSealDataUrl = window.__krgSealDataUrl || '';
 let ptLoaded         = false; // 수납 대상 데이터 로드 여부
 let crLoaded         = false;
 let srMatches        = [];      // 현재 검색 결과 전체 (상태 필터용)
@@ -2532,7 +2535,7 @@ function buildDlqSmsNoticeHtml(rows, contractDetails) {
       + '<div class="cm-box"><div class="cm-box-title">발 신 인</div>'
       + '<div class="cm-box-body">'
       + '<div class="cm-row"><div class="cm-lbl">상    호</div><div class="cm-val cm-val-emp">케이알지그룹 주식회사 (법무팀)</div></div>'
-      + '<div class="cm-row"><div class="cm-lbl">대표자</div><div class="cm-val">대표이사 강 휘 수</div></div>'
+      + '<div class="cm-row"><div class="cm-lbl">대표자</div><div class="cm-val">대표이사 김기성, 김준영</div></div>'
       + '<div class="cm-row"><div class="cm-lbl">소재지</div><div class="cm-val">충청남도 천안시 동남구 목천읍 천정1길 227-14</div></div>'
       + '<div class="cm-row"><div class="cm-lbl">연락처</div><div class="cm-val">Tel. 010-9715-8064</div></div>'
       + '</div></div>'
@@ -2565,8 +2568,7 @@ function buildDlqSmsNoticeHtml(rows, contractDetails) {
 
       // 발신인 영역
       + '<div class="cm-sender">'
-      + '<div class="cm-sender-row"><div class="cm-sender-lbl">발 신 인</div><div class="cm-sender-val">케이알지그룹 주식회사 법무팀</div><div class="cm-sender-stamp">(인)</div></div>'
-      + '<div class="cm-sender-row"><div class="cm-sender-lbl">대 표 자</div><div class="cm-sender-val">대표이사 강 휘 수</div></div>'
+      + '<div class="cm-sender-row"><div class="cm-sender-lbl">발 신 인</div><div class="cm-sender-val">케이알지그룹 주식회사 법무팀</div>' + (window.__krgSealDataUrl ? '<img src="' + window.__krgSealDataUrl + '" alt="인장" class="cm-sender-stamp-img" style="width:80px;height:80px;margin-left:14px;object-fit:contain">' : '<div class="cm-sender-stamp">(인)</div>') + '</div>'
       + '<div class="cm-sender-row"><div class="cm-sender-lbl">소 재 지</div><div class="cm-sender-val">충청남도 천안시 동남구 목천읍 천정1길 227-14</div></div>'
       + '<div class="cm-sender-row"><div class="cm-sender-lbl">연 락 처</div><div class="cm-sender-val">Tel. 010-9715-8064 &nbsp;|&nbsp; 신한은행 140-012-419494 (예금주: 케이알지그룹주식회사)</div></div>'
       + '</div>'
