@@ -4081,7 +4081,7 @@ function parseDailyForPt(resp) {
       const m = String(aCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
       if (m) aDate = new Date(+m[1], +m[2], +m[3]);
     }
-    const dContent = c[4] ? String(c[4].v ?? c[4].f ?? '') : '';
+    const dContent = (_contentIdx >= 0 && c[_contentIdx]) ? String(c[_contentIdx].v ?? c[_contentIdx].f ?? '') : '';  // [v24] _contentIdx 사용 (v22 누락 수정)
     if (aDate && (!map[cno] || aDate > map[cno].latestDate)) {
       const mm = String(aDate.getMonth()+1).padStart(2,'0');
       const dd = String(aDate.getDate()).padStart(2,'0');
