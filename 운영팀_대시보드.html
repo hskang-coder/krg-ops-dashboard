@@ -956,19 +956,20 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-filter-btn { padding:4px 10px; border:1px solid #d1d5db; background:#fff; border-radius:14px; font-size:12px; cursor:pointer; color:#374151; transition:all .15s; white-space:nowrap; }
 .dlq-filter-btn:hover { border-color:#3b82f6; color:#3b82f6; }
 .dlq-filter-btn.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
-.dlq-tbl { width:100%; border-collapse:collapse; font-size:12px; min-width:900px; }
+/* [v33] 컬럼 컴팩트 + 최근대응 컬럼 확장 */
+.dlq-tbl { width:100%; border-collapse:collapse; font-size:11.5px; min-width:1000px; table-layout:auto; }
 .dlq-tbl thead tr { background:#f1f5f9; }
-.dlq-tbl th { padding:9px 10px; text-align:left; font-weight:600; color:#475569; font-size:11px; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+.dlq-tbl th { padding:7px 6px; text-align:left; font-weight:600; color:#475569; font-size:10.5px; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
 .dlq-tbl-row { border-bottom:1px solid #f1f5f9; transition:background .12s; }
 .dlq-tbl-row:hover { background:#eff6ff; cursor:pointer; }
-.dlq-tbl td { padding:8px 10px; color:#374151; vertical-align:middle; }
+.dlq-tbl td { padding:6px 6px; color:#374151; vertical-align:middle; }
 .dlq-tbl-cno { color:#3b82f6; font-weight:600; }
-.dlq-tbl-group { font-size:11px; color:#6b7280; background:#f3f4f6; padding:2px 6px; border-radius:4px; }
-.dlq-tbl-nm { font-weight:500; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.dlq-tbl-info { font-size:11px; color:#6b7280; }
-.dlq-tbl-amt { font-weight:500; color:#374151; white-space:nowrap; }
-.dlq-tbl-tel { color:#6b7280; font-size:11px; }
-.dlq-tbl-content { max-width:200px; color:#6b7280; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dlq-tbl-group { font-size:10px; color:#6b7280; background:#f3f4f6; padding:1px 5px; border-radius:4px; }
+.dlq-tbl-nm { font-weight:500; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dlq-tbl-info { font-size:10.5px; color:#6b7280; }
+.dlq-tbl-amt { font-weight:500; color:#374151; white-space:nowrap; font-size:11px; }
+.dlq-tbl-tel { color:#6b7280; font-size:10.5px; }
+.dlq-tbl-content { min-width:380px; max-width:none; color:#374151; white-space:normal; word-break:keep-all; line-height:1.55; font-size:11.5px; }
 .dlq-days-badge { display:inline-block; padding:2px 7px; border-radius:10px; font-size:11px; font-weight:600; }
 .dlq-days-low  { background:#dcfce7; color:#166534; }
 .dlq-days-mid  { background:#fef9c3; color:#854d0e; }
@@ -4711,7 +4712,7 @@ function dlqRenderTableRows() {
             <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
             <td style="white-space:nowrap;font-size:11px;color:#374151">${r.actionDateStr&&r.actionDateStr!=='-'?r.actionDateStr:'—'}</td>
             <td>${r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-'}</td>
-            <td class="dlq-tbl-content" style="min-width:300px;white-space:normal;line-height:1.5;color:#374151">${shortContent}</td>
+            <td class="dlq-tbl-content">${shortContent}</td>
           </tr>`;
         }).join('')}
       </tbody>
