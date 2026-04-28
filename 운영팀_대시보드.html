@@ -1649,18 +1649,19 @@ function findColIdx(labels, keywords, fallbackIdx) {
 }
 
 // 연체관리(Daily Report) 시트 파서
-// 실제 시트 컬럼: A=대응일(0) | B=계약번호(1) | C=입금인(2) | D=입금예정(3) | E=대응 상세내용(4) | F=담당자(5)
+// [v23] 시트 컬럼 (2026-04-28 변경): A=대응일(0) | B=계약번호(1) | C=입금인(2) | D=입금예정(3) | E=업무구분(4) | F=대응 상세내용(5)
 function parseDailyReport(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
   const labels = cols.map(c => (c.label||c.id||'').trim());
-  // 헤더 매칭 + 절대 위치 fallback (헤더 사라지거나 필터 걸려도 안전)
+  // 헤더 매칭 + 절대 위치 fallback (시트 컬럼 변경에 안전)
   const dateIdx    = findColIdx(labels, ['대응일','일자','날짜'],         0);  // A열
   const noIdx      = findColIdx(labels, ['계약번호','계약'],              1);  // B열
   const payDateIdx = findColIdx(labels, ['입금예정','납기일','납부예정'],   3);  // D열
-  const contentIdx = findColIdx(labels, ['대응 상세','대응상세','대응내용','내용'], 4);  // E열
-  const billIdx    = findColIdx(labels, ['청구서명','청구'],            -1);  // 시트에 없음
-  const stepIdx    = findColIdx(labels, ['단계','step'],                -1);  // 시트에 없음
+  const jobTypeIdx = findColIdx(labels, ['업무구분','업무 구분','구분'],   4);  // E열 (신규)
+  const contentIdx = findColIdx(labels, ['대응 상세','대응상세','대응내용','상세내용','내용'], 5);  // F열 (E→F로 이동)
+  const billIdx    = findColIdx(labels, ['청구서명','청구'],            -1);
+  const stepIdx    = findColIdx(labels, ['단계','step'],                -1);
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
@@ -1670,9 +1671,10 @@ function parseDailyReport(resp) {
       date:    cell(dateIdx),
       no:      no,
       payDate: cell(payDateIdx),
+      jobType: cell(jobTypeIdx),  // E열: 업무구분 (연체관리 / 중도퇴실관리 등)
       bill:    cell(billIdx),
       content: cell(contentIdx),
-      step:    cell(stepIdx)   // E열: 단계
+      step:    cell(stepIdx)
     };
   }).filter(Boolean);
 }
@@ -1852,33 +1854,72 @@ async function loadContractData() {
 }
 
 function buildResponseTableHTML(responses) {
-  if (responses.length === 0)
-    return `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">대응 내역이 없습니다</div>`;
+  // [v23] window._respJobFilter 적용 (전체 / 연체관리 / 중도퇴실관리)
+  const jobFilter = window._respJobFilter || '전체';
+  const filtered = (jobFilter === '전체')
+    ? responses
+    : responses.filter(r => String(r.jobType||'').trim() === jobFilter);
+  if (filtered.length === 0)
+    return `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">${jobFilter==='전체'?'대응 내역이 없습니다':jobFilter+' 대응 내역이 없습니다'}</div>`;
   return `<div style="overflow-x:auto;padding:0 4px 4px">
     <table class="cr-detail-table">
       <thead><tr>
         <th style="width:36px;text-align:center">No</th>
         <th style="width:100px">대응일</th>
         <th style="width:130px">입금예정일</th>
+        <th style="width:110px">업무구분</th>
         <th>대응 상세내용</th>
       </tr></thead>
-      <tbody>${responses.map((r,i) => `<tr>
-        <td style="text-align:center;color:#8A9AB5;font-size:11px">${responses.length - i}</td>
+      <tbody>${filtered.map((r,i) => {
+        const jt = String(r.jobType||'').trim();
+        const jtColor = jt==='연체관리' ? '#DC2626' : jt==='중도퇴실관리' ? '#7C3AED' : '#6B7280';
+        const jtBg    = jt==='연체관리' ? '#FEE2E2' : jt==='중도퇴실관리' ? '#EDE9FE' : '#F3F4F6';
+        return `<tr>
+        <td style="text-align:center;color:#8A9AB5;font-size:11px">${filtered.length - i}</td>
         <td style="white-space:nowrap;font-size:12px;font-weight:600">${r.date}</td>
         <td style="font-size:12px;color:${r.payDate?'#D97706':'#B0BDCE'};font-weight:${r.payDate?'700':'400'}">
           ${r.payDate||'—'}
         </td>
+        <td style="font-size:11px">${jt?`<span style="background:${jtBg};color:${jtColor};font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap">${jt}</span>`:'<span style="color:#B0BDCE">—</span>'}</td>
         <td style="font-size:12px">${r.content||'—'}</td>
-      </tr>`).join('')}
+      </tr>`;}).join('')}
       </tbody>
     </table></div>`;
 }
 
+// [v23] 업무구분 필터 적용 핸들러
+window._respJobFilter = window._respJobFilter || '전체';
+window._respCachedNo  = null;
+window._respCachedRes = null;
+function setRespJobFilter(val) {
+  window._respJobFilter = val;
+  if (window._respCachedNo && window._respCachedRes) {
+    updateResponseSection(window._respCachedNo, window._respCachedRes);
+  }
+}
+
+function buildJobFilterBar(responses) {
+  const sel = window._respJobFilter || '전체';
+  const counts = { '전체': responses.length, '연체관리': 0, '중도퇴실관리': 0 };
+  responses.forEach(r => { const jt = String(r.jobType||'').trim(); if (counts[jt] !== undefined) counts[jt]++; });
+  function pill(val) {
+    const active = (val === sel);
+    const bg = active ? (val==='연체관리'?'#DC2626':val==='중도퇴실관리'?'#7C3AED':'#1B3976') : '#F3F4F6';
+    const fg = active ? '#fff' : '#374151';
+    return `<button onclick="setRespJobFilter('${val}')" style="background:${bg};color:${fg};border:none;padding:4px 12px;border-radius:14px;font-size:11.5px;font-weight:700;cursor:pointer;margin-right:6px">${val} <span style="opacity:.7;font-weight:600">(${counts[val]})</span></button>`;
+  }
+  return `<div style="display:flex;align-items:center;gap:4px;padding:0 4px 8px">${pill('전체')}${pill('연체관리')}${pill('중도퇴실관리')}</div>`;
+}
+
 function updateResponseSection(no, responses) {
+  // [v23] 캐시: 필터 변경 시 재사용
+  window._respCachedNo  = no;
+  window._respCachedRes = responses;
   const section = document.getElementById('crResponseSection');
   if (!section) return;
   section.innerHTML = `
     <div class="cr-card-title">📞 대응 내역 (${responses.length}건)</div>
+    ${buildJobFilterBar(responses)}
     ${buildResponseTableHTML(responses)}`;
 }
 
@@ -3232,7 +3273,7 @@ function renderContractRecord(c, payments, responses = []) {
     <div class="cr-card-title">📞 대응 내역 (${responses.length}건${daeungRawData.length===0?' · 로딩 중...':''})</div>
     ${daeungRawData.length === 0
       ? `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">📡 대응내역 로딩 중...</div>`
-      : buildResponseTableHTML(responses)}
+      : (window._respCachedNo = String(c['계약번호']||'').trim(), window._respCachedRes = responses, buildJobFilterBar(responses) + buildResponseTableHTML(responses))}
   </div>
 
   <div class="cr-card">
@@ -3932,7 +3973,7 @@ function parseDailyForPayDate(resp, delinqRows) {
   const dateIdx_    = findColIdx(_labels, ['대응일','일자','날짜'],         0);
   const noIdx_      = findColIdx(_labels, ['계약번호','계약'],              1);
   const payDateIdx_ = findColIdx(_labels, ['입금예정','납부예정','예정일'], 3);
-  const contentIdx_ = findColIdx(_labels, ['대응 상세내용','대응내용','상세내용','내용'], 4);
+  const contentIdx_ = findColIdx(_labels, ['대응 상세내용','대응내용','상세내용','내용'], 5);  // [v23] E→F
 
   // 연체 계약번호 set 구성
   const delinqSet = new Set((delinqRows || []).map(r => String(r.cno).replace(/\.0$/,'').trim()));
@@ -4028,7 +4069,7 @@ function parseDailyForPt(resp) {
   const _dateIdx    = findColIdx(_labels, ['대응일','일자','날짜'], 0);
   const _noIdx      = findColIdx(_labels, ['계약번호','계약'],      1);
   const _payDateIdx = findColIdx(_labels, ['입금예정','납부예정','예정일'], 3);
-  const _contentIdx = findColIdx(_labels, ['대응 상세내용','대응내용','상세내용','내용'], 4);
+  const _contentIdx = findColIdx(_labels, ['대응 상세내용','대응내용','상세내용','내용'], 5);  // [v23] E→F
   const map = {}; // cno → { latestDate, latestDateStr, latestContent }
   rows.forEach(row => {
     const c = row.c || [];
