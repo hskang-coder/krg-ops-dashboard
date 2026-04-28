@@ -3926,6 +3926,13 @@ function parseDailyForPayDate(resp, delinqRows) {
   // delinqRows: gid=1953907648에서 k=정상, bp=연체인 계약 목록
   if (!resp || !resp.table) return { past:0, today:0, future:0, payDateMap:{} };
   const rows = resp.table.rows || [];
+  // [v22] 헤더 라벨 매핑 (컬럼 순서 변경에 안전 / 헤더 없으면 절대 인덱스 fallback)
+  const _cols = resp.table.cols || [];
+  const _labels = _cols.map(c => (c.label||c.id||'').trim());
+  const dateIdx_    = findColIdx(_labels, ['대응일','일자','날짜'],         0);
+  const noIdx_      = findColIdx(_labels, ['계약번호','계약'],              1);
+  const payDateIdx_ = findColIdx(_labels, ['입금예정','납부예정','예정일'], 3);
+  const contentIdx_ = findColIdx(_labels, ['대응 상세내용','대응내용','상세내용','내용'], 4);
 
   // 연체 계약번호 set 구성
   const delinqSet = new Set((delinqRows || []).map(r => String(r.cno).replace(/\.0$/,'').trim()));
@@ -3939,11 +3946,11 @@ function parseDailyForPayDate(resp, delinqRows) {
   const contractLatestRow = {};
   rows.forEach(row => {
     const c = row.c || [];
-    const cno = c[1] ? String(c[1].f ?? c[1].v ?? '').replace(/\.0$/,'').trim() : '';
+    const cno = (noIdx_ >= 0 && c[noIdx_]) ? String(c[noIdx_].f ?? c[noIdx_].v ?? '').replace(/\.0$/,'').trim() : '';
     if (!delinqSet.has(cno)) return;
 
-    // A열(대응일) 파싱
-    const aCell = c[0];
+    // 대응일 파싱 (헤더 매핑된 인덱스)
+    const aCell = dateIdx_ >= 0 ? c[dateIdx_] : null;
     let aDate = null;
     if (aCell && aCell.v) {
       const ma = String(aCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
@@ -3959,8 +3966,8 @@ function parseDailyForPayDate(resp, delinqRows) {
     const prev = contractLatestRow[cno];
     if (prev && prev.aDate && aDate < prev.aDate) return;
 
-    // D열(입금예정일) 파싱 — 같은 행에서
-    const dateCell = c[3];
+    // 입금예정일 파싱 — 같은 행에서 (헤더 매핑된 인덱스)
+    const dateCell = payDateIdx_ >= 0 ? c[payDateIdx_] : null;
     let payDate = null;
     if (dateCell && (dateCell.v || dateCell.f)) {
       const vStr = String(dateCell.f || dateCell.v || '');
@@ -3972,8 +3979,8 @@ function parseDailyForPayDate(resp, delinqRows) {
       }
     }
 
-    // E열(대응내용) — 같은 행에서
-    const content = c[4] ? String(c[4].f || c[4].v || '') : '';
+    // 대응내용 — 같은 행에서 (헤더 매핑된 인덱스)
+    const content = (contentIdx_ >= 0 && c[contentIdx_]) ? String(c[contentIdx_].f || c[contentIdx_].v || '') : '';
 
     contractLatestRow[cno] = { aDate, payDate, content };
   });
@@ -4015,12 +4022,19 @@ function parseDailyForPayDate(resp, delinqRows) {
 function parseDailyForPt(resp) {
   if (!resp || !resp.table) return {};
   const rows = resp.table.rows || [];
+  // [v22] 헤더 라벨 매핑 (컬럼 순서 변경에 안전)
+  const _cols = resp.table.cols || [];
+  const _labels = _cols.map(c => (c.label||c.id||'').trim());
+  const _dateIdx    = findColIdx(_labels, ['대응일','일자','날짜'], 0);
+  const _noIdx      = findColIdx(_labels, ['계약번호','계약'],      1);
+  const _payDateIdx = findColIdx(_labels, ['입금예정','납부예정','예정일'], 3);
+  const _contentIdx = findColIdx(_labels, ['대응 상세내용','대응내용','상세내용','내용'], 4);
   const map = {}; // cno → { latestDate, latestDateStr, latestContent }
   rows.forEach(row => {
     const c = row.c || [];
-    const cno = c[1] ? String(c[1].f ?? c[1].v ?? '').replace(/\.0$/,'').trim() : '';
+    const cno = (_noIdx >= 0 && c[_noIdx]) ? String(c[_noIdx].f ?? c[_noIdx].v ?? '').replace(/\.0$/,'').trim() : '';
     if (!cno) return;
-    const aCell = c[0];
+    const aCell = _dateIdx >= 0 ? c[_dateIdx] : null;
     let aDate = null;
     if (aCell && aCell.v) {
       const m = String(aCell.v).match(/Date\((\d+),(\d+),(\d+)\)/);
