@@ -2658,6 +2658,15 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
       + '<table class="cm-amt-tbl"><tr><th style="width:30%">계약자</th><th style="width:25%">연체 일수</th><th>미납 금액 (발행일 기준 누적)</th></tr>'
       + '<tr><td>' + (r.nm||'') + '</td><td class="days">' + (r.days||0) + '일</td><td class="amt">금 ' + fmtKRW(r.amt) + '원 정 (₩' + fmtKRW(r.amt) + ')</td></tr>'
       + '</table>'
+      // [v41] '3. 본 통지의 요지' 섹션은 페이지2로 이동 (분량 균형)
+      + '</div>'  // [v30] 페이지1 cm-body 닫기
+      + '<div style="text-align:right;font-size:8.5pt;color:#9ca3af;margin-top:18px;border-top:1px solid #d1d5db;padding-top:6px">— 1 / 2 —</div>'
+      + '</div>'  // [v30] 페이지1 .np 닫기
+      // [v30] 페이지 2 시작 — [v39] data-name + data-pageseq=2
+      + '<div class="np" data-name="' + _safeName + '" data-pageseq="2">'
+      + '<div style="text-align:right;font-size:9pt;color:#374151;margin-bottom:14px;border-bottom:1.5px solid #1f2937;padding-bottom:6px"><b>내용증명서</b> (계속) &nbsp;|&nbsp; 증서번호: ' + refNo(cno) + '</div>'
+      + '<div class="cm-body">'  // [v30] 페이지2 cm-body 시작
+      // [v41] 페이지1에서 옮겨온 '3. 본 통지의 요지'
       + '<p><strong>3. 본 통지의 요지</strong><br>&nbsp;&nbsp;&nbsp;&nbsp;귀하의 위 미납은 임대차 계약의 중대한 위반에 해당하며, 본 발신인은 이로 인한 손해를 회복하기 위하여 아래와 같이 조치할 예정입니다.</p>'
       + '<ol class="cm-list">'
       + '<li><strong>지급명령(독촉절차) 신청</strong> — 관할 법원에 지급명령을 신청하며, 이의 신청이 없을 경우 즉시 확정됩니다.</li>'
@@ -2666,13 +2675,6 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
       + '<li><strong>소송 비용 일체 부담</strong> — 본 절차로 발생하는 인지대, 송달료, 변호사 비용 등 일체의 비용은 귀하가 부담합니다.</li>'
       + '<li><strong>신용정보 등록</strong> — 한국신용정보원 등에 채무불이행 정보가 등록되어 향후 금융 거래에 제약이 발생할 수 있습니다.</li>'
       + '</ol>'
-      + '</div>'  // [v30] 페이지1 cm-body 닫기
-      + '<div style="text-align:right;font-size:8.5pt;color:#9ca3af;margin-top:18px;border-top:1px solid #d1d5db;padding-top:6px">— 1 / 2 —</div>'
-      + '</div>'  // [v30] 페이지1 .np 닫기
-      // [v30] 페이지 2 시작 — [v39] data-name + data-pageseq=2
-      + '<div class="np" data-name="' + _safeName + '" data-pageseq="2">'
-      + '<div style="text-align:right;font-size:9pt;color:#374151;margin-bottom:14px;border-bottom:1.5px solid #1f2937;padding-bottom:6px"><b>내용증명서</b> (계속) &nbsp;|&nbsp; 증서번호: ' + refNo(cno) + '</div>'
-      + '<div class="cm-body">'  // [v30] 페이지2 cm-body 시작
       + (includeCriminal ? '<p><strong>4. 형사상 조치</strong><br>&nbsp;&nbsp;&nbsp;&nbsp;또한, 귀하의 행위는 단순한 채무불이행을 넘어서는 형사범죄에 해당합니다.</p>' +
           '<ol class="cm-list">' +
           '<li><strong>계약 당시부터 납부를 피하고 임대차 계약을 체결한 점</strong> → 사기죄 (형법 제347조)</li>' +
