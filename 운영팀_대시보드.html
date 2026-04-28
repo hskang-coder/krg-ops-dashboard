@@ -2424,7 +2424,7 @@ function buildDlqNoticeHtml(rows, contractDetails) {
       // CTA
       + '<div class="cta-box">'
       + '<div class="cta-main">지금 즉시 납부하거나 담당자에게 연락하십시오.</div>'
-      + '<div class="cta-sub">Tel. 010-9715-8064 &nbsp;|&nbsp; 신한은행 140-012-419494 (케이알지그룹)</div>'
+      + '<div class="cta-sub">Tel. 02-6933-0099 &nbsp;|&nbsp; 신한은행 140-012-419494 (케이알지그룹)</div>'
       + '</div>'
       + '<div class="notice-txt">※ 본 안내문은 법적 고지를 포함하며, 향후 분쟁 발생 시 증빙자료로 활용됩니다.</div>'
       + '</div>'
@@ -2434,8 +2434,8 @@ function buildDlqNoticeHtml(rows, contractDetails) {
       + '<div class="footer-right">'
       + '<div style="font-size:8pt;color:#9ca3af;margin-bottom:4px">발행인</div>'
       + '<div class="footer-company">케이알지그룹주식회사 법무팀</div>'
-      + '<div class="footer-tel">Tel. 010-9715-8064</div>'
-      + '<div class="footer-tel" style="margin-top:2px">충남 천안시 동남구 목천읍 천정1길 227-14</div>'
+      + '<div class="footer-tel">Tel. 02-6933-0099</div>'
+      + '<div class="footer-tel" style="margin-top:2px">서울특별시 강남구 강남대로 450(한국자산관리공사) 507호</div>'
       + '</div>'
       + '</div>'
       + '</div>';
@@ -2516,7 +2516,8 @@ function buildDlqSmsNoticeHtml(rows, contractDetails) {
   rows.forEach(function(r) {
     var cno = String(r.cno);
     var addr = (contractDetails[cno] && contractDetails[cno].addr) || '';
-    var dueDateStr = (r.dateStr && r.dateStr !== '-') ? r.dateStr : deadlineDate();
+    // [v29] '긴급대응필요'인 경우도 todayKo (발행일)로 표시
+    var dueDateStr = (r.dateStr && r.dateStr !== '-' && r.dateStr !== '긴급대응필요') ? r.dateStr : todayKo;
 
     pages += '<div class="np">'
       + '<div class="cm-title">내 용 증 명</div>'
@@ -2536,8 +2537,8 @@ function buildDlqSmsNoticeHtml(rows, contractDetails) {
       + '<div class="cm-box-body">'
       + '<div class="cm-row"><div class="cm-lbl">상    호</div><div class="cm-val cm-val-emp">케이알지그룹 주식회사 (법무팀)</div></div>'
       + '<div class="cm-row"><div class="cm-lbl">대표자</div><div class="cm-val">대표이사 김기성, 김준영</div></div>'
-      + '<div class="cm-row"><div class="cm-lbl">소재지</div><div class="cm-val">충청남도 천안시 동남구 목천읍 천정1길 227-14</div></div>'
-      + '<div class="cm-row"><div class="cm-lbl">연락처</div><div class="cm-val">Tel. 010-9715-8064</div></div>'
+      + '<div class="cm-row"><div class="cm-lbl">소재지</div><div class="cm-val">서울특별시 강남구 강남대로 450(한국자산관리공사) 507호</div></div>'
+      + '<div class="cm-row"><div class="cm-lbl">연락처</div><div class="cm-val">Tel. 02-6933-0099</div></div>'
       + '</div></div>'
 
       // 사건명
@@ -2569,8 +2570,8 @@ function buildDlqSmsNoticeHtml(rows, contractDetails) {
       // 발신인 영역
       + '<div class="cm-sender">'
       + '<div class="cm-sender-row"><div class="cm-sender-lbl">발 신 인</div><div class="cm-sender-val">케이알지그룹 주식회사 법무팀</div>' + (window.__krgSealDataUrl ? '<img src="' + window.__krgSealDataUrl + '" alt="인장" class="cm-sender-stamp-img" style="width:80px;height:80px;margin-left:14px;object-fit:contain">' : '<div class="cm-sender-stamp">(인)</div>') + '</div>'
-      + '<div class="cm-sender-row"><div class="cm-sender-lbl">소 재 지</div><div class="cm-sender-val">충청남도 천안시 동남구 목천읍 천정1길 227-14</div></div>'
-      + '<div class="cm-sender-row"><div class="cm-sender-lbl">연 락 처</div><div class="cm-sender-val">Tel. 010-9715-8064 &nbsp;|&nbsp; 신한은행 140-012-419494 (예금주: 케이알지그룹주식회사)</div></div>'
+      + '<div class="cm-sender-row"><div class="cm-sender-lbl">소 재 지</div><div class="cm-sender-val">서울특별시 강남구 강남대로 450(한국자산관리공사) 507호</div></div>'
+      + '<div class="cm-sender-row"><div class="cm-sender-lbl">연 락 처</div><div class="cm-sender-val">Tel. 02-6933-0099 &nbsp;|&nbsp; 신한은행 140-012-419494 (예금주: 케이알지그룹주식회사)</div></div>'
       + '</div>'
 
       // 우체국 안내
@@ -5908,7 +5909,7 @@ function buildSubAgreementHtml(d) {
     + '<div class="sa-sig-ttl">케이알지그룹(주)(갑)</div>'
     + '<div class="sa-sig-body">'
     + '<table class="sa-sig-tbl">'
-    + '<tr><td class="sa-sig-lbl">주소</td><td class="sa-sig-val">충남 천안시 동남구 목천읍 천정1길 227-14</td></tr>'
+    + '<tr><td class="sa-sig-lbl">주소</td><td class="sa-sig-val">서울특별시 강남구 강남대로 450(한국자산관리공사) 507호</td></tr>'
     + '<tr><td class="sa-sig-lbl">연락처</td><td class="sa-sig-val">02-6933-0099</td></tr>'
     + '<tr><td class="sa-sig-lbl">이름(법인명)</td><td class="sa-sig-val">케이알지그룹 주식회사</td></tr>'
     + '</table>'
@@ -6226,7 +6227,7 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '<div style="display:grid;grid-template-columns:1fr 60px;margin-top:4px">'
     + '<table class="sg-tbl" style="font-size:8pt">'
     + '<colgroup><col style="width:22%"><col></colgroup>'
-    + '<tr><td class="sg-lbl" style="padding:3px 7px">주소</td><td style="padding:3px 7px">충남 천안시 동남구 목천읍 천정1길 227-14</td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">주소</td><td style="padding:3px 7px">서울특별시 강남구 강남대로 450(한국자산관리공사) 507호</td></tr>'
     + '<tr><td class="sg-lbl" style="padding:3px 7px">연락처</td><td style="padding:3px 7px">02-6933-0099</td></tr>'
     + '<tr><td class="sg-lbl" style="padding:3px 7px">이름(법인명)</td><td style="padding:3px 7px">케이알지그룹 주식회사</td></tr>'
     + '</table>'
