@@ -2305,9 +2305,12 @@ async function dlqGenerateDoc(type) {
       html = buildDlqNoticeHtml(rows, contractDetails);
     } else if (type === 'civil_criminal') {
       html = buildDlqSmsNoticeHtml(rows, contractDetails, {includeCriminal: true});
-    } else {
-      // 'sms', 'civil' — 동일한 정식 내용증명 양식 (민사)
+    } else if (type === 'civil') {
+      // 정식 내용증명 양식 (민사)
       html = buildDlqSmsNoticeHtml(rows, contractDetails);
+    } else {
+      // 'sms' — 짧은 SMS 통보 양식 (휴대폰 문자 발송용)
+      html = buildDlqSmsTextHtml(rows, contractDetails);
     }
     var win = window.open('', '_blank', 'width=920,height=900,scrollbars=yes');
     if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
@@ -2462,6 +2465,89 @@ function buildDlqNoticeHtml(rows, contractDetails) {
     + pages + '</body></html>';
 }
 
+
+// ── 내용증명 문자 발송 — 짧은 SMS 통보 양식 ────────────
+function buildDlqSmsTextHtml(rows, contractDetails) {
+  var now = new Date();
+  var yy = now.getFullYear();
+  var mo = String(now.getMonth()+1).padStart(2,'0');
+  var dd = String(now.getDate()).padStart(2,'0');
+  var hh = String(now.getHours()).padStart(2,'0');
+  var mi = String(now.getMinutes()).padStart(2,'0');
+  var todayKo = yy + '년 ' + parseInt(mo) + '월 ' + parseInt(dd) + '일';
+  function fmtKRW(n){ return Math.round(n||0).toLocaleString('ko-KR'); }
+  function refNo(cno){ return yy+mo+dd+'-'+hh+mi+String(cno); }
+
+  // 계약구분에 따른 호칭 (vacancyRawData에서 contractInfo 조회)
+  function nameLabel(cno){
+    var v = (typeof vacancyRawData !== 'undefined' && vacancyRawData) ? vacancyRawData.find(function(x){return String(x.no).trim()===String(cno).trim();}) : null;
+    if (v && v.contractInfo === '공동전차인') return '계약자1, 계약자2(을)';
+    if (v && v.contractInfo === '연대보증인') return '계약자1(을), 연대보증인(병)';
+    return '계약자1(을)';
+  }
+
+  var css = '*{box-sizing:border-box;margin:0;padding:0}'
+    + 'body{font-family:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:11.5pt;color:#1a1a1a;background:#eef0f4;line-height:1.95}'
+    + '.np{width:210mm;min-height:297mm;padding:30mm 25mm;background:#fff;position:relative}'
+    + '@media screen{.np{margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.15)}.np+.np{margin-top:24px}.no-print{display:block!important}}'
+    + '@media print{@page{size:A4 portrait;margin:0}body{background:#fff}.np{margin:0;box-shadow:none;width:100%;padding:30mm 25mm}.np~.np{break-before:page;page-break-before:always}.no-print{display:none!important}}'
+    + '.sms-hdr{background:#7f1d1d;color:#fff;padding:18px 24px;text-align:center;border-radius:6px 6px 0 0}'
+    + '.sms-hdr-sub{font-size:9pt;opacity:.8;letter-spacing:1px;margin-bottom:5px}'
+    + '.sms-hdr-title{font-size:22pt;font-weight:900;letter-spacing:2px}'
+    + '.sms-meta{display:flex;justify-content:space-between;font-size:8.5pt;color:#6b7280;margin:8px 4px 28px}'
+    + '.sms-target{font-size:13pt;font-weight:700;color:#1a1a1a;margin:30px 0 14px;padding:12px 18px;border-left:5px solid #b91c1c;background:#fef2f2;line-height:1.7}'
+    + '.sms-target b{color:#b91c1c;font-weight:800}'
+    + '.sms-body{font-size:12pt;line-height:2.2;color:#1a1a1a;margin-bottom:20px}'
+    + '.sms-body p{margin-bottom:14px}'
+    + '.sms-body strong{font-weight:800;color:#b91c1c}'
+    + '.sms-emp{display:inline-block;background:#fffbeb;color:#92400e;padding:2px 10px;font-weight:800;border-radius:4px;border:1.5px solid #fbbf24;margin:0 3px}'
+    + '.sms-amt{display:inline-block;background:#fef2f2;color:#b91c1c;padding:3px 12px;font-weight:800;border-radius:4px;border:1.5px solid #fca5a5;font-size:13pt;margin:0 4px}'
+    + '.sms-actions{margin:24px 0;padding:18px 22px;background:#1f2937;color:#fff;border-radius:8px;font-size:11.5pt;line-height:1.95}'
+    + '.sms-actions strong{color:#fbbf24;font-weight:800}'
+    + '.sms-footer{margin-top:30px;padding-top:18px;border-top:2px solid #1f2937;font-size:10pt;color:#374151;line-height:1.85}'
+    + '.sms-footer-tit{font-weight:800;color:#1a1a1a;font-size:11pt;margin-bottom:6px}'
+    + '.sms-stamp{width:80px;height:80px;float:right;margin-top:-12px}';
+
+  var pages = '';
+  rows.forEach(function(r){
+    var cno = String(r.cno);
+    var label = nameLabel(cno);
+    var dueDateStr = (r.dateStr && r.dateStr !== '-' && r.dateStr !== '긴급대응필요') ? r.dateStr : todayKo;
+    pages += '<div class="np">'
+      + '<div class="sms-hdr"><div class="sms-hdr-sub">법무팀 공식 통보</div><div class="sms-hdr-title">[ 민사소송 예정 통보 ]</div></div>'
+      + '<div class="sms-meta"><span>증서번호: ' + refNo(cno) + '</span><span>작성일자: ' + todayKo + '</span></div>'
+      + '<div class="sms-target"><b>' + label + '</b> ' + (r.nm ? '— <b>' + r.nm + '</b> 님' : '님') + '</div>'
+      + '<div class="sms-body">'
+      + '<p>귀하는 계약중 월세 연체가 <span class="sms-emp">' + (r.days||0) + '일</span> 발생 중이며, 미납 금액은 <span class="sms-amt">₩' + fmtKRW(r.amt) + '원</span> 입니다.</p>'
+      + '<p>당사는 <strong>지급명령(독촉절차) 신청 및 민사소송(본안) 제기</strong>를 포함한 법적 절차를 진행 예정입니다.</p>'
+      + '<p>약속된 <span class="sms-emp">' + dueDateStr + '</span>까지 연체금 <span class="sms-amt">₩' + fmtKRW(r.amt) + '원</span> 전액 납부가 안될 경우, 아래 절차를 즉각 진행하겠습니다.</p>'
+      + '</div>'
+      + '<div class="sms-actions">'
+      + '<div><strong>① 법원 절차 접수</strong> — 지급명령(독촉절차) 신청 및 민사소송 제기</div>'
+      + '<div><strong>② 확정 시 강제집행</strong> — 급여 · 예금 · 보증금 · 유체동산 등 전 자산 압류</div>'
+      + '</div>'
+      + '<div class="sms-footer">'
+      + (window.__krgSealDataUrl ? '<img src="' + window.__krgSealDataUrl + '" class="sms-stamp" alt="인장">' : '')
+      + '<div class="sms-footer-tit">케이알지그룹 주식회사 법무팀</div>'
+      + '<div>소재지: 서울특별시 강남구 강남대로 450(한국자산관리공사) 507호</div>'
+      + '<div>연락처: Tel. 02-6933-0099 &nbsp;|&nbsp; 신한은행 140-012-419494 (예금주: 케이알지그룹주식회사)</div>'
+      + '<div style="margin-top:6px;font-size:9pt;color:#6b7280">※ 본 통보는 법적 효력을 갖는 사전 통지서이며, 향후 분쟁 시 증빙자료로 활용됩니다.</div>'
+      + '</div>'
+      + '</div>';
+  });
+
+  return '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
+    + '<title>민사소송 예정 통보</title>'
+    + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">'
+    + '<style>'+css+'</style></head><body>'
+    + '<div class="dl-btns no-print" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:999">'
+    + '<button class="print-btn" onclick="window.print()" style="background:#1a1a1a;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖨️ 인쇄 / PDF 저장</button>'
+    + '<button class="jpg-btn" onclick="downloadAsJpg()" style="background:#0d9488;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖼️ JPG 저장</button>'
+    + '</div>'
+    + '<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>'
+    + '<script>function downloadAsJpg(){var pages=document.querySelectorAll(".np");if(!pages.length){alert("저장할 페이지가 없습니다.");return;}if(typeof html2canvas==="undefined"){alert("html2canvas 로딩 중입니다. 1~2초 후 다시 시도하세요.");return;}var btn=document.querySelector(".jpg-btn");var original=btn?btn.textContent:"";if(btn){btn.disabled=true;btn.textContent="\u23F3 \uBCC0\uD658 \uC911...";}var title=(document.title||"document").replace(/[^a-z0-9\uAC00-\uD7AF\-_]/gi,"_");var idx=0;function next(){if(idx>=pages.length){if(btn){btn.disabled=false;btn.textContent=original;}return;}html2canvas(pages[idx],{scale:2,useCORS:true,backgroundColor:"#ffffff",logging:false}).then(function(canvas){var suffix=pages.length>1?"_"+(idx+1):"";var link=document.createElement("a");link.download=title+suffix+".jpg";link.href=canvas.toDataURL("image/jpeg",0.95);document.body.appendChild(link);link.click();document.body.removeChild(link);idx++;setTimeout(next,400);}).catch(function(e){console.error(e);alert("JPG 저장 중 오류: "+e.message);if(btn){btn.disabled=false;btn.textContent=original;}});}next();}<\/script>'
+    + pages + '</body></html>';
+}
 
 // ── 내용증명서 (정식 공문 양식) ─────────────────────────
 function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
