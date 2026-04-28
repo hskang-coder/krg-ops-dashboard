@@ -274,9 +274,11 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .pt-chip-first { background: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
 .pt-chip-active { background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE; }
 .pt-chip-mgmt  { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
-.pt-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.pt-table th { background: #1A3A5C; color: #fff; padding: 9px 12px; font-weight: 700; text-align: left; font-size: 11px; position: sticky; top: 0; white-space: nowrap; }
-.pt-table td { padding: 9px 12px; border-bottom: 1px solid #F0F4F8; vertical-align: middle; }
+/* [v37] pt-table 컴팩트 + 컬럼별 폭 제어 */
+.pt-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: auto; }
+.pt-table th { background: #1A3A5C; color: #fff; padding: 7px 8px; font-weight: 700; text-align: left; font-size: 11px; position: sticky; top: 0; white-space: nowrap; }
+.pt-table td { padding: 7px 8px; border-bottom: 1px solid #F0F4F8; vertical-align: middle; white-space: nowrap; }
+.pt-table td.pt-td-content { white-space: normal !important; word-break: keep-all; line-height: 1.5; min-width: 280px; max-width: 360px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .pt-table tr:hover td { background: #EEF4FF; cursor: pointer; }
 .pt-tag { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; display: inline-block; white-space: nowrap; }
 .pt-tag-delinq { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
@@ -3034,9 +3036,9 @@ function renderPaymentTargets() {
         const dm = (window._ptDailyMap||{})[r.no] || {};
         const dateStr = dm.latestDateStr || '—';
         const content = dm.latestContent || '—';
-        const shortC = content.length > 30 ? content.substring(0,30)+'…' : content;
+        const shortC = content.length > 90 ? content.substring(0,90)+'…' : content;
         return `<td style="white-space:nowrap;font-size:11px;color:#374151">${dateStr}</td>
-                <td style="font-size:11px;color:#374151;max-width:160px" title="${content.replace(/"/g,'&quot;')}">${shortC}</td>`;
+                <td class="pt-td-content" style="font-size:11px;color:#374151" title="${content.replace(/"/g,'&quot;')}">${shortC}</td>`;
       })()}
       <td>${tagHtml(x)}</td>
     </tr>`;
