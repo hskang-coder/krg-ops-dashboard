@@ -1878,8 +1878,9 @@ function buildResponseTableHTML(responses) {
       </tr></thead>
       <tbody>${filtered.map((r,i) => {
         const jt = String(r.jobType||'').trim();
-        const jtColor = jt==='연체관리' ? '#DC2626' : jt==='중도퇴실관리' ? '#7C3AED' : '#6B7280';
-        const jtBg    = jt==='연체관리' ? '#FEE2E2' : jt==='중도퇴실관리' ? '#EDE9FE' : '#F3F4F6';
+        // [v40] 수납관리 하늘색 추가
+        const jtColor = jt==='연체관리' ? '#DC2626' : jt==='중도퇴실관리' ? '#7C3AED' : jt==='수납관리' ? '#0284C7' : '#6B7280';
+        const jtBg    = jt==='연체관리' ? '#FEE2E2' : jt==='중도퇴실관리' ? '#EDE9FE' : jt==='수납관리' ? '#E0F2FE' : '#F3F4F6';
         return `<tr>
         <td style="text-align:center;color:#8A9AB5;font-size:11px">${filtered.length - i}</td>
         <td style="white-space:nowrap;font-size:12px;font-weight:600">${r.date}</td>
@@ -1906,15 +1907,18 @@ function setRespJobFilter(val) {
 
 function buildJobFilterBar(responses) {
   const sel = window._respJobFilter || '전체';
-  const counts = { '전체': responses.length, '연체관리': 0, '중도퇴실관리': 0 };
+  // [v40] 수납관리 추가
+  const counts = { '전체': responses.length, '연체관리': 0, '중도퇴실관리': 0, '수납관리': 0 };
   responses.forEach(r => { const jt = String(r.jobType||'').trim(); if (counts[jt] !== undefined) counts[jt]++; });
   function pill(val) {
     const active = (val === sel);
-    const bg = active ? (val==='연체관리'?'#DC2626':val==='중도퇴실관리'?'#7C3AED':'#1B3976') : '#F3F4F6';
+    // [v40] 수납관리 active bg = 하늘색 (#0EA5E9)
+    const bg = active ? (val==='연체관리'?'#DC2626':val==='중도퇴실관리'?'#7C3AED':val==='수납관리'?'#0EA5E9':'#1B3976') : '#F3F4F6';
     const fg = active ? '#fff' : '#374151';
     return `<button onclick="setRespJobFilter('${val}')" style="background:${bg};color:${fg};border:none;padding:4px 12px;border-radius:14px;font-size:11.5px;font-weight:700;cursor:pointer;margin-right:6px">${val} <span style="opacity:.7;font-weight:600">(${counts[val]})</span></button>`;
   }
-  return `<div style="display:flex;align-items:center;gap:4px;padding:0 4px 8px">${pill('전체')}${pill('연체관리')}${pill('중도퇴실관리')}</div>`;
+  // [v40] 수납관리 pill 추가
+  return `<div style="display:flex;align-items:center;gap:4px;padding:0 4px 8px">${pill('전체')}${pill('연체관리')}${pill('수납관리')}${pill('중도퇴실관리')}</div>`;
 }
 
 function updateResponseSection(no, responses) {
