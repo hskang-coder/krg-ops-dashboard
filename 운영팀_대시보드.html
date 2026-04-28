@@ -956,20 +956,20 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-filter-btn { padding:4px 10px; border:1px solid #d1d5db; background:#fff; border-radius:14px; font-size:12px; cursor:pointer; color:#374151; transition:all .15s; white-space:nowrap; }
 .dlq-filter-btn:hover { border-color:#3b82f6; color:#3b82f6; }
 .dlq-filter-btn.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
-/* [v33] 컬럼 컴팩트 + 최근대응 컬럼 확장 */
-.dlq-tbl { width:100%; border-collapse:collapse; font-size:11.5px; min-width:1000px; table-layout:auto; }
+/* [v34] 모든 td nowrap + 최근대응 약간만 확장 */
+.dlq-tbl { width:100%; border-collapse:collapse; font-size:11.5px; min-width:1280px; table-layout:auto; }
 .dlq-tbl thead tr { background:#f1f5f9; }
 .dlq-tbl th { padding:7px 6px; text-align:left; font-weight:600; color:#475569; font-size:10.5px; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
 .dlq-tbl-row { border-bottom:1px solid #f1f5f9; transition:background .12s; }
 .dlq-tbl-row:hover { background:#eff6ff; cursor:pointer; }
-.dlq-tbl td { padding:6px 6px; color:#374151; vertical-align:middle; }
-.dlq-tbl-cno { color:#3b82f6; font-weight:600; }
-.dlq-tbl-group { font-size:10px; color:#6b7280; background:#f3f4f6; padding:1px 5px; border-radius:4px; }
-.dlq-tbl-nm { font-weight:500; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.dlq-tbl-info { font-size:10.5px; color:#6b7280; }
+.dlq-tbl td { padding:6px 6px; color:#374151; vertical-align:middle; white-space:nowrap; }
+.dlq-tbl-cno { color:#3b82f6; font-weight:600; white-space:nowrap; }
+.dlq-tbl-group { font-size:10px; color:#6b7280; background:#f3f4f6; padding:1px 5px; border-radius:4px; white-space:nowrap; }
+.dlq-tbl-nm { font-weight:500; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dlq-tbl-info { font-size:10.5px; color:#6b7280; white-space:nowrap; }
 .dlq-tbl-amt { font-weight:500; color:#374151; white-space:nowrap; font-size:11px; }
-.dlq-tbl-tel { color:#6b7280; font-size:10.5px; }
-.dlq-tbl-content { min-width:380px; max-width:none; color:#374151; white-space:normal; word-break:keep-all; line-height:1.55; font-size:11.5px; }
+.dlq-tbl-tel { color:#6b7280; font-size:10.5px; white-space:nowrap; }
+.dlq-tbl-content { min-width:260px; max-width:none; color:#374151; white-space:normal; word-break:keep-all; line-height:1.55; font-size:11.5px; }
 .dlq-days-badge { display:inline-block; padding:2px 7px; border-radius:10px; font-size:11px; font-weight:600; }
 .dlq-days-low  { background:#dcfce7; color:#166534; }
 .dlq-days-mid  { background:#fef9c3; color:#854d0e; }
@@ -2310,8 +2310,8 @@ async function dlqGenerateDoc(type) {
       // 정식 내용증명 양식 (민사)
       html = buildDlqSmsNoticeHtml(rows, contractDetails);
     } else {
-      // 'sms' — 짧은 SMS 통보 양식 (휴대폰 문자 발송용)
-      html = buildDlqSmsTextHtml(rows, contractDetails);
+      // 'sms' — 상단 단순 텍스트(복사용) + 하단 정식 내용증명 양식
+      html = buildDlqSmsNoticeHtml(rows, contractDetails, {includeTextPrefix: true});
     }
     var win = window.open('', '_blank', 'width=920,height=900,scrollbars=yes');
     if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
@@ -2553,7 +2553,8 @@ function buildDlqSmsTextHtml(rows, contractDetails) {
 // ── 내용증명서 (정식 공문 양식) ─────────────────────────
 function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
   // [v31] options.includeCriminal === true → 4. 형사상 조치 항목 추가, 번호 자동 조정
-  var includeCriminal = !!(options && options.includeCriminal);
+  var includeCriminal    = !!(options && options.includeCriminal);
+  var includeTextPrefix  = !!(options && options.includeTextPrefix);  // [v34] 상단 단순 텍스트
   var num납부 = includeCriminal ? '5' : '4';
   var num결론 = includeCriminal ? '6' : '5';
   var now = new Date();
@@ -2695,6 +2696,33 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
       + '</div>';
   });
 
+  // [v34] 상단 단순 텍스트 prefix
+  var textPrefixHtml = '';
+  if (includeTextPrefix) {
+    function _nameLabel(cno){
+      var v = (typeof vacancyRawData !== 'undefined' && vacancyRawData) ? vacancyRawData.find(function(x){return String(x.no).trim()===String(cno).trim();}) : null;
+      if (v && v.contractInfo === '공동전차인') return '계약자1, 계약자2(을)';
+      if (v && v.contractInfo === '연대보증인') return '계약자1(을), 연대보증인(병)';
+      return '계약자1(을)';
+    }
+    rows.forEach(function(r){
+      var cno = String(r.cno);
+      var label = _nameLabel(cno);
+      var dueDateStr = (r.dateStr && r.dateStr !== '-' && r.dateStr !== '긴급대응필요') ? r.dateStr : todayKo;
+      textPrefixHtml += '<div class="sms-text-block no-print" style="max-width:680px;margin:30px auto 18px;padding:24px 28px;background:#fff;border:1.5px solid #d1d5db;border-radius:8px;font-family:Noto Sans KR,sans-serif;font-size:14px;line-height:1.85;color:#1a1a1a;box-shadow:0 2px 12px rgba(0,0,0,.06)">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-weight:800;font-size:16pt;color:#7f1d1d">[민사소송 예정 통보]</div>'
+        + '<button onclick="(function(b){var t=b.parentNode.parentNode.querySelector(\'.sms-txt-content\').innerText;navigator.clipboard.writeText(t).then(function(){var o=b.textContent;b.textContent=\'\\u2705 \\uBCF5\\uC0AC\\uB418\\uC5C8\\uC2B5\\uB2C8\\uB2E4\';setTimeout(function(){b.textContent=o;},1500);});})(this)" style="background:#1f2937;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">📋 텍스트 복사</button></div>'
+        + '<div class="sms-txt-content" style="white-space:pre-wrap;font-size:13.5px;color:#1f2937;border-top:1px dashed #d1d5db;padding-top:12px">'
+        + '[민사소송 예정 통보]\n\n'
+        + label + '님은 계약중 월세 연체가 ' + (r.days||0) + '일 발생 중이며, 미납 금액은 ₩' + fmtKRW(r.amt) + '원 입니다.\n\n'
+        + '당사는 지급명령(독촉절차) 신청 및 민사소송(본안) 제기를 포함한 법적 절차를 진행 예정입니다.\n\n'
+        + '약속된 ' + dueDateStr + '까지 연체금 ₩' + fmtKRW(r.amt) + '원 전액 납부가 안될 경우, ① 법원 절차 접수 → ② 확정 시 강제집행 (예: 급여·예금·보증금·유체동산 등) 절차를 즉각 진행하겠습니다.'
+        + '</div>'
+        + '<div style="margin-top:10px;font-size:11px;color:#9ca3af;text-align:right">— 케이알지그룹 주식회사 법무팀 (Tel. 02-6933-0099) —</div>'
+        + '</div>';
+    });
+  }
+
   return '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
     + '<title>내용증명서</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;700;900&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">'
@@ -2705,7 +2733,7 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
     + '</div>'
     + '<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>'
     + '<script>function downloadAsJpg(){var pages=document.querySelectorAll(".np");if(!pages.length){alert("저장할 페이지가 없습니다.");return;}if(typeof html2canvas==="undefined"){alert("html2canvas 로딩 중입니다. 1~2초 후 다시 시도하세요.");return;}var btn=document.querySelector(".jpg-btn");var original=btn?btn.textContent:"";if(btn){btn.disabled=true;btn.textContent="\u23F3 \uBCC0\uD658 \uC911...";}var title=(document.title||"document").replace(/[^a-z0-9\uAC00-\uD7AF\-_]/gi,"_");var idx=0;function next(){if(idx>=pages.length){if(btn){btn.disabled=false;btn.textContent=original;}return;}html2canvas(pages[idx],{scale:2,useCORS:true,backgroundColor:"#ffffff",logging:false}).then(function(canvas){var suffix=pages.length>1?"_"+(idx+1):"";var link=document.createElement("a");link.download=title+suffix+".jpg";link.href=canvas.toDataURL("image/jpeg",0.95);document.body.appendChild(link);link.click();document.body.removeChild(link);idx++;setTimeout(next,400);}).catch(function(e){console.error(e);alert("JPG 저장 중 오류: "+e.message);if(btn){btn.disabled=false;btn.textContent=original;}});}next();}<\/script>'
-    + pages + '</body></html>';
+    + textPrefixHtml + pages + '</body></html>';
 }
 
 // ── 납부예정일 카드 계약상태 필터 ─────────────────────────
