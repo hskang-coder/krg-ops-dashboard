@@ -2457,7 +2457,7 @@ function buildDlqNoticeHtml(rows, contractDetails) {
     + '<title>월세 납부 독촉 및 연체 안내문</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">'
     + '<style>'+css+'</style></head><body>'
-    + '<div class="dl-btns no-print" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:999">'
+    + '<div class="dl-btns no-print" style="position:fixed;top:16px;' + (includeTextPrefix?'left:50%;transform:translateX(-50%);':'right:16px;') + 'display:flex;gap:8px;z-index:999">'
     + '<button class="print-btn" onclick="window.print()" style="background:#1a1a1a;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖨️ 인쇄 / PDF 저장</button>'
     + '<button class="jpg-btn" onclick="downloadAsJpg()" style="background:#0d9488;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖼️ JPG 저장</button>'
     + '</div>'
@@ -2541,7 +2541,7 @@ function buildDlqSmsTextHtml(rows, contractDetails) {
     + '<title>민사소송 예정 통보</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">'
     + '<style>'+css+'</style></head><body>'
-    + '<div class="dl-btns no-print" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:999">'
+    + '<div class="dl-btns no-print" style="position:fixed;top:16px;' + (includeTextPrefix?'left:50%;transform:translateX(-50%);':'right:16px;') + 'display:flex;gap:8px;z-index:999">'
     + '<button class="print-btn" onclick="window.print()" style="background:#1a1a1a;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖨️ 인쇄 / PDF 저장</button>'
     + '<button class="jpg-btn" onclick="downloadAsJpg()" style="background:#0d9488;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖼️ JPG 저장</button>'
     + '</div>'
@@ -2705,20 +2705,33 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
       if (v && v.contractInfo === '연대보증인') return '계약자1(을), 연대보증인(병)';
       return '계약자1(을)';
     }
+    function _nameDisplay(cno, primary){
+      var v = (typeof vacancyRawData !== 'undefined' && vacancyRawData) ? vacancyRawData.find(function(x){return String(x.no).trim()===String(cno).trim();}) : null;
+      var name1 = primary || (v && v.tenant1Name) || (v && v.tenantName) || '';
+      var name2 = (v && v.coName) ? v.coName : '';
+      var name2Label = '';
+      if (v && v.contractInfo === '공동전차인') name2Label = '계약자2';
+      else if (v && v.contractInfo === '연대보증인') name2Label = '연대보증인';
+      var out = name1 + '(계약자1)';
+      if (name2 && name2Label) out += ', ' + name2 + '(' + name2Label + ')';
+      return out;
+    }
     rows.forEach(function(r){
       var cno = String(r.cno);
-      var label = _nameLabel(cno);
+      var nameLine = _nameDisplay(cno, r.nm);
       var dueDateStr = (r.dateStr && r.dateStr !== '-' && r.dateStr !== '긴급대응필요') ? r.dateStr : todayKo;
-      textPrefixHtml += '<div class="sms-text-block no-print" style="max-width:680px;margin:30px auto 18px;padding:24px 28px;background:#fff;border:1.5px solid #d1d5db;border-radius:8px;font-family:Noto Sans KR,sans-serif;font-size:14px;line-height:1.85;color:#1a1a1a;box-shadow:0 2px 12px rgba(0,0,0,.06)">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-weight:800;font-size:16pt;color:#7f1d1d">[민사소송 예정 통보]</div>'
-        + '<button onclick="(function(b){var t=b.parentNode.parentNode.querySelector(\'.sms-txt-content\').innerText;navigator.clipboard.writeText(t).then(function(){var o=b.textContent;b.textContent=\'\\u2705 \\uBCF5\\uC0AC\\uB418\\uC5C8\\uC2B5\\uB2C8\\uB2E4\';setTimeout(function(){b.textContent=o;},1500);});})(this)" style="background:#1f2937;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">📋 텍스트 복사</button></div>'
-        + '<div class="sms-txt-content" style="white-space:pre-wrap;font-size:13.5px;color:#1f2937;border-top:1px dashed #d1d5db;padding-top:12px">'
+      textPrefixHtml += '<div class="sms-text-block no-print" style="max-width:880px;margin:90px auto 24px;padding:30px 36px;background:#fff;border:1.5px solid #d1d5db;border-radius:8px;font-family:Noto Sans KR,sans-serif;font-size:14px;line-height:1.95;color:#1a1a1a;box-shadow:0 2px 12px rgba(0,0,0,.06);text-align:center">'
+        + '<div style="font-weight:800;font-size:18pt;color:#7f1d1d;margin-bottom:18px">[민사소송 예정 통보]</div>'
+        + '<div class="sms-txt-content" style="white-space:pre-wrap;font-size:14px;color:#1f2937;border-top:1px dashed #d1d5db;padding-top:18px;text-align:center;line-height:2.1">'
         + '[민사소송 예정 통보]\n\n'
-        + label + '님은 계약중 월세 연체가 ' + (r.days||0) + '일 발생 중이며, 미납 금액은 ₩' + fmtKRW(r.amt) + '원 입니다.\n\n'
-        + '당사는 지급명령(독촉절차) 신청 및 민사소송(본안) 제기를 포함한 법적 절차를 진행 예정입니다.\n\n'
-        + '약속된 ' + dueDateStr + '까지 연체금 ₩' + fmtKRW(r.amt) + '원 전액 납부가 안될 경우, ① 법원 절차 접수 → ② 확정 시 강제집행 (예: 급여·예금·보증금·유체동산 등) 절차를 즉각 진행하겠습니다.'
+        + nameLine + '님은 계약중 월세 연체가 ' + (r.days||0) + '일 발생 중이며,\n미납 금액은 ₩' + fmtKRW(r.amt) + '원 입니다.\n\n'
+        + '당사는 지급명령(독촉절차) 신청 및 민사소송(본안) 제기를\n포함한 법적 절차를 진행 예정입니다.\n\n'
+        + '약속된 ' + dueDateStr + '까지 연체금 ₩' + fmtKRW(r.amt) + '원 전액 납부가 안될 경우,\n① 법원 절차 접수 → ② 확정 시 강제집행\n(예: 급여·예금·보증금·유체동산 등) 절차를 즉각 진행하겠습니다.'
         + '</div>'
-        + '<div style="margin-top:10px;font-size:11px;color:#9ca3af;text-align:right">— 케이알지그룹 주식회사 법무팀 (Tel. 02-6933-0099) —</div>'
+        + '<div style="margin-top:18px;text-align:center">'
+        + '<button onclick="(function(b){var t=b.parentNode.parentNode.querySelector(\'.sms-txt-content\').innerText;navigator.clipboard.writeText(t).then(function(){var o=b.textContent;b.textContent=\'\\u2705 \\uBCF5\\uC0AC\\uB418\\uC5C8\\uC2B5\\uB2C8\\uB2E4\';setTimeout(function(){b.textContent=o;},1500);});})(this)" style="background:#1f2937;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">📋 텍스트 복사</button>'
+        + '</div>'
+        + '<div style="margin-top:14px;font-size:11px;color:#9ca3af">— 케이알지그룹 주식회사 법무팀 (Tel. 02-6933-0099) —</div>'
         + '</div>';
     });
   }
@@ -2727,7 +2740,7 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
     + '<title>내용증명서</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;700;900&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">'
     + '<style>'+css+'</style></head><body>'
-    + '<div class="dl-btns no-print" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:999">'
+    + '<div class="dl-btns no-print" style="position:fixed;top:16px;' + (includeTextPrefix?'left:50%;transform:translateX(-50%);':'right:16px;') + 'display:flex;gap:8px;z-index:999">'
     + '<button class="print-btn" onclick="window.print()" style="background:#1a1a1a;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖨️ 인쇄 / PDF 저장</button>'
     + '<button class="jpg-btn" onclick="downloadAsJpg()" style="background:#0d9488;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🖼️ JPG 저장</button>'
     + '</div>'
