@@ -6576,7 +6576,7 @@ function buildGuaranteezContractHtml(d, specialNotes) {
 .rnw-period-row label { font-size:12px; font-weight:700; color:#374151; }
 .rnw-period-row select { padding:5px 10px; font-size:12px; border:1px solid #D1D5DB; border-radius:6px; background:#fff; cursor:pointer; }
 .rnw-period-row .rnw-period-info { font-size:11.5px; color:#6B7280; margin-left:8px; }
-.rnw-kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:18px; }
+.rnw-kpi-row { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:18px; }  /* [v63] 6열 */
 .rnw-kpi { background:#fff; border:1px solid #E5E7EB; border-radius:10px; padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
 .rnw-kpi-label { font-size:11px; color:#6B7280; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; }
 .rnw-kpi-val { font-size:24px; font-weight:800; margin-top:6px; }
@@ -6585,6 +6585,7 @@ function buildGuaranteezContractHtml(d, specialNotes) {
 .rnw-kpi.k-imp    .rnw-kpi-val { color:#0EA5E9; }
 .rnw-kpi.k-exit   .rnw-kpi-val { color:#F59E0B; }
 .rnw-kpi.k-deny   .rnw-kpi-val { color:#DC2626; }
+.rnw-kpi.k-ended  .rnw-kpi-val { color:#374151; }  /* [v63] 계약종료 */
 .rnw-kpi-sub { font-size:11px; color:#9CA3AF; margin-top:2px; }
 .rnw-card { background:#fff; border:1px solid #E5E7EB; border-radius:10px; padding:16px 18px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
 .rnw-card-title { font-size:14px; font-weight:800; color:#1F2937; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
@@ -6661,7 +6662,7 @@ function rnwSetPeriod(which, val){
   renderRenewalView();
 }
 // [v45] 계약상태 필터 (all / 계약중 / 종료)
-window._rnwContractFilter = window._rnwContractFilter || 'all';
+window._rnwContractFilter = window._rnwContractFilter || '계약중';  // [v63] 디폴트 계약중
 function rnwSetContractFilter(val){ window._rnwContractFilter = val; renderRenewalView(); }
 // [v62] KPI 클릭 필터 (진행상태 기준)
 window._rnwKpiFilter = window._rnwKpiFilter || 'all';
@@ -6845,12 +6846,14 @@ function rnwProgressKind(judgement, sheetStatus, dDay, contractStatus, deadline)
   // 자동 분류
   if (judgement === 'deny') return 'rej';
   // [v62] 묵시적 갱신 D-Day 세분화 — 계약중일 때만
-  //   D-Day ≤ 60: 묵시적갱신(imp) / D-Day > 60: 묵시적갱신대상(imp_cand)
-  var isContract = (contractStatus||'').trim() === '계약중';
+  var cs = (contractStatus||'').trim();
+  var isContract = cs === '계약중';
   if (isContract && dDay !== null) {
     if (dDay <= 60) return 'imp';
     return 'imp_cand';
   }
+  // [v63] 계약 종료 (계약중 아니고 자동거절도 아닌 경우) → 계약종료
+  if (cs && !isContract) return 'ended';
   if (judgement === 'cond') return 'cond_progress';
   return 'na';
 }
@@ -6868,6 +6871,7 @@ function rnwBadgeProgress(p){
   if (p==='exit')           return '<span class="rnw-badge rnw-b-exit">만기퇴실예정</span>';  /* [v61] 만기퇴실의사 → 만기퇴실예정 */
   if (p==='rej')            return '<span class="rnw-badge rnw-b-rej">갱신거절</span>';
   if (p==='cond_progress')  return '<span class="rnw-badge rnw-b-cond">조건부승인</span>';
+  if (p==='ended')          return '<span class="rnw-badge rnw-b-na" style="background:#374151;color:#fff">계약종료</span>';  /* [v63] */
   return '<span class="rnw-badge rnw-b-na">미응답</span>';
 }
 function rnwBadgeContractStatus(s){
@@ -7007,12 +7011,13 @@ function rnwBuildEnriched(){
 }
 
 function rnwCountKPI(enriched){
-  // [v62] 묵시적갱신 KPI = imp + imp_cand + na (미응답 통합)
-  var kpi = { target: enriched.length, hope:0, imp:0, exit:0, deny:0 };
+  // [v63] KPI: target/hope/imp/exit/deny + ended (계약종료)
+  var kpi = { target: enriched.length, hope:0, imp:0, exit:0, deny:0, ended:0 };
   enriched.forEach(function(e){
     if (e.progress === 'hope') kpi.hope++;
     else if (e.progress === 'imp' || e.progress === 'imp_cand' || e.progress === 'na' || e.progress === 'cond_progress') kpi.imp++;
     else if (e.progress === 'exit') kpi.exit++;
+    else if (e.progress === 'ended') kpi.ended++;
     if (e.progress === 'rej' || e.judge === 'deny') kpi.deny++;
   });
   return kpi;
@@ -7059,11 +7064,12 @@ function renderRenewalView(){
   var filter = window._rnwFilter || 'all';
   var kpiFilter = window._rnwKpiFilter || 'all';
   var filtered = enriched;
-  // [v62] KPI 필터 (진행상태 기준) 우선 적용
+  // [v62/v63] KPI 필터 (진행상태 기준)
   if (kpiFilter === 'hope') filtered = filtered.filter(function(e){ return e.progress === 'hope'; });
   else if (kpiFilter === 'imp')  filtered = filtered.filter(function(e){ return e.progress === 'imp' || e.progress === 'imp_cand' || e.progress === 'na' || e.progress === 'cond_progress'; });
   else if (kpiFilter === 'exit') filtered = filtered.filter(function(e){ return e.progress === 'exit'; });
   else if (kpiFilter === 'deny') filtered = filtered.filter(function(e){ return e.progress === 'rej' || e.judge === 'deny'; });
+  else if (kpiFilter === 'ended') filtered = filtered.filter(function(e){ return e.progress === 'ended'; });  /* [v63] */
   // 심사결과 필터 (기존)
   if (filter === 'app') filtered = filtered.filter(function(e){ return e.judge==='app'; });
   else if (filter === 'cond') filtered = filtered.filter(function(e){ return e.judge==='cond'; });
@@ -7095,6 +7101,7 @@ function renderRenewalView(){
     + '<div class="rnw-kpi k-imp" style="' + kStyle(kf==='imp') + '" onclick="rnwSetKpiFilter(\'imp\')"><div class="rnw-kpi-label">묵시적갱신</div><div class="rnw-kpi-val">' + kpi.imp + '명</div><div class="rnw-kpi-sub">계약중 + 미응답 (D-Day별)</div></div>'
     + '<div class="rnw-kpi k-exit" style="' + kStyle(kf==='exit') + '" onclick="rnwSetKpiFilter(\'exit\')"><div class="rnw-kpi-label">만기퇴실</div><div class="rnw-kpi-val">' + kpi.exit + '명</div><div class="rnw-kpi-sub">퇴실 의사 전달</div></div>'
     + '<div class="rnw-kpi k-deny" style="' + kStyle(kf==='deny') + '" onclick="rnwSetKpiFilter(\'deny\')"><div class="rnw-kpi-label">갱신불가</div><div class="rnw-kpi-val">' + kpi.deny + '명</div><div class="rnw-kpi-sub">심사 거절</div></div>'
+    + '<div class="rnw-kpi k-ended" style="' + kStyle(kf==='ended') + '" onclick="rnwSetKpiFilter(\'ended\')"><div class="rnw-kpi-label">계약종료</div><div class="rnw-kpi-val">' + kpi.ended + '명</div><div class="rnw-kpi-sub">중도퇴실 + 만기퇴실</div></div>'
     + '</div>';
 
   // [v55] 필터 행 순서: 계약상태 → 심사결과 → 문자 발송 버튼
