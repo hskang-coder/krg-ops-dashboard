@@ -6674,6 +6674,12 @@ function rnwBuildContractFilterPills(){
 }
 
 // === 헬퍼 ===
+// [v46] 계약상태 '정상' → '계약중' 정규화
+function rnwNormalizeContractStatus(s){
+  s = (s || '').trim();
+  if (s === '정상') return '계약중';
+  return s;
+}
 function rnwParseDate(s){
   if (!s) return null;
   if (s instanceof Date) return s;
@@ -6889,7 +6895,7 @@ function rnwBuildTargets(){
       name: (contract && (contract['임차인명']||contract['계약자']||'')) || v.tenantName || v.tenant1Name || '',
       tel: v.tenantPhone || (contract && contract['연락처']) || '',
       group: (contract && contract['그룹']) || v.contractInfo || '',
-      contractStatus: (contract && contract['계약상태']) || '',
+      contractStatus: rnwNormalizeContractStatus((contract && contract['계약상태']) || ''),  // [v46] '정상' → '계약중'
       vacancyStatus: v.status || '',
       startDate: startDate,
       endDate: endDate,
