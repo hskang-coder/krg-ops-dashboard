@@ -6663,15 +6663,16 @@ function rnwSetPeriod(which, val){
 // [v45] 계약상태 필터 (all / 계약중 / 종료)
 window._rnwContractFilter = window._rnwContractFilter || 'all';
 function rnwSetContractFilter(val){ window._rnwContractFilter = val; renderRenewalView(); }
-// [v48] 코호트 표 기간 필터 (입주월 기준)
+// [v48] 코호트 표 기간 필터 (입주월 기준) — [v56] 디폴트: today -2년 ~ -1년
 (function initRnwCohortPeriod(){
   if (window._rnwCohortStart && window._rnwCohortEnd) return;
   var t = new Date();
-  var endY = t.getFullYear(), endM = t.getMonth()+1;
-  // 기본: 현재월 -11개월 ~ 현재월
-  var sd = new Date(endY, endM - 1 - 11, 1);
+  // [v56] 디폴트: 12개월 구간, today 기준 -23개월 ~ -12개월
+  // 예) 2026.04.28 today → 2024-05 ~ 2025-04
+  var sd = new Date(t.getFullYear(), t.getMonth() - 23, 1);
+  var ed = new Date(t.getFullYear(), t.getMonth() - 12, 1);
   window._rnwCohortStart = sd.getFullYear() + '-' + String(sd.getMonth()+1).padStart(2,'0');
-  window._rnwCohortEnd   = endY + '-' + String(endM).padStart(2,'0');
+  window._rnwCohortEnd   = ed.getFullYear() + '-' + String(ed.getMonth()+1).padStart(2,'0');
 })();
 function rnwSetCohortPeriod(which, val){
   if (which === 'start') window._rnwCohortStart = val;
