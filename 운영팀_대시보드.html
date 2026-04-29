@@ -6663,6 +6663,21 @@ function rnwSetPeriod(which, val){
 // [v45] 계약상태 필터 (all / 계약중 / 종료)
 window._rnwContractFilter = window._rnwContractFilter || 'all';
 function rnwSetContractFilter(val){ window._rnwContractFilter = val; renderRenewalView(); }
+// [v48] 코호트 표 기간 필터 (입주월 기준)
+(function initRnwCohortPeriod(){
+  if (window._rnwCohortStart && window._rnwCohortEnd) return;
+  var t = new Date();
+  var endY = t.getFullYear(), endM = t.getMonth()+1;
+  // 기본: 현재월 -11개월 ~ 현재월
+  var sd = new Date(endY, endM - 1 - 11, 1);
+  window._rnwCohortStart = sd.getFullYear() + '-' + String(sd.getMonth()+1).padStart(2,'0');
+  window._rnwCohortEnd   = endY + '-' + String(endM).padStart(2,'0');
+})();
+function rnwSetCohortPeriod(which, val){
+  if (which === 'start') window._rnwCohortStart = val;
+  else window._rnwCohortEnd = val;
+  renderRenewalView();
+}
 function rnwBuildContractFilterPills(){
   var f = window._rnwContractFilter || 'all';
   return '<div class="rnw-filter-row" style="margin-bottom:0">'
@@ -6914,21 +6929,27 @@ function rnwBuildTargets(){
 // === 코호트 (월별 입주) ===
 function rnwBuildCohorts(){
   if (!Array.isArray(contractRawData)) return [];
+  // [v48] 기간 필터 적용 (입주월 기준)
+  var startKey = window._rnwCohortStart || '';
+  var endKey   = window._rnwCohortEnd   || '';
   var byMonth = {};
   contractRawData.forEach(function(c){
     var startDate = rnwParseDate(c['시작일']);
     if (!startDate) return;
     var key = startDate.getFullYear() + '-' + String(startDate.getMonth()+1).padStart(2,'0');
+    // [v48] 범위 밖이면 제외
+    if (startKey && key < startKey) return;
+    if (endKey && key > endKey) return;
     if (!byMonth[key]) byMonth[key] = { 계약자:0, 갱신완료:0, 중도퇴실:0, 만기퇴실:0 };
     byMonth[key].계약자++;
-    var status = (c['계약상태']||'').trim();
+    var status = rnwNormalizeContractStatus(c['계약상태']||'');
     var endDate = rnwParseDate(c['종료일']);
     var round = rnwRenewalRound(startDate, endDate);
     if (round >= 1 && status === '계약중') byMonth[key].갱신완료++;
     if (status.indexOf('중도') >= 0) byMonth[key].중도퇴실++;
     if (status === '만기퇴실' || status === '종료') byMonth[key].만기퇴실++;
   });
-  return Object.keys(byMonth).sort().reverse().slice(0, 12).map(function(k){
+  return Object.keys(byMonth).sort().reverse().map(function(k){
     return Object.assign({ month: k }, byMonth[k]);
   });
 }
@@ -6973,7 +6994,8 @@ function rnwCountKPI(enriched){
 function rnwMonthOptions(selected){
   var t = new Date();
   var opts = [];
-  for (var i = -6; i <= 12; i++) {
+  // [v48] 범위 확장: -36개월(코호트) ~ +12개월(심사 진행)
+  for (var i = -36; i <= 12; i++) {
     var d = new Date(t.getFullYear(), t.getMonth() + i, 1);
     var key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
     var label = d.getFullYear() + '년 ' + (d.getMonth()+1) + '월';
@@ -7130,7 +7152,13 @@ function renderRenewalView(){
     + filterHtml + rowsHtml
     + '</div>'
     + '<div class="rnw-card">'
-    + '<div class="rnw-card-title"><span class="dot"></span>📊 갱신 회차 코호트 통계 (입주월별 최근 12개월)</div>'
+    + '<div class="rnw-card-title" style="justify-content:space-between"><span style="display:flex;align-items:center;gap:6px"><span class="dot"></span>📊 갱신 회차 코호트 통계 (입주월별)</span>'
+    + '<span style="display:flex;gap:6px;align-items:center;font-weight:600;font-size:12px;color:#6B7280">'
+    + '<select onchange="rnwSetCohortPeriod(\'start\', this.value)" style="padding:4px 8px;font-size:11.5px;border:1px solid #D1D5DB;border-radius:6px;background:#fff;cursor:pointer">' + rnwMonthOptions(window._rnwCohortStart) + '</select>'
+    + '<span style="color:#9CA3AF">~</span>'
+    + '<select onchange="rnwSetCohortPeriod(\'end\', this.value)" style="padding:4px 8px;font-size:11.5px;border:1px solid #D1D5DB;border-radius:6px;background:#fff;cursor:pointer">' + rnwMonthOptions(window._rnwCohortEnd) + '</select>'
+    + '</span>'
+    + '</div>'
     + cohortHtml
     + '</div>'
     + infoHtml;
