@@ -1012,6 +1012,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <button class="view-tab"        onclick="switchView('contract')">📋 계약관리</button>
     <button class="view-tab"        onclick="switchView('payment')">💰 수납관리</button>
     <button class="view-tab" onclick="switchView('delinquency')">🚨 연체관리</button>
+    <button class="view-tab" onclick="switchView('renewal')">🔄 갱신관리</button>
   </div>
 
   <!-- Person tabs (checklist only) -->
@@ -1260,6 +1261,11 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   <div id="delinquencyView" class="view-content">
   <div class="dlq-inner"></div>
 </div>
+
+  <!-- [v43] 갱신관리 뷰 -->
+  <div id="renewalView" class="view-content">
+    <div class="rnw-inner"></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1272,6 +1278,9 @@ const SHEET_ID        = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
 const DAEUNG_GID      = '1690142748';
 const DAILY_RPT_GID   = '554798125';  // 연체관리(Daily Report) 시트
 const VACANCY_GID     = '1953907648'; // 공실현황 시트 (BN=공실상태, BO=퇴실일)
+// [v43] 갱신관리 시트 — 사용자가 시트 추가 후 GID 입력 필요
+// 시트 컬럼: A=계약번호, B=갱신상태(갱신희망/묵시적갱신/만기퇴실의사/갱신거절/처리중), C=갱신확인일, D=비고
+var RENEWAL_GID = window.RENEWAL_GID || ''; // 비어있으면 '미응답' 디폴트로 동작
 const CONTRACT_SHEET  = '계약관리(Raw DATA)';
 const INCOME_SHEET    = '입금내역(Raw DATA)';
 const INCOME_GID      = '131074722';   // 입금내역(Raw DATA) GID
@@ -1531,14 +1540,18 @@ function switchView(view) {
   document.getElementById('contractView').classList.toggle('active', view === 'contract');
   document.getElementById('paymentView').classList.toggle('active', view === 'payment');
   document.getElementById('delinquencyView').classList.toggle('active', view === 'delinquency');
+  document.getElementById('renewalView').classList.toggle('active', view === 'renewal');  // [v43]
   if (view === 'delinquency') renderDelinquency();
+  if (view === 'renewal') renderRenewalView();  // [v43]
   document.getElementById('personTabsRow').style.display = view === 'checklist' ? 'flex' : 'none';
-  const titles = { dashboard:'운영팀 대시보드', checklist:'업무 체크리스트', contract:'계약 레코드 관리', payment:'수납 대상 관리' };
+  // [v43] renewal 타이틀 추가
+  const titles = { dashboard:'운영팀 대시보드', checklist:'업무 체크리스트', contract:'계약 레코드 관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리' };
   document.getElementById('pageTitle').textContent = titles[view] || '';
   document.getElementById('refreshBtn').style.display = view === 'dashboard' ? '' : 'none';
 
+  // [v43] 6개 탭 (dashboard/checklist/contract/payment/delinquency/renewal)
   document.querySelectorAll('.view-tab').forEach((btn,i) => {
-    btn.classList.toggle('active', ['dashboard','checklist','contract','payment'][i] === view);
+    btn.classList.toggle('active', ['dashboard','checklist','contract','payment','delinquency','renewal'][i] === view);
   });
 
   if (view === 'checklist') {
@@ -6542,6 +6555,431 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + cG_buildTerms()
     + '</body></html>';
 }
+
+// ═══════════════════════════════════════════
+// ■ [v43] 갱신관리 (Renewal Management)
+// ═══════════════════════════════════════════
+
+// CSS 동적 주입 (한 번만)
+(function injectRenewalCSS(){
+  if (document.getElementById('rnw-css')) return;
+  var css = `
+.rnw-inner { padding: 18px 22px 40px; max-width: 1500px; margin: 0 auto; }
+.rnw-banner { background:#FEF3C7; border:1px solid #FCD34D; color:#92400E; padding:10px 14px; border-radius:8px; font-size:12.5px; margin-bottom:14px; line-height:1.6; }
+.rnw-banner b { color:#78350F; }
+.rnw-kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:18px; }
+.rnw-kpi { background:#fff; border:1px solid #E5E7EB; border-radius:10px; padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+.rnw-kpi-label { font-size:11px; color:#6B7280; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; }
+.rnw-kpi-val { font-size:24px; font-weight:800; margin-top:6px; }
+.rnw-kpi.k-target .rnw-kpi-val { color:#06B6D4; }
+.rnw-kpi.k-hope   .rnw-kpi-val { color:#16A34A; }
+.rnw-kpi.k-imp    .rnw-kpi-val { color:#0EA5E9; }
+.rnw-kpi.k-exit   .rnw-kpi-val { color:#F59E0B; }
+.rnw-kpi.k-deny   .rnw-kpi-val { color:#DC2626; }
+.rnw-kpi-sub { font-size:11px; color:#9CA3AF; margin-top:2px; }
+.rnw-card { background:#fff; border:1px solid #E5E7EB; border-radius:10px; padding:16px 18px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+.rnw-card-title { font-size:14px; font-weight:800; color:#1F2937; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+.rnw-card-title .dot { width:8px; height:8px; border-radius:50%; background:#06B6D4; }
+.rnw-filter-row { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+.rnw-filter-btn { background:#F3F4F6; border:1px solid #E5E7EB; border-radius:16px; padding:5px 14px; font-size:11.5px; font-weight:700; color:#374151; cursor:pointer; transition:all .15s; }
+.rnw-filter-btn:hover { background:#E5E7EB; }
+.rnw-filter-btn.active { background:#06B6D4; border-color:#06B6D4; color:#fff; }
+.rnw-tbl { width:100%; border-collapse:collapse; font-size:12px; min-width:1100px; }
+.rnw-tbl thead tr { background:#F9FAFB; }
+.rnw-tbl th { padding:8px 10px; text-align:left; font-weight:700; color:#475569; font-size:11px; border-bottom:2px solid #E5E7EB; white-space:nowrap; }
+.rnw-tbl td { padding:7px 10px; border-bottom:1px solid #F3F4F6; vertical-align:middle; white-space:nowrap; }
+.rnw-tbl tr:hover td { background:#F0FDFA; cursor:pointer; }
+.rnw-badge { display:inline-block; padding:2px 9px; border-radius:10px; font-size:10.5px; font-weight:700; line-height:1.5; white-space:nowrap; }
+.rnw-b-app  { background:#DCFCE7; color:#166534; }   /* 승인 */
+.rnw-b-cond { background:#FEF3C7; color:#92400E; }   /* 조건부승인 */
+.rnw-b-deny { background:#FEE2E2; color:#991B1B; }   /* 거절 */
+.rnw-b-none { background:#F3F4F6; color:#6B7280; }   /* 미심사 */
+.rnw-b-hope { background:#D1FAE5; color:#065F46; }   /* 갱신희망 */
+.rnw-b-imp  { background:#E0F2FE; color:#0C4A6E; }   /* 묵시적 */
+.rnw-b-exit { background:#FED7AA; color:#9A3412; }   /* 만기퇴실 */
+.rnw-b-rej  { background:#FECACA; color:#7F1D1D; }   /* 갱신거절 */
+.rnw-b-na   { background:#E5E7EB; color:#374151; }   /* 처리중/미응답 */
+.rnw-dday-near { color:#DC2626; font-weight:700; }
+.rnw-dday-mid  { color:#F59E0B; font-weight:700; }
+.rnw-dday-far  { color:#16A34A; font-weight:600; }
+.rnw-rate-high { color:#DC2626; font-weight:700; }
+.rnw-rate-mid  { color:#F59E0B; font-weight:600; }
+.rnw-rate-low  { color:#16A34A; font-weight:600; }
+.rnw-empty { text-align:center; color:#9CA3AF; padding:30px 0; font-size:13px; }
+.rnw-cohort-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.rnw-cohort-tbl th, .rnw-cohort-tbl td { padding:7px 10px; text-align:right; border-bottom:1px solid #F3F4F6; }
+.rnw-cohort-tbl th:first-child, .rnw-cohort-tbl td:first-child { text-align:left; font-weight:600; }
+.rnw-cohort-tbl thead tr { background:#F9FAFB; }
+.rnw-cohort-tbl th { font-weight:700; color:#475569; font-size:11px; }
+.rnw-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.rnw-info-grid .rnw-card { margin-bottom:0; }
+.rnw-tip-list { font-size:12px; color:#374151; line-height:1.7; padding-left:18px; margin:0; }
+.rnw-tip-list li { margin-bottom:4px; }
+.rnw-tip-list li b { color:#0E7490; }
+@media(max-width:1200px){ .rnw-kpi-row { grid-template-columns:repeat(3,1fr); } .rnw-info-grid { grid-template-columns:1fr; } }
+@media(max-width:700px){ .rnw-kpi-row { grid-template-columns:repeat(2,1fr); } }
+`;
+  var st = document.createElement('style');
+  st.id = 'rnw-css';
+  st.textContent = css;
+  document.head.appendChild(st);
+})();
+
+// 상태 관리
+window._rnwFilter = window._rnwFilter || 'all';
+window._rnwIncomeRaw = window._rnwIncomeRaw || null;
+window._rnwSheetMap = window._rnwSheetMap || {}; // cno → { status, confirmDate, memo }
+
+function rnwSetFilter(val){ window._rnwFilter = val; renderRenewalView(); }
+
+// 날짜 파싱 헬퍼
+function rnwParseDate(s){
+  if (!s) return null;
+  if (s instanceof Date) return s;
+  var str = String(s);
+  var m1 = str.match(/Date\((\d+),(\d+),(\d+)/);
+  if (m1) return new Date(+m1[1], +m1[2], +m1[3]);
+  var m2 = str.match(/(\d{4})[\.\-\/년\s]+(\d{1,2})[\.\-\/월\s]+(\d{1,2})/);
+  if (m2) return new Date(+m2[1], +m2[2]-1, +m2[3]);
+  return null;
+}
+function rnwFmtDate(d){
+  if (!d) return '—';
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  var dd = String(d.getDate()).padStart(2,'0');
+  return d.getFullYear() + '.' + mm + '.' + dd;
+}
+function rnwDDay(endDate){
+  if (!endDate) return null;
+  var t = new Date(); t.setHours(0,0,0,0);
+  return Math.floor((endDate - t) / (24*3600*1000));
+}
+
+// 직전 10회 임대료 청구 기준 연체 산정
+// 청구일 다음날부터 연체 인정 (사용자 결정 ③)
+function rnwCalcLateMetrics(cno, incomeResp){
+  if (!incomeResp || !incomeResp.table) return { count:0, sumDays:0, rate:0, total:0 };
+  var rows = incomeResp.table.rows || [];
+  var matches = [];
+  rows.forEach(function(row){
+    var c = row.c || [];
+    var rowCno = c[4] ? String(c[4].f ?? c[4].v ?? '').replace(/\.0$/,'').trim() : '';
+    if (rowCno !== String(cno).replace(/\.0$/,'').trim()) return;
+    var n13 = c[13] ? String(c[13].v ?? '') : '';
+    var f5  = c[5]  ? String(c[5].v  ?? '') : '';
+    if (n13 === '삭제' || n13 === '계약 철회') return;
+    if (f5 !== '임대료') return;  // 임대료 청구만
+    var ad29 = c[29] ? Number(c[29].v ?? 0) : 0;
+    var billDate = null;
+    // 청구일 추정: A열(date) 또는 다른 위치 — 기본 row index를 정렬에 사용
+    if (c[0] && c[0].v) billDate = rnwParseDate(c[0].v) || rnwParseDate(c[0].f);
+    matches.push({ days: ad29, billDate: billDate });
+  });
+  // 청구일 정렬 후 직전 10건만
+  matches.sort(function(a,b){ return (b.billDate||0) - (a.billDate||0); });
+  var top10 = matches.slice(0, 10);
+  var total = top10.length;
+  // 연체 인정: 청구일 다음날부터 → ad29 > 0 면 연체
+  var lateRows = top10.filter(function(r){ return r.days > 0; });
+  var count = lateRows.length;
+  var sumDays = lateRows.reduce(function(s,r){ return s + r.days; }, 0);
+  var rate = total > 0 ? Math.round(count / total * 100) : 0;
+  return { count: count, sumDays: sumDays, rate: rate, total: total };
+}
+
+// 심사 분류 (Claude 제안안 — 사용자 결정 ②)
+function rnwClassify(metrics){
+  if (!metrics || metrics.total === 0) return 'none'; // 미심사 (데이터 부족)
+  // 1) 거절: 연체횟수 ≥ 7회, 누적일 > 30일, 연체율 ≥ 60%
+  if (metrics.count >= 7 || metrics.sumDays > 30 || metrics.rate >= 60) return 'deny';
+  // 2) 조건부승인: 연체횟수 5~6회, 누적일 21~30일
+  if (metrics.count >= 5 || metrics.sumDays >= 21) return 'cond';
+  // 3) 승인: ≤ 4회, ≤ 20일
+  return 'app';
+}
+
+// 갱신 진척 분류 (사용자 결정 ④: D-30 + 승인 + 미응답 = 묵시적 자동)
+function rnwProgressKind(judgement, sheetStatus, dDay){
+  var status = (sheetStatus || '').trim();
+  if (status === '갱신희망')      return 'hope';
+  if (status === '만기퇴실의사')  return 'exit';
+  if (status === '갱신거절')      return 'rej';
+  if (status === '묵시적갱신')    return 'imp';
+  // 자동 묵시적: 심사 승인 + 미응답 + D-30 경과 (즉 dDay <= 30)
+  if (judgement === 'app' && (!status || status === '처리중') && dDay !== null && dDay <= 30) return 'imp';
+  if (judgement === 'deny') return 'rej';
+  return 'na'; // 처리중/미응답
+}
+
+// 갱신 대상자 생성: 만기 D-90 ~ D-60
+function rnwBuildTargets(){
+  var targets = [];
+  if (!Array.isArray(contractRawData) || !contractRawData.length) return targets;
+  contractRawData.forEach(function(c){
+    var endStr = c['종료일'];
+    var endDate = rnwParseDate(endStr);
+    if (!endDate) return;
+    var dday = rnwDDay(endDate);
+    if (dday === null) return;
+    if (dday < 0 || dday > 90) return; // 만기 90일 이내 (과거는 제외)
+    var startDate = rnwParseDate(c['시작일']);
+    var cno = String(c['계약번호']||'').trim();
+    var sheet = window._rnwSheetMap[cno] || {};
+    targets.push({
+      cno: cno,
+      name: c['임차인명'] || '',
+      startDate: startDate,
+      endDate: endDate,
+      dday: dday,
+      sheetStatus: sheet.status || '',
+      confirmDate: sheet.confirmDate || '',
+      memo: sheet.memo || ''
+    });
+  });
+  // 만기 가까운 순
+  targets.sort(function(a,b){ return a.dday - b.dday; });
+  return targets;
+}
+
+// 갱신 회차 계산
+function rnwRenewalRound(startDate, endDate){
+  if (!startDate || !endDate) return 0;
+  var diffMs = endDate - startDate;
+  var years = Math.round(diffMs / (365 * 24 * 3600 * 1000));
+  return Math.max(0, years);
+}
+
+// 코호트 (월별 입주) 통계
+function rnwBuildCohorts(){
+  if (!Array.isArray(contractRawData)) return [];
+  var byMonth = {}; // "YYYY-MM" → { 계약자, 갱신완료, 중도퇴실, 만기퇴실 }
+  contractRawData.forEach(function(c){
+    var startDate = rnwParseDate(c['시작일']);
+    if (!startDate) return;
+    var key = startDate.getFullYear() + '-' + String(startDate.getMonth()+1).padStart(2,'0');
+    if (!byMonth[key]) byMonth[key] = { 계약자:0, 갱신완료:0, 중도퇴실:0, 만기퇴실:0 };
+    byMonth[key].계약자++;
+    var status = (c['계약상태']||'').trim();
+    var endDate = rnwParseDate(c['종료일']);
+    var round = rnwRenewalRound(startDate, endDate);
+    if (round >= 1 && status === '계약중') byMonth[key].갱신완료++;
+    if (status.indexOf('중도') >= 0 || status === '중도퇴실') byMonth[key].중도퇴실++;
+    if (status === '만기퇴실' || status === '종료') byMonth[key].만기퇴실++;
+  });
+  var arr = Object.keys(byMonth).sort().reverse().slice(0, 12).map(function(k){
+    return Object.assign({ month: k }, byMonth[k]);
+  });
+  return arr;
+}
+
+function rnwBadgeJudge(j){
+  if (j==='app')  return '<span class="rnw-badge rnw-b-app">승인</span>';
+  if (j==='cond') return '<span class="rnw-badge rnw-b-cond">조건부승인</span>';
+  if (j==='deny') return '<span class="rnw-badge rnw-b-deny">거절</span>';
+  return '<span class="rnw-badge rnw-b-none">미심사</span>';
+}
+function rnwBadgeProgress(p){
+  if (p==='hope') return '<span class="rnw-badge rnw-b-hope">갱신희망</span>';
+  if (p==='imp')  return '<span class="rnw-badge rnw-b-imp">묵시적갱신</span>';
+  if (p==='exit') return '<span class="rnw-badge rnw-b-exit">만기퇴실</span>';
+  if (p==='rej')  return '<span class="rnw-badge rnw-b-rej">갱신거절</span>';
+  return '<span class="rnw-badge rnw-b-na">처리중</span>';
+}
+function rnwDDayCls(d){
+  if (d <= 30) return 'rnw-dday-near';
+  if (d <= 60) return 'rnw-dday-mid';
+  return 'rnw-dday-far';
+}
+function rnwRateCls(r){
+  if (r >= 60) return 'rnw-rate-high';
+  if (r >= 30) return 'rnw-rate-mid';
+  return 'rnw-rate-low';
+}
+
+// 심사 대상자 + 진척 정보 빌드
+function rnwBuildEnriched(){
+  var targets = rnwBuildTargets();
+  var enriched = targets.map(function(t){
+    var metrics = rnwCalcLateMetrics(t.cno, window._rnwIncomeRaw);
+    var judge = rnwClassify(metrics);
+    var progress = rnwProgressKind(judge, t.sheetStatus, t.dday);
+    var round = rnwRenewalRound(t.startDate, t.endDate) + 1; // 다음 갱신회차
+    return Object.assign({}, t, { metrics: metrics, judge: judge, progress: progress, round: round });
+  });
+  return enriched;
+}
+
+// KPI 카운트
+function rnwCountKPI(enriched){
+  var kpi = { target: enriched.length, hope:0, imp:0, exit:0, deny:0 };
+  enriched.forEach(function(e){
+    if (e.progress === 'hope') kpi.hope++;
+    else if (e.progress === 'imp') kpi.imp++;
+    else if (e.progress === 'exit') kpi.exit++;
+    if (e.progress === 'rej' || e.judge === 'deny') kpi.deny++;
+  });
+  return kpi;
+}
+
+// 메인 렌더
+function renderRenewalView(){
+  var wrap = document.querySelector('#renewalView .rnw-inner');
+  if (!wrap) return;
+
+  // 데이터 준비 — 입금 데이터 미로드 시 백그라운드 로드
+  if (!window._rnwIncomeRaw) {
+    wrap.innerHTML = '<div class="rnw-empty">📡 갱신관리 데이터 로딩 중...</div>';
+    fetchSheetByGid(INCOME_GID).then(function(resp){
+      window._rnwIncomeRaw = resp;
+      // 갱신 시트도 같이 로드 시도 (있으면)
+      if (RENEWAL_GID) {
+        fetchSheetByGid(RENEWAL_GID).then(function(rResp){
+          window._rnwSheetMap = rnwParseRenewalSheet(rResp);
+          renderRenewalView();
+        }).catch(function(){ window._rnwSheetMap = {}; renderRenewalView(); });
+      } else {
+        renderRenewalView();
+      }
+    }).catch(function(e){
+      wrap.innerHTML = '<div class="rnw-empty">❌ 데이터 로드 실패: ' + e.message + '</div>';
+    });
+    return;
+  }
+
+  var enriched = rnwBuildEnriched();
+  var filter = window._rnwFilter || 'all';
+  var filtered = enriched;
+  if (filter === 'app') filtered = enriched.filter(function(e){ return e.judge==='app'; });
+  else if (filter === 'cond') filtered = enriched.filter(function(e){ return e.judge==='cond'; });
+  else if (filter === 'deny') filtered = enriched.filter(function(e){ return e.judge==='deny'; });
+  else if (filter === 'none') filtered = enriched.filter(function(e){ return e.judge==='none'; });
+
+  var kpi = rnwCountKPI(enriched);
+  var cohorts = rnwBuildCohorts();
+
+  var bannerHtml = RENEWAL_GID ? '' :
+    '<div class="rnw-banner">⚠️ <b>갱신관리 시트가 아직 연결되지 않았습니다.</b> '
+    + '시트에 다음 컬럼으로 신규 시트 추가 후 GID를 설정해 주세요: '
+    + '<b>A=계약번호, B=갱신상태(갱신희망/묵시적갱신/만기퇴실의사/갱신거절/처리중), C=갱신확인일, D=비고</b>. '
+    + '연결 전에는 모든 임차인이 "처리중/미응답" 상태로 표시됩니다.</div>';
+
+  var kpiHtml = '<div class="rnw-kpi-row">'
+    + '<div class="rnw-kpi k-target"><div class="rnw-kpi-label">갱신확인대상</div><div class="rnw-kpi-val">' + kpi.target + '명</div><div class="rnw-kpi-sub">D-90 ~ D-Day</div></div>'
+    + '<div class="rnw-kpi k-hope"><div class="rnw-kpi-label">갱신희망</div><div class="rnw-kpi-val">' + kpi.hope + '명</div><div class="rnw-kpi-sub">의향 표명</div></div>'
+    + '<div class="rnw-kpi k-imp"><div class="rnw-kpi-label">묵시적갱신</div><div class="rnw-kpi-val">' + kpi.imp + '명</div><div class="rnw-kpi-sub">승인 + 미응답 (D-30)</div></div>'
+    + '<div class="rnw-kpi k-exit"><div class="rnw-kpi-label">만기퇴실</div><div class="rnw-kpi-val">' + kpi.exit + '명</div><div class="rnw-kpi-sub">퇴실 의사 전달</div></div>'
+    + '<div class="rnw-kpi k-deny"><div class="rnw-kpi-label">갱신불가</div><div class="rnw-kpi-val">' + kpi.deny + '명</div><div class="rnw-kpi-sub">심사 거절자</div></div>'
+    + '</div>';
+
+  var filterHtml = '<div class="rnw-filter-row">'
+    + '<button class="rnw-filter-btn ' + (filter==='all'?'active':'') + '" onclick="rnwSetFilter(\'all\')">전체 (' + enriched.length + ')</button>'
+    + '<button class="rnw-filter-btn ' + (filter==='app'?'active':'') + '" onclick="rnwSetFilter(\'app\')">승인</button>'
+    + '<button class="rnw-filter-btn ' + (filter==='cond'?'active':'') + '" onclick="rnwSetFilter(\'cond\')">조건부승인</button>'
+    + '<button class="rnw-filter-btn ' + (filter==='deny'?'active':'') + '" onclick="rnwSetFilter(\'deny\')">거절</button>'
+    + '<button class="rnw-filter-btn ' + (filter==='none'?'active':'') + '" onclick="rnwSetFilter(\'none\')">미심사</button>'
+    + '</div>';
+
+  var rowsHtml;
+  if (filtered.length === 0) {
+    rowsHtml = '<div class="rnw-empty">해당 조건의 대상자가 없습니다.</div>';
+  } else {
+    rowsHtml = '<div style="overflow-x:auto"><table class="rnw-tbl">'
+      + '<thead><tr>'
+      + '<th>계약번호</th><th>임차인</th><th>입주일</th><th>만기일</th><th>D-Day</th>'
+      + '<th>갱신회차</th><th>심사결과</th>'
+      + '<th>연체횟수</th><th>누적일</th><th>연체율</th>'
+      + '<th>진행상태</th><th>확인일</th><th>비고</th>'
+      + '</tr></thead><tbody>'
+      + filtered.map(function(e){
+          var ddayCls = rnwDDayCls(e.dday);
+          var rateCls = rnwRateCls(e.metrics.rate);
+          var memoShort = (e.memo||'').length > 30 ? (e.memo.substring(0,30)+'…') : (e.memo||'—');
+          return '<tr onclick="crNavFromView(\'' + e.cno + '\',\'renewal\')">'
+            + '<td><b style="color:#0E7490">' + e.cno + '</b></td>'
+            + '<td>' + (e.name||'—') + '</td>'
+            + '<td style="color:#6B7280;font-size:11px">' + rnwFmtDate(e.startDate) + '</td>'
+            + '<td style="font-size:11px">' + rnwFmtDate(e.endDate) + '</td>'
+            + '<td class="' + ddayCls + '">D-' + e.dday + '</td>'
+            + '<td>' + e.round + '회차</td>'
+            + '<td>' + rnwBadgeJudge(e.judge) + '</td>'
+            + '<td>' + e.metrics.count + '/' + e.metrics.total + '</td>'
+            + '<td>' + e.metrics.sumDays + '일</td>'
+            + '<td class="' + rateCls + '">' + e.metrics.rate + '%</td>'
+            + '<td>' + rnwBadgeProgress(e.progress) + '</td>'
+            + '<td style="color:#6B7280;font-size:11px">' + (e.confirmDate || '—') + '</td>'
+            + '<td style="color:#6B7280;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis" title="' + (e.memo||'').replace(/"/g,'&quot;') + '">' + memoShort + '</td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table></div>';
+  }
+
+  var cohortHtml;
+  if (cohorts.length === 0) {
+    cohortHtml = '<div class="rnw-empty">코호트 데이터 없음</div>';
+  } else {
+    cohortHtml = '<table class="rnw-cohort-tbl">'
+      + '<thead><tr><th>입주월</th><th>계약자</th><th>갱신완료</th><th>중도퇴실</th><th>만기퇴실</th><th>갱신율</th></tr></thead>'
+      + '<tbody>'
+      + cohorts.map(function(c){
+          var rate = c.계약자 > 0 ? Math.round(c.갱신완료 / c.계약자 * 100) : 0;
+          return '<tr><td>' + c.month + '</td><td>' + c.계약자 + '명</td><td>' + c.갱신완료 + '명</td><td>' + c.중도퇴실 + '명</td><td>' + c.만기퇴실 + '명</td><td><b>' + rate + '%</b></td></tr>';
+        }).join('')
+      + '</tbody></table>';
+  }
+
+  var infoHtml = '<div class="rnw-info-grid">'
+    + '<div class="rnw-card">'
+    + '<div class="rnw-card-title"><span class="dot"></span>📅 시기별 액션 가이드</div>'
+    + '<ul class="rnw-tip-list">'
+    + '<li><b>D-90</b>: 갱신 의향 확인 SMS 자동 발송</li>'
+    + '<li><b>D-60</b>: 갱신 심사 + 결과 안내</li>'
+    + '<li><b>D-45</b>: 갱신희망자 → 신규 계약서 / 거절자 → 명도 절차</li>'
+    + '<li><b>D-30</b>: 미응답 + 승인자 → 묵시적 갱신 처리</li>'
+    + '<li><b>D-7</b>: 모든 미확정 건 1차 종결</li>'
+    + '<li><b>D-Day</b>: 만기 분류 확정</li>'
+    + '</ul></div>'
+    + '<div class="rnw-card">'
+    + '<div class="rnw-card-title"><span class="dot"></span>⚖️ 법적 주의사항</div>'
+    + '<ul class="rnw-tip-list">'
+    + '<li>주임법 §6: 만기 6개월~2개월 전 통지 없으면 <b>묵시적 갱신</b></li>'
+    + '<li>주임법 §6의3: 임차인 <b>1회 갱신요구권</b> — 거절 시 정당 사유 필요</li>'
+    + '<li>주임법 §7: 차임 인상은 <b>5% 이내</b></li>'
+    + '<li>거절 시 사유를 <b>서면</b>으로 전달 (분쟁 시 증거)</li>'
+    + '</ul></div>'
+    + '</div>';
+
+  wrap.innerHTML = bannerHtml + kpiHtml
+    + '<div class="rnw-card">'
+    + '<div class="rnw-card-title"><span class="dot"></span>갱신 심사 대상자 (D-90 ~ D-Day)</div>'
+    + filterHtml + rowsHtml
+    + '</div>'
+    + '<div class="rnw-card">'
+    + '<div class="rnw-card-title"><span class="dot"></span>📊 갱신 회차 코호트 통계 (입주월별 최근 12개월)</div>'
+    + cohortHtml
+    + '</div>'
+    + infoHtml;
+}
+
+// 신규 시트 파서 (안전 fallback — 시트 없으면 {} 반환)
+function rnwParseRenewalSheet(resp){
+  if (!resp || !resp.table) return {};
+  var rows = resp.table.rows || [];
+  var map = {};
+  rows.forEach(function(row){
+    var c = row.c || [];
+    var cno = c[0] ? String(c[0].f ?? c[0].v ?? '').replace(/\.0$/,'').trim() : '';
+    if (!cno) return;
+    map[cno] = {
+      status:      c[1] ? String(c[1].v ?? '').trim() : '',
+      confirmDate: c[2] ? String(c[2].f ?? c[2].v ?? '').trim() : '',
+      memo:        c[3] ? String(c[3].v ?? '').trim() : ''
+    };
+  });
+  return map;
+}
+// ═══════════════════════════════════════════
+// ■ [v43] 갱신관리 끝
+// ═══════════════════════════════════════════
 
 </script>
 </body>
