@@ -6752,7 +6752,8 @@ function rnwBuildSheetMap(){
     if (!map[cno] || (d && d > map[cno].date)) {
       map[cno] = {
         date: d,                                              // 대응일
-        confirmDate: r.payDate || '',                         // D열 → 갱신확인일 (재해석)
+        // [v47] D열(입금예정) → A열(대응일)로 변경 — 갱신관리 시트의 대응일을 사용
+        confirmDate: (r.date && r.date !== '-') ? r.date : '',          // A열 → 대응일
         status: (r.renewalStatus || '').trim(),               // G열 → 갱신상태
         content: r.content || '',                             // F열 → 대응 내용
         memo: r.content || ''
@@ -7052,14 +7053,14 @@ function renderRenewalView(){
   if (filtered.length === 0) {
     rowsHtml = '<div class="rnw-empty">해당 조건의 대상자가 없습니다.</div>';
   } else {
-    // 컬럼: No > 계약번호 > 그룹 > 계약상태 > 공실상태 > 갱신심사결과 > 임차인 > 연락처 > 갱신기한 > 만기일 > D-Day > 회차 > 연체횟수 > 누적일 > 연체율 > 진행상태 > 확인일 > 최근 대응 내용
+    // [v47] 컬럼: No > 계약번호 > 그룹 > 계약상태 > 공실상태 > 갱신심사결과 > 임차인 > 연락처 > 갱신기한 > 만기일 > D-Day > 회차 > 연체횟수 > 누적일 > 연체율 > 진행상태 > 대응일 > 최근 대응 내용
     rowsHtml = '<div style="overflow-x:auto"><table class="rnw-tbl">'
       + '<thead><tr>'
       + '<th>No</th><th>계약번호</th><th>그룹</th><th>계약상태</th><th>공실상태</th>'
       + '<th>갱신심사결과</th><th>임차인</th><th>연락처</th>'
       + '<th>갱신기한</th><th>만기일</th><th>D-Day</th><th>회차</th>'
       + '<th>연체횟수</th><th>누적일</th><th>연체율</th>'
-      + '<th>진행상태</th><th>확인일</th><th>최근 대응 내용</th>'
+      + '<th>진행상태</th><th>대응일</th><th>최근 대응 내용</th>'  // [v47] 확인일 → 대응일
       + '</tr></thead><tbody>'
       + filtered.map(function(e, idx){
           var ddayCls = rnwDDayCls(e.dday);
