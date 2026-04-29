@@ -6663,6 +6663,14 @@ function rnwSetPeriod(which, val){
 // [v45] 계약상태 필터 (all / 계약중 / 종료)
 window._rnwContractFilter = window._rnwContractFilter || 'all';
 function rnwSetContractFilter(val){ window._rnwContractFilter = val; renderRenewalView(); }
+// [v62] KPI 클릭 필터 (진행상태 기준)
+window._rnwKpiFilter = window._rnwKpiFilter || 'all';
+function rnwSetKpiFilter(val){
+  // 같은 카드 다시 클릭 시 해제 (전체로)
+  if (window._rnwKpiFilter === val) window._rnwKpiFilter = 'all';
+  else window._rnwKpiFilter = val;
+  renderRenewalView();
+}
 // [v48] 코호트 표 기간 필터 (입주월 기준) — [v56] 디폴트: today -2년 ~ -1년
 (function initRnwCohortPeriod(){
   if (window._rnwCohortStart && window._rnwCohortEnd) return;
@@ -6833,12 +6841,16 @@ function rnwProgressKind(judgement, sheetStatus, dDay, contractStatus, deadline)
   var status = (sheetStatus || '').trim();
   // 수동 입력 우선
   if (status === '갱신희망')      return 'hope';
-  if (status === '만기퇴실의사' || status === '만기퇴실예정')  return 'exit';  /* [v61] 두 값 모두 인식 */
+  if (status === '만기퇴실의사' || status === '만기퇴실예정')  return 'exit';
   // 자동 분류
   if (judgement === 'deny') return 'rej';
-  // [v45] 묵시적 갱신: 계약중(정상) AND today > 갱신기한(만기-2개월)
-  var todayMid = new Date(); todayMid.setHours(0,0,0,0);
-  if ((contractStatus||'').trim() === '계약중' && deadline && todayMid > deadline) return 'imp';
+  // [v62] 묵시적 갱신 D-Day 세분화 — 계약중일 때만
+  //   D-Day ≤ 60: 묵시적갱신(imp) / D-Day > 60: 묵시적갱신대상(imp_cand)
+  var isContract = (contractStatus||'').trim() === '계약중';
+  if (isContract && dDay !== null) {
+    if (dDay <= 60) return 'imp';
+    return 'imp_cand';
+  }
   if (judgement === 'cond') return 'cond_progress';
   return 'na';
 }
@@ -6852,6 +6864,7 @@ function rnwBadgeJudge(j){
 function rnwBadgeProgress(p){
   if (p==='hope')           return '<span class="rnw-badge rnw-b-hope">갱신희망</span>';
   if (p==='imp')            return '<span class="rnw-badge rnw-b-imp">묵시적갱신</span>';
+  if (p==='imp_cand')       return '<span class="rnw-badge rnw-b-imp" style="opacity:0.75">묵시적갱신대상</span>';  /* [v62] D-Day > 60 */
   if (p==='exit')           return '<span class="rnw-badge rnw-b-exit">만기퇴실예정</span>';  /* [v61] 만기퇴실의사 → 만기퇴실예정 */
   if (p==='rej')            return '<span class="rnw-badge rnw-b-rej">갱신거절</span>';
   if (p==='cond_progress')  return '<span class="rnw-badge rnw-b-cond">조건부승인</span>';
@@ -6994,10 +7007,11 @@ function rnwBuildEnriched(){
 }
 
 function rnwCountKPI(enriched){
+  // [v62] 묵시적갱신 KPI = imp + imp_cand + na (미응답 통합)
   var kpi = { target: enriched.length, hope:0, imp:0, exit:0, deny:0 };
   enriched.forEach(function(e){
     if (e.progress === 'hope') kpi.hope++;
-    else if (e.progress === 'imp') kpi.imp++;
+    else if (e.progress === 'imp' || e.progress === 'imp_cand' || e.progress === 'na' || e.progress === 'cond_progress') kpi.imp++;
     else if (e.progress === 'exit') kpi.exit++;
     if (e.progress === 'rej' || e.judge === 'deny') kpi.deny++;
   });
@@ -7043,10 +7057,17 @@ function renderRenewalView(){
 
   var enriched = rnwBuildEnriched();
   var filter = window._rnwFilter || 'all';
+  var kpiFilter = window._rnwKpiFilter || 'all';
   var filtered = enriched;
-  if (filter === 'app') filtered = enriched.filter(function(e){ return e.judge==='app'; });
-  else if (filter === 'cond') filtered = enriched.filter(function(e){ return e.judge==='cond'; });
-  else if (filter === 'deny') filtered = enriched.filter(function(e){ return e.judge==='deny'; });
+  // [v62] KPI 필터 (진행상태 기준) 우선 적용
+  if (kpiFilter === 'hope') filtered = filtered.filter(function(e){ return e.progress === 'hope'; });
+  else if (kpiFilter === 'imp')  filtered = filtered.filter(function(e){ return e.progress === 'imp' || e.progress === 'imp_cand' || e.progress === 'na' || e.progress === 'cond_progress'; });
+  else if (kpiFilter === 'exit') filtered = filtered.filter(function(e){ return e.progress === 'exit'; });
+  else if (kpiFilter === 'deny') filtered = filtered.filter(function(e){ return e.progress === 'rej' || e.judge === 'deny'; });
+  // 심사결과 필터 (기존)
+  if (filter === 'app') filtered = filtered.filter(function(e){ return e.judge==='app'; });
+  else if (filter === 'cond') filtered = filtered.filter(function(e){ return e.judge==='cond'; });
+  else if (filter === 'deny') filtered = filtered.filter(function(e){ return e.judge==='deny'; });
 
   var kpi = rnwCountKPI(enriched);
   var cohorts = rnwBuildCohorts();
@@ -7065,12 +7086,15 @@ function renderRenewalView(){
     + contractFilterPills
     + '</div>';
 
+  // [v62] KPI 클릭 = 진행상태 필터 (window._rnwKpiFilter: 'all'|'hope'|'imp'|'exit'|'deny')
+  var kf = window._rnwKpiFilter || 'all';
+  var kStyle = function(active){ return 'cursor:pointer;transition:transform .12s,box-shadow .12s;' + (active ? 'box-shadow:0 0 0 2px var(--blue,#1B3976) inset;' : ''); };
   var kpiHtml = '<div class="rnw-kpi-row">'
-    + '<div class="rnw-kpi k-target"><div class="rnw-kpi-label">갱신확인대상</div><div class="rnw-kpi-val">' + kpi.target + '명</div><div class="rnw-kpi-sub">선택 기간 만기 도래자</div></div>'
-    + '<div class="rnw-kpi k-hope"><div class="rnw-kpi-label">갱신희망</div><div class="rnw-kpi-val">' + kpi.hope + '명</div><div class="rnw-kpi-sub">의향 표명 (수동)</div></div>'
-    + '<div class="rnw-kpi k-imp"><div class="rnw-kpi-label">묵시적갱신</div><div class="rnw-kpi-val">' + kpi.imp + '명</div><div class="rnw-kpi-sub">계약중 + 갱신기한 초과</div></div>'
-    + '<div class="rnw-kpi k-exit"><div class="rnw-kpi-label">만기퇴실</div><div class="rnw-kpi-val">' + kpi.exit + '명</div><div class="rnw-kpi-sub">퇴실 의사 전달</div></div>'
-    + '<div class="rnw-kpi k-deny"><div class="rnw-kpi-label">갱신불가</div><div class="rnw-kpi-val">' + kpi.deny + '명</div><div class="rnw-kpi-sub">심사 거절</div></div>'
+    + '<div class="rnw-kpi k-target" style="' + kStyle(kf==='all') + '" onclick="rnwSetKpiFilter(\'all\')"><div class="rnw-kpi-label">갱신확인대상</div><div class="rnw-kpi-val">' + kpi.target + '명</div><div class="rnw-kpi-sub">전체 (선택 기간 만기 도래자)</div></div>'
+    + '<div class="rnw-kpi k-hope" style="' + kStyle(kf==='hope') + '" onclick="rnwSetKpiFilter(\'hope\')"><div class="rnw-kpi-label">갱신희망</div><div class="rnw-kpi-val">' + kpi.hope + '명</div><div class="rnw-kpi-sub">의향 표명 (수동)</div></div>'
+    + '<div class="rnw-kpi k-imp" style="' + kStyle(kf==='imp') + '" onclick="rnwSetKpiFilter(\'imp\')"><div class="rnw-kpi-label">묵시적갱신</div><div class="rnw-kpi-val">' + kpi.imp + '명</div><div class="rnw-kpi-sub">계약중 + 미응답 (D-Day별)</div></div>'
+    + '<div class="rnw-kpi k-exit" style="' + kStyle(kf==='exit') + '" onclick="rnwSetKpiFilter(\'exit\')"><div class="rnw-kpi-label">만기퇴실</div><div class="rnw-kpi-val">' + kpi.exit + '명</div><div class="rnw-kpi-sub">퇴실 의사 전달</div></div>'
+    + '<div class="rnw-kpi k-deny" style="' + kStyle(kf==='deny') + '" onclick="rnwSetKpiFilter(\'deny\')"><div class="rnw-kpi-label">갱신불가</div><div class="rnw-kpi-val">' + kpi.deny + '명</div><div class="rnw-kpi-sub">심사 거절</div></div>'
     + '</div>';
 
   // [v55] 필터 행 순서: 계약상태 → 심사결과 → 문자 발송 버튼
