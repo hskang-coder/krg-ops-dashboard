@@ -3187,7 +3187,7 @@ function selectContractRow(no) {
   // 돌아가기 버튼 표시 여부
   var btn = document.getElementById('crBackBtn');
   if (btn) {
-    var labels = { payment:'← 수납관리로 돌아가기', delinquency:'← 연체관리로 돌아가기' };
+    var labels = { payment:'← 수납관리로 돌아가기', delinquency:'← 연체관리로 돌아가기', renewal:'← 갱신관리로 돌아가기' };
     if (window._crPrevView && labels[window._crPrevView]) {
       btn.textContent = labels[window._crPrevView];
       btn.classList.add('visible');
@@ -6660,6 +6660,18 @@ function rnwSetPeriod(which, val){
   else window._rnwEndMonth = val;
   renderRenewalView();
 }
+// [v45] 계약상태 필터 (all / 계약중 / 종료)
+window._rnwContractFilter = window._rnwContractFilter || 'all';
+function rnwSetContractFilter(val){ window._rnwContractFilter = val; renderRenewalView(); }
+function rnwBuildContractFilterPills(){
+  var f = window._rnwContractFilter || 'all';
+  return '<div class="rnw-filter-row" style="margin-bottom:0">'
+    + '<span style="font-size:11.5px;color:#6B7280;font-weight:700;align-self:center;margin-right:4px">계약상태:</span>'
+    + '<button class="rnw-filter-btn ' + (f==='all'?'active':'') + '" onclick="rnwSetContractFilter(\'all\')">전체</button>'
+    + '<button class="rnw-filter-btn ' + (f==='계약중'?'active':'') + '" onclick="rnwSetContractFilter(\'계약중\')">계약중</button>'
+    + '<button class="rnw-filter-btn ' + (f==='종료'?'active':'') + '" onclick="rnwSetContractFilter(\'종료\')">종료</button>'
+    + '</div>';
+}
 
 // === 헬퍼 ===
 function rnwParseDate(s){
@@ -6794,16 +6806,17 @@ function rnwClassify(metrics){
 // === 진행상태 판정 ===
 // 자동: 묵시적갱신 / 갱신거절 / 조건부승인 (심사 결과 기반)
 // 수동: 갱신희망 / 만기퇴실의사 (시트 입력)
-function rnwProgressKind(judgement, sheetStatus, dDay){
+function rnwProgressKind(judgement, sheetStatus, dDay, contractStatus, deadline){
   var status = (sheetStatus || '').trim();
   // 수동 입력 우선
   if (status === '갱신희망')      return 'hope';
   if (status === '만기퇴실의사')  return 'exit';
-  // 자동 분류 (시트값과 일치 시 그대로)
+  // 자동 분류
   if (judgement === 'deny') return 'rej';
-  if (judgement === 'cond') return 'cond_progress'; // 조건부승인 진행상태
-  // 묵시적: 승인 + 미응답 + D-30 경과
-  if (judgement === 'app' && !status && dDay !== null && dDay <= 30) return 'imp';
+  // [v45] 묵시적 갱신: 계약중(정상) AND today > 갱신기한(만기-2개월)
+  var todayMid = new Date(); todayMid.setHours(0,0,0,0);
+  if ((contractStatus||'').trim() === '계약중' && deadline && todayMid > deadline) return 'imp';
+  if (judgement === 'cond') return 'cond_progress';
   return 'na';
 }
 
@@ -6916,12 +6929,23 @@ function rnwBuildCohorts(){
 // === enriched (심사 결과 + 진행상태 결합) ===
 function rnwBuildEnriched(){
   var targets = rnwBuildTargets();
+  // [v45] 계약상태 필터 적용
+  var cf = window._rnwContractFilter || 'all';
+  if (cf !== 'all') {
+    targets = targets.filter(function(t){
+      var s = (t.contractStatus||'').trim();
+      if (cf === '계약중') return s === '계약중';
+      if (cf === '종료') return s.indexOf('종료') >= 0 || s.indexOf('퇴실') >= 0 || s === '만기퇴실';
+      return true;
+    });
+  }
   return targets.map(function(t){
     var metrics = rnwCalcLateMetrics(t.cno, window._rnwIncomeRaw);
     var judge = rnwClassify(metrics);
-    var progress = rnwProgressKind(judge, t.sheetStatus, t.dday);
-    var round = rnwRenewalRound(t.startDate, t.endDate) + 1;
     var deadline = t.endDate ? rnwAddMonths(t.endDate, -2) : null; // 갱신기한 = 만기일 - 2개월
+    // [v45] progress 계산 시 contractStatus + deadline 전달
+    var progress = rnwProgressKind(judge, t.sheetStatus, t.dday, t.contractStatus, deadline);
+    var round = rnwRenewalRound(t.startDate, t.endDate) + 1;
     var content = rnwLatestRenewalContent(t.cno) || '—';
     return Object.assign({}, t, { metrics: metrics, judge: judge, progress: progress, round: round, deadline: deadline, latestContent: content });
   });
@@ -6956,13 +6980,18 @@ function renderRenewalView(){
   var wrap = document.querySelector('#renewalView .rnw-inner');
   if (!wrap) return;
 
-  // 필요 데이터 로드 (income / vacancy / daeung)
-  if (!window._rnwIncomeRaw || !Array.isArray(vacancyRawData) || !vacancyRawData.length || !Array.isArray(daeungRawData) || !daeungRawData.length) {
+  // [v45] contractRawData 로드 보장 추가 (레코드 클릭 시 계약관리 자동 열람)
+  var needLoad = !window._rnwIncomeRaw
+    || !Array.isArray(vacancyRawData) || !vacancyRawData.length
+    || !Array.isArray(daeungRawData) || !daeungRawData.length
+    || !crLoaded;
+  if (needLoad) {
     wrap.innerHTML = '<div class="rnw-empty">📡 갱신관리 데이터 로딩 중...</div>';
     var promises = [];
     if (!window._rnwIncomeRaw) promises.push(fetchSheetByGid(INCOME_GID).then(function(r){ window._rnwIncomeRaw = r; }));
     if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) promises.push(fetchSheetByGid(VACANCY_GID).then(function(r){ vacancyRawData = parseVacancySheet(r); }));
     if (!Array.isArray(daeungRawData) || !daeungRawData.length) promises.push(fetchSheetByGid(DAILY_RPT_GID).then(function(r){ daeungRawData = parseDailyReport(r); }));
+    if (!crLoaded) promises.push(fetchSheetByName(CONTRACT_SHEET).then(function(r){ contractRawData = gvizToObjects(r).filter(function(x){return x['계약번호'];}); crLoaded = true; }));
     Promise.all(promises).then(function(){ renderRenewalView(); }).catch(function(e){
       wrap.innerHTML = '<div class="rnw-empty">❌ 데이터 로드 실패: ' + e.message + '</div>';
     });
@@ -6980,27 +7009,37 @@ function renderRenewalView(){
   var cohorts = rnwBuildCohorts();
   var range = rnwMonthRange(window._rnwStartMonth, window._rnwEndMonth);
 
-  var periodHtml = '<div class="rnw-period-row">'
+  // [v45] 기간 카드 안에 계약상태 필터 함께 표시 (우측)
+  var contractFilterPills = rnwBuildContractFilterPills();
+  var periodHtml = '<div class="rnw-period-row" style="justify-content:space-between">'
+    + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
     + '<label>심사 진행 기간:</label>'
     + '<select onchange="rnwSetPeriod(\'start\', this.value)">' + rnwMonthOptions(window._rnwStartMonth) + '</select>'
     + '<span style="color:#9CA3AF">~</span>'
     + '<select onchange="rnwSetPeriod(\'end\', this.value)">' + rnwMonthOptions(window._rnwEndMonth) + '</select>'
     + '<span class="rnw-period-info">→ 만기일 <b>' + rnwFmtDate(range.start) + ' ~ ' + rnwFmtDate(range.end) + '</b> 도래자 출력</span>'
+    + '</div>'
+    + contractFilterPills
     + '</div>';
 
   var kpiHtml = '<div class="rnw-kpi-row">'
     + '<div class="rnw-kpi k-target"><div class="rnw-kpi-label">갱신확인대상</div><div class="rnw-kpi-val">' + kpi.target + '명</div><div class="rnw-kpi-sub">선택 기간 만기 도래자</div></div>'
     + '<div class="rnw-kpi k-hope"><div class="rnw-kpi-label">갱신희망</div><div class="rnw-kpi-val">' + kpi.hope + '명</div><div class="rnw-kpi-sub">의향 표명 (수동)</div></div>'
-    + '<div class="rnw-kpi k-imp"><div class="rnw-kpi-label">묵시적갱신</div><div class="rnw-kpi-val">' + kpi.imp + '명</div><div class="rnw-kpi-sub">승인+미응답 D-30</div></div>'
+    + '<div class="rnw-kpi k-imp"><div class="rnw-kpi-label">묵시적갱신</div><div class="rnw-kpi-val">' + kpi.imp + '명</div><div class="rnw-kpi-sub">계약중 + 갱신기한 초과</div></div>'
     + '<div class="rnw-kpi k-exit"><div class="rnw-kpi-label">만기퇴실</div><div class="rnw-kpi-val">' + kpi.exit + '명</div><div class="rnw-kpi-sub">퇴실 의사 전달</div></div>'
     + '<div class="rnw-kpi k-deny"><div class="rnw-kpi-label">갱신불가</div><div class="rnw-kpi-val">' + kpi.deny + '명</div><div class="rnw-kpi-sub">심사 거절</div></div>'
     + '</div>';
 
-  var filterHtml = '<div class="rnw-filter-row">'
+  // [v45] 심사결과 필터 + 계약상태 필터 양쪽 표시
+  var filterHtml = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">'
+    + '<div class="rnw-filter-row" style="margin-bottom:0">'
+    + '<span style="font-size:11.5px;color:#6B7280;font-weight:700;align-self:center;margin-right:4px">심사결과:</span>'
     + '<button class="rnw-filter-btn ' + (filter==='all'?'active':'') + '" onclick="rnwSetFilter(\'all\')">전체 (' + enriched.length + ')</button>'
     + '<button class="rnw-filter-btn ' + (filter==='app'?'active':'') + '" onclick="rnwSetFilter(\'app\')">승인</button>'
     + '<button class="rnw-filter-btn ' + (filter==='cond'?'active':'') + '" onclick="rnwSetFilter(\'cond\')">조건부승인</button>'
     + '<button class="rnw-filter-btn ' + (filter==='deny'?'active':'') + '" onclick="rnwSetFilter(\'deny\')">거절</button>'
+    + '</div>'
+    + contractFilterPills
     + '</div>';
 
   var rowsHtml;
