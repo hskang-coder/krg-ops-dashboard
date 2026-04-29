@@ -6912,6 +6912,7 @@ function rnwBuildTargets(){
       tel: v.tenantPhone || (contract && contract['연락처']) || '',
       group: (contract && contract['그룹']) || v.contractInfo || '',
       contractStatus: rnwNormalizeContractStatus((contract && contract['계약상태']) || ''),  // [v46] '정상' → '계약중'
+      landlordName: (v && v.landlordName) || (contract && contract['임대인명']) || '',  // [v51] 임대인명
       vacancyStatus: v.status || '',
       startDate: startDate,
       endDate: endDate,
@@ -7090,6 +7091,7 @@ function renderRenewalView(){
     // [v47] 컬럼: No > 계약번호 > 그룹 > 계약상태 > 공실상태 > 갱신심사결과 > 임차인 > 연락처 > 갱신기한 > 만기일 > D-Day > 회차 > 연체횟수 > 누적일 > 연체율 > 진행상태 > 대응일 > 최근 대응 내용
     rowsHtml = '<div style="overflow-x:auto"><table class="rnw-tbl">'
       + '<thead><tr>'
+      + '<th style="width:32px;text-align:center"><input type="checkbox" class="dlq-cb" id="rnwChkAll" onchange="rnwSelectAll(this.checked)" title="전체 선택"></th>'
       + '<th>No</th><th>계약번호</th><th>그룹</th><th>계약상태</th><th>공실상태</th>'
       + '<th>갱신심사결과</th><th>임차인</th><th>연락처</th>'
       + '<th>갱신기한</th><th>만기일</th><th>D-Day</th><th>회차</th>'
@@ -7100,6 +7102,7 @@ function renderRenewalView(){
           var ddayCls = rnwDDayCls(e.dday);
           var rateCls = rnwRateCls(e.metrics.rate);
           return '<tr onclick="crNavFromView(\'' + e.cno + '\',\'renewal\')">'
+            + '<td onclick="event.stopPropagation()" style="text-align:center;padding:4px"><input type="checkbox" class="dlq-cb rnw-row-cb" value="' + e.cno + '" onchange="rnwToggleSelect(\'' + e.cno + '\',this.checked)"></td>'
             + '<td style="color:#8A9AB5;font-size:11px">' + (idx+1) + '</td>'
             + '<td><b style="color:#0E7490">' + e.cno + '</b></td>'
             + '<td style="font-size:11px;color:#6B7280">' + (e.group||'—') + '</td>'
@@ -7160,7 +7163,12 @@ function renderRenewalView(){
 
   wrap.innerHTML = periodHtml + kpiHtml
     + '<div class="rnw-card">'
-    + '<div class="rnw-card-title"><span class="dot"></span>갱신 심사 대상자</div>'
+    + '<div class="rnw-card-title" style="justify-content:space-between"><span style="display:flex;align-items:center;gap:6px"><span class="dot"></span>갱신 심사 대상자</span>'
+    + '<span style="display:flex;gap:6px;flex-wrap:wrap">'
+    + '<button onclick="rnwGenerateMsg(\'expired\')" style="background:#F59E0B;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 만기퇴실 문자</button>'
+    + '<button onclick="rnwGenerateMsg(\'conditional\')" style="background:#0EA5E9;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 조건부승인 문자</button>'
+    + '<button onclick="rnwGenerateMsg(\'denied\')" style="background:#DC2626;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 갱신불가 문자</button>'
+    + '</span></div>'
     + filterHtml + rowsHtml
     + '</div>'
     + '<div class="rnw-card">'
@@ -7230,6 +7238,91 @@ function rnwCohortFormulaCard(){
     + '</div>';
 }
 
+// [v51] 체크박스 + 메시지 발송
+window._rnwSelectedCnos = window._rnwSelectedCnos || new Set();
+function rnwToggleSelect(cno, checked){
+  if (checked) window._rnwSelectedCnos.add(String(cno));
+  else window._rnwSelectedCnos.delete(String(cno));
+}
+function rnwSelectAll(checked){
+  document.querySelectorAll('.rnw-row-cb').forEach(function(cb){
+    cb.checked = checked;
+    var cno = cb.value;
+    if (checked) window._rnwSelectedCnos.add(String(cno));
+    else window._rnwSelectedCnos.delete(String(cno));
+  });
+}
+
+// 메시지 템플릿 생성 (계약자별)
+function rnwBuildMsgFor(type, e){
+  var name = e.name || 'OOO';
+  var landlord = e.landlordName || 'OOO';
+  var endStr = rnwFmtDate(e.endDate);
+  if (type === 'expired') {
+    // 만기퇴실 문자
+    return name + ' 임(전)차인님 , ' + landlord + ' 임대인님 안녕하세요\n'
+      + '개런티즈서비스 케이알지그룹(주)입니다. 임(전)대차계약 관련하여 계약 만기퇴실 예정입니다.\n'
+      + '* 계약 만기일 : ' + endStr + ' 입니다.\n'
+      + '임(전)차인님 퇴실 시, 반드시 임대인님과 일정을 맞춰서 퇴실정산 및 원상회복체크 퇴실 정산 완료 요청 드립니다.\n'
+      + '완료 후 정산완료 문자 회신 부탁드립니다.\n'
+      + '*주의사항)) 임대인님 임(전)차인이 계약만료 1주일이 경과 시 보증계약은 소멸됩니다. 원상회복 이슈가 있을 경우, 반드시 퇴실 후 3일 내 연락 바랍니다. 감사합니다.';
+  }
+  if (type === 'conditional') {
+    // 조건부 승인자 발송 문자
+    return name + ' 임(전)차님 개런티즈 서비스 KRG그룹(주)입니다.\n'
+      + '계약 갱신을 위해 아래의 링크로 갱신 심사 진행 부탁드립니다.\n'
+      + '부동산 중개사 사무소 명칭 기재란에 반드시 " 갱신심사" 로 기재해주셔야 갱신심사로 진행됩니다.\n'
+      + '- 이용자 심사링크\nhttps://check.guaranteez.co.kr?aid=gaengsin1';
+  }
+  if (type === 'denied') {
+    // 갱신불가 발송 문자
+    return name + ' 임(전)차님, ' + landlord + ' 임대인님 안녕하세요\n'
+      + '개런티즈서비스 케이알지그룹(주)입니다. 임(전)대차계약 관련하여 갱신심사 결과 갱신 불가되었습니다.\n'
+      + '* 계약 만기일 : ' + endStr + ' 입니다.\n'
+      + '임(전)차인님 퇴실 시, 반드시 임대인님과 일정을 맞춰서 퇴실정산 및 원상회복체크 퇴실 정산 완료 요청 드립니다. 완료 후 정산완료 문자 회신 부탁드립니다.\n'
+      + '임대인님 퇴실 후 1주일이 경과 시 보증계약은 소멸됩니다. 원상회복 이슈가 있을 경우, 반드시 퇴실 후 3일 내 연락 바랍니다. 감사합니다.';
+  }
+  return '';
+}
+
+function rnwGenerateMsg(type){
+  if (!window._rnwSelectedCnos || window._rnwSelectedCnos.size === 0) {
+    alert('대상자를 1명 이상 체크해 주세요.');
+    return;
+  }
+  var enriched = rnwBuildEnriched();
+  var selected = enriched.filter(function(e){ return window._rnwSelectedCnos.has(String(e.cno)); });
+  if (!selected.length) { alert('체크된 대상자를 찾을 수 없습니다. 화면을 새로고침해 주세요.'); return; }
+  var typeLabels = { expired:'만기퇴실 문자', conditional:'조건부승인 발송 문자', denied:'갱신불가 발송 문자' };
+  var typeColors = { expired:'#F59E0B', conditional:'#0EA5E9', denied:'#DC2626' };
+  var label = typeLabels[type] || '문자';
+  var color = typeColors[type] || '#1F2937';
+  var blocks = selected.map(function(e, idx){
+    var msg = rnwBuildMsgFor(type, e);
+    var safeId = 'msg_' + idx;
+    return '<div style="margin-bottom:16px;background:#fff;border:1.5px solid #E5E7EB;border-radius:8px;padding:14px 16px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;border-bottom:1px dashed #E5E7EB;padding-bottom:8px">'
+      + '<div style="font-weight:700;font-size:13px;color:#1F2937">[' + (idx+1) + '] ' + (e.name||'—') + ' (' + e.cno + ')'
+      + ' <span style="margin-left:8px;font-size:11px;color:#6B7280;font-weight:500">📞 ' + (e.tel||'—') + '</span></div>'
+      + '<button onclick="(function(b){var t=document.getElementById(\'' + safeId + '\').innerText;navigator.clipboard.writeText(t).then(function(){var o=b.textContent;b.textContent=\'\u2705 \uBCF5\uC0AC\uB418\uC5C8\uC2B5\uB2C8\uB2E4\';setTimeout(function(){b.textContent=o;},1500);});})(this)" style="background:#1F2937;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">📋 복사</button>'
+      + '</div>'
+      + '<div id="' + safeId + '" style="white-space:pre-wrap;font-size:12.5px;line-height:1.75;color:#1F2937;font-family:\'Noto Sans KR\',sans-serif">' + msg + '</div>'
+      + '</div>';
+  }).join('');
+  var allMsgs = selected.map(function(e){ return '─── ' + (e.name||'') + ' (' + e.cno + ') ───\n' + rnwBuildMsgFor(type, e); }).join('\n\n');
+  var w = window.open('', '_blank', 'width=720,height=820,scrollbars=yes');
+  if (!w) { alert('팝업 차단을 해제해 주세요.'); return; }
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>' + label + ' (' + selected.length + '명)</title>'
+    + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">'
+    + '<style>body{font-family:\'Noto Sans KR\',sans-serif;background:#F9FAFB;margin:0;padding:20px;color:#1F2937}.hdr{background:' + color + ';color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}.hdr h2{margin:0;font-size:16px}.hdr button{background:#fff;color:' + color + ';border:none;padding:7px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:12.5px}</style></head><body>'
+    + '<div class="hdr"><h2>📨 ' + label + ' (' + selected.length + '명)</h2>'
+    + '<button onclick="navigator.clipboard.writeText(document.getElementById(\'allMsg\').innerText).then(function(){this.textContent=\'\u2705 \uC804\uCCB4 \uBCF5\uC0AC\uB428\';}.bind(this))">📋 전체 복사</button>'
+    + '</div>'
+    + blocks
+    + '<div id="allMsg" style="display:none">' + allMsgs + '</div>'
+    + '</body></html>');
+  w.document.close();
+}
 // ═══════════════════════════════════════════
 // ■ [v44] 갱신관리 끝
 // ═══════════════════════════════════════════
