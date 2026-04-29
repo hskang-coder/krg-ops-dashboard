@@ -7182,8 +7182,11 @@ function renderRenewalView(){
     + '</span>'
     + '</div>'
     + cohortHtml
+    + '<div style="margin-top:16px;position:relative;height:300px"><canvas id="rnwCohortCanvas" role="img" aria-label="코호트 혼합형 차트">월별 코호트 차트</canvas></div>'
     + '</div>'
     + infoHtml;
+  // [v52] DOM 반영 후 차트 그리기
+  setTimeout(function(){ rnwRenderCohortChart(cohorts); }, 0);
 }
 
 // [v50] 코호트 통계 수식표
@@ -7323,6 +7326,59 @@ function rnwGenerateMsg(type){
     + '</body></html>');
   w.document.close();
 }
+// [v52] 코호트 혼합형 차트 (누적 막대 + 갱신율 선)
+window._rnwCohortChart = window._rnwCohortChart || null;
+function rnwRenderCohortChart(cohorts){
+  if (typeof Chart === 'undefined') return;
+  var canvas = document.getElementById('rnwCohortCanvas');
+  if (!canvas) return;
+  if (window._rnwCohortChart) {
+    try { window._rnwCohortChart.destroy(); } catch(e){}
+    window._rnwCohortChart = null;
+  }
+  if (!cohorts || !cohorts.length) return;
+  // 시간 오름차순 (과거 → 현재) 정렬
+  var sorted = cohorts.slice().sort(function(a,b){ return a.month < b.month ? -1 : (a.month > b.month ? 1 : 0); });
+  var labels = sorted.map(function(c){ return c.month; });
+  var renew  = sorted.map(function(c){ return c.갱신완료 || 0; });
+  var mid    = sorted.map(function(c){ return c.중도퇴실 || 0; });
+  var expire = sorted.map(function(c){ return c.만기퇴실 || 0; });
+  var rate   = sorted.map(function(c){ return c.계약자 > 0 ? Math.round(c.갱신완료 / c.계약자 * 100) : 0; });
+  window._rnwCohortChart = new Chart(canvas, {
+    data: {
+      labels: labels,
+      datasets: [
+        { type: 'bar',  label: '갱신완료', data: renew,  backgroundColor: '#16A34A', stack: 'a', yAxisID: 'y', order: 2 },
+        { type: 'bar',  label: '중도퇴실', data: mid,    backgroundColor: '#F59E0B', stack: 'a', yAxisID: 'y', order: 2 },
+        { type: 'bar',  label: '만기퇴실', data: expire, backgroundColor: '#DC2626', stack: 'a', yAxisID: 'y', order: 2 },
+        { type: 'line', label: '갱신율 %', data: rate,   borderColor: '#0EA5E9', backgroundColor: '#0EA5E9', borderWidth: 2.5, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#0EA5E9', yAxisID: 'y1', order: 1 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', align: 'end', labels: { boxWidth: 12, font: { size: 11 }, padding: 10 } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx){
+              var v = ctx.parsed.y;
+              if (ctx.dataset.label === '갱신율 %') return ctx.dataset.label + ': ' + v + '%';
+              return ctx.dataset.label + ': ' + v + '명';
+            }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, ticks: { autoSkip: false, maxRotation: 45, font: { size: 10 } } },
+        y:  { stacked: true, beginAtZero: true, position: 'left', title: { display: true, text: '인원수', font: { size: 11 } }, ticks: { font: { size: 10 } } },
+        y1: { beginAtZero: true, max: 100, position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: function(v){ return v + '%'; }, font: { size: 10 } }, title: { display: true, text: '갱신율 %', font: { size: 11 } } }
+      }
+    }
+  });
+}
+
 // ═══════════════════════════════════════════
 // ■ [v44] 갱신관리 끝
 // ═══════════════════════════════════════════
