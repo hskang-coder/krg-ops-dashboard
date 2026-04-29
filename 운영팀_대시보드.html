@@ -2372,7 +2372,7 @@ function buildDlqNoticeHtml(rows, contractDetails) {
   var css = '*{box-sizing:border-box;margin:0;padding:0}'
     + 'body{font-family:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:10pt;color:#1a1a1a;background:#eef0f4;line-height:1.7}'
     + '.np{width:210mm;padding:0;background:#fff;position:relative}'
-    + '@media screen{.np{margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.15)}.np+.np{margin-top:24px}.no-print{display:block!important}}'
+    + '@media screen{.np{margin:80px auto 20px;box-shadow:0 4px 24px rgba(0,0,0,.15)}.np+.np{margin-top:24px}.no-print{display:block!important}}'  /* [v61] 상단 여백 80px (fixed 버튼 비낌) */
     + '@media print{@page{size:A4 portrait;margin:0}body{background:#fff}.np{margin:0;box-shadow:none;width:100%}.np~.np{break-before:page;page-break-before:always}.no-print{display:none!important}}'
     + '.print-btn{background:#1a1a1a;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700}'  /* [v60] position:fixed 제거 — 부모 .dl-btns가 위치 담당 */
     + '.hdr{background:#1a1a1a;color:#fff;padding:20px 28px 22px}'
@@ -2515,7 +2515,7 @@ function buildDlqSmsTextHtml(rows, contractDetails) {
   var css = '*{box-sizing:border-box;margin:0;padding:0}'
     + 'body{font-family:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:11.5pt;color:#1a1a1a;background:#eef0f4;line-height:1.95}'
     + '.np{width:210mm;min-height:297mm;padding:30mm 25mm;background:#fff;position:relative}'
-    + '@media screen{.np{margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.15)}.np+.np{margin-top:24px}.no-print{display:block!important}}'
+    + '@media screen{.np{margin:80px auto 20px;box-shadow:0 4px 24px rgba(0,0,0,.15)}.np+.np{margin-top:24px}.no-print{display:block!important}}'  /* [v61] 상단 여백 80px (fixed 버튼 비낌) */
     + '@media print{@page{size:A4 portrait;margin:0}body{background:#fff}.np{margin:0;box-shadow:none;width:100%;padding:30mm 25mm}.np~.np{break-before:page;page-break-before:always}.no-print{display:none!important}}'
     + '.sms-hdr{background:#7f1d1d;color:#fff;padding:18px 24px;text-align:center;border-radius:6px 6px 0 0}'
     + '.sms-hdr-sub{font-size:9pt;opacity:.8;letter-spacing:1px;margin-bottom:5px}'
@@ -2600,7 +2600,7 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
   var css = '*{box-sizing:border-box;margin:0;padding:0}'
     + 'body{font-family:"Noto Serif KR","Malgun Gothic","Apple SD Gothic Neo",serif;font-size:11pt;color:#000;background:#e5e7eb;line-height:1.85}'
     + '.np{width:210mm;min-height:297mm;padding:25mm 22mm 22mm 22mm;background:#fff;position:relative}'
-    + '@media screen{.np{margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.15)}.np+.np{margin-top:24px}.no-print{display:block!important}}'
+    + '@media screen{.np{margin:80px auto 20px;box-shadow:0 4px 24px rgba(0,0,0,.15)}.np+.np{margin-top:24px}.no-print{display:block!important}}'  /* [v61] 상단 여백 80px (fixed 버튼 비낌) */
     + '@media print{@page{size:A4 portrait;margin:0}body{background:#fff}.np{margin:0;box-shadow:none;width:100%}.np~.np{break-before:page;page-break-before:always}.no-print{display:none!important}}'
     + '.cm-title{text-align:center;font-size:32pt;font-weight:900;letter-spacing:24px;padding-left:24px;margin-bottom:6px;color:#000;border-bottom:3px double #000;padding-bottom:14px}'
     + '.cm-subtitle{text-align:right;font-size:9pt;color:#374151;margin-top:6px;margin-bottom:18px}'
@@ -6833,7 +6833,7 @@ function rnwProgressKind(judgement, sheetStatus, dDay, contractStatus, deadline)
   var status = (sheetStatus || '').trim();
   // 수동 입력 우선
   if (status === '갱신희망')      return 'hope';
-  if (status === '만기퇴실의사')  return 'exit';
+  if (status === '만기퇴실의사' || status === '만기퇴실예정')  return 'exit';  /* [v61] 두 값 모두 인식 */
   // 자동 분류
   if (judgement === 'deny') return 'rej';
   // [v45] 묵시적 갱신: 계약중(정상) AND today > 갱신기한(만기-2개월)
@@ -6852,7 +6852,7 @@ function rnwBadgeJudge(j){
 function rnwBadgeProgress(p){
   if (p==='hope')           return '<span class="rnw-badge rnw-b-hope">갱신희망</span>';
   if (p==='imp')            return '<span class="rnw-badge rnw-b-imp">묵시적갱신</span>';
-  if (p==='exit')           return '<span class="rnw-badge rnw-b-exit">만기퇴실의사</span>';
+  if (p==='exit')           return '<span class="rnw-badge rnw-b-exit">만기퇴실예정</span>';  /* [v61] 만기퇴실의사 → 만기퇴실예정 */
   if (p==='rej')            return '<span class="rnw-badge rnw-b-rej">갱신거절</span>';
   if (p==='cond_progress')  return '<span class="rnw-badge rnw-b-cond">조건부승인</span>';
   return '<span class="rnw-badge rnw-b-na">미응답</span>';
