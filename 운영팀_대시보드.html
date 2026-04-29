@@ -7171,8 +7171,7 @@ function renderRenewalView(){
     + '<div class="rnw-card-title"><span class="dot"></span>갱신 심사 대상자</div>'  // [v53] 문자 버튼은 필터 행으로 이동
     + filterHtml + rowsHtml
     + '</div>'
-    + '<div class="rnw-card">'
-    + rnwCohortFormulaCard()  // [v50] 수식표 카드
+    // [v54] 수식표 카드 삭제 (사용자 요청)
     + '<div class="rnw-card">'
     + '<div class="rnw-card-title" style="justify-content:space-between"><span style="display:flex;align-items:center;gap:6px"><span class="dot"></span>📊 갱신 회차 코호트 통계 (입주월별)</span>'
     + '<span style="display:flex;gap:6px;align-items:center;font-weight:600;font-size:12px;color:#6B7280">'
@@ -7262,8 +7261,9 @@ function rnwBuildMsgFor(type, e){
   var landlord = e.landlordName || 'OOO';
   var endStr = rnwFmtDate(e.endDate);
   if (type === 'expired') {
-    // 만기퇴실 문자 — 가독성 개선
-    return name + ' 임(전)차인님, ' + landlord + ' 임대인님 안녕하세요.\n'
+    // 만기퇴실 문자 — [v54] [계약만기종료 안내] 헤더 추가
+    return '[계약만기종료 안내]\n\n'
+      + name + ' 임(전)차인님, ' + landlord + ' 임대인님 안녕하세요.\n'
       + '\n'
       + '개런티즈서비스 케이알지그룹(주)입니다.\n'
       + '임(전)대차계약 관련하여 계약 만기퇴실 예정입니다.\n'
@@ -7281,8 +7281,9 @@ function rnwBuildMsgFor(type, e){
       + '감사합니다.';
   }
   if (type === 'conditional') {
-    // 조건부 승인자 발송 문자 — 가독성 개선
-    return name + ' 임(전)차님, 안녕하세요.\n'
+    // 조건부 승인자 발송 문자 — [v54] [갱신심사 필요 안내] 헤더 추가
+    return '[갱신심사 필요 안내]\n\n'
+      + name + ' 임(전)차님, 안녕하세요.\n'
       + '\n'
       + '개런티즈 서비스 KRG그룹(주)입니다.\n'
       + '\n'
@@ -7295,8 +7296,9 @@ function rnwBuildMsgFor(type, e){
       + 'https://check.guaranteez.co.kr?aid=gaengsin1';
   }
   if (type === 'denied') {
-    // 갱신불가 발송 문자 — [v53] 주의사항 문구 변경 + 가독성 개선
-    return name + ' 임(전)차님, ' + landlord + ' 임대인님 안녕하세요.\n'
+    // 갱신불가 발송 문자 — [v54] [임(전)차인 서비스 갱신불가 안내] 헤더 추가
+    return '[임(전)차인 서비스 갱신불가 안내]\n\n'
+      + name + ' 임(전)차님, ' + landlord + ' 임대인님 안녕하세요.\n'
       + '\n'
       + '개런티즈서비스 케이알지그룹(주)입니다.\n'
       + '임(전)대차계약 관련하여 갱신심사 결과 갱신 불가되었습니다.\n'
