@@ -7072,7 +7072,7 @@ function renderRenewalView(){
     + '<div class="rnw-kpi k-deny"><div class="rnw-kpi-label">갱신불가</div><div class="rnw-kpi-val">' + kpi.deny + '명</div><div class="rnw-kpi-sub">심사 거절</div></div>'
     + '</div>';
 
-  // [v45] 심사결과 필터 + 계약상태 필터 양쪽 표시
+  // [v53] 심사결과 필터 + 3종 문자 버튼 + 계약상태 필터 한 줄에 배치
   var filterHtml = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">'
     + '<div class="rnw-filter-row" style="margin-bottom:0">'
     + '<span style="font-size:11.5px;color:#6B7280;font-weight:700;align-self:center;margin-right:4px">심사결과:</span>'
@@ -7080,6 +7080,11 @@ function renderRenewalView(){
     + '<button class="rnw-filter-btn ' + (filter==='app'?'active':'') + '" onclick="rnwSetFilter(\'app\')">승인</button>'
     + '<button class="rnw-filter-btn ' + (filter==='cond'?'active':'') + '" onclick="rnwSetFilter(\'cond\')">조건부승인</button>'
     + '<button class="rnw-filter-btn ' + (filter==='deny'?'active':'') + '" onclick="rnwSetFilter(\'deny\')">거절</button>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+    + '<button onclick="rnwGenerateMsg(\'expired\')" style="background:#F59E0B;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 만기퇴실 문자</button>'
+    + '<button onclick="rnwGenerateMsg(\'conditional\')" style="background:#0EA5E9;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 조건부승인 문자</button>'
+    + '<button onclick="rnwGenerateMsg(\'denied\')" style="background:#DC2626;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 갱신불가 문자</button>'
     + '</div>'
     + contractFilterPills
     + '</div>';
@@ -7163,12 +7168,7 @@ function renderRenewalView(){
 
   wrap.innerHTML = periodHtml + kpiHtml
     + '<div class="rnw-card">'
-    + '<div class="rnw-card-title" style="justify-content:space-between"><span style="display:flex;align-items:center;gap:6px"><span class="dot"></span>갱신 심사 대상자</span>'
-    + '<span style="display:flex;gap:6px;flex-wrap:wrap">'
-    + '<button onclick="rnwGenerateMsg(\'expired\')" style="background:#F59E0B;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 만기퇴실 문자</button>'
-    + '<button onclick="rnwGenerateMsg(\'conditional\')" style="background:#0EA5E9;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 조건부승인 문자</button>'
-    + '<button onclick="rnwGenerateMsg(\'denied\')" style="background:#DC2626;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 갱신불가 문자</button>'
-    + '</span></div>'
+    + '<div class="rnw-card-title"><span class="dot"></span>갱신 심사 대상자</div>'  // [v53] 문자 버튼은 필터 행으로 이동
     + filterHtml + rowsHtml
     + '</div>'
     + '<div class="rnw-card">'
@@ -7256,34 +7256,62 @@ function rnwSelectAll(checked){
   });
 }
 
-// 메시지 템플릿 생성 (계약자별)
+// 메시지 템플릿 생성 (계약자별) — [v53] 가독성 개선 + 갱신불가 텍스트 변경
 function rnwBuildMsgFor(type, e){
   var name = e.name || 'OOO';
   var landlord = e.landlordName || 'OOO';
   var endStr = rnwFmtDate(e.endDate);
   if (type === 'expired') {
-    // 만기퇴실 문자
-    return name + ' 임(전)차인님 , ' + landlord + ' 임대인님 안녕하세요\n'
-      + '개런티즈서비스 케이알지그룹(주)입니다. 임(전)대차계약 관련하여 계약 만기퇴실 예정입니다.\n'
-      + '* 계약 만기일 : ' + endStr + ' 입니다.\n'
-      + '임(전)차인님 퇴실 시, 반드시 임대인님과 일정을 맞춰서 퇴실정산 및 원상회복체크 퇴실 정산 완료 요청 드립니다.\n'
+    // 만기퇴실 문자 — 가독성 개선
+    return name + ' 임(전)차인님, ' + landlord + ' 임대인님 안녕하세요.\n'
+      + '\n'
+      + '개런티즈서비스 케이알지그룹(주)입니다.\n'
+      + '임(전)대차계약 관련하여 계약 만기퇴실 예정입니다.\n'
+      + '\n'
+      + '▷ 계약 만기일 : ' + endStr + '\n'
+      + '\n'
+      + '임(전)차인님 퇴실 시, 반드시 임대인님과 일정을 맞춰서\n'
+      + '퇴실정산 및 원상회복체크, 퇴실 정산 완료 요청드립니다.\n'
       + '완료 후 정산완료 문자 회신 부탁드립니다.\n'
-      + '*주의사항)) 임대인님 임(전)차인이 계약만료 1주일이 경과 시 보증계약은 소멸됩니다. 원상회복 이슈가 있을 경우, 반드시 퇴실 후 3일 내 연락 바랍니다. 감사합니다.';
+      + '\n'
+      + '※ 주의사항\n'
+      + '임대인님, 임(전)차인이 계약만료 1주일이 경과 시 보증계약은 소멸됩니다.\n'
+      + '원상회복 이슈가 있을 경우, 반드시 퇴실 후 3일 내 연락 바랍니다.\n'
+      + '\n'
+      + '감사합니다.';
   }
   if (type === 'conditional') {
-    // 조건부 승인자 발송 문자
-    return name + ' 임(전)차님 개런티즈 서비스 KRG그룹(주)입니다.\n'
-      + '계약 갱신을 위해 아래의 링크로 갱신 심사 진행 부탁드립니다.\n'
-      + '부동산 중개사 사무소 명칭 기재란에 반드시 " 갱신심사" 로 기재해주셔야 갱신심사로 진행됩니다.\n'
-      + '- 이용자 심사링크\nhttps://check.guaranteez.co.kr?aid=gaengsin1';
+    // 조건부 승인자 발송 문자 — 가독성 개선
+    return name + ' 임(전)차님, 안녕하세요.\n'
+      + '\n'
+      + '개런티즈 서비스 KRG그룹(주)입니다.\n'
+      + '\n'
+      + '계약 갱신을 위해 아래 링크로 갱신 심사 진행 부탁드립니다.\n'
+      + '\n'
+      + '※ 부동산 중개사 사무소 명칭 기재란에 반드시 "갱신심사"로\n'
+      + '   기재해주셔야 갱신심사로 진행됩니다.\n'
+      + '\n'
+      + '▷ 이용자 심사링크\n'
+      + 'https://check.guaranteez.co.kr?aid=gaengsin1';
   }
   if (type === 'denied') {
-    // 갱신불가 발송 문자
-    return name + ' 임(전)차님, ' + landlord + ' 임대인님 안녕하세요\n'
-      + '개런티즈서비스 케이알지그룹(주)입니다. 임(전)대차계약 관련하여 갱신심사 결과 갱신 불가되었습니다.\n'
-      + '* 계약 만기일 : ' + endStr + ' 입니다.\n'
-      + '임(전)차인님 퇴실 시, 반드시 임대인님과 일정을 맞춰서 퇴실정산 및 원상회복체크 퇴실 정산 완료 요청 드립니다. 완료 후 정산완료 문자 회신 부탁드립니다.\n'
-      + '임대인님 퇴실 후 1주일이 경과 시 보증계약은 소멸됩니다. 원상회복 이슈가 있을 경우, 반드시 퇴실 후 3일 내 연락 바랍니다. 감사합니다.';
+    // 갱신불가 발송 문자 — [v53] 주의사항 문구 변경 + 가독성 개선
+    return name + ' 임(전)차님, ' + landlord + ' 임대인님 안녕하세요.\n'
+      + '\n'
+      + '개런티즈서비스 케이알지그룹(주)입니다.\n'
+      + '임(전)대차계약 관련하여 갱신심사 결과 갱신 불가되었습니다.\n'
+      + '\n'
+      + '▷ 계약 만기일 : ' + endStr + '\n'
+      + '\n'
+      + '임(전)차인님 퇴실 시, 반드시 임대인님과 일정을 맞춰서\n'
+      + '퇴실정산 및 원상회복체크, 퇴실 정산 완료 요청드립니다.\n'
+      + '완료 후 정산완료 문자 회신 부탁드립니다.\n'
+      + '\n'
+      + '※ 주의사항\n'
+      + '임대인님, 임(전)차인이 계약만료 1주일이 경과 시 보증계약은 소멸됩니다.\n'
+      + '원상회복 이슈가 있을 경우, 반드시 퇴실 후 3일 내 연락 바랍니다.\n'
+      + '\n'
+      + '감사합니다.';
   }
   return '';
 }
