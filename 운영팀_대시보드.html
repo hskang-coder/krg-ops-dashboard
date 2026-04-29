@@ -6932,6 +6932,11 @@ function rnwBuildCohorts(){
   // [v48] 기간 필터 적용 (입주월 기준)
   var startKey = window._rnwCohortStart || '';
   var endKey   = window._rnwCohortEnd   || '';
+  // [v49] vacancy 맵 (J열 기준 중도/만기 분리)
+  var vacancyMap = {};
+  if (Array.isArray(vacancyRawData)) {
+    vacancyRawData.forEach(function(v){ vacancyMap[String(v.no||'').trim()] = v; });
+  }
   var byMonth = {};
   contractRawData.forEach(function(c){
     var startDate = rnwParseDate(c['시작일']);
@@ -6946,8 +6951,15 @@ function rnwBuildCohorts(){
     var endDate = rnwParseDate(c['종료일']);
     var round = rnwRenewalRound(startDate, endDate);
     if (round >= 1 && status === '계약중') byMonth[key].갱신완료++;
-    if (status.indexOf('중도') >= 0) byMonth[key].중도퇴실++;
-    if (status === '만기퇴실' || status === '종료') byMonth[key].만기퇴실++;
+    // [v49] 종료 계약 중에서 vacancy J열로 중도/만기 분리
+    var isEnded = (status !== '계약중' && status !== '');
+    if (isEnded) {
+      var cno = String(c['계약번호']||'').trim();
+      var v = vacancyMap[cno];
+      var jVal = (v && v.jValue) ? String(v.jValue) : '';
+      if (jVal.indexOf('중도') >= 0) byMonth[key].중도퇴실++;
+      else byMonth[key].만기퇴실++;
+    }
   });
   return Object.keys(byMonth).sort().reverse().map(function(k){
     return Object.assign({ month: k }, byMonth[k]);
