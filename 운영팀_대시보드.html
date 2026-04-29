@@ -7164,6 +7164,8 @@ function renderRenewalView(){
     + filterHtml + rowsHtml
     + '</div>'
     + '<div class="rnw-card">'
+    + rnwCohortFormulaCard()  // [v50] 수식표 카드
+    + '<div class="rnw-card">'
     + '<div class="rnw-card-title" style="justify-content:space-between"><span style="display:flex;align-items:center;gap:6px"><span class="dot"></span>📊 갱신 회차 코호트 통계 (입주월별)</span>'
     + '<span style="display:flex;gap:6px;align-items:center;font-weight:600;font-size:12px;color:#6B7280">'
     + '<select onchange="rnwSetCohortPeriod(\'start\', this.value)" style="padding:4px 8px;font-size:11.5px;border:1px solid #D1D5DB;border-radius:6px;background:#fff;cursor:pointer">' + rnwMonthOptions(window._rnwCohortStart) + '</select>'
@@ -7174,6 +7176,58 @@ function renderRenewalView(){
     + cohortHtml
     + '</div>'
     + infoHtml;
+}
+
+// [v50] 코호트 통계 수식표
+function rnwCohortFormulaCard(){
+  return '<div class="rnw-card" style="background:#F8FAFC;border-color:#E0F2FE">'
+    + '<div class="rnw-card-title"><span class="dot" style="background:#0E7490"></span>📐 코호트 통계 수식 / 데이터 출처</div>'
+    + '<table class="rnw-cohort-tbl" style="font-size:11.5px">'
+    + '<thead><tr>'
+    + '<th style="width:90px">지표</th>'
+    + '<th style="width:auto;text-align:left">산정 수식</th>'
+    + '<th style="width:280px;text-align:left">데이터 출처</th>'
+    + '</tr></thead>'
+    + '<tbody>'
+    + '<tr>'
+    + '<td><b>입주월</b></td>'
+    + '<td style="text-align:left;color:#374151"><code>YYYY-MM (시작일 기준)</code></td>'
+    + '<td style="text-align:left;color:#6B7280;font-size:11px">계약관리(Raw DATA) <b>시작일 (W열)</b></td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td><b>계약자</b></td>'
+    + '<td style="text-align:left;color:#374151"><code>해당 입주월에 신규 입주한 전체 계약자 수</code></td>'
+    + '<td style="text-align:left;color:#6B7280;font-size:11px">계약관리 시트 행 수 (필터: 계약번호 존재)</td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td style="color:#16A34A"><b>갱신완료</b></td>'
+    + '<td style="text-align:left;color:#374151"><code>계약상태 = \'계약중\' AND 갱신회차 ≥ 1</code><br>'
+    + '<span style="font-size:10.5px;color:#6B7280">└ 갱신회차 = round((종료일 − 시작일) ÷ 365)</span></td>'
+    + '<td style="text-align:left;color:#6B7280;font-size:11px">계약관리: <b>계약상태</b> + <b>시작일/종료일</b><br>(\'정상\' → \'계약중\' 정규화)</td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td style="color:#F59E0B"><b>중도퇴실</b></td>'
+    + '<td style="text-align:left;color:#374151"><code>계약상태 ≠ \'계약중\' AND 공실현황 J열 ⊃ "중도"</code></td>'
+    + '<td style="text-align:left;color:#6B7280;font-size:11px">공실현황(gid=1953907648) <b>J열</b> 값 검사</td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td style="color:#DC2626"><b>만기퇴실</b></td>'
+    + '<td style="text-align:left;color:#374151"><code>계약상태 ≠ \'계약중\' AND J열에 "중도" 미포함 (그 외 종료)</code></td>'
+    + '<td style="text-align:left;color:#6B7280;font-size:11px">공실현황 J열 — \'중도\' 외 모든 종료 케이스</td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td style="color:#0EA5E9"><b>갱신율</b></td>'
+    + '<td style="text-align:left;color:#374151"><code>(갱신완료 ÷ 계약자) × 100%</code><br>'
+    + '<span style="font-size:10.5px;color:#6B7280">└ 소수점 반올림</span></td>'
+    + '<td style="text-align:left;color:#6B7280;font-size:11px">파생값 (계약자=0이면 0%)</td>'
+    + '</tr>'
+    + '</tbody></table>'
+    + '<div style="margin-top:10px;padding:10px 12px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;font-size:11px;color:#92400E;line-height:1.7">'
+    + '<b>⚠️ 검증 포인트:</b> '
+    + '계약자 = 갱신완료 + 중도퇴실 + 만기퇴실 + 진행중(미만기) 합계와 일치해야 합니다. '
+    + '단, 갱신회차가 0회차(첫 입주)이면서 계약중인 경우는 \'갱신완료\'에 포함되지 않습니다.'
+    + '</div>'
+    + '</div>';
 }
 
 // ═══════════════════════════════════════════
