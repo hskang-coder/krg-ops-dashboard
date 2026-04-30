@@ -1886,15 +1886,11 @@ async function loadContractData() {
 }
 
 function buildResponseTableHTML(responses) {
-  // [v23/v68] 업무구분 + 담당자 필터 둘 다 적용
+  // [v23] window._respJobFilter 적용 (담당자 필터는 v70에서 제거됨)
   const jobFilter = window._respJobFilter || '전체';
-  const personFilter = window._respPersonFilter || '전체';
-  let filtered = (jobFilter === '전체')
+  const filtered = (jobFilter === '전체')
     ? responses
     : responses.filter(r => String(r.jobType||'').trim() === jobFilter);
-  if (personFilter !== '전체') {
-    filtered = filtered.filter(r => String(r.person||'').trim() === personFilter);
-  }
   if (filtered.length === 0)
     return `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">${jobFilter==='전체'?'대응 내역이 없습니다':jobFilter+' 대응 내역이 없습니다'}</div>`;
   return `<div style="overflow-x:auto;padding:0 4px 4px">
@@ -1928,18 +1924,10 @@ function buildResponseTableHTML(responses) {
 
 // [v23] 업무구분 필터 적용 핸들러
 window._respJobFilter = window._respJobFilter || '연체관리';  // [v66] 디폴트 연체관리
-window._respPersonFilter = window._respPersonFilter || '전체';  // [v68] 담당자 필터
 window._respCachedNo  = null;
 window._respCachedRes = null;
 function setRespJobFilter(val) {
   window._respJobFilter = val;
-  if (window._respCachedNo && window._respCachedRes) {
-    updateResponseSection(window._respCachedNo, window._respCachedRes);
-  }
-}
-// [v68] 담당자 필터
-function setRespPersonFilter(val) {
-  window._respPersonFilter = val;
   if (window._respCachedNo && window._respCachedRes) {
     updateResponseSection(window._respCachedNo, window._respCachedRes);
   }
@@ -1963,23 +1951,8 @@ function buildJobFilterBar(responses) {
     else { bg = active ? '#1B3976' : '#F3F4F6'; fg = active ? '#fff' : '#374151'; }
     return `<button onclick="setRespJobFilter('${val}')" style="background:${bg};color:${fg};border:none;padding:4px 12px;border-radius:14px;font-size:11.5px;font-weight:700;cursor:pointer;margin-right:6px">${val} <span style="opacity:.7;font-weight:600">(${counts[val]})</span></button>`;
   }
-  // [v66] 순서: 전체 → 수납관리 → 연체관리 → 갱신관리 → 중도퇴실관리 → 계약(입주)관리
-  // [v68] 담당자 필터 — responses에서 unique 담당자 추출
-  const psel = window._respPersonFilter || '전체';
-  const personCounts = { '전체': responses.length };
-  responses.forEach(r => {
-    const p = String(r.person||'').trim();
-    if (p) personCounts[p] = (personCounts[p]||0) + 1;
-  });
-  const personList = ['전체'].concat(Object.keys(personCounts).filter(k => k !== '전체').sort((a,b) => personCounts[b] - personCounts[a]));
-  function personPill(val) {
-    const active = (val === psel);
-    const bg = active ? '#0F766E' : '#F0FDF4';
-    const fg = active ? '#fff' : '#0F766E';
-    return `<button onclick="setRespPersonFilter('${val}')" style="background:${bg};color:${fg};border:none;padding:3px 11px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;margin-right:5px">${val}${val!=='전체'?` <span style="opacity:.7;font-weight:600">(${personCounts[val]})</span>`:` <span style="opacity:.7;font-weight:600">(${personCounts['전체']})</span>`}</button>`;
-  }
-  return `<div style="display:flex;align-items:center;gap:4px;padding:0 4px 4px">${pill('전체')}${pill('수납관리')}${pill('연체관리')}${pill('갱신관리')}${pill('중도퇴실관리')}${pill('계약(입주)관리')}</div>
-  <div style="display:flex;align-items:center;gap:4px;padding:0 4px 8px;flex-wrap:wrap"><span style="font-size:11px;color:#6B7280;font-weight:700;margin-right:4px">담당자:</span>${personList.map(personPill).join('')}</div>`;
+  // [v66/v70] 순서: 전체 → 수납관리 → 연체관리 → 갱신관리 → 중도퇴실관리 → 계약(입주)관리 (담당자 필터는 v69 별도 컬럼으로 대체)
+  return `<div style="display:flex;align-items:center;gap:4px;padding:0 4px 8px">${pill('전체')}${pill('수납관리')}${pill('연체관리')}${pill('갱신관리')}${pill('중도퇴실관리')}${pill('계약(입주)관리')}</div>`;
 }
 
 function updateResponseSection(no, responses) {
