@@ -1901,9 +1901,9 @@ function buildResponseTableHTML(responses) {
       </tr></thead>
       <tbody>${filtered.map((r,i) => {
         const jt = String(r.jobType||'').trim();
-        // [v64] 갱신관리 청록 추가
-        const jtColor = jt==='연체관리' ? '#DC2626' : jt==='중도퇴실관리' ? '#7C3AED' : jt==='수납관리' ? '#0284C7' : jt==='갱신관리' ? '#0F766E' : '#6B7280';
-        const jtBg    = jt==='연체관리' ? '#FEE2E2' : jt==='중도퇴실관리' ? '#EDE9FE' : jt==='수납관리' ? '#E0F2FE' : jt==='갱신관리' ? '#CCFBF1' : '#F3F4F6';
+        // [v66] 계약(입주)관리 녹색 추가
+        const jtColor = jt==='연체관리' ? '#DC2626' : jt==='중도퇴실관리' ? '#7C3AED' : jt==='수납관리' ? '#0284C7' : jt==='갱신관리' ? '#0F766E' : jt==='계약(입주)관리' ? '#166534' : '#6B7280';
+        const jtBg    = jt==='연체관리' ? '#FEE2E2' : jt==='중도퇴실관리' ? '#EDE9FE' : jt==='수납관리' ? '#E0F2FE' : jt==='갱신관리' ? '#CCFBF1' : jt==='계약(입주)관리' ? '#DCFCE7' : '#F3F4F6';
         return `<tr>
         <td style="text-align:center;color:#8A9AB5;font-size:11px">${filtered.length - i}</td>
         <td style="white-space:nowrap;font-size:12px;font-weight:600">${r.date}</td>
@@ -1918,7 +1918,7 @@ function buildResponseTableHTML(responses) {
 }
 
 // [v23] 업무구분 필터 적용 핸들러
-window._respJobFilter = window._respJobFilter || '전체';
+window._respJobFilter = window._respJobFilter || '연체관리';  // [v66] 디폴트 연체관리
 window._respCachedNo  = null;
 window._respCachedRes = null;
 function setRespJobFilter(val) {
@@ -1930,8 +1930,8 @@ function setRespJobFilter(val) {
 
 function buildJobFilterBar(responses) {
   const sel = window._respJobFilter || '전체';
-  // [v64] 갱신관리 추가 + 순서 (수납→연체→갱신→중도퇴실)
-  const counts = { '전체': responses.length, '연체관리': 0, '중도퇴실관리': 0, '수납관리': 0, '갱신관리': 0 };
+  // [v66] 계약(입주)관리 추가
+  const counts = { '전체': responses.length, '연체관리': 0, '중도퇴실관리': 0, '수납관리': 0, '갱신관리': 0, '계약(입주)관리': 0 };
   responses.forEach(r => { const jt = String(r.jobType||'').trim(); if (counts[jt] !== undefined) counts[jt]++; });
   function pill(val) {
     const active = (val === sel);
@@ -1942,11 +1942,12 @@ function buildJobFilterBar(responses) {
     else if (val === '연체관리') { bg = active ? '#DC2626' : '#FEE2E2'; fg = active ? '#fff' : '#DC2626'; }
     else if (val === '갱신관리') { bg = active ? '#06B6D4' : '#CCFBF1'; fg = active ? '#fff' : '#0F766E'; }
     else if (val === '중도퇴실관리') { bg = active ? '#7C3AED' : '#EDE9FE'; fg = active ? '#fff' : '#7C3AED'; }
+    else if (val === '계약(입주)관리') { bg = active ? '#16A34A' : '#DCFCE7'; fg = active ? '#fff' : '#166534'; }  /* [v66] */
     else { bg = active ? '#1B3976' : '#F3F4F6'; fg = active ? '#fff' : '#374151'; }
     return `<button onclick="setRespJobFilter('${val}')" style="background:${bg};color:${fg};border:none;padding:4px 12px;border-radius:14px;font-size:11.5px;font-weight:700;cursor:pointer;margin-right:6px">${val} <span style="opacity:.7;font-weight:600">(${counts[val]})</span></button>`;
   }
-  // [v64] 순서: 전체 → 수납관리 → 연체관리 → 갱신관리 → 중도퇴실관리
-  return `<div style="display:flex;align-items:center;gap:4px;padding:0 4px 8px">${pill('전체')}${pill('수납관리')}${pill('연체관리')}${pill('갱신관리')}${pill('중도퇴실관리')}</div>`;
+  // [v66] 순서: 전체 → 수납관리 → 연체관리 → 갱신관리 → 중도퇴실관리 → 계약(입주)관리
+  return `<div style="display:flex;align-items:center;gap:4px;padding:0 4px 8px">${pill('전체')}${pill('수납관리')}${pill('연체관리')}${pill('갱신관리')}${pill('중도퇴실관리')}${pill('계약(입주)관리')}</div>`;
 }
 
 function updateResponseSection(no, responses) {
