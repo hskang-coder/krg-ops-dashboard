@@ -1807,6 +1807,10 @@ function parseVacancySheet(resp) {
   const feePaidIdx   = 82; // CE열 = 수수료입금
   const signedIdx    = 83; // CF열 = 서명
   const nasIdx       = 86; // CI열 = NAS
+  // [v76] 계약관리(파트너 매핑/구분) 컬럼
+  const housingTypeIdx  = 13; // N열 = 주택/상가 구분
+  const partnerNameIdx  = 63; // BL열 = 부동산명
+  const partnerPersonIdx= 64; // BM열 = 부동산 계약담당자
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -1846,7 +1850,11 @@ function parseVacancySheet(resp) {
       eContract:  (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[eContractIdx] && (c[eContractIdx].v != null ? c[eContractIdx].v : c[eContractIdx].f)),
       feePaid:    (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[feePaidIdx] && (c[feePaidIdx].v != null ? c[feePaidIdx].v : c[feePaidIdx].f)),
       signed:     (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[signedIdx] && (c[signedIdx].v != null ? c[signedIdx].v : c[signedIdx].f)),
-      nas:        (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[nasIdx] && (c[nasIdx].v != null ? c[nasIdx].v : c[nasIdx].f))
+      nas:        (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[nasIdx] && (c[nasIdx].v != null ? c[nasIdx].v : c[nasIdx].f)),
+      // [v76] 계약관리용
+      housingType:   cell(housingTypeIdx),   // N열: 주택/상가
+      partnerName:   cell(partnerNameIdx),   // BL열: 부동산명
+      partnerPerson: cell(partnerPersonIdx)  // BM열: 부동산 계약담당자
     };
   }).filter(Boolean);
 }
@@ -7521,6 +7529,41 @@ function rnwRenderCohortChart(cohorts){
 .cmg-tbl th { padding:8px 10px; text-align:left; font-weight:700; color:#475569; font-size:11px; border-bottom:2px solid #E5E7EB; white-space:nowrap; }
 .cmg-tbl td { padding:7px 10px; border-bottom:1px solid #F3F4F6; vertical-align:middle; white-space:nowrap; }
 .cmg-tbl tr:hover td { background:#FAF5FF; cursor:pointer; }
+.cmg-tbl td.cmg-num { text-align:right; font-variant-numeric: tabular-nums; }
+.cmg-money { font-weight:700; color:#1F2937; }
+.cmg-money-sub { font-size:10.5px; color:#9CA3AF; margin-top:2px; }
+.cmg-expand-row td { background:#FAFAFA !important; padding:0 !important; border-bottom:2px solid #E5E7EB; }
+.cmg-expand-inner { padding:12px 18px 14px; }
+.cmg-expand-tbl { width:100%; border-collapse:collapse; font-size:11.5px; }
+.cmg-expand-tbl th { padding:5px 8px; background:#F1F5F9; color:#475569; font-weight:700; text-align:left; border-bottom:1px solid #E2E8F0; white-space:nowrap; }
+.cmg-expand-tbl td { padding:5px 8px; border-bottom:1px solid #E5E7EB; }
+.cmg-expand-tbl tr:hover td { background:#FFF7ED; }
+.cmg-partner-info { display:flex; flex-wrap:wrap; gap:8px 18px; margin-bottom:8px; font-size:11.5px; color:#475569; }
+.cmg-partner-info b { color:#1F2937; }
+.cmg-rank-badge { display:inline-block; padding:2px 7px; font-size:10px; font-weight:700; border-radius:10px; margin-left:6px; vertical-align:middle; }
+.cmg-rank-A { background:#16A34A; color:#fff; }
+.cmg-rank-B { background:#3B82F6; color:#fff; }
+.cmg-rank-C { background:#F59E0B; color:#fff; }
+.cmg-rank-D { background:#9CA3AF; color:#fff; }
+.cmg-section-meta { font-size:11.5px; color:#6B7280; margin-bottom:10px; }
+.cmg-section-meta b { color:#374151; }
+.cmg-quality { display:inline-block; font-size:10.5px; padding:2px 6px; border-radius:8px; font-weight:700; margin-right:3px; }
+.cmg-q-good { background:#DCFCE7; color:#166534; }
+.cmg-q-mid  { background:#FEF3C7; color:#92400E; }
+.cmg-q-bad  { background:#FEE2E2; color:#991B1B; }
+.cmg-q-na   { background:#F3F4F6; color:#9CA3AF; }
+.cmg-spark { display:inline-block; vertical-align:middle; }
+.cmg-paid-cb { width:14px; height:14px; cursor:pointer; vertical-align:middle; accent-color:#16A34A; }
+.cmg-region-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:10px; margin-top:8px; }
+.cmg-region-cell { background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:10px 12px; }
+.cmg-region-cell .name { font-size:13px; font-weight:800; color:#1F2937; }
+.cmg-region-cell .cnt  { font-size:11px; color:#6B7280; margin-top:2px; }
+.cmg-onboard-tbl { width:100%; border-collapse:collapse; font-size:11.5px; margin-top:6px; }
+.cmg-onboard-tbl th { padding:6px 8px; background:#F1F5F9; color:#475569; font-weight:700; text-align:left; }
+.cmg-onboard-tbl td { padding:6px 8px; border-bottom:1px solid #E5E7EB; }
+.cmg-warn { background:#FEF3C7 !important; }
+.cmg-paid-true { color:#16A34A; font-weight:700; }
+.cmg-paid-false { color:#DC2626; font-weight:700; }
 .cmg-chk-yes { display:inline-block; width:22px; height:22px; line-height:22px; text-align:center; background:#DCFCE7; color:#166534; border-radius:50%; font-weight:700; font-size:13px; }
 .cmg-chk-no  { display:inline-block; width:22px; height:22px; line-height:22px; text-align:center; background:#F3F4F6; color:#9CA3AF; border-radius:50%; font-weight:700; font-size:13px; }
 .cmg-pct-bar { display:inline-block; width:80px; height:6px; background:#F3F4F6; border-radius:3px; overflow:hidden; vertical-align:middle; margin-right:6px; }
@@ -7538,8 +7581,711 @@ function rnwRenderCohortChart(cohorts){
 })();
 
 // 기간 필터 상태
-window._cmgPeriod = window._cmgPeriod || 'all';
+window._cmgPeriod = window._cmgPeriod || 'month'; // [v76] 디폴트 월
+window._cmgPartnerPeriod = window._cmgPartnerPeriod || 'month'; // [v76] 부동산/담당자 섹션
+window._cmgPaidMap = window._cmgPaidMap || {}; // [v76] 정산 입금완료 메모리 저장
 function cmgSetPeriod(val){ window._cmgPeriod = val; renderContractMgmtView(); }
+function cmgSetPartnerPeriod(val){ window._cmgPartnerPeriod = val; renderContractMgmtView(); }
+
+// [v76] 파트너 부동산 시트 (gid=1799140165)
+const PARTNER_GID = '1799140165';
+let partnerRawData = [];
+let partnerLoaded = false;
+
+function parsePartnerSheet(resp) {
+  if (!resp || !resp.table) return [];
+  const { rows } = resp.table;
+  return (rows||[]).map(function(row){
+    const c = row.c || [];
+    const cell = function(i){ return (i < 0 || !c[i]) ? '' : String(c[i].f != null ? c[i].f : (c[i].v != null ? c[i].v : '')).trim(); };
+    return {
+      shortName:  cell(0),  // A 파트너명(약칭)
+      fullName:   cell(1),  // B 상호 (정식명)
+      person:     cell(2),  // C 담당
+      mobile:     cell(3),  // D 핸드폰
+      tel:        cell(4),  // E 대표전화
+      bizNo:      cell(5),  // F 등록번호
+      addr:       cell(6),  // G 주소
+      sheetCnt:   cell(7),  // H 계약건수 (시트 자동, 검증용)
+      bank:       cell(8),  // I 은행
+      account:    cell(9),  // J 계좌번호
+      acctHolder: cell(10), // K 예금주
+      regDate:    cell(11)  // L 등록일 (있을 시)
+    };
+  }).filter(function(p){ return p.fullName || p.shortName; });
+}
+
+// [v76] 한국 주택임대차 법정 중개보수 자동 계산
+// 거래금액 = 보증금 + (월세 × 100)
+// 주택: 구간별 요율/한도, 상가/오피스텔: 0.9% 협의
+function calcBrokerage(deposit, monthlyRent, housingType){
+  const dep = parseFloat(String(deposit||0).replace(/[^0-9.-]/g,'')) || 0;
+  const mr  = parseFloat(String(monthlyRent||0).replace(/[^0-9.-]/g,'')) || 0;
+  const tradeAmt = dep + mr * 100;
+  const ht = String(housingType||'');
+  const isCommercial = ht.indexOf('상가') >= 0 || ht.indexOf('오피스텔') >= 0 || ht.indexOf('상업') >= 0;
+  if (isCommercial) return Math.round(tradeAmt * 0.009);
+  let rate, cap;
+  if (tradeAmt < 5e7)       { rate = 0.005; cap = 200000; }
+  else if (tradeAmt < 1e8)  { rate = 0.004; cap = 300000; }
+  else if (tradeAmt < 3e8)  { rate = 0.003; cap = 700000; }
+  else if (tradeAmt < 6e8)  { rate = 0.004; cap = 2400000; }
+  else if (tradeAmt < 12e8) { rate = 0.005; cap = 7000000; }
+  else                      { rate = 0.006; cap = Infinity; }
+  return Math.round(Math.min(tradeAmt * rate, cap));
+}
+
+// [v77] 파트너 매칭
+function cmgFindPartner(name){
+  if (!Array.isArray(partnerRawData)) return null;
+  var n = String(name||'').trim();
+  if (!n) return null;
+  return partnerRawData.find(function(p){ return p.shortName === n || p.fullName === n; }) || null;
+}
+
+// [v77] 시작일 파싱
+function cmgParseStartDate(raw){
+  if (!raw) return null;
+  var s = String(raw);
+  var m1 = s.match(/Date\((\d+),(\d+),(\d+)/);
+  if (m1) return new Date(+m1[1], +m1[2], +m1[3]);
+  var m2 = s.match(/(\d{4})[\.\-\/]+(\d{1,2})[\.\-\/]+(\d{1,2})/);
+  if (m2) return new Date(+m2[1], +m2[2]-1, +m2[3]);
+  var d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+// [v77] 금액 파싱
+function cmgParseAmount(raw){
+  if (raw == null) return 0;
+  var n = parseFloat(String(raw).replace(/[^0-9.\-]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+// [v77] 기간 cutoff
+function cmgGetPartnerCutoff(period){
+  var t = new Date(); t.setHours(0,0,0,0);
+  switch(period) {
+    case 'quarter': return new Date(t.getFullYear(), t.getMonth()-3, t.getDate());
+    case 'half':    return new Date(t.getFullYear(), t.getMonth()-6, t.getDate());
+    case 'year':    return new Date(t.getFullYear(), t.getMonth()-12, t.getDate());
+    case 'month':
+    default:        return new Date(t.getFullYear(), t.getMonth()-1, t.getDate());
+  }
+}
+
+// [v77] 파트너별 통계 빌드
+function cmgBuildPartnerStats(){
+  if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) return [];
+  var period = window._cmgPartnerPeriod || 'month';
+  var cutoff = cmgGetPartnerCutoff(period);
+  var contractMap = {};
+  if (Array.isArray(contractRawData)) {
+    contractRawData.forEach(function(c){ contractMap[String(c['계약번호']||'').trim()] = c; });
+  }
+  var byPartner = {};
+  vacancyRawData.forEach(function(v){
+    var pn = String(v.partnerName||'').trim();
+    if (!pn) return;
+    var cno = String(v.no||'').trim();
+    var c = contractMap[cno];
+    var startDate = c ? cmgParseStartDate(c['시작일']) : null;
+    if (!startDate || startDate < cutoff) return;
+    var dep  = cmgParseAmount(v.deposit);
+    var rent = cmgParseAmount(v.monthRent || v.rent);
+    var brk  = calcBrokerage(dep, rent, v.housingType);
+    var trade = dep + rent * 100;
+    if (!byPartner[pn]) {
+      byPartner[pn] = {
+        partnerName: pn,
+        partner: cmgFindPartner(pn),
+        contracts: [],
+        totalDeposit: 0,
+        totalRent: 0,
+        totalTrade: 0,
+        totalBrokerage: 0
+      };
+    }
+    byPartner[pn].contracts.push({
+      cno: cno,
+      tenant: v.tenant1Name || v.tenantName || '',
+      person: v.partnerPerson || '',
+      housingType: v.housingType || '',
+      startDate: startDate,
+      deposit: dep,
+      rent: rent,
+      brokerage: brk,
+      trade: trade,
+      contractStatus: c ? (c['계약상태']||'') : ''
+    });
+    byPartner[pn].totalDeposit += dep;
+    byPartner[pn].totalRent    += rent;
+    byPartner[pn].totalTrade   += trade;
+    byPartner[pn].totalBrokerage += brk;
+  });
+  var arr = Object.keys(byPartner).map(function(k){ return byPartner[k]; });
+  arr.sort(function(a,b){ return b.contracts.length - a.contracts.length || b.totalBrokerage - a.totalBrokerage; });
+  return arr;
+}
+
+// [v77] 만원/억원 단위 표기
+function cmgFmtKor(n){
+  n = +n || 0;
+  if (n >= 1e8) return (n/1e8).toFixed(n >= 1e9 ? 1 : 2).replace(/\.?0+$/, '') + '억';
+  if (n >= 1e4) return Math.round(n/1e4).toLocaleString() + '만';
+  return Math.round(n).toLocaleString();
+}
+function cmgFmtMoney(n){ return '₩' + Math.round(+n||0).toLocaleString(); }
+function cmgFmtMoneyKor(n){ return '₩' + cmgFmtKor(n); }
+
+// [v77] 파트너 expand
+window._cmgExpandedPartner = window._cmgExpandedPartner || null;
+function cmgTogglePartner(name){
+  window._cmgExpandedPartner = (window._cmgExpandedPartner === name) ? null : name;
+  renderContractMgmtView();
+}
+
+// [v77] 파트너 통계 카드 렌더
+function cmgRenderPartnerStats(){
+  var stats = cmgBuildPartnerStats();
+  var period = window._cmgPartnerPeriod || 'month';
+  var periodLabel = { month:'최근 1개월', quarter:'최근 분기(3개월)', half:'최근 반기(6개월)', year:'최근 1년' }[period] || period;
+  var totalCnt = stats.reduce(function(s,p){ return s + p.contracts.length; }, 0);
+  var totalBrk = stats.reduce(function(s,p){ return s + p.totalBrokerage; }, 0);
+  var totalTrade = stats.reduce(function(s,p){ return s + p.totalTrade; }, 0);
+  var periodHtml = '<div class="cmg-period-row"><span style="font-size:12px;color:#6B7280;font-weight:700;margin-right:4px">기간:</span>'
+    + '<button class="cmg-period-btn ' + (period==='month'?'active':'') + '" onclick="cmgSetPartnerPeriod(\'month\')">1개월</button>'
+    + '<button class="cmg-period-btn ' + (period==='quarter'?'active':'') + '" onclick="cmgSetPartnerPeriod(\'quarter\')">분기</button>'
+    + '<button class="cmg-period-btn ' + (period==='half'?'active':'') + '" onclick="cmgSetPartnerPeriod(\'half\')">반기</button>'
+    + '<button class="cmg-period-btn ' + (period==='year'?'active':'') + '" onclick="cmgSetPartnerPeriod(\'year\')">1년</button>'
+    + '</div>';
+  var meta = '<div class="cmg-section-meta">'
+    + '<b>' + periodLabel + '</b> · 활성 파트너 <b>' + stats.length + '개</b>'
+    + ' · 총 <b>' + totalCnt + '건</b>'
+    + ' · 총 거래액 <b>' + cmgFmtMoneyKor(totalTrade) + '</b>'
+    + ' · 중개보수 합계 <b>' + cmgFmtMoney(totalBrk) + '</b>'
+    + '</div>';
+  var tableHtml;
+  if (stats.length === 0) {
+    tableHtml = '<div class="cmg-empty">선택 기간에 계약 시작 건이 없습니다.</div>';
+  } else {
+    tableHtml = '<div style="overflow-x:auto"><table class="cmg-tbl">'
+      + '<thead><tr>'
+      + '<th>No</th><th>파트너</th><th>상호 / 등록번호</th><th class="cmg-num">건수</th>'
+      + '<th class="cmg-num">총 거래액</th><th class="cmg-num">중개보수</th>'
+      + '<th>품질</th>'
+      + '<th>담당</th><th>연락처</th>'
+      + '</tr></thead><tbody>'
+      + stats.map(function(p, i){
+          var info = p.partner;
+          var biz  = info ? (info.fullName||'') : '';
+          var bizNo= info ? (info.bizNo||'') : '';
+          var per  = info ? (info.person||'') : '';
+          var tel  = info ? (info.mobile || info.tel || '') : '';
+          var isOpen = window._cmgExpandedPartner === p.partnerName;
+          var pnEsc = p.partnerName.replace(/'/g, "\\'");
+          var rowsExpand = '';
+          if (isOpen) {
+            var expContracts = p.contracts.slice().sort(function(a,b){ return b.startDate - a.startDate; });
+            rowsExpand = '<tr class="cmg-expand-row"><td colspan="9"><div class="cmg-expand-inner">'
+              + (info ? '<div class="cmg-partner-info">'
+                  + (info.bizNo ? '<span>등록번호: <b>' + info.bizNo + '</b></span>' : '')
+                  + (info.addr ? '<span>주소: <b>' + info.addr + '</b></span>' : '')
+                  + (info.bank ? '<span>정산: <b>' + info.bank + ' ' + (info.account||'') + ' (' + (info.acctHolder||'') + ')</b></span>' : '')
+                  + '</div>' : '')
+              + '<table class="cmg-expand-tbl"><thead><tr>'
+              + '<th>계약번호</th><th>계약자</th><th>구분</th><th>시작일</th>'
+              + '<th class="cmg-num">보증금</th><th class="cmg-num">월세</th>'
+              + '<th class="cmg-num">거래액</th><th class="cmg-num">중개보수</th>'
+              + '<th>계약상태</th>'
+              + '</tr></thead><tbody>'
+              + expContracts.map(function(ct){
+                  return '<tr onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="cursor:pointer">'
+                    + '<td><b style="color:#7C3AED">' + ct.cno + '</b></td>'
+                    + '<td>' + (ct.tenant||'—') + '</td>'
+                    + '<td style="color:#6B7280">' + (ct.housingType||'—') + '</td>'
+                    + '<td style="color:#6B7280">' + cmgFmtDate(ct.startDate) + '</td>'
+                    + '<td class="cmg-num">' + cmgFmtMoneyKor(ct.deposit) + '</td>'
+                    + '<td class="cmg-num">' + cmgFmtMoneyKor(ct.rent) + '</td>'
+                    + '<td class="cmg-num">' + cmgFmtMoneyKor(ct.trade) + '</td>'
+                    + '<td class="cmg-num cmg-money">' + cmgFmtMoney(ct.brokerage) + '</td>'
+                    + '<td style="color:#6B7280">' + (ct.contractStatus||'—') + '</td>'
+                    + '</tr>';
+                }).join('')
+              + '</tbody></table>'
+              + cmgRenderSparkline(cmgBuildSparkline(p.partnerName)) // [v79] 6-6
+              + '</div></td></tr>';
+          }
+          var rank = cmgPartnerRank(p.partnerName); // [v78]
+          return '<tr onclick="cmgTogglePartner(\'' + pnEsc + '\')">'
+            + '<td style="color:#8A9AB5;font-size:11px">' + (i+1) + '</td>'
+            + '<td><b>' + p.partnerName + '</b>'
+              + ' <span class="cmg-rank-badge cmg-rank-' + rank + '">' + rank + '</span>'
+              + (isOpen ? ' <span style="color:#7C3AED">▼</span>' : ' <span style="color:#9CA3AF">▶</span>')
+              + '</td>'
+            + '<td><div style="font-size:11.5px">' + (biz||'—') + '</div>'
+              + (bizNo ? '<div class="cmg-money-sub">' + bizNo + '</div>' : '')
+              + '</td>'
+            + '<td class="cmg-num"><b>' + p.contracts.length + '</b>건</td>'
+            + '<td class="cmg-num">' + cmgFmtMoneyKor(p.totalTrade) + '</td>'
+            + '<td class="cmg-num cmg-money">' + cmgFmtMoney(p.totalBrokerage) + '</td>'
+            + '<td>' + cmgRenderQuality(cmgGetPartnerQuality(p.partnerName)) + '</td>' // [v79]
+            + '<td>' + (per||'—') + '</td>'
+            + '<td style="font-size:11px;color:#6B7280">' + (tel||'—') + '</td>'
+            + '</tr>'
+            + rowsExpand;
+        }).join('')
+      + '</tbody></table></div>';
+  }
+  return '<div class="cmg-card">'
+    + '<div class="cmg-card-title"><span class="dot" style="background:#0EA5E9"></span>🏢 부동산(파트너)별 계약 통계 + 중개보수료</div>'
+    + periodHtml
+    + meta
+    + tableHtml
+    + '</div>';
+}
+
+// [v78] 파트너 등급 자동 산정 (누적계약 + 최근활동)
+//   A: 누적 ≥30건 + 최근6개월 활동
+//   B: 10~29건 또는 최근활동 있음
+//   C: 1~9건 (신규)
+//   D: 6개월 이상 무계약 (휴면)
+function cmgPartnerRank(partnerName){
+  if (!Array.isArray(vacancyRawData)) return 'C';
+  if (!Array.isArray(contractRawData)) return 'C';
+  var contractMap = {};
+  contractRawData.forEach(function(c){ contractMap[String(c['계약번호']||'').trim()] = c; });
+  var cnt = 0, recentCnt = 0;
+  var sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6); sixMonthsAgo.setHours(0,0,0,0);
+  vacancyRawData.forEach(function(v){
+    if (String(v.partnerName||'').trim() !== partnerName) return;
+    cnt++;
+    var c = contractMap[String(v.no||'').trim()];
+    if (c) {
+      var sd = cmgParseStartDate(c['시작일']);
+      if (sd && sd >= sixMonthsAgo) recentCnt++;
+    }
+  });
+  if (cnt >= 30 && recentCnt > 0) return 'A';
+  if (cnt >= 10) return 'B';
+  if (cnt === 0) return 'D';
+  if (recentCnt > 0) return 'B';
+  // 누적 1~9건 + 최근활동 없음
+  // 누적 시작일 모두 6개월 전이면 D
+  // 단순화: 1~9건이면 C
+  return 'C';
+}
+
+// [v78] 담당자별 통계 빌드 (partnerPerson = vacancy.BM 기준)
+function cmgBuildPersonStats(){
+  if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) return [];
+  var period = window._cmgPartnerPeriod || 'month';
+  var cutoff = cmgGetPartnerCutoff(period);
+  var contractMap = {};
+  if (Array.isArray(contractRawData)) {
+    contractRawData.forEach(function(c){ contractMap[String(c['계약번호']||'').trim()] = c; });
+  }
+  var byPerson = {};
+  vacancyRawData.forEach(function(v){
+    var person = String(v.partnerPerson||'').trim();
+    var pn = String(v.partnerName||'').trim();
+    if (!person) return;
+    var cno = String(v.no||'').trim();
+    var c = contractMap[cno];
+    var startDate = c ? cmgParseStartDate(c['시작일']) : null;
+    if (!startDate || startDate < cutoff) return;
+    var dep  = cmgParseAmount(v.deposit);
+    var rent = cmgParseAmount(v.monthRent || v.rent);
+    var brk  = calcBrokerage(dep, rent, v.housingType);
+    var trade = dep + rent * 100;
+    var key = person + '|' + pn; // 담당자 + 파트너 조합
+    if (!byPerson[key]) {
+      byPerson[key] = { person: person, partnerName: pn, count: 0, totalTrade: 0, totalBrokerage: 0, contracts: [] };
+    }
+    byPerson[key].count++;
+    byPerson[key].totalTrade += trade;
+    byPerson[key].totalBrokerage += brk;
+    byPerson[key].contracts.push({ cno: cno, tenant: v.tenant1Name||v.tenantName||'', startDate: startDate, brokerage: brk, trade: trade });
+  });
+  var arr = Object.keys(byPerson).map(function(k){ return byPerson[k]; });
+  arr.sort(function(a,b){ return b.count - a.count || b.totalBrokerage - a.totalBrokerage; });
+  return arr;
+}
+
+// [v78] 섹션 C 카드 렌더 (담당자별 KPI)
+function cmgRenderPersonStats(){
+  var stats = cmgBuildPersonStats();
+  var period = window._cmgPartnerPeriod || 'month';
+  var periodLabel = { month:'최근 1개월', quarter:'최근 분기', half:'최근 반기', year:'최근 1년' }[period] || period;
+  var totalCnt = stats.reduce(function(s,p){ return s + p.count; }, 0);
+  var totalBrk = stats.reduce(function(s,p){ return s + p.totalBrokerage; }, 0);
+  var meta = '<div class="cmg-section-meta">'
+    + '<b>' + periodLabel + '</b> · 활성 담당자 <b>' + stats.length + '명</b>'
+    + ' · 총 <b>' + totalCnt + '건</b>'
+    + ' · 중개보수 합계 <b>' + cmgFmtMoney(totalBrk) + '</b>'
+    + ' <span style="color:#9CA3AF">(부동산 계약담당자 기준 — vacancy BM열)</span>'
+    + '</div>';
+  var tableHtml;
+  if (stats.length === 0) {
+    tableHtml = '<div class="cmg-empty">선택 기간에 계약 시작 건이 없습니다.</div>';
+  } else {
+    tableHtml = '<div style="overflow-x:auto"><table class="cmg-tbl">'
+      + '<thead><tr>'
+      + '<th>No</th><th>담당자</th><th>소속 파트너</th><th class="cmg-num">건수</th>'
+      + '<th class="cmg-num">총 거래액</th><th class="cmg-num">중개보수</th>'
+      + '<th class="cmg-num">건당 평균</th>'
+      + '</tr></thead><tbody>'
+      + stats.map(function(p, i){
+          var avgBrk = p.count > 0 ? Math.round(p.totalBrokerage / p.count) : 0;
+          return '<tr>'
+            + '<td style="color:#8A9AB5;font-size:11px">' + (i+1) + '</td>'
+            + '<td><b>' + p.person + '</b></td>'
+            + '<td style="color:#475569">' + (p.partnerName || '—') + '</td>'
+            + '<td class="cmg-num"><b>' + p.count + '</b>건</td>'
+            + '<td class="cmg-num">' + cmgFmtMoneyKor(p.totalTrade) + '</td>'
+            + '<td class="cmg-num cmg-money">' + cmgFmtMoney(p.totalBrokerage) + '</td>'
+            + '<td class="cmg-num">' + cmgFmtMoney(avgBrk) + '</td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table></div>';
+  }
+  return '<div class="cmg-card">'
+    + '<div class="cmg-card-title"><span class="dot" style="background:#10B981"></span>👤 담당자별 계약 KPI</div>'
+    + meta
+    + tableHtml
+    + '</div>';
+}
+
+// ==================================================================
+// [v79] 6-3 부동산별 품질 지표 (연체율 / 갱신율)
+// ==================================================================
+// 그 partnerName이 소개한 임차인들의 paymentRawData 연체상태 비율
+function cmgGetPartnerQuality(partnerName){
+  if (!Array.isArray(vacancyRawData) || !partnerName) return null;
+  // 해당 파트너의 모든 계약번호 수집
+  var cnos = [];
+  vacancyRawData.forEach(function(v){
+    if (String(v.partnerName||'').trim() === partnerName) {
+      var cno = String(v.no||'').trim();
+      if (cno) cnos.push(cno);
+    }
+  });
+  if (cnos.length === 0) return null;
+  // 연체 발생 여부 (paymentRawData에서 해당 계약번호의 납부상태에 연체중/분납중 포함)
+  var delqCnt = 0, validCnt = 0;
+  cnos.forEach(function(cno){
+    var pays = (Array.isArray(paymentRawData) ? paymentRawData : []).filter(function(p){
+      return String(p['계약번호']||'').trim() === cno;
+    });
+    if (pays.length === 0) return;
+    validCnt++;
+    var hasDelq = pays.some(function(p){
+      var st = String(p['납부상태']||'').trim();
+      return st.indexOf('연체중') >= 0 || st.indexOf('분납중') >= 0;
+    });
+    if (hasDelq) delqCnt++;
+  });
+  // 갱신율: contractRawData의 계약상태에서 '갱신' 포함 vs 만기도래(현재일 > 만기일) 카운트
+  var renewedCnt = 0, expiredCnt = 0;
+  var today = new Date(); today.setHours(0,0,0,0);
+  cnos.forEach(function(cno){
+    var c = (Array.isArray(contractRawData) ? contractRawData : []).find(function(r){ return String(r['계약번호']||'').trim() === cno; });
+    if (!c) return;
+    var status = String(c['계약상태']||'');
+    if (status.indexOf('갱신') >= 0) renewedCnt++;
+    var v = vacancyRawData.find(function(vv){ return String(vv.no||'').trim() === cno; });
+    if (v && v.endDate) {
+      var ed = cmgParseStartDate(v.endDate);
+      if (ed && ed < today) expiredCnt++;
+    }
+  });
+  var delqRate = validCnt > 0 ? (delqCnt / validCnt) : null;
+  var renewRate = expiredCnt > 0 ? (renewedCnt / expiredCnt) : null;
+  return { totalCnt: cnos.length, validCnt: validCnt, delqCnt: delqCnt, delqRate: delqRate, renewedCnt: renewedCnt, expiredCnt: expiredCnt, renewRate: renewRate };
+}
+
+function cmgRenderQuality(q){
+  if (!q) return '<span class="cmg-quality cmg-q-na">데이터 없음</span>';
+  var html = '';
+  if (q.delqRate !== null) {
+    var pct = Math.round(q.delqRate * 100);
+    var cls = q.delqRate <= 0.05 ? 'cmg-q-good' : (q.delqRate <= 0.15 ? 'cmg-q-mid' : 'cmg-q-bad');
+    html += '<span class="cmg-quality ' + cls + '" title="연체 발생: ' + q.delqCnt + '/' + q.validCnt + '">연체 ' + pct + '%</span>';
+  } else {
+    html += '<span class="cmg-quality cmg-q-na">연체 N/A</span>';
+  }
+  if (q.renewRate !== null) {
+    var pct2 = Math.round(q.renewRate * 100);
+    var cls2 = q.renewRate >= 0.5 ? 'cmg-q-good' : (q.renewRate >= 0.3 ? 'cmg-q-mid' : 'cmg-q-bad');
+    html += '<span class="cmg-quality ' + cls2 + '" title="갱신: ' + q.renewedCnt + '/' + q.expiredCnt + '">갱신 ' + pct2 + '%</span>';
+  } else {
+    html += '<span class="cmg-quality cmg-q-na">갱신 N/A</span>';
+  }
+  return html;
+}
+
+// ==================================================================
+// [v79] 6-4 신규 파트너 온보딩 추적
+// ==================================================================
+function cmgBuildOnboarding(){
+  if (!Array.isArray(partnerRawData)) return [];
+  var today = new Date(); today.setHours(0,0,0,0);
+  var arr = [];
+  partnerRawData.forEach(function(p){
+    var pn = p.shortName || p.fullName;
+    if (!pn) return;
+    var regDate = cmgParseStartDate(p.regDate);
+    var firstStart = null, totalCnt = 0;
+    if (Array.isArray(vacancyRawData)) {
+      vacancyRawData.forEach(function(v){
+        if (String(v.partnerName||'').trim() !== pn) return;
+        totalCnt++;
+        var c = (Array.isArray(contractRawData) ? contractRawData : []).find(function(r){ return String(r['계약번호']||'').trim() === String(v.no||'').trim(); });
+        if (c) {
+          var sd = cmgParseStartDate(c['시작일']);
+          if (sd && (!firstStart || sd < firstStart)) firstStart = sd;
+        }
+      });
+    }
+    var daysToFirst = (regDate && firstStart) ? Math.floor((firstStart - regDate) / 86400000) : null;
+    var daysSinceReg = regDate ? Math.floor((today - regDate) / 86400000) : null;
+    var isNoActivity90 = (daysSinceReg !== null && daysSinceReg >= 90 && totalCnt === 0);
+    arr.push({ partnerName: pn, fullName: p.fullName, regDate: regDate, firstStart: firstStart, daysToFirst: daysToFirst, daysSinceReg: daysSinceReg, totalCnt: totalCnt, isNoActivity90: isNoActivity90 });
+  });
+  // 등록일 기준 신순 (최근 등록 먼저)
+  arr.sort(function(a,b){
+    var ad = a.regDate ? a.regDate.getTime() : 0;
+    var bd = b.regDate ? b.regDate.getTime() : 0;
+    return bd - ad;
+  });
+  return arr;
+}
+
+function cmgRenderOnboardingCard(){
+  var rows = cmgBuildOnboarding();
+  // 등록일이 있는 항목만 (없으면 추적 불가)
+  var withReg = rows.filter(function(r){ return r.regDate; });
+  var noActivityCnt = withReg.filter(function(r){ return r.isNoActivity90; }).length;
+  var fmtDate = function(d){ return d ? cmgFmtDate(d) : '—'; };
+  var html = '<div class="cmg-card">'
+    + '<div class="cmg-card-title"><span class="dot" style="background:#F59E0B"></span>🌱 신규 파트너 온보딩 추적 (6-4)</div>';
+  if (withReg.length === 0) {
+    html += '<div class="cmg-empty">파트너시트에 등록일(L열) 데이터가 없어 온보딩 추적이 비활성화되었습니다.</div>';
+  } else {
+    html += '<div class="cmg-section-meta">활성 파트너 <b>' + withReg.length + '명</b>'
+      + (noActivityCnt > 0 ? ' · <span style="color:#DC2626">⚠ 등록 90일 무계약 <b>' + noActivityCnt + '명</b></span>' : '')
+      + '</div>';
+    html += '<table class="cmg-onboard-tbl"><thead><tr>'
+      + '<th>파트너</th><th>등록일</th><th>경과일</th><th>첫 계약일</th><th>등록→첫계약 일수</th><th class="cmg-num">누적계약</th>'
+      + '</tr></thead><tbody>';
+    html += withReg.slice(0, 30).map(function(r){
+      return '<tr class="' + (r.isNoActivity90 ? 'cmg-warn' : '') + '">'
+        + '<td><b>' + r.partnerName + '</b>' + (r.fullName ? ' <span style="color:#9CA3AF;font-size:10px">' + r.fullName + '</span>' : '') + '</td>'
+        + '<td>' + fmtDate(r.regDate) + '</td>'
+        + '<td>' + (r.daysSinceReg !== null ? r.daysSinceReg + '일' : '—') + '</td>'
+        + '<td>' + fmtDate(r.firstStart) + '</td>'
+        + '<td>' + (r.daysToFirst !== null ? r.daysToFirst + '일' : '<span style="color:#DC2626">미계약</span>') + '</td>'
+        + '<td class="cmg-num"><b>' + r.totalCnt + '</b>건</td>'
+        + '</tr>';
+    }).join('');
+    html += '</tbody></table>';
+  }
+  return html + '</div>';
+}
+
+// ==================================================================
+// [v79] 6-5 지역(상권)별 파트너 매핑
+// ==================================================================
+function cmgExtractRegion(addr){
+  if (!addr) return '미지정';
+  var s = String(addr);
+  // 서울 ○○구 / 경기 ○○시 ○○구 / ○○도 ○○시 등 매칭
+  var m = s.match(/(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충[북남]|전[북남]|경[북남]|제주)[\s\S]{0,30}?([가-힣]+(?:구|시|군))/);
+  if (m) return m[1] + ' ' + m[2];
+  // fallback: 첫 단어 (구/시/군 검색)
+  var m2 = s.match(/([가-힣]+(?:구|시|군))/);
+  return m2 ? m2[1] : '미지정';
+}
+
+function cmgBuildRegionStats(){
+  if (!Array.isArray(partnerRawData)) return [];
+  var byRegion = {};
+  partnerRawData.forEach(function(p){
+    var pn = p.shortName || p.fullName;
+    if (!pn) return;
+    var region = cmgExtractRegion(p.addr);
+    if (!byRegion[region]) byRegion[region] = { region: region, partners: 0, totalContracts: 0 };
+    byRegion[region].partners++;
+    if (Array.isArray(vacancyRawData)) {
+      vacancyRawData.forEach(function(v){
+        if (String(v.partnerName||'').trim() === pn) byRegion[region].totalContracts++;
+      });
+    }
+  });
+  var arr = Object.values(byRegion);
+  arr.sort(function(a,b){ return b.totalContracts - a.totalContracts || b.partners - a.partners; });
+  return arr;
+}
+
+function cmgRenderRegionCard(){
+  var stats = cmgBuildRegionStats();
+  var totalP = stats.reduce(function(s,r){ return s + r.partners; }, 0);
+  var totalC = stats.reduce(function(s,r){ return s + r.totalContracts; }, 0);
+  var html = '<div class="cmg-card">'
+    + '<div class="cmg-card-title"><span class="dot" style="background:#8B5CF6"></span>📍 지역별 파트너 분포 (6-5)</div>'
+    + '<div class="cmg-section-meta"><b>' + stats.length + '개 지역</b> · 파트너 <b>' + totalP + '개</b> · 누적 계약 <b>' + totalC + '건</b></div>';
+  if (stats.length === 0) {
+    html += '<div class="cmg-empty">파트너 데이터가 없습니다.</div>';
+  } else {
+    html += '<div class="cmg-region-grid">';
+    html += stats.map(function(r){
+      return '<div class="cmg-region-cell">'
+        + '<div class="name">' + r.region + '</div>'
+        + '<div class="cnt">파트너 <b>' + r.partners + '</b>개 · 계약 <b>' + r.totalContracts + '</b>건</div>'
+        + '</div>';
+    }).join('');
+    html += '</div>';
+  }
+  return html + '</div>';
+}
+
+// ==================================================================
+// [v79] 6-2 정산 워크플로우 (이번 달 미지급 보수료)
+// ==================================================================
+function cmgPaidKey(partnerName, ym){ return partnerName + '|' + ym; }
+function cmgTogglePaid(pn, ym, cb){
+  var key = cmgPaidKey(pn, ym);
+  if (cb && cb.checked !== undefined) {
+    window._cmgPaidMap[key] = cb.checked;
+  } else {
+    window._cmgPaidMap[key] = !window._cmgPaidMap[key];
+  }
+  renderContractMgmtView();
+}
+
+function cmgBuildSettlement(){
+  if (!Array.isArray(vacancyRawData)) return [];
+  var today = new Date(); today.setHours(0,0,0,0);
+  var contractMap = {};
+  if (Array.isArray(contractRawData)) {
+    contractRawData.forEach(function(c){ contractMap[String(c['계약번호']||'').trim()] = c; });
+  }
+  var byPartnerYM = {};
+  vacancyRawData.forEach(function(v){
+    var pn = String(v.partnerName||'').trim();
+    if (!pn) return;
+    var c = contractMap[String(v.no||'').trim()];
+    if (!c) return;
+    var sd = cmgParseStartDate(c['시작일']);
+    if (!sd) return;
+    var ym = sd.getFullYear() + '-' + String(sd.getMonth()+1).padStart(2,'0');
+    var dep = cmgParseAmount(v.deposit);
+    var rent = cmgParseAmount(v.monthRent || v.rent);
+    var brk = calcBrokerage(dep, rent, v.housingType);
+    var key = pn + '|' + ym;
+    if (!byPartnerYM[key]) byPartnerYM[key] = { partnerName: pn, ym: ym, count: 0, totalBrokerage: 0, startDate: sd };
+    byPartnerYM[key].count++;
+    byPartnerYM[key].totalBrokerage += brk;
+  });
+  var arr = Object.values(byPartnerYM);
+  // 미지급(unpaid) 우선, 그다음 ym 최신순
+  arr.sort(function(a,b){
+    var ap = window._cmgPaidMap[cmgPaidKey(a.partnerName, a.ym)] ? 1 : 0;
+    var bp = window._cmgPaidMap[cmgPaidKey(b.partnerName, b.ym)] ? 1 : 0;
+    if (ap !== bp) return ap - bp;
+    return b.ym.localeCompare(a.ym);
+  });
+  return arr;
+}
+
+function cmgRenderSettlementCard(){
+  var rows = cmgBuildSettlement();
+  // 최근 6개월만 표시
+  var sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  rows = rows.filter(function(r){ return r.startDate && r.startDate >= sixMonthsAgo; });
+  var unpaidCnt = rows.filter(function(r){ return !window._cmgPaidMap[cmgPaidKey(r.partnerName, r.ym)]; }).length;
+  var unpaidAmt = rows.reduce(function(s,r){ return window._cmgPaidMap[cmgPaidKey(r.partnerName, r.ym)] ? s : s + r.totalBrokerage; }, 0);
+  var html = '<div class="cmg-card">'
+    + '<div class="cmg-card-title"><span class="dot" style="background:#EF4444"></span>💰 정산 워크플로우 (최근 6개월) (6-2)</div>'
+    + '<div class="cmg-section-meta">미지급 <b style="color:#DC2626">' + unpaidCnt + '건</b> · 미지급 합계 <b style="color:#DC2626">' + cmgFmtMoney(unpaidAmt) + '</b> <span style="color:#9CA3AF">(체크박스는 메모리 저장 — 새로고침 시 초기화)</span></div>';
+  if (rows.length === 0) {
+    html += '<div class="cmg-empty">최근 6개월 정산 대상이 없습니다.</div>';
+  } else {
+    html += '<table class="cmg-onboard-tbl"><thead><tr>'
+      + '<th>월</th><th>파트너</th><th class="cmg-num">건수</th>'
+      + '<th class="cmg-num">중개보수 합계</th><th>입금완료</th><th>상태</th>'
+      + '</tr></thead><tbody>';
+    html += rows.map(function(r){
+      var paid = !!window._cmgPaidMap[cmgPaidKey(r.partnerName, r.ym)];
+      var partner = cmgFindPartner(r.partnerName);
+      var hasBizNo = partner && partner.bizNo;
+      var pnEsc = r.partnerName.replace(/'/g, "\\'");
+      return '<tr class="' + (paid ? '' : 'cmg-warn') + '">'
+        + '<td><b>' + r.ym + '</b></td>'
+        + '<td>' + r.partnerName + (!hasBizNo ? ' <span style="color:#9CA3AF;font-size:10px">(등록번호 없음)</span>' : '') + '</td>'
+        + '<td class="cmg-num">' + r.count + '건</td>'
+        + '<td class="cmg-num cmg-money">' + cmgFmtMoney(r.totalBrokerage) + '</td>'
+        + '<td><input type="checkbox" class="cmg-paid-cb" ' + (paid ? 'checked' : '') + ' onchange="cmgTogglePaid(\'' + pnEsc + '\',\'' + r.ym + '\',this)"></td>'
+        + '<td>' + (paid ? '<span class="cmg-paid-true">✓ 지급완료</span>' : '<span class="cmg-paid-false">미지급</span>') + '</td>'
+        + '</tr>';
+    }).join('');
+    html += '</tbody></table>';
+  }
+  return html + '</div>';
+}
+
+// ==================================================================
+// [v79] 6-6 파트너별 계약 추이 sparkline
+// ==================================================================
+function cmgBuildSparkline(partnerName){
+  if (!Array.isArray(vacancyRawData)) return null;
+  var contractMap = {};
+  if (Array.isArray(contractRawData)) {
+    contractRawData.forEach(function(c){ contractMap[String(c['계약번호']||'').trim()] = c; });
+  }
+  var today = new Date();
+  // 최근 12개월
+  var months = [];
+  for (var i = 11; i >= 0; i--) {
+    var d = new Date(today.getFullYear(), today.getMonth()-i, 1);
+    months.push({ ym: d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'), count: 0 });
+  }
+  var idx = {};
+  months.forEach(function(m, i){ idx[m.ym] = i; });
+  vacancyRawData.forEach(function(v){
+    if (String(v.partnerName||'').trim() !== partnerName) return;
+    var c = contractMap[String(v.no||'').trim()];
+    if (!c) return;
+    var sd = cmgParseStartDate(c['시작일']);
+    if (!sd) return;
+    var ym = sd.getFullYear() + '-' + String(sd.getMonth()+1).padStart(2,'0');
+    if (idx[ym] !== undefined) months[idx[ym]].count++;
+  });
+  return months;
+}
+
+function cmgRenderSparkline(months){
+  if (!months || months.length === 0) return '';
+  var max = Math.max.apply(null, months.map(function(m){ return m.count; }));
+  if (max === 0) return '<div style="font-size:11px;color:#9CA3AF">최근 12개월 계약 없음</div>';
+  var w = 240, h = 36, n = months.length;
+  var bw = w / n;
+  var bars = months.map(function(m, i){
+    var bh = max > 0 ? (m.count / max) * (h - 6) : 0;
+    var x = i * bw + 1;
+    var y = h - bh;
+    var color = m.count > 0 ? '#7C3AED' : '#E5E7EB';
+    return '<rect x="' + x + '" y="' + y + '" width="' + (bw - 2) + '" height="' + bh + '" fill="' + color + '" rx="1"></rect>'
+      + '<text x="' + (x + bw/2) + '" y="' + (h - 1) + '" font-size="8" fill="#fff" text-anchor="middle" font-weight="700">' + (m.count > 0 ? m.count : '') + '</text>';
+  }).join('');
+  var labels = months.map(function(m, i){
+    if (i % 3 !== 0 && i !== n - 1) return '';
+    var mm = m.ym.split('-')[1];
+    return '<text x="' + (i * bw + bw/2) + '" y="' + (h + 11) + '" font-size="9" fill="#6B7280" text-anchor="middle">' + mm + '월</text>';
+  }).join('');
+  return '<div style="margin-top:8px"><div style="font-size:11px;color:#475569;font-weight:700;margin-bottom:4px">📈 최근 12개월 계약 추이</div>'
+    + '<svg class="cmg-spark" width="' + w + '" height="' + (h+14) + '">' + bars + labels + '</svg></div>';
+}
 
 // 진척 데이터 빌드 (vacancy + contract 시작일)
 function cmgBuildProgress(){
@@ -7611,7 +8357,7 @@ function renderContractMgmtView(){
   var wrap = document.querySelector('#contractMgmtView .cmg-inner');
   if (!wrap) return;
   // 데이터 로드 대기
-  var needLoad = !Array.isArray(vacancyRawData) || !vacancyRawData.length || !crLoaded;
+  var needLoad = !Array.isArray(vacancyRawData) || !vacancyRawData.length || !crLoaded || !partnerLoaded; // [v76] partnerLoaded
   if (needLoad) {
     wrap.innerHTML = '<div class="cmg-empty">📡 계약관리 데이터 로딩 중...</div>';
     var promises = [];
@@ -7621,6 +8367,7 @@ function renderContractMgmtView(){
       crLoaded = true;
     }));
     if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) promises.push(fetchSheetByGid(VACANCY_GID).then(function(r){ vacancyRawData = parseVacancySheet(r); }));
+    if (!partnerLoaded) promises.push(fetchSheetByGid(PARTNER_GID).then(function(r){ partnerRawData = parsePartnerSheet(r); partnerLoaded = true; }).catch(function(e){ console.warn('partner fetch fail', e); partnerLoaded = true; })); // [v76]
     Promise.all(promises).then(function(){ renderContractMgmtView(); }).catch(function(e){
       wrap.innerHTML = '<div class="cmg-empty">❌ 데이터 로드 실패: ' + e.message + '</div>';
     });
@@ -7698,14 +8445,11 @@ function renderContractMgmtView(){
     + '<div class="cmg-card-title"><span class="dot"></span>📋 입주 전 진척 체크리스트 (홈버튼 / 전자계약 / 수수료 / 서명 / NAS)</div>'
     + rowsHtml
     + '</div>'
-    + '<div class="cmg-card" style="background:#FEF3C7;border-color:#FCD34D">'
-    + '<div style="font-size:12px;color:#92400E;line-height:1.7">'
-    + '<b>📌 다음 단계 (Phase 2/3 안내)</b><br>'
-    + '• Phase 2: 부동산별 계약 통계 + 중개보수료 정산 (계약↔파트너 매핑 결정 후 진행)<br>'
-    + '• Phase 3: 담당자별 KPI + 추가 추천 기능 (등급/정산/지역 등 사용자 선택)<br>'
-    + '<b>※ 결정 필요사항(7가지)을 회신하시면 다음 단계 진행합니다.</b>'
-    + '</div>'
-    + '</div>';
+    + cmgRenderPartnerStats() // [v77] 섹션 B
+    + cmgRenderPersonStats() // [v78] 섹션 C
+    + cmgRenderSettlementCard() // [v79] 6-2
+    + cmgRenderOnboardingCard() // [v79] 6-4
+    + cmgRenderRegionCard(); // [v79] 6-5
 }
 // ═══════════════════════════════════════════
 // ■ [v44] 갱신관리 끝
