@@ -9890,7 +9890,8 @@ function sumBuildSection3(){
 
   vacancyRawData.forEach(function(v){
     if (s3Cutoff) {
-      var sdF = parseAnyDate(v.startDate);
+      // [v120] cmgParseStartDate (검증된 헬퍼) 사용 — parseAnyDate 파싱 실패 fix
+      var sdF = (typeof cmgParseStartDate === 'function') ? cmgParseStartDate(v.startDate) : parseAnyDate(v.startDate);
       if (!sdF || sdF < s3Cutoff) return;
     }
     var months = sumCalcResidence(v);
@@ -9967,9 +9968,9 @@ function sumBuildSection3(){
       var st = String(p['납부상태']||'').trim();
       // 연체 후 회수된 케이스만 (납부상태='연체납부')
       if (st !== '연체납부') return;
-      // [v119] 납부일 기간 필터
+      // [v119/v120] 납부일 기간 필터 — cmgParseStartDate 우선
       if (s3Cutoff) {
-        var pDateF = parseAnyDate(p['납부일']);
+        var pDateF = (typeof cmgParseStartDate === 'function') ? cmgParseStartDate(p['납부일']) : parseAnyDate(p['납부일']);
         if (!pDateF || pDateF < s3Cutoff) return;
       }
       var days = parseInt(String(p['연체일수']||'').replace(/[^0-9\-]/g,''),10);
