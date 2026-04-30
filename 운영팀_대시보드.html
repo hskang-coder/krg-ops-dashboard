@@ -1622,6 +1622,36 @@ async function fetchSheetByGid(gid) {
   return JSON.parse(m[1]);
 }
 
+// [v113] 시트 캐시 (stale-while-revalidate)
+window._sumSheetCacheTTL = 3 * 60 * 1000; // 3분
+window._sumSheetCacheKey = function(kind, key){ return "krg_sum_cache_" + kind + "_" + key; };
+window._sumSheetCacheGet = function(kind, key){
+  try {
+    const raw = localStorage.getItem(window._sumSheetCacheKey(kind, key));
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (!o || !o.data || !o.ts) return null;
+    return { data: o.data, ts: o.ts, age: Date.now() - o.ts };
+  } catch(e){ return null; }
+};
+window._sumSheetCacheSet = function(kind, key, data){
+  try { localStorage.setItem(window._sumSheetCacheKey(kind, key), JSON.stringify({ data: data, ts: Date.now() })); } catch(e){}
+};
+// pre-fetch — 캐시 만료된 항목만 백그라운드 fetch
+window.sumPrefetch = function(){
+  if (window._sumPrefetchStarted) return;
+  window._sumPrefetchStarted = true;
+  try {
+    const c1 = window._sumSheetCacheGet("name", CONTRACT_SHEET);
+    const c2 = window._sumSheetCacheGet("name", INCOME_SHEET);
+    const c3 = window._sumSheetCacheGet("gid", VACANCY_GID);
+    if (!c1 || c1.age >= window._sumSheetCacheTTL) fetchSheetByName(CONTRACT_SHEET).then(d => window._sumSheetCacheSet("name", CONTRACT_SHEET, d)).catch(()=>{});
+    if (!c2 || c2.age >= window._sumSheetCacheTTL) fetchSheetByName(INCOME_SHEET).then(d => window._sumSheetCacheSet("name", INCOME_SHEET, d)).catch(()=>{});
+    if (!c3 || c3.age >= window._sumSheetCacheTTL) fetchSheetByGid(VACANCY_GID).then(d => window._sumSheetCacheSet("gid", VACANCY_GID, d)).catch(()=>{});
+  } catch(e){}
+};
+
+
 function gvizToObjects(gviz) {
   const cols = gviz.table.cols.map(c => c.label.trim());
   return (gviz.table.rows || []).map(row => {
@@ -5840,9 +5870,10 @@ renderCkProgress();
 loadData();
 // 1분마다 날짜·체크리스트 갱신
 setInterval(() => { updateDateBadge(); renderCkProgress(); }, 60000);
-// [v104] 첫 화면을 종합 대시보드로
+// [v104/v113] 첫 화면을 종합 대시보드로 — 즉시 전환 + pre-fetch
 if (typeof switchView === 'function') {
-  setTimeout(function(){ switchView('summary'); }, 100);
+  if (typeof window.sumPrefetch === 'function') window.sumPrefetch();
+  switchView('summary'); // 즉시
 }
 // 5분마다 Sheets 데이터 자동 재로드
 setInterval(() => { loadData(); }, 5 * 60 * 1000);
@@ -9201,21 +9232,62 @@ function sumCalcCycle(months){
 function renderSummaryDashboard(){
   var wrap = document.querySelector('#summaryView .sum-inner');
   if (!wrap) return;
-  // 데이터 로드 대기
+  // [v113] 데이터 로드 — 캐시 우선 (즉시 표시) + 백그라운드 갱신
   var needLoad = !Array.isArray(vacancyRawData) || !vacancyRawData.length || !crLoaded;
   if (needLoad) {
-    wrap.innerHTML = '<div class="sum-loading">📡 종합 대시보드 데이터 로딩 중...</div>';
-    var promises = [];
-    if (!crLoaded) promises.push(Promise.all([fetchSheetByName(CONTRACT_SHEET), fetchSheetByName(INCOME_SHEET)]).then(function(arr){
-      contractRawData = gvizToObjects(arr[0]).filter(function(x){return x['계약번호'];});
-      paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return x['계약번호'];});
-      crLoaded = true;
-    }));
-    if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) promises.push(fetchSheetByGid(VACANCY_GID).then(function(r){ vacancyRawData = parseVacancySheet(r); }));
-    Promise.all(promises).then(function(){ renderSummaryDashboard(); }).catch(function(e){
-      wrap.innerHTML = '<div class="sum-empty">❌ 데이터 로드 실패: ' + e.message + '</div>';
-    });
-    return;
+    var cName1 = window._sumSheetCacheGet && window._sumSheetCacheGet('name', CONTRACT_SHEET);
+    var cName2 = window._sumSheetCacheGet && window._sumSheetCacheGet('name', INCOME_SHEET);
+    var cGidV  = window._sumSheetCacheGet && window._sumSheetCacheGet('gid',  VACANCY_GID);
+    var allCached = cName1 && cName2 && cGidV;
+    if (allCached) {
+      // 즉시 적용 (stale도 OK — UI 먼저 표시)
+      if (!crLoaded) {
+        contractRawData = gvizToObjects(cName1.data).filter(function(x){return x['계약번호'];});
+        paymentRawData  = gvizToObjects(cName2.data).filter(function(x){return x['계약번호'];});
+        crLoaded = true;
+      }
+      if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) {
+        vacancyRawData = parseVacancySheet(cGidV.data);
+      }
+      // stale인 항목은 백그라운드 갱신 후 1회 재렌더
+      var maxAge = Math.max(cName1.age, cName2.age, cGidV.age);
+      if (maxAge >= window._sumSheetCacheTTL && !window._sumBgRefreshing) {
+        window._sumBgRefreshing = true;
+        Promise.all([
+          fetchSheetByName(CONTRACT_SHEET).then(function(d){ window._sumSheetCacheSet('name', CONTRACT_SHEET, d); return d; }),
+          fetchSheetByName(INCOME_SHEET).then(function(d){ window._sumSheetCacheSet('name', INCOME_SHEET, d); return d; }),
+          fetchSheetByGid(VACANCY_GID).then(function(d){ window._sumSheetCacheSet('gid', VACANCY_GID, d); return d; })
+        ]).then(function(arr){
+          contractRawData = gvizToObjects(arr[0]).filter(function(x){return x['계약번호'];});
+          paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return x['계약번호'];});
+          vacancyRawData  = parseVacancySheet(arr[2]);
+          window._sumBgRefreshing = false;
+          renderSummaryDashboard();
+        }).catch(function(){ window._sumBgRefreshing = false; });
+      }
+      // fall through — 아래 KPI/렌더 로직으로
+    } else {
+      // 캐시 미적중 — 일반 fetch (loading 표시)
+      wrap.innerHTML = '<div class="sum-loading">📡 종합 대시보드 데이터 로딩 중...</div>';
+      var promises = [];
+      if (!crLoaded) promises.push(Promise.all([fetchSheetByName(CONTRACT_SHEET), fetchSheetByName(INCOME_SHEET)]).then(function(arr){
+        if (window._sumSheetCacheSet) {
+          window._sumSheetCacheSet('name', CONTRACT_SHEET, arr[0]);
+          window._sumSheetCacheSet('name', INCOME_SHEET, arr[1]);
+        }
+        contractRawData = gvizToObjects(arr[0]).filter(function(x){return x['계약번호'];});
+        paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return x['계약번호'];});
+        crLoaded = true;
+      }));
+      if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) promises.push(fetchSheetByGid(VACANCY_GID).then(function(r){
+        if (window._sumSheetCacheSet) window._sumSheetCacheSet('gid', VACANCY_GID, r);
+        vacancyRawData = parseVacancySheet(r);
+      }));
+      Promise.all(promises).then(function(){ renderSummaryDashboard(); }).catch(function(e){
+        wrap.innerHTML = '<div class="sum-empty">❌ 데이터 로드 실패: ' + e.message + '</div>';
+      });
+      return;
+    }
   }
 
   // KPI 계산
@@ -9839,12 +9911,22 @@ function sumBuildSection3(){
         var paid    = parseAmt(p['납부금액(원)']) || parseAmt(p['입금액']);
         amt = Math.max(0, charged - paid);
       }
-      // 신규 연체 (이번달 청구분)
+      // [v114] 신규 연체 (이번달 청구분) — paymentRawData '계약자명' 우선
       if (ym === thisYM) {
         var cno = String(p['계약번호']||'').trim();
         var vc = vacancyRawData.find(function(x){ return String(x.no||'').trim() === cno; });
-        var name = vc ? (vc.tenantName || vc.tenant1Name || cno) : cno;
-        if (newDelqList.length < 5) newDelqList.push({ cno: cno, name: name, amt: amt });
+        // 우선순위: payment.계약자명 → vacancy.tenant1Name (C열) → vacancy.tenantName → contract.임차인명
+        var nm = String(p['계약자명']||'').trim();
+        if (!nm && vc) nm = String(vc.tenant1Name||'').trim();
+        if (!nm && vc) nm = String(vc.tenantName||'').trim();
+        if (!nm && Array.isArray(contractRawData)) {
+          var cc = contractRawData.find(function(x){ return String(x['계약번호']||'').trim() === cno; });
+          if (cc) nm = String(cc['임차인명']||cc['계약자']||'').trim();
+        }
+        // 모든 값이 숫자만이면 '-' 표시 (사업자번호/RRN 우려)
+        if (nm && /^[0-9\-\s]+$/.test(nm)) nm = '';
+        if (!nm) nm = cno;
+        if (newDelqList.length < 5) newDelqList.push({ cno: cno, name: nm, amt: amt });
       }
       // 연체 경과 일수
       if (ym) {
