@@ -7603,6 +7603,18 @@ function cmgSetPersonPartnerFilter(val){
   window._cmgPersonPartnerFilter = val;
   renderContractMgmtView();
 }
+// [v88] 진척 체크리스트 — 미완료 항목 필터 (all / homeBtn / eContract / feePaid / signed / nas)
+window._cmgProgUnchecked = window._cmgProgUnchecked || 'all';
+function cmgSetProgUnchecked(val){
+  window._cmgProgUnchecked = val;
+  renderContractMgmtView();
+}
+// [v88] 진척 체크리스트 — 정렬 기준 (cno / tentative / startDate / pct)
+window._cmgProgSort = window._cmgProgSort || 'cno';
+function cmgSetProgSort(val){
+  window._cmgProgSort = val;
+  renderContractMgmtView();
+}
 // [v82] 진척 체크리스트 — 입주일 기준 기간 (디폴트: 1개월 후까지)
 function cmgProgDefaultRange(){
   // [v84] 앞뒤 30일 양방향 (-30 ~ +30) — 최근 입주자 + 입주 예정자 모두 포함
@@ -8663,14 +8675,40 @@ function cmgBuildProgress(){
       contractInfo: v.contractInfo || '', // [v86] O열 계약정보
       startDate: startDate,
       tentativeDate: v.tentativeDate || '', // [v86] BK열 가계약일
+      partnerName: v.partnerName || '', // [v88] BL열 부동산
+      partnerPerson: v.partnerPerson || '', // [v88] BM열 계약담당자
       contractStatus: c ? (c['계약상태']||'') : '',
       checks: checks,
       trueCnt: trueCnt,
       pct: pct
     });
   });
-  // [v85] 계약번호 오름차순 정렬
-  rows.sort(function(a,b){ return String(a.cno).localeCompare(String(b.cno)); });
+  // [v88] 미완료 항목 필터 — 선택된 항목이 false인 row만 포함
+  var unchecked = window._cmgProgUnchecked || 'all';
+  var idxMap = { homeBtn: 0, eContract: 1, feePaid: 2, signed: 3, nas: 4 };
+  if (unchecked !== 'all' && idxMap[unchecked] !== undefined) {
+    var filterIdx = idxMap[unchecked];
+    rows = rows.filter(function(r){ return r.checks[filterIdx] === false; });
+  }
+  // [v88] 정렬 기준
+  var sortKey = window._cmgProgSort || 'cno';
+  rows.sort(function(a, b){
+    if (sortKey === 'tentative') {
+      var at = String(a.tentativeDate || '');
+      var bt = String(b.tentativeDate || '');
+      return at.localeCompare(bt) || String(a.cno).localeCompare(String(b.cno));
+    }
+    if (sortKey === 'startDate') {
+      var ad = a.startDate ? a.startDate.getTime() : Infinity;
+      var bd = b.startDate ? b.startDate.getTime() : Infinity;
+      return ad - bd || String(a.cno).localeCompare(String(b.cno));
+    }
+    if (sortKey === 'pct') {
+      return a.pct - b.pct || String(a.cno).localeCompare(String(b.cno));
+    }
+    // 디폴트: cno 오름차순
+    return String(a.cno).localeCompare(String(b.cno));
+  });
   return rows;
 }
 
@@ -8753,10 +8791,40 @@ function renderContractMgmtView(){
   if (rows.length === 0) {
     rowsHtml = '<div class="cmg-empty">해당 기간의 계약자 데이터가 없습니다.</div>';
   } else {
-    rowsHtml = '<div style="overflow-x:auto"><table class="cmg-tbl">'
+    var uf = window._cmgProgUnchecked || 'all';
+    var sf = window._cmgProgSort || 'cno';
+    var ufBtn = function(val, label){
+      return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;font-weight:' + (uf===val?'700':'500') + ';color:' + (uf===val?'#DC2626':'#374151') + '">'
+        + '<input type="radio" name="cmgProgUf" ' + (uf===val?'checked':'') + ' onchange="cmgSetProgUnchecked(\'' + val + '\')"> ' + label
+        + '</label>';
+    };
+    var sfBtn = function(val, label){
+      return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;font-weight:' + (sf===val?'700':'500') + ';color:' + (sf===val?'#7C3AED':'#374151') + '">'
+        + '<input type="radio" name="cmgProgSort" ' + (sf===val?'checked':'') + ' onchange="cmgSetProgSort(\'' + val + '\')"> ' + label
+        + '</label>';
+    };
+    var filterHtml = '<div class="cmg-period-row" style="background:#FEF2F2;flex-wrap:wrap">'
+      + '<span style="font-size:12px;color:#991B1B;font-weight:700;margin-right:4px">미완료 항목:</span>'
+      + ufBtn('all', '전체')
+      + ufBtn('homeBtn', '홈버튼')
+      + ufBtn('eContract', '전자계약')
+      + ufBtn('feePaid', '수수료')
+      + ufBtn('signed', '서명')
+      + ufBtn('nas', 'NAS')
+      + '</div>'
+      + '<div class="cmg-period-row" style="background:#F5F3FF;flex-wrap:wrap">'
+      + '<span style="font-size:12px;color:#6D28D9;font-weight:700;margin-right:4px">정렬 기준:</span>'
+      + sfBtn('cno', '계약번호')
+      + sfBtn('tentative', '가계약일')
+      + sfBtn('startDate', '시작일')
+      + sfBtn('pct', '진척률')
+      + '</div>';
+    rowsHtml = filterHtml
+      + '<div style="overflow-x:auto"><table class="cmg-tbl">'
       + '<thead><tr>'
       + '<th>No</th><th>계약번호</th><th>계약자</th><th>연락처</th>'
       + '<th>계약정보</th><th>시작일</th><th>가계약일</th>'
+      + '<th>부동산</th><th>계약담당자</th>'
       + '<th>계약상태</th>'
       + '<th style="text-align:center">홈버튼</th><th style="text-align:center">전자계약</th>'
       + '<th style="text-align:center">수수료</th><th style="text-align:center">서명</th>'
@@ -8775,6 +8843,8 @@ function renderContractMgmtView(){
             + '<td style="font-size:11px;color:#6B7280">' + (r.contractInfo||'—') + '</td>'
             + '<td style="font-size:11px;color:#6B7280">' + cmgFmtDate(r.startDate) + (dDay !== null && dDay <= 7 && r.pct < 80 ? ' <span style="color:#DC2626;font-size:10px;font-weight:700">D' + (dDay >= 0 ? '-'+dDay : '+'+Math.abs(dDay)) + '</span>' : '') + '</td>'
             + '<td style="font-size:11px;color:#6B7280">' + (r.tentativeDate||'—') + '</td>'
+            + '<td style="font-size:11px;color:#374151">' + (r.partnerName||'—') + '</td>'
+            + '<td style="font-size:11px;color:#374151">' + (r.partnerPerson||'—') + '</td>'
             + '<td style="font-size:11px;color:#6B7280">' + (r.contractStatus||'—') + '</td>'
             + '<td style="text-align:center">' + chk(r.checks[0]) + '</td>'
             + '<td style="text-align:center">' + chk(r.checks[1]) + '</td>'
