@@ -7843,37 +7843,100 @@ function cmgMonthsBetween(start, end){
   return Math.max(0, months);
 }
 
-// [v82] PDF 출력 (선택된 계약들)
-function cmgExportPdfFor(partnerName){
-  var pnEsc = String(partnerName||'').replace(/'/g, "\\'");
-  var checkboxes = document.querySelectorAll('.cmg-pdf-cb[data-pn="' + partnerName + '"]:checked');
-  if (checkboxes.length === 0) {
-    alert('선택된 계약이 없습니다. 체크박스로 선택 후 다시 시도하세요.');
-    return;
-  }
+// [v82/v87] PDF 출력 — 부동산(파트너) 단위, 계약담당자별 그룹화
+function cmgExportPdfFor(partnerName, mode){
   var stats = cmgBuildPartnerStats();
   var partner = stats.find(function(p){ return p.partnerName === partnerName; });
-  if (!partner) return;
+  if (!partner) { alert('파트너 데이터를 찾을 수 없습니다.'); return; }
   var info = cmgFindPartner(partnerName);
-  var selectedCnos = Array.from(checkboxes).map(function(cb){ return cb.value; });
-  var rows = partner.contracts.filter(function(ct){ return selectedCnos.indexOf(ct.cno) >= 0; });
-  // 합계
-  var totalRent = rows.reduce(function(s,r){ return s + (r.rent||0); }, 0);
-  var totalSupply = rows.reduce(function(s,r){ return s + (r.brokerage||0); }, 0);
-  var totalVat = Math.round(totalSupply * 0.1);
-  var totalBrk = totalSupply + totalVat;
-  // PDF용 HTML
+  var rows;
+  if (mode === 'all') {
+    // [v87] 부동산 전체 — 체크박스 무관, 모든 계약 포함
+    rows = partner.contracts.slice();
+  } else {
+    var checkboxes = document.querySelectorAll('.cmg-pdf-cb[data-pn="' + partnerName + '"]:checked');
+    if (checkboxes.length === 0) {
+      alert('선택된 계약이 없습니다. 체크박스로 선택 후 다시 시도하거나 [부동산 전체 PDF] 버튼을 사용하세요.');
+      return;
+    }
+    var selectedCnos = Array.from(checkboxes).map(function(cb){ return cb.value; });
+    rows = partner.contracts.filter(function(ct){ return selectedCnos.indexOf(ct.cno) >= 0; });
+  }
+  // [v87] 계약담당자별 그룹화
+  var byPerson = {};
+  rows.forEach(function(ct){
+    var key = (ct.person || '(담당자 미지정)');
+    if (!byPerson[key]) byPerson[key] = { person: key, contracts: [], rent: 0, supply: 0, vat: 0, total: 0 };
+    var supply = Math.round(ct.brokerage);
+    var vat = Math.round(ct.brokerage * 0.1);
+    byPerson[key].contracts.push(ct);
+    byPerson[key].rent   += (ct.rent || 0);
+    byPerson[key].supply += supply;
+    byPerson[key].vat    += vat;
+    byPerson[key].total  += supply + vat;
+  });
+  // 계약담당자 정렬: 건수 내림차순
+  var personGroups = Object.values(byPerson).sort(function(a, b){
+    return b.contracts.length - a.contracts.length || a.person.localeCompare(b.person);
+  });
+  // 부동산 합계
+  var totalRent   = personGroups.reduce(function(s,g){ return s + g.rent; }, 0);
+  var totalSupply = personGroups.reduce(function(s,g){ return s + g.supply; }, 0);
+  var totalVat    = personGroups.reduce(function(s,g){ return s + g.vat; }, 0);
+  var totalBrk    = personGroups.reduce(function(s,g){ return s + g.total; }, 0);
+
   var today = new Date();
   var todayStr = today.getFullYear() + '.' + String(today.getMonth()+1).padStart(2,'0') + '.' + String(today.getDate()).padStart(2,'0');
+  var rowIdx = 0;
+  var bodyRows = '';
+  personGroups.forEach(function(g){
+    // 그룹 헤더 (계약담당자)
+    bodyRows += '<tr style="background:#EFF6FF;border-top:2px solid #1F2937">'
+      + '<td colspan="11" style="border:1px solid #9CA3AF;padding:6px;font-weight:700;color:#1F4ED8">▸ 계약담당자: ' + g.person + ' <span style="color:#6B7280;font-weight:400">(' + g.contracts.length + '건)</span></td>'
+      + '</tr>';
+    // 계약 행들
+    g.contracts.forEach(function(ct){
+      rowIdx++;
+      var supply = Math.round(ct.brokerage);
+      var vat = Math.round(ct.brokerage * 0.1);
+      var total = supply + vat;
+      var endDate = ct.endDate ? cmgParseStartDate(ct.endDate) : null;
+      var months = cmgMonthsBetween(ct.startDate, endDate);
+      bodyRows += '<tr>'
+        + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:center">' + rowIdx + '</td>'
+        + '<td style="border:1px solid #9CA3AF;padding:4px">' + ct.cno + '</td>'
+        + '<td style="border:1px solid #9CA3AF;padding:4px">' + (ct.tenant||'-') + '</td>'
+        + '<td style="border:1px solid #9CA3AF;padding:4px">' + ((ct.contractKind||'') + (ct.contractKind && ct.housingType ? '/' : '') + (ct.housingType||'') || '-') + '</td>'
+        + '<td style="border:1px solid #9CA3AF;padding:4px">' + cmgFmtDate(ct.startDate) + '</td>'
+        + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:center">' + (months > 0 ? months + '개월' : '-') + '</td>'
+        + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right">' + cmgFmtMoney(ct.rent) + '</td>'
+        + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right">' + cmgFmtMoney(supply) + '</td>'
+        + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right">' + cmgFmtMoney(vat) + '</td>'
+        + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right;font-weight:700">' + cmgFmtMoney(total) + '</td>'
+        + '<td style="border:1px solid #9CA3AF;padding:4px;font-size:9px">' + (ct.address||'-') + '</td>'
+        + '</tr>';
+    });
+    // 그룹 소계
+    bodyRows += '<tr style="background:#DBEAFE;font-weight:700">'
+      + '<td colspan="6" style="border:1px solid #9CA3AF;padding:5px;text-align:right;color:#1F4ED8">└ ' + g.person + ' 소계 (' + g.contracts.length + '건)</td>'
+      + '<td style="border:1px solid #9CA3AF;padding:5px;text-align:right;color:#1F4ED8">' + cmgFmtMoney(g.rent) + '</td>'
+      + '<td style="border:1px solid #9CA3AF;padding:5px;text-align:right;color:#1F4ED8">' + cmgFmtMoney(g.supply) + '</td>'
+      + '<td style="border:1px solid #9CA3AF;padding:5px;text-align:right;color:#1F4ED8">' + cmgFmtMoney(g.vat) + '</td>'
+      + '<td style="border:1px solid #9CA3AF;padding:5px;text-align:right;color:#1F4ED8">' + cmgFmtMoney(g.total) + '</td>'
+      + '<td style="border:1px solid #9CA3AF"></td>'
+      + '</tr>';
+  });
+
   var html = '<div style="font-family:\'Malgun Gothic\',sans-serif;padding:20px;font-size:11px;color:#1F2937">'
-    + '<div style="text-align:center;font-size:18px;font-weight:800;margin-bottom:14px">중개보수료 정산 명세서</div>'
+    + '<div style="text-align:center;font-size:20px;font-weight:800;margin-bottom:6px">🏢 ' + partnerName + ' 중개보수료 정산 명세서</div>'
+    + '<div style="text-align:center;font-size:11px;color:#6B7280;margin-bottom:14px">(부동산 단위 — 계약담당자별 그룹화)</div>'
     + '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1F2937">'
-    + '<div><b>파트너:</b> ' + partnerName + (info && info.fullName ? ' (' + info.fullName + ')' : '') + '<br>'
+    + '<div><b>부동산:</b> ' + partnerName + (info && info.fullName ? ' (' + info.fullName + ')' : '') + '<br>'
     + (info && info.bizNo ? '<b>등록번호:</b> ' + info.bizNo + '<br>' : '')
     + (info && info.addr ? '<b>주소:</b> ' + info.addr + '<br>' : '')
-    + (info && (info.bank || info.account) ? '<b>정산:</b> ' + (info.bank||'') + ' ' + (info.account||'') + ' (' + (info.acctHolder||'') + ')' : '')
+    + (info && (info.bank || info.account) ? '<b>정산계좌:</b> ' + (info.bank||'') + ' ' + (info.account||'') + ' (' + (info.acctHolder||'') + ')' : '')
     + '</div>'
-    + '<div style="text-align:right"><b>발행일:</b> ' + todayStr + '<br><b>건수:</b> ' + rows.length + '건</div>'
+    + '<div style="text-align:right"><b>발행일:</b> ' + todayStr + '<br><b>총 건수:</b> ' + rows.length + '건<br><b>담당자수:</b> ' + personGroups.length + '명</div>'
     + '</div>'
     + '<table style="width:100%;border-collapse:collapse;font-size:10px">'
     + '<thead><tr style="background:#F3F4F6">'
@@ -7889,33 +7952,14 @@ function cmgExportPdfFor(partnerName){
     + '<th style="border:1px solid #9CA3AF;padding:5px;text-align:right">중개보수료</th>'
     + '<th style="border:1px solid #9CA3AF;padding:5px">주소</th>'
     + '</tr></thead><tbody>'
-    + rows.map(function(ct, i){
-        var supply = Math.round(ct.brokerage);
-        var vat = Math.round(ct.brokerage * 0.1);
-        var total = supply + vat;
-        var endDate = ct.endDate ? cmgParseStartDate(ct.endDate) : null;
-        var months = cmgMonthsBetween(ct.startDate, endDate);
-        return '<tr>'
-          + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:center">' + (i+1) + '</td>'
-          + '<td style="border:1px solid #9CA3AF;padding:4px">' + ct.cno + '</td>'
-          + '<td style="border:1px solid #9CA3AF;padding:4px">' + (ct.tenant||'-') + '</td>'
-          + '<td style="border:1px solid #9CA3AF;padding:4px">' + ((ct.contractKind||'') + (ct.contractKind && ct.housingType ? '/' : '') + (ct.housingType||'') || '-') + '</td>'
-          + '<td style="border:1px solid #9CA3AF;padding:4px">' + cmgFmtDate(ct.startDate) + '</td>'
-          + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:center">' + (months > 0 ? months + '개월' : '-') + '</td>'
-          + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right">' + cmgFmtMoney(ct.rent) + '</td>'
-          + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right">' + cmgFmtMoney(supply) + '</td>'
-          + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right">' + cmgFmtMoney(vat) + '</td>'
-          + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right;font-weight:700">' + cmgFmtMoney(total) + '</td>'
-          + '<td style="border:1px solid #9CA3AF;padding:4px;font-size:9px">' + (ct.address||'-') + '</td>'
-          + '</tr>';
-      }).join('')
-    + '<tr style="background:#FEF3C7;font-weight:700">'
-    + '<td colspan="6" style="border:1px solid #9CA3AF;padding:6px;text-align:right">합계</td>'
-    + '<td style="border:1px solid #9CA3AF;padding:6px;text-align:right">' + cmgFmtMoney(totalRent) + '</td>'
-    + '<td style="border:1px solid #9CA3AF;padding:6px;text-align:right">' + cmgFmtMoney(totalSupply) + '</td>'
-    + '<td style="border:1px solid #9CA3AF;padding:6px;text-align:right">' + cmgFmtMoney(totalVat) + '</td>'
-    + '<td style="border:1px solid #9CA3AF;padding:6px;text-align:right;color:#DC2626">' + cmgFmtMoney(totalBrk) + '</td>'
-    + '<td style="border:1px solid #9CA3AF"></td>'
+    + bodyRows
+    + '<tr style="background:#FEF3C7;font-weight:800;border-top:3px double #1F2937">'
+    + '<td colspan="6" style="border:2px solid #1F2937;padding:7px;text-align:right;font-size:11px">🏢 ' + partnerName + ' 부동산 합계 (' + rows.length + '건)</td>'
+    + '<td style="border:2px solid #1F2937;padding:7px;text-align:right">' + cmgFmtMoney(totalRent) + '</td>'
+    + '<td style="border:2px solid #1F2937;padding:7px;text-align:right">' + cmgFmtMoney(totalSupply) + '</td>'
+    + '<td style="border:2px solid #1F2937;padding:7px;text-align:right">' + cmgFmtMoney(totalVat) + '</td>'
+    + '<td style="border:2px solid #1F2937;padding:7px;text-align:right;color:#DC2626;font-size:12px">' + cmgFmtMoney(totalBrk) + '</td>'
+    + '<td style="border:2px solid #1F2937"></td>'
     + '</tr>'
     + '</tbody></table>'
     + '<div style="margin-top:20px;font-size:10px;color:#6B7280;text-align:right">— ' + todayStr + ' KRG 운영팀 자동 생성 —</div>'
@@ -8012,8 +8056,9 @@ function cmgRenderPartnerStats(){
                   + '</div>' : '')
               + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:6px 0;border-bottom:1px dashed #E5E7EB">'
               +   '<button onclick="event.stopPropagation();var cbs=document.querySelectorAll(\'.cmg-pdf-cb[data-pn=&quot;' + p.partnerName.replace(/"/g,'&quot;').replace(/\\/g,'\\\\') + '&quot;]\');var checked=Array.from(cbs).every(function(c){return c.checked;});cbs.forEach(function(c){c.checked=!checked;});" style="padding:4px 10px;font-size:11px;border:1px solid #C7D2FE;background:#fff;border-radius:6px;cursor:pointer;font-weight:700">전체 선택/해제</button>'
-              +   '<button onclick="event.stopPropagation();cmgExportPdfFor(\'' + pnEsc2 + '\')" style="padding:5px 14px;font-size:12px;border:1px solid #DC2626;background:#DC2626;color:#fff;border-radius:6px;cursor:pointer;font-weight:700">📄 선택 항목 PDF 출력</button>'
-              +   '<span style="font-size:11px;color:#6B7280">체크박스로 정산할 계약 선택 후 출력하세요</span>'
+              +   '<button onclick="event.stopPropagation();cmgExportPdfFor(\'' + pnEsc2 + '\',\'selected\')" style="padding:5px 14px;font-size:12px;border:1px solid #DC2626;background:#DC2626;color:#fff;border-radius:6px;cursor:pointer;font-weight:700">📄 선택 항목 PDF</button>'
+              +   '<button onclick="event.stopPropagation();cmgExportPdfFor(\'' + pnEsc2 + '\',\'all\')" style="padding:5px 14px;font-size:12px;border:1px solid #1F4ED8;background:#fff;color:#1F4ED8;border-radius:6px;cursor:pointer;font-weight:700">📑 부동산 전체 PDF</button>'
+              +   '<span style="font-size:11px;color:#6B7280">계약담당자별 그룹화하여 PDF 생성</span>'
               + '</div>'
               + '<table class="cmg-expand-tbl"><thead><tr>'
               + '<th style="text-align:center;width:30px"><input type="checkbox" onclick="event.stopPropagation();var cbs=document.querySelectorAll(\'.cmg-pdf-cb[data-pn=&quot;' + p.partnerName.replace(/"/g,'&quot;').replace(/\\/g,'\\\\') + '&quot;]\');cbs.forEach(function(c){c.checked=event.target.checked;});"></th>'
@@ -8065,6 +8110,7 @@ function cmgRenderPartnerStats(){
             + '<td style="color:#8A9AB5;font-size:11px">' + (i+1) + '</td>'
             + '<td><b>' + p.partnerName + '</b>'
               + ' <span class="cmg-rank-badge cmg-rank-' + rank + '">' + rank + '</span>'
+              + ' <button onclick="event.stopPropagation();cmgExportPdfFor(\'' + pnEsc + '\',\'all\')" title="해당 부동산 전체 PDF" style="margin-left:4px;padding:2px 7px;font-size:10px;border:1px solid #DC2626;background:#fff;color:#DC2626;border-radius:5px;cursor:pointer;font-weight:700">📄 PDF</button>'
               + (isOpen ? ' <span style="color:#7C3AED">▼</span>' : ' <span style="color:#9CA3AF">▶</span>')
               + '</td>'
             + '<td><div style="font-size:11.5px">' + (biz||'—') + '</div>'
