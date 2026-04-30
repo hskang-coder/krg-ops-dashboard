@@ -1007,8 +1007,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 
   <!-- View toggle -->
   <div class="view-tabs">
-    <button class="view-tab"        onclick="switchView('summary')">📈 대시보드</button>
-    <button class="view-tab active" onclick="switchView('dashboard')">📊 운영관리</button>
+    <button class="view-tab active" onclick="switchView('summary')">📈 대시보드</button>
+    <button class="view-tab"        onclick="switchView('dashboard')">📊 운영관리</button>
     <button class="view-tab"        onclick="switchView('checklist')">✅ 업무루틴관리</button>
     <button class="view-tab"        onclick="switchView('contractMgmt')">📑 계약관리</button>
     <button class="view-tab"        onclick="switchView('contract')">📋 입주관리</button>
@@ -1042,7 +1042,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 </div>
 
 <!-- ─── DASHBOARD VIEW ─── -->
-<div id="dashboardView" class="view-content active">
+<div id="dashboardView" class="view-content">
   <div class="dash-inner">
 
     <!-- KPI -->
@@ -1273,7 +1273,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   <div id="contractMgmtView" class="view-content">
     <div class="cmg-inner"></div>
   </div>
-  <div id="summaryView" class="view-content">
+  <div id="summaryView" class="view-content active">
     <div class="sum-inner"></div>
   </div>
 </div>
@@ -5840,6 +5840,10 @@ renderCkProgress();
 loadData();
 // 1분마다 날짜·체크리스트 갱신
 setInterval(() => { updateDateBadge(); renderCkProgress(); }, 60000);
+// [v104] 첫 화면을 종합 대시보드로
+if (typeof switchView === 'function') {
+  setTimeout(function(){ switchView('summary'); }, 100);
+}
 // 5분마다 Sheets 데이터 자동 재로드
 setInterval(() => { loadData(); }, 5 * 60 * 1000);
 
@@ -9227,15 +9231,26 @@ function sumCalcKpi(){
     return ym === thisYM;
   }).length;
 
-  // 연체 금액 (paymentRawData에서 연체중/분납중)
+  // [v104] 연체 금액 — 컬럼 fallback 확장 + 청구액-입금액 계산
   if (Array.isArray(paymentRawData)) {
+    // 디버그: 첫 진입 시 컬럼명 콘솔 출력
+    if (paymentRawData[0] && !window.__sumPaymentKeysLogged) {
+      console.log('[v104] paymentRawData keys:', Object.keys(paymentRawData[0]));
+      window.__sumPaymentKeysLogged = true;
+    }
+    var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
     kpi.delqAmount = paymentRawData.reduce(function(sum, p){
       var st = String(p['납부상태']||'').trim();
-      if (st.indexOf('연체중') >= 0 || st.indexOf('분납중') >= 0) {
-        var amt = parseFloat(String(p['미수금']||p['청구액']||0).replace(/[^0-9.\-]/g,'')) || 0;
-        return sum + amt;
+      if (st.indexOf('연체중') < 0 && st.indexOf('분납중') < 0) return sum;
+      // 우선순위: 미수금 → 미수액 → 연체금액 → 연체액 → 잔액 → 미납액
+      var amt = parseAmt(p['미수금']) || parseAmt(p['미수액']) || parseAmt(p['연체금액']) || parseAmt(p['연체액']) || parseAmt(p['잔액']) || parseAmt(p['미납액']);
+      // 직접 미수 컬럼 없으면: 청구액 - 입금액
+      if (amt === 0) {
+        var charged = parseAmt(p['청구액']) || parseAmt(p['실청구액']) || parseAmt(p['청구금액']);
+        var paid    = parseAmt(p['입금액']) || parseAmt(p['실입금액']) || parseAmt(p['납부액']);
+        amt = Math.max(0, charged - paid);
       }
-      return sum;
+      return sum + amt;
     }, 0);
   }
 
@@ -9280,141 +9295,156 @@ function sumKpiBar(kpi){
     + '</div>';
 }
 
-// [v103] Section ① 일별 가계약 추이 — 글로벌 상태
-window._sumDailyMonths = window._sumDailyMonths || (function(){
-  var t = new Date();
-  var ym = function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
-  return [ym(t), ym(new Date(t.getFullYear(), t.getMonth()-1, 1)), ym(new Date(t.getFullYear(), t.getMonth()-2, 1))];
-})();
-window._sumDailyScale = window._sumDailyScale || 'log';
-
-function sumSetDailyMonth(idx, val){
-  if (!val) return;
-  window._sumDailyMonths[idx] = val;
-  renderSummaryDashboard();
-}
-function sumSetDailyScale(s){
-  window._sumDailyScale = s;
-  renderSummaryDashboard();
-}
-
-// [v103] 특정 월(YYYY-MM)의 일별 누적 가계약 카운트
-function sumBuildDailyData(ym){
-  var counts = new Array(31).fill(0);
-  if (!Array.isArray(vacancyRawData) || !ym) return counts;
+// [v105] Section ① 월별 가계약 추이 — 12개월 막대 + 5일/30일 시점 라인
+function sumBuildMonthlyData(){
+  if (!Array.isArray(vacancyRawData)) return [];
+  var t = new Date(); t.setHours(0,0,0,0);
+  var months = [];
+  for (var i = 11; i >= 0; i--) {
+    var d = new Date(t.getFullYear(), t.getMonth() - i, 1);
+    var ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    months.push({ ym: ym, label: (d.getFullYear()%100) + '.' + String(d.getMonth()+1).padStart(2,'0'), total: 0, day5: 0, day30: 0 });
+  }
+  var idx = {};
+  months.forEach(function(m, i){ idx[m.ym] = i; });
   vacancyRawData.forEach(function(v){
     var d = cmgParseStartDate(v.tentativeDate);
     if (!d) return;
-    var dym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-    if (dym !== ym) return;
+    var ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    if (idx[ym] === undefined) return;
     var day = d.getDate();
-    if (day >= 1 && day <= 31) counts[day-1]++;
+    months[idx[ym]].total++;
+    if (day <= 5)  months[idx[ym]].day5++;
+    if (day <= 30) months[idx[ym]].day30++;
   });
-  // cumulative
-  var cum = 0;
-  return counts.map(function(c){ cum += c; return cum; });
+  return months;
 }
 
-// [v103] Section ① 카드 HTML
+// [v105] Section ① 카드 HTML — 월별 막대+라인 차트
 function sumRenderDailyCard(){
-  var months = window._sumDailyMonths;
-  var scale = window._sumDailyScale;
   var html = ''
-    + '<div class="sum-card-title"><span class="dot" style="background:#0EA5E9"></span>① 일별 가계약 추이 (BK열) <span class="badge sum-badge-sales">SALES</span></div>'
-    + '<div class="sum-compare-row">'
-    +   '<label>비교 1:</label>'
-    +   '<input type="month" value="' + months[0] + '" onchange="sumSetDailyMonth(0,this.value)">'
-    +   '<label>비교 2:</label>'
-    +   '<input type="month" value="' + months[1] + '" onchange="sumSetDailyMonth(1,this.value)">'
-    +   '<label>비교 3:</label>'
-    +   '<input type="month" value="' + months[2] + '" onchange="sumSetDailyMonth(2,this.value)">'
-    +   '<div class="sum-scale-toggle">'
-    +     '<span style="font-size:10.5px;color:#6B7280">Y축:</span>'
-    +     '<button class="' + (scale==='linear'?'active':'') + '" onclick="sumSetDailyScale(\'linear\')">Linear</button>'
-    +     '<button class="' + (scale==='log'?'active':'') + '" onclick="sumSetDailyScale(\'log\')">Log</button>'
-    +   '</div>'
-    + '</div>'
-    + '<div style="position:relative;height:300px"><canvas id="sumDailyChart"></canvas></div>'
+    + '<div class="sum-card-title"><span class="dot" style="background:#0EA5E9"></span>① 월별 가계약 추이 (BK열) — 최근 12개월 <span class="badge sum-badge-sales">SALES</span></div>'
+    + '<div style="font-size:11px;color:#6B7280;margin-bottom:8px">노란 막대 = 월별 총 가계약 · 초록 라인 = 매월 5일까지 누적(월초 페이스) · 핑크 라인 = 매월 30일까지 누적(월말)</div>'
+    + '<div style="position:relative;height:380px"><canvas id="sumDailyChart"></canvas></div>'
     + '<div class="sum-insight-row" id="sumDailyInsight"></div>';
   return html;
 }
 
-// [v103] Section ① 차트 그리기 (DOM 완성 후)
+// [v105] Section ① 차트 그리기 — 12개월 막대+라인 (커스텀 데이터 라벨)
 function sumDrawDailyChart(){
   var canvas = document.getElementById('sumDailyChart');
   if (!canvas || typeof Chart === 'undefined') return;
   if (window._sumDailyChartInstance) {
     try { window._sumDailyChartInstance.destroy(); } catch(e){}
   }
-  var months = window._sumDailyMonths;
-  var scale = window._sumDailyScale;
-  var data1 = sumBuildDailyData(months[0]);
-  var data2 = sumBuildDailyData(months[1]);
-  var data3 = sumBuildDailyData(months[2]);
+  var months = sumBuildMonthlyData();
+  var labels = months.map(function(m){ return m.label; });
+  var totals = months.map(function(m){ return m.total; });
+  var day5s  = months.map(function(m){ return m.day5; });
+  var day30s = months.map(function(m){ return m.day30; });
 
-  // 당월(현재월)이면 오늘 이후는 null로 처리
-  var today = new Date();
-  var todayYM = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0');
-  var todayDay = today.getDate();
-  var trim = function(arr, ym){
-    if (ym !== todayYM) return arr;
-    return arr.map(function(v, i){ return (i+1) > todayDay ? null : v; });
+  // 커스텀 데이터 라벨 플러그인
+  var dataLabels = {
+    id: 'sumDailyDataLabels',
+    afterDatasetsDraw: function(chart){
+      var ctx = chart.ctx;
+      chart.data.datasets.forEach(function(ds, i){
+        var meta = chart.getDatasetMeta(i);
+        meta.data.forEach(function(point, idx){
+          var v = ds.data[idx];
+          if (v == null) return;
+          var color = ds.type === 'bar' ? '#1F2937' : (ds.borderColor || '#000');
+          ctx.save();
+          ctx.fillStyle = color;
+          ctx.font = 'bold 11px Pretendard, "Malgun Gothic", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          // bar는 막대 위, line은 점 위
+          var y = (ds.type === 'bar') ? point.y - 4 : point.y - 8;
+          ctx.fillText(v + '건', point.x, y);
+          ctx.restore();
+        });
+      });
+    }
   };
-  var d1 = trim(data1, months[0]);
-  var d2 = trim(data2, months[1]);
-  var d3 = trim(data3, months[2]);
-  // log 스케일에서 0 처리: 0.5 대체 (시각적으로 0근처 표현)
-  if (scale === 'log') {
-    d1 = d1.map(function(v){ return v === null ? null : (v === 0 ? 0.5 : v); });
-    d2 = d2.map(function(v){ return v === null ? null : (v === 0 ? 0.5 : v); });
-    d3 = d3.map(function(v){ return v === null ? null : (v === 0 ? 0.5 : v); });
-  }
-  var labels = Array.from({length: 31}, function(_, i){ return (i+1)+'일'; });
-  var lbl = function(ym){ return ym + (ym === todayYM ? ' (당월)' : ''); };
 
   window._sumDailyChartInstance = new Chart(canvas, {
-    type: 'line',
+    type: 'bar',
     data: {
       labels: labels,
       datasets: [
-        {label: lbl(months[0]), data: d1, borderColor:'#7C3AED', borderWidth:2.8, tension:0.2, pointRadius:2.5, fill:false},
-        {label: lbl(months[1]), data: d2, borderColor:'#0EA5E9', borderWidth:2, tension:0.2, pointRadius:1.5, borderDash:[6,3], fill:false},
-        {label: lbl(months[2]), data: d3, borderColor:'#94A3B8', borderWidth:1.6, tension:0.2, pointRadius:1.5, borderDash:[3,3], fill:false}
+        {
+          type: 'bar',
+          label: '월별 가계약 건수',
+          data: totals,
+          backgroundColor: '#FDE68A',
+          borderColor: '#F59E0B',
+          borderWidth: 1,
+          borderRadius: 4,
+          order: 3
+        },
+        {
+          type: 'line',
+          label: '매월 5일까지 누적',
+          data: day5s,
+          borderColor: '#16A34A',
+          backgroundColor: 'rgba(22,163,74,0.15)',
+          borderWidth: 2.5,
+          tension: 0.35,
+          fill: true,
+          pointRadius: 4,
+          pointBackgroundColor: '#16A34A',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1.5,
+          order: 1
+        },
+        {
+          type: 'line',
+          label: '매월 30일까지 누적',
+          data: day30s,
+          borderColor: '#EC4899',
+          backgroundColor: 'transparent',
+          borderWidth: 2.5,
+          tension: 0.35,
+          fill: false,
+          pointRadius: 5,
+          pointStyle: 'rectRot',
+          pointBackgroundColor: '#EC4899',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1.5,
+          order: 2
+        }
       ]
     },
     options: {
       maintainAspectRatio: false,
+      layout: { padding: { top: 30 } }, // 데이터 라벨 공간
       plugins: {
-        legend: {position:'top', align:'end', labels:{boxWidth:10, font:{size:10.5}}},
-        tooltip: {mode:'index', intersect:false, callbacks:{label:function(c){
-          var v = c.parsed.y;
-          return c.dataset.label + ': ' + (v == null ? '-' : (v < 1 ? 0 : Math.round(v))) + '건';
-        }}}
+        legend: { position: 'top', align: 'center', labels: { boxWidth: 12, font: { size: 11.5 }, padding: 10 } },
+        tooltip: { mode: 'index', intersect: false }
       },
       scales: {
-        y: scale === 'log'
-          ? {type:'logarithmic', min:0.5, ticks:{font:{size:10}, callback:function(v){
-              if (v === 0.5 || v === 1 || v === 2 || v === 5 || v === 10 || v === 20 || v === 50 || v === 100 || v === 200 || v === 500) return v + '건';
-              return '';
-            }}, title:{display:true, text:'누적 (로그)'}}
-          : {type:'linear', beginAtZero:true, ticks:{font:{size:10}, callback:function(v){ return v + '건'; }}, title:{display:true, text:'누적 (선형)'}},
-        x: {ticks:{font:{size:10}}}
+        y: { beginAtZero: true, ticks: { font: { size: 10 }, callback: function(v){ return v + '건'; } } },
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } }
       }
-    }
+    },
+    plugins: [dataLabels]
   });
 
-  // 인사이트 텍스트 (월별 누적)
+  // 인사이트 (최근 3개월 합계)
   var ins = document.getElementById('sumDailyInsight');
   if (ins) {
-    var last = function(arr, ym){
-      if (ym === todayYM) return arr[todayDay - 1] || 0;
-      return arr[arr.length-1] || 0;
-    };
-    var t1 = last(data1, months[0]), t2 = last(data2, months[1]), t3 = last(data3, months[2]);
+    var last3 = months.slice(-3);
+    var thisM = last3[2] || {ym:'-', total:0};
+    var prevM = last3[1] || {ym:'-', total:0};
+    var trend = prevM.total > 0 ? Math.round(((thisM.total - prevM.total) / prevM.total) * 100) : 0;
+    var trendColor = trend >= 0 ? '#16A34A' : '#DC2626';
+    var trendArrow = trend >= 0 ? '▲' : '▼';
     ins.innerHTML = ''
-      + '<div><span style="color:#6B7280">' + months[0] + ':</span> <b style="color:#7C3AED">' + t1 + '건</b></div>'
-      + '<div><span style="color:#6B7280">' + months[1] + ':</span> <b>' + t2 + '건</b></div>'
-      + '<div><span style="color:#6B7280">' + months[2] + ':</span> <b>' + t3 + '건</b></div>';
+      + '<div><span style="color:#6B7280">최근 3개월 합계:</span> <b style="color:#1F2937">' + last3.reduce(function(s,m){return s+m.total;}, 0) + '건</b></div>'
+      + '<div><span style="color:#6B7280">이번달 (' + thisM.ym + '):</span> <b style="color:#7C3AED">' + thisM.total + '건</b></div>'
+      + '<div><span style="color:#6B7280">전월 대비:</span> <b style="color:' + trendColor + '">' + trendArrow + ' ' + Math.abs(trend) + '%</b></div>'
+      + '<div style="margin-left:auto;color:#9CA3AF;font-size:10px">5일 평균 ' + Math.round(months.reduce(function(s,m){return s+m.day5;},0)/12) + '건 · 30일 평균 ' + Math.round(months.reduce(function(s,m){return s+m.day30;},0)/12) + '건</div>';
   }
 }
 
