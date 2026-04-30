@@ -9311,9 +9311,7 @@ window._sumChartCfg = window._sumChartCfg || (function(){
     basis: 'tentative',     // 'tentative' (가계약일 BK) | 'startDate' (입주일 W)
     start: fmt(startD),
     end:   fmt(endD),
-    day1:  5,               // 체크포인트 1: 매월 N일
-    day2Mode: 'today',      // 'today' (오늘 자동) | 'fixed'
-    day2Fixed: 30           // 체크포인트 2 고정값
+    day1:  5                // 체크포인트: 매월 N일까지 (디폴트 5일)
   };
 })();
 
@@ -9359,13 +9357,8 @@ function sumBuildMonthlyData(){
     months[idx[ym]].total++;
     // 체크포인트 1 (매월 N일까지)
     if (day <= cfg.day1) months[idx[ym]].day1++;
-    // 체크포인트 2 (오늘 자동 OR 고정 N일)
-    var day2Cutoff;
-    if (cfg.day2Mode === 'today') {
-      day2Cutoff = (ym === todayYM) ? todayDay : 31; // 과거 = 월말, 당월 = 오늘
-    } else {
-      day2Cutoff = cfg.day2Fixed;
-    }
+    // [v107] 체크포인트 ② = 오늘 기준 자동 (당월=today, 과거=월말)
+    var day2Cutoff = (ym === todayYM) ? todayDay : 31;
     if (day <= day2Cutoff) months[idx[ym]].day2++;
   });
   return months;
@@ -9392,14 +9385,12 @@ function sumRenderDailyCard(){
     +   '<input type="date" value="' + cfg.end + '" onchange="sumSetCfg(\'end\',this.value)">'
     + '</div>'
     + '<div class="sum-cfg-row">'
-    +   '<span class="sum-cfg-label">체크포인트 ①:</span>'
-    +   '매월 <input type="number" min="1" max="31" value="' + cfg.day1 + '" onchange="sumSetCfg(\'day1\',Math.max(1,Math.min(31,parseInt(this.value)||5)))" style="width:46px">일까지'
+    +   '<span class="sum-cfg-label">체크포인트:</span>'
+    +   '매월 <input type="number" min="1" max="31" value="' + cfg.day1 + '" onchange="sumSetCfg(\'day1\',Math.max(1,Math.min(31,parseInt(this.value)||5)))" style="width:46px">일까지 누적 (월초 페이스)'
     +   '<span class="sum-cfg-sep"></span>'
-    +   '<span class="sum-cfg-label">체크포인트 ②:</span>'
-    +   '<label class="sum-cfg-radio"><input type="radio" name="sumDay2" value="today" ' + (cfg.day2Mode==='today'?'checked':'') + ' onchange="sumSetCfg(\'day2Mode\',\'today\')"> 오늘 자동 (' + todayDay + '일)</label>'
-    +   '<label class="sum-cfg-radio"><input type="radio" name="sumDay2" value="fixed" ' + (cfg.day2Mode==='fixed'?'checked':'') + ' onchange="sumSetCfg(\'day2Mode\',\'fixed\')"> 매월 <input type="number" min="1" max="31" value="' + cfg.day2Fixed + '" onchange="sumSetCfg(\'day2Fixed\',Math.max(1,Math.min(31,parseInt(this.value)||30)))" style="width:46px">일까지</label>'
+    +   '<span style="color:#6B7280;font-size:10.5px">핑크 라인 = <b style="color:#EC4899">오늘(' + todayDay + '일) 자동</b> 기준 누적</span>'
     + '</div>'
-    + '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">노란 막대 = 월별 총 ' + titleVerb + ' · 초록 라인 = 매월 ' + cfg.day1 + '일까지 누적 · 핑크 라인 = ' + d2Label + ' 누적</div>'
+    + '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">노란 막대 = 월별 총 ' + titleVerb + ' · 초록 라인 = 매월 ' + cfg.day1 + '일까지 누적 · 핑크 라인 = 오늘(' + todayDay + '일) 기준 누적 (당월=오늘까지, 과거=월말)</div>'
     + '<div style="position:relative;height:380px"><canvas id="sumDailyChart"></canvas></div>'
     + '<div class="sum-insight-row" id="sumDailyInsight"></div>';
   return html;
@@ -9417,7 +9408,7 @@ function sumDrawDailyChart(){
   var titleVerb = cfg.basis === 'startDate' ? '입주' : '가계약';
   var today = new Date();
   var todayDay = today.getDate();
-  var d2Label = cfg.day2Mode === 'today' ? ('오늘(' + todayDay + '일)') : (cfg.day2Fixed + '일');
+  var d2Label = '오늘(' + todayDay + '일)'; // [v107] 항상 today 자동
   var labels = months.map(function(m){ return m.label; });
   var totals = months.map(function(m){ return m.total; });
   var day5s  = months.map(function(m){ return m.day1; });
