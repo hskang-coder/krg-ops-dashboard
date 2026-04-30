@@ -1811,6 +1811,9 @@ function parseVacancySheet(resp) {
   const housingTypeIdx  = 13; // N열 = 주택/상가 구분
   const partnerNameIdx  = 63; // BL열 = 부동산명
   const partnerPersonIdx= 64; // BM열 = 부동산 계약담당자
+  // [v81] 계약종류, 원본도착
+  const contractKindIdx = 10; // K열 = 계약종류
+  const origDeliveredIdx= 85; // CH열 = 원본도착 (TRUE/FALSE)
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -1854,7 +1857,10 @@ function parseVacancySheet(resp) {
       // [v76] 계약관리용
       housingType:   cell(housingTypeIdx),   // N열: 주택/상가
       partnerName:   cell(partnerNameIdx),   // BL열: 부동산명
-      partnerPerson: cell(partnerPersonIdx)  // BM열: 부동산 계약담당자
+      partnerPerson: cell(partnerPersonIdx), // BM열: 부동산 계약담당자
+      // [v81]
+      contractKind:  cell(contractKindIdx),  // K열: 계약종류
+      origDelivered: (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[origDeliveredIdx] && (c[origDeliveredIdx].v != null ? c[origDeliveredIdx].v : c[origDeliveredIdx].f))
     };
   }).filter(Boolean);
 }
@@ -7740,16 +7746,21 @@ function cmgBuildPartnerStats(){
         totalBrokerage: 0
       };
     }
+    var addr = c ? [c['계약지주소'], c['건물명'], c['호수']].filter(Boolean).join(' ') : '';
     byPartner[pn].contracts.push({
       cno: cno,
-      tenant: v.tenant1Name || v.tenantName || '',
+      tenant: v.tenantName || v.tenant1Name || '', // [v81] AT열 우선
       person: v.partnerPerson || '',
+      contractKind: v.contractKind || '',
       housingType: v.housingType || '',
       startDate: startDate,
+      endDate: v.endDate || '', // [v81]
       deposit: dep,
       rent: rent,
       brokerage: brk,
       trade: trade,
+      origDelivered: !!v.origDelivered, // [v81]
+      address: addr, // [v81]
       contractStatus: c ? (c['계약상태']||'') : ''
     });
     byPartner[pn].totalDeposit += dep;
@@ -7832,22 +7843,39 @@ function cmgRenderPartnerStats(){
                   + (info.bank ? '<span>정산: <b>' + info.bank + ' ' + (info.account||'') + ' (' + (info.acctHolder||'') + ')</b></span>' : '')
                   + '</div>' : '')
               + '<table class="cmg-expand-tbl"><thead><tr>'
-              + '<th>계약번호</th><th>계약자</th><th>구분</th><th>시작일</th>'
-              + '<th class="cmg-num">보증금</th><th class="cmg-num">월세</th>'
-              + '<th class="cmg-num">거래액</th><th class="cmg-num">중개보수</th>'
-              + '<th>계약상태</th>'
+              + '<th style="text-align:center">No</th>'
+              + '<th style="text-align:center">원본도착</th>'
+              + '<th>계약번호</th><th>계약자</th><th>계약종류</th>'
+              + '<th>계약기간</th>'
+              + '<th class="cmg-num">월세</th>'
+              + '<th class="cmg-num">공급가액</th>'
+              + '<th class="cmg-num">부가세</th>'
+              + '<th class="cmg-num">중개보수료</th>'
+              + '<th>계약담당</th>'
+              + '<th>주소</th>'
               + '</tr></thead><tbody>'
-              + expContracts.map(function(ct){
+              + expContracts.map(function(ct, idx){
+                  var supply = Math.round(ct.brokerage); // 공급가액
+                  var vat    = Math.round(ct.brokerage * 0.1); // 부가세 10%
+                  var total  = supply + vat; // 중개보수료(총액)
+                  var period = cmgFmtDate(ct.startDate) + (ct.endDate ? ' ~ ' + ct.endDate.replace(/[^0-9]/g, '').slice(0,8).replace(/(\d{4})(\d{2})(\d{2})/, '$1.$2.$3') : '');
+                  var origMark = ct.origDelivered
+                    ? '<span style="color:#16A34A;font-weight:700">✓</span>'
+                    : '<span style="color:#DC2626;font-weight:700">✗</span>';
+                  var kind = (ct.contractKind || '') + (ct.contractKind && ct.housingType ? ' / ' : '') + (ct.housingType || '') || '—';
                   return '<tr onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="cursor:pointer">'
+                    + '<td style="text-align:center;color:#8A9AB5;font-size:11px">' + (idx+1) + '</td>'
+                    + '<td style="text-align:center">' + origMark + '</td>'
                     + '<td><b style="color:#7C3AED">' + ct.cno + '</b></td>'
-                    + '<td>' + (ct.tenant||'—') + '</td>'
-                    + '<td style="color:#6B7280">' + (ct.housingType||'—') + '</td>'
-                    + '<td style="color:#6B7280">' + cmgFmtDate(ct.startDate) + '</td>'
-                    + '<td class="cmg-num">' + cmgFmtMoneyKor(ct.deposit) + '</td>'
+                    + '<td><b>' + (ct.tenant||'—') + '</b></td>'
+                    + '<td style="color:#6B7280">' + kind + '</td>'
+                    + '<td style="color:#6B7280;font-size:11px">' + period + '</td>'
                     + '<td class="cmg-num">' + cmgFmtMoneyKor(ct.rent) + '</td>'
-                    + '<td class="cmg-num">' + cmgFmtMoneyKor(ct.trade) + '</td>'
-                    + '<td class="cmg-num cmg-money">' + cmgFmtMoney(ct.brokerage) + '</td>'
-                    + '<td style="color:#6B7280">' + (ct.contractStatus||'—') + '</td>'
+                    + '<td class="cmg-num">' + cmgFmtMoney(supply) + '</td>'
+                    + '<td class="cmg-num" style="color:#6B7280">' + cmgFmtMoney(vat) + '</td>'
+                    + '<td class="cmg-num cmg-money">' + cmgFmtMoney(total) + '</td>'
+                    + '<td style="color:#6B7280">' + (ct.person||'—') + '</td>'
+                    + '<td style="color:#6B7280;font-size:11px">' + (ct.address||'—') + '</td>'
                     + '</tr>';
                 }).join('')
               + '</tbody></table>'
