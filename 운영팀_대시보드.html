@@ -7561,6 +7561,17 @@ function rnwRenderCohortChart(cohorts){
 .cmg-rank-D { background:#9CA3AF; color:#fff; }
 .cmg-section-meta { font-size:11.5px; color:#6B7280; margin-bottom:10px; }
 .cmg-section-meta b { color:#374151; }
+.cmg-itemcards { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:14px; }
+.cmg-itemcard { background:#fff; border:1.5px solid #E5E7EB; border-radius:9px; padding:10px 12px; cursor:pointer; transition:transform .12s, box-shadow .12s; }
+.cmg-itemcard:hover { transform:translateY(-1px); box-shadow:0 2px 6px rgba(0,0,0,0.08); }
+.cmg-itemcard.active { border-width:2.5px; box-shadow:0 0 0 2px rgba(220,38,38,0.15); }
+.cmg-itemcard .ic-label { font-size:11px; color:#6B7280; font-weight:700; }
+.cmg-itemcard .ic-rate  { font-size:18px; font-weight:800; margin-top:3px; }
+.cmg-itemcard .ic-bar   { height:5px; background:#F3F4F6; border-radius:3px; margin-top:5px; overflow:hidden; }
+.cmg-itemcard .ic-fill  { display:block; height:100%; transition:width .25s; }
+.cmg-itemcard .ic-detail{ font-size:10.5px; color:#9CA3AF; margin-top:3px; }
+.cmg-miss-chip { display:inline-block; padding:1px 5px; margin:1px 2px 1px 0; font-size:9.5px; font-weight:700; border-radius:9px; background:#FEE2E2; color:#991B1B; white-space:nowrap; }
+@media(max-width:900px){ .cmg-itemcards { grid-template-columns:repeat(2,1fr); } }
 .cmg-quality { display:inline-block; font-size:10.5px; padding:2px 6px; border-radius:8px; font-weight:700; margin-right:3px; }
 .cmg-q-good { background:#DCFCE7; color:#166534; }
 .cmg-q-mid  { background:#FEF3C7; color:#92400E; }
@@ -7637,10 +7648,14 @@ function cmgSetProgRange(which, val){
   if (!window._cmgProgRange) window._cmgProgRange = cmgProgDefaultRange();
   if (which === 'start') window._cmgProgRange.start = val;
   if (which === 'end')   window._cmgProgRange.end   = val;
+  // [v90] 날짜 변경 시 항목/KPI 필터는 그대로 둠 (날짜 바꾸기는 의도적 행위)
   renderContractMgmtView();
 }
 function cmgProgQuick(kind){
   // [v84] 양방향 윈도우 (오늘 기준 앞뒤 N일)
+  // [v90] 빠른선택 클릭 시 항목/KPI 필터도 리셋해서 빈 표 방지
+  window._cmgProgUnchecked = 'all';
+  window._cmgProgKpiFilter = 'all';
   var t = new Date(); t.setHours(0,0,0,0);
   var s, e;
   if (kind === 'all') {
@@ -8714,21 +8729,22 @@ function cmgBuildProgress(){
   // [v88] 정렬 기준
   var sortKey = window._cmgProgSort || 'cno';
   rows.sort(function(a, b){
+    // [v90] 가계약일/시작일/계약번호 = 내림차순, 진척률 = 오름차순
     if (sortKey === 'tentative') {
       var at = String(a.tentativeDate || '');
       var bt = String(b.tentativeDate || '');
-      return at.localeCompare(bt) || String(a.cno).localeCompare(String(b.cno));
+      return bt.localeCompare(at) || String(b.cno).localeCompare(String(a.cno));
     }
     if (sortKey === 'startDate') {
-      var ad = a.startDate ? a.startDate.getTime() : Infinity;
-      var bd = b.startDate ? b.startDate.getTime() : Infinity;
-      return ad - bd || String(a.cno).localeCompare(String(b.cno));
+      var ad = a.startDate ? a.startDate.getTime() : -Infinity;
+      var bd = b.startDate ? b.startDate.getTime() : -Infinity;
+      return bd - ad || String(b.cno).localeCompare(String(a.cno));
     }
     if (sortKey === 'pct') {
       return a.pct - b.pct || String(a.cno).localeCompare(String(b.cno));
     }
-    // 디폴트: cno 오름차순
-    return String(a.cno).localeCompare(String(b.cno));
+    // 디폴트: cno 내림차순
+    return String(b.cno).localeCompare(String(a.cno));
   });
   return rows;
 }
@@ -8827,6 +8843,36 @@ function renderContractMgmtView(){
   } else {
     var uf = window._cmgProgUnchecked || 'all';
     var sf = window._cmgProgSort || 'cno';
+    // [v90] 항목별 미완 통계 (rows 기준) — KPI/날짜 필터 후의 모집단
+    var itemStats = {
+      homeBtn:   { label: '🏠 홈버튼',   key: 'homeBtn',   idx: 0, done: 0, total: 0 },
+      eContract: { label: '📝 전자계약', key: 'eContract', idx: 1, done: 0, total: 0 },
+      feePaid:   { label: '💰 수수료',   key: 'feePaid',   idx: 2, done: 0, total: 0 },
+      signed:    { label: '✍️ 서명',     key: 'signed',    idx: 3, done: 0, total: 0 },
+      nas:       { label: '💾 NAS',      key: 'nas',       idx: 4, done: 0, total: 0 }
+    };
+    rows.forEach(function(r){
+      Object.keys(itemStats).forEach(function(k){
+        itemStats[k].total++;
+        if (r.checks[itemStats[k].idx]) itemStats[k].done++;
+      });
+    });
+    var itemCardsHtml = '<div class="cmg-itemcards">'
+      + Object.keys(itemStats).map(function(k){
+          var s = itemStats[k];
+          var rate = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0;
+          var miss = s.total - s.done;
+          var color = rate >= 90 ? '#16A34A' : rate >= 70 ? '#F59E0B' : '#DC2626';
+          var cls = (uf === k) ? 'cmg-itemcard active' : 'cmg-itemcard';
+          var style = (uf === k) ? 'border-color:' + color : '';
+          return '<div class="' + cls + '" style="' + style + '" onclick="cmgSetProgUnchecked(\'' + k + '\')" title="' + s.label + ' 미완 ' + miss + '건 클릭→필터">'
+            + '<div class="ic-label">' + s.label + '</div>'
+            + '<div class="ic-rate" style="color:' + color + '">' + rate + '%</div>'
+            + '<div class="ic-bar"><span class="ic-fill" style="width:' + rate + '%;background:' + color + '"></span></div>'
+            + '<div class="ic-detail">완료 <b style="color:#1F2937">' + s.done + '</b> / 미완 <b style="color:#DC2626">' + miss + '</b> / 전체 ' + s.total + '</div>'
+            + '</div>';
+        }).join('')
+      + '</div>';
     var ufBtn = function(val, label){
       return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;font-weight:' + (uf===val?'700':'500') + ';color:' + (uf===val?'#DC2626':'#374151') + '">'
         + '<input type="radio" name="cmgProgUf" ' + (uf===val?'checked':'') + ' onchange="cmgSetProgUnchecked(\'' + val + '\')"> ' + label
@@ -8853,7 +8899,7 @@ function renderContractMgmtView(){
       + sfBtn('startDate', '시작일')
       + sfBtn('pct', '진척률')
       + '</div>';
-    rowsHtml = filterHtml
+    rowsHtml = itemCardsHtml + filterHtml
       + '<div style="overflow-x:auto"><table class="cmg-tbl">'
       + '<thead><tr>'
       + '<th>No</th><th>계약번호</th><th>계약자</th><th>연락처</th>'
@@ -8862,7 +8908,7 @@ function renderContractMgmtView(){
       + '<th>계약상태</th>'
       + '<th style="text-align:center">홈버튼</th><th style="text-align:center">전자계약</th>'
       + '<th style="text-align:center">수수료</th><th style="text-align:center">서명</th>'
-      + '<th style="text-align:center">NAS</th><th>진척률</th>'
+      + '<th style="text-align:center">NAS</th><th>미완 항목</th><th>진척률</th>'
       + '</tr></thead><tbody>'
       + rows.map(function(r, i){
           var chk = function(b){ return b ? '<span class="cmg-chk-yes">✓</span>' : '<span class="cmg-chk-no">·</span>'; };
@@ -8885,6 +8931,12 @@ function renderContractMgmtView(){
             + '<td style="text-align:center">' + chk(r.checks[2]) + '</td>'
             + '<td style="text-align:center">' + chk(r.checks[3]) + '</td>'
             + '<td style="text-align:center">' + chk(r.checks[4]) + '</td>'
+            + '<td>' + (function(checks){
+                var labels = ['홈버튼','전자계약','수수료','서명','NAS'];
+                var miss = [];
+                checks.forEach(function(v, i){ if (!v) miss.push('<span class="cmg-miss-chip">' + labels[i] + '</span>'); });
+                return miss.length ? miss.join('') : '<span style="color:#16A34A;font-size:10px;font-weight:700">완료</span>';
+              })(r.checks) + '</td>'
             + '<td><span class="cmg-pct-bar"><span class="cmg-pct-fill" style="width:' + r.pct + '%;background:' + color + '"></span></span><span style="font-weight:700;color:' + color + '">' + r.pct + '%</span></td>'
             + '</tr>';
         }).join('')
