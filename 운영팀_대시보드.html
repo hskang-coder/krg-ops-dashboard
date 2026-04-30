@@ -7587,9 +7587,44 @@ function rnwRenderCohortChart(cohorts){
 })();
 
 // 기간 필터 상태
-window._cmgPeriod = window._cmgPeriod || 'month'; // [v76] 디폴트 월
-window._cmgPartnerPeriod = window._cmgPartnerPeriod || 'month'; // [v76] 부동산/담당자 섹션
-window._cmgPaidMap = window._cmgPaidMap || {}; // [v76] 정산 입금완료 메모리 저장
+window._cmgPeriod = window._cmgPeriod || 'month'; // [v76] (deprecated, v82)
+window._cmgPartnerPeriod = window._cmgPartnerPeriod || 'month';
+window._cmgPaidMap = window._cmgPaidMap || {};
+window._cmgPersonPartnerFilter = window._cmgPersonPartnerFilter || 'all'; // [v83] 담당자 KPI 부동산 필터
+function cmgSetPersonPartnerFilter(val){
+  window._cmgPersonPartnerFilter = val;
+  renderContractMgmtView();
+}
+// [v82] 진척 체크리스트 — 입주일 기준 기간 (디폴트: 1개월 후까지)
+function cmgProgDefaultRange(){
+  var t = new Date(); t.setHours(0,0,0,0);
+  var end = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 30);
+  return { start: cmgDateInputFmt(t), end: cmgDateInputFmt(end) };
+}
+function cmgDateInputFmt(d){
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+window._cmgProgRange = window._cmgProgRange || null; // initialized lazily on first render
+function cmgSetProgRange(which, val){
+  if (!window._cmgProgRange) window._cmgProgRange = cmgProgDefaultRange();
+  if (which === 'start') window._cmgProgRange.start = val;
+  if (which === 'end')   window._cmgProgRange.end   = val;
+  renderContractMgmtView();
+}
+function cmgProgQuick(kind){
+  var t = new Date(); t.setHours(0,0,0,0);
+  var s = cmgDateInputFmt(t);
+  var e;
+  switch(kind){
+    case 'today':  e = cmgDateInputFmt(t); break;
+    case '3day':   e = cmgDateInputFmt(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 3)); break;
+    case 'week':   e = cmgDateInputFmt(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 7)); break;
+    case 'month':
+    default:       e = cmgDateInputFmt(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 30)); break;
+  }
+  window._cmgProgRange = { start: s, end: e };
+  renderContractMgmtView();
+}
 function cmgSetPeriod(val){ window._cmgPeriod = val; renderContractMgmtView(); }
 function cmgSetPartnerPeriod(val){ window._cmgPartnerPeriod = val; renderContractMgmtView(); }
 
@@ -7773,6 +7808,111 @@ function cmgBuildPartnerStats(){
   return arr;
 }
 
+// [v82] 두 날짜 사이 개월수 (절대값 양수)
+function cmgMonthsBetween(start, end){
+  if (!start || !end) return 0;
+  var months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  if (end.getDate() < start.getDate()) months--;
+  return Math.max(0, months);
+}
+
+// [v82] PDF 출력 (선택된 계약들)
+function cmgExportPdfFor(partnerName){
+  var pnEsc = String(partnerName||'').replace(/'/g, "\\'");
+  var checkboxes = document.querySelectorAll('.cmg-pdf-cb[data-pn="' + partnerName + '"]:checked');
+  if (checkboxes.length === 0) {
+    alert('선택된 계약이 없습니다. 체크박스로 선택 후 다시 시도하세요.');
+    return;
+  }
+  var stats = cmgBuildPartnerStats();
+  var partner = stats.find(function(p){ return p.partnerName === partnerName; });
+  if (!partner) return;
+  var info = cmgFindPartner(partnerName);
+  var selectedCnos = Array.from(checkboxes).map(function(cb){ return cb.value; });
+  var rows = partner.contracts.filter(function(ct){ return selectedCnos.indexOf(ct.cno) >= 0; });
+  // 합계
+  var totalRent = rows.reduce(function(s,r){ return s + (r.rent||0); }, 0);
+  var totalSupply = rows.reduce(function(s,r){ return s + (r.brokerage||0); }, 0);
+  var totalVat = Math.round(totalSupply * 0.1);
+  var totalBrk = totalSupply + totalVat;
+  // PDF용 HTML
+  var today = new Date();
+  var todayStr = today.getFullYear() + '.' + String(today.getMonth()+1).padStart(2,'0') + '.' + String(today.getDate()).padStart(2,'0');
+  var html = '<div style="font-family:\'Malgun Gothic\',sans-serif;padding:20px;font-size:11px;color:#1F2937">'
+    + '<div style="text-align:center;font-size:18px;font-weight:800;margin-bottom:14px">중개보수료 정산 명세서</div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1F2937">'
+    + '<div><b>파트너:</b> ' + partnerName + (info && info.fullName ? ' (' + info.fullName + ')' : '') + '<br>'
+    + (info && info.bizNo ? '<b>등록번호:</b> ' + info.bizNo + '<br>' : '')
+    + (info && info.addr ? '<b>주소:</b> ' + info.addr + '<br>' : '')
+    + (info && (info.bank || info.account) ? '<b>정산:</b> ' + (info.bank||'') + ' ' + (info.account||'') + ' (' + (info.acctHolder||'') + ')' : '')
+    + '</div>'
+    + '<div style="text-align:right"><b>발행일:</b> ' + todayStr + '<br><b>건수:</b> ' + rows.length + '건</div>'
+    + '</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:10px">'
+    + '<thead><tr style="background:#F3F4F6">'
+    + '<th style="border:1px solid #9CA3AF;padding:5px">No</th>'
+    + '<th style="border:1px solid #9CA3AF;padding:5px">계약번호</th>'
+    + '<th style="border:1px solid #9CA3AF;padding:5px">계약자</th>'
+    + '<th style="border:1px solid #9CA3AF;padding:5px">계약종류</th>'
+    + '<th style="border:1px solid #9CA3AF;padding:5px">입주일</th>'
+    + '<th style="border:1px solid #9CA3AF;padding:5px">계약기간</th>'
+    + '<th style="border:1px solid #9CA3AF;padding:5px;text-align:right">월세</th>'
+    + '<th style="border:1px solid #9CA3AF;padding:5px;text-align:right">공급가액</th>'
+    + '<th style="border:1px solid #9CA3AF;padding:5px;text-align:right">부가세</th>'
+    + '<th style="border:1px solid #9CA3AF;padding:5px;text-align:right">중개보수료</th>'
+    + '<th style="border:1px solid #9CA3AF;padding:5px">주소</th>'
+    + '</tr></thead><tbody>'
+    + rows.map(function(ct, i){
+        var supply = Math.round(ct.brokerage);
+        var vat = Math.round(ct.brokerage * 0.1);
+        var total = supply + vat;
+        var endDate = ct.endDate ? cmgParseStartDate(ct.endDate) : null;
+        var months = cmgMonthsBetween(ct.startDate, endDate);
+        return '<tr>'
+          + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:center">' + (i+1) + '</td>'
+          + '<td style="border:1px solid #9CA3AF;padding:4px">' + ct.cno + '</td>'
+          + '<td style="border:1px solid #9CA3AF;padding:4px">' + (ct.tenant||'-') + '</td>'
+          + '<td style="border:1px solid #9CA3AF;padding:4px">' + ((ct.contractKind||'') + (ct.contractKind && ct.housingType ? '/' : '') + (ct.housingType||'') || '-') + '</td>'
+          + '<td style="border:1px solid #9CA3AF;padding:4px">' + cmgFmtDate(ct.startDate) + '</td>'
+          + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:center">' + (months > 0 ? months + '개월' : '-') + '</td>'
+          + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right">' + cmgFmtMoney(ct.rent) + '</td>'
+          + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right">' + cmgFmtMoney(supply) + '</td>'
+          + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right">' + cmgFmtMoney(vat) + '</td>'
+          + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right;font-weight:700">' + cmgFmtMoney(total) + '</td>'
+          + '<td style="border:1px solid #9CA3AF;padding:4px;font-size:9px">' + (ct.address||'-') + '</td>'
+          + '</tr>';
+      }).join('')
+    + '<tr style="background:#FEF3C7;font-weight:700">'
+    + '<td colspan="6" style="border:1px solid #9CA3AF;padding:6px;text-align:right">합계</td>'
+    + '<td style="border:1px solid #9CA3AF;padding:6px;text-align:right">' + cmgFmtMoney(totalRent) + '</td>'
+    + '<td style="border:1px solid #9CA3AF;padding:6px;text-align:right">' + cmgFmtMoney(totalSupply) + '</td>'
+    + '<td style="border:1px solid #9CA3AF;padding:6px;text-align:right">' + cmgFmtMoney(totalVat) + '</td>'
+    + '<td style="border:1px solid #9CA3AF;padding:6px;text-align:right;color:#DC2626">' + cmgFmtMoney(totalBrk) + '</td>'
+    + '<td style="border:1px solid #9CA3AF"></td>'
+    + '</tr>'
+    + '</tbody></table>'
+    + '<div style="margin-top:20px;font-size:10px;color:#6B7280;text-align:right">— ' + todayStr + ' KRG 운영팀 자동 생성 —</div>'
+    + '</div>';
+
+  var container = document.createElement('div');
+  container.innerHTML = html;
+  document.body.appendChild(container);
+  var fname = '중개보수료_' + partnerName + '_' + todayStr + '.pdf';
+  if (typeof html2pdf !== 'undefined') {
+    html2pdf().from(container).set({
+      filename: fname,
+      jsPDF: { format: 'a4', orientation: 'landscape' },
+      margin: [10, 8, 10, 8],
+      html2canvas: { scale: 2 }
+    }).save().then(function(){ container.remove(); }).catch(function(e){ console.error(e); container.remove(); });
+  } else {
+    // 인쇄 다이얼로그 fallback
+    var w = window.open('', '_blank');
+    w.document.write('<!DOCTYPE html><html><head><title>' + fname + '</title></head><body>' + html + '<script>window.print();<\/script></body></html>');
+    container.remove();
+  }
+}
+
 // [v77] 만원/억원 단위 표기
 function cmgFmtKor(n){
   n = +n || 0;
@@ -7836,16 +7976,24 @@ function cmgRenderPartnerStats(){
           var rowsExpand = '';
           if (isOpen) {
             var expContracts = p.contracts.slice().sort(function(a,b){ return b.startDate - a.startDate; });
+            var pnEsc2 = p.partnerName.replace(/'/g, "\\'");
             rowsExpand = '<tr class="cmg-expand-row"><td colspan="9"><div class="cmg-expand-inner">'
               + (info ? '<div class="cmg-partner-info">'
                   + (info.bizNo ? '<span>등록번호: <b>' + info.bizNo + '</b></span>' : '')
                   + (info.addr ? '<span>주소: <b>' + info.addr + '</b></span>' : '')
                   + (info.bank ? '<span>정산: <b>' + info.bank + ' ' + (info.account||'') + ' (' + (info.acctHolder||'') + ')</b></span>' : '')
                   + '</div>' : '')
+              + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:6px 0;border-bottom:1px dashed #E5E7EB">'
+              +   '<button onclick="event.stopPropagation();var cbs=document.querySelectorAll(\'.cmg-pdf-cb[data-pn=&quot;' + p.partnerName.replace(/"/g,'&quot;').replace(/\\/g,'\\\\') + '&quot;]\');var checked=Array.from(cbs).every(function(c){return c.checked;});cbs.forEach(function(c){c.checked=!checked;});" style="padding:4px 10px;font-size:11px;border:1px solid #C7D2FE;background:#fff;border-radius:6px;cursor:pointer;font-weight:700">전체 선택/해제</button>'
+              +   '<button onclick="event.stopPropagation();cmgExportPdfFor(\'' + pnEsc2 + '\')" style="padding:5px 14px;font-size:12px;border:1px solid #DC2626;background:#DC2626;color:#fff;border-radius:6px;cursor:pointer;font-weight:700">📄 선택 항목 PDF 출력</button>'
+              +   '<span style="font-size:11px;color:#6B7280">체크박스로 정산할 계약 선택 후 출력하세요</span>'
+              + '</div>'
               + '<table class="cmg-expand-tbl"><thead><tr>'
+              + '<th style="text-align:center;width:30px"><input type="checkbox" onclick="event.stopPropagation();var cbs=document.querySelectorAll(\'.cmg-pdf-cb[data-pn=&quot;' + p.partnerName.replace(/"/g,'&quot;').replace(/\\/g,'\\\\') + '&quot;]\');cbs.forEach(function(c){c.checked=event.target.checked;});"></th>'
               + '<th style="text-align:center">No</th>'
               + '<th style="text-align:center">원본도착</th>'
               + '<th>계약번호</th><th>계약자</th><th>계약종류</th>'
+              + '<th>입주일</th>'
               + '<th>계약기간</th>'
               + '<th class="cmg-num">월세</th>'
               + '<th class="cmg-num">공급가액</th>'
@@ -7855,27 +8003,30 @@ function cmgRenderPartnerStats(){
               + '<th>주소</th>'
               + '</tr></thead><tbody>'
               + expContracts.map(function(ct, idx){
-                  var supply = Math.round(ct.brokerage); // 공급가액
-                  var vat    = Math.round(ct.brokerage * 0.1); // 부가세 10%
-                  var total  = supply + vat; // 중개보수료(총액)
-                  var period = cmgFmtDate(ct.startDate) + (ct.endDate ? ' ~ ' + ct.endDate.replace(/[^0-9]/g, '').slice(0,8).replace(/(\d{4})(\d{2})(\d{2})/, '$1.$2.$3') : '');
+                  var supply = Math.round(ct.brokerage);
+                  var vat    = Math.round(ct.brokerage * 0.1);
+                  var total  = supply + vat;
+                  var endDateObj = ct.endDate ? cmgParseStartDate(ct.endDate) : null;
+                  var months = cmgMonthsBetween(ct.startDate, endDateObj);
                   var origMark = ct.origDelivered
                     ? '<span style="color:#16A34A;font-weight:700">✓</span>'
                     : '<span style="color:#DC2626;font-weight:700">✗</span>';
                   var kind = (ct.contractKind || '') + (ct.contractKind && ct.housingType ? ' / ' : '') + (ct.housingType || '') || '—';
-                  return '<tr onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="cursor:pointer">'
-                    + '<td style="text-align:center;color:#8A9AB5;font-size:11px">' + (idx+1) + '</td>'
-                    + '<td style="text-align:center">' + origMark + '</td>'
-                    + '<td><b style="color:#7C3AED">' + ct.cno + '</b></td>'
-                    + '<td><b>' + (ct.tenant||'—') + '</b></td>'
-                    + '<td style="color:#6B7280">' + kind + '</td>'
-                    + '<td style="color:#6B7280;font-size:11px">' + period + '</td>'
-                    + '<td class="cmg-num">' + cmgFmtMoneyKor(ct.rent) + '</td>'
-                    + '<td class="cmg-num">' + cmgFmtMoney(supply) + '</td>'
-                    + '<td class="cmg-num" style="color:#6B7280">' + cmgFmtMoney(vat) + '</td>'
-                    + '<td class="cmg-num cmg-money">' + cmgFmtMoney(total) + '</td>'
-                    + '<td style="color:#6B7280">' + (ct.person||'—') + '</td>'
-                    + '<td style="color:#6B7280;font-size:11px">' + (ct.address||'—') + '</td>'
+                  return '<tr style="cursor:pointer">'
+                    + '<td style="text-align:center" onclick="event.stopPropagation()"><input type="checkbox" class="cmg-pdf-cb" data-pn="' + p.partnerName.replace(/"/g,'&quot;') + '" value="' + ct.cno + '"></td>'
+                    + '<td style="text-align:center;color:#8A9AB5;font-size:11px" onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')">' + (idx+1) + '</td>'
+                    + '<td style="text-align:center" onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')">' + origMark + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')"><b style="color:#7C3AED">' + ct.cno + '</b></td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')"><b>' + (ct.tenant||'—') + '</b></td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="color:#6B7280">' + kind + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="color:#6B7280;font-size:11px">' + cmgFmtDate(ct.startDate) + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="color:#374151;text-align:center;font-weight:700">' + (months > 0 ? months + '개월' : '—') + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" class="cmg-num">' + cmgFmtMoneyKor(ct.rent) + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" class="cmg-num">' + cmgFmtMoney(supply) + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" class="cmg-num" style="color:#6B7280">' + cmgFmtMoney(vat) + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" class="cmg-num cmg-money">' + cmgFmtMoney(total) + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="color:#6B7280">' + (ct.person||'—') + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="color:#6B7280;font-size:11px">' + (ct.address||'—') + '</td>'
                     + '</tr>';
                 }).join('')
               + '</tbody></table>'
@@ -7981,15 +8132,42 @@ function cmgBuildPersonStats(){
 
 // [v78] 섹션 C 카드 렌더 (담당자별 KPI)
 function cmgRenderPersonStats(){
-  var stats = cmgBuildPersonStats();
+  var statsAll = cmgBuildPersonStats();
   var range = window._cmgStatsRange || cmgRangeFromOffset(1); // [v80]
+  // [v83] 활성 파트너 목록 (현재 기간 기준, 알파벳 정렬)
+  var partnerSet = {};
+  statsAll.forEach(function(p){ if (p.partnerName) partnerSet[p.partnerName] = true; });
+  var partnerList = Object.keys(partnerSet).sort();
+  // [v83] 부동산 필터 적용
+  var filter = window._cmgPersonPartnerFilter || 'all';
+  if (filter !== 'all' && !partnerSet[filter]) {
+    // 선택된 파트너가 현재 기간에 없으면 자동 'all'로 리셋
+    window._cmgPersonPartnerFilter = 'all'; filter = 'all';
+  }
+  var stats = (filter === 'all') ? statsAll : statsAll.filter(function(p){ return p.partnerName === filter; });
   var totalCnt = stats.reduce(function(s,p){ return s + p.count; }, 0);
   var totalBrk = stats.reduce(function(s,p){ return s + p.totalBrokerage; }, 0);
+  // [v83] 라디오 버튼 행
+  var radioHtml = '<div class="cmg-period-row" style="background:#ECFDF5;flex-wrap:wrap">'
+    + '<span style="font-size:12px;color:#065F46;font-weight:700;margin-right:4px">부동산 필터:</span>'
+    + '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;font-weight:700;color:' + (filter==='all'?'#16A34A':'#6B7280') + '">'
+    + '<input type="radio" name="cmgPersonPF" ' + (filter==='all'?'checked':'') + ' onchange="cmgSetPersonPartnerFilter(\'all\')"> 전체'
+    + '</label>'
+    + partnerList.map(function(pn){
+        var pnEsc = pn.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        var checked = filter === pn;
+        return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;font-weight:' + (checked?'700':'500') + ';color:' + (checked?'#16A34A':'#374151') + '">'
+          + '<input type="radio" name="cmgPersonPF" ' + (checked?'checked':'') + ' onchange="cmgSetPersonPartnerFilter(\'' + pnEsc + '\')"> ' + pn
+          + '</label>';
+      }).join('')
+    + '</div>';
   var meta = '<div class="cmg-section-meta">'
-    + '<b>' + range.start + ' ~ ' + range.end + '</b> · 활성 담당자 <b>' + stats.length + '명</b>'
+    + '<b>' + range.start + ' ~ ' + range.end + '</b>'
+    + (filter !== 'all' ? ' · <span style="color:#16A34A;font-weight:700">[' + filter + ']</span>' : '')
+    + ' · 활성 담당자 <b>' + stats.length + '명</b>'
     + ' · 총 <b>' + totalCnt + '건</b>'
     + ' · 중개보수 합계 <b>' + cmgFmtMoney(totalBrk) + '</b>'
-    + ' <span style="color:#9CA3AF">(부동산 계약담당자 기준 — vacancy BM열, 부동산별 통계와 동일 기간)</span>'
+    + ' <span style="color:#9CA3AF">(부동산 계약담당자 기준 — vacancy BM열)</span>'
     + '</div>';
   var tableHtml;
   if (stats.length === 0) {
@@ -8017,6 +8195,7 @@ function cmgRenderPersonStats(){
   }
   return '<div class="cmg-card">'
     + '<div class="cmg-card-title"><span class="dot" style="background:#10B981"></span>👤 담당자별 계약 KPI</div>'
+    + radioHtml
     + meta
     + tableHtml
     + '</div>';
@@ -8371,12 +8550,11 @@ function cmgBuildProgress(){
   if (Array.isArray(contractRawData)) {
     contractRawData.forEach(function(c){ contractMap[String(c['계약번호']||'').trim()] = c; });
   }
-  var period = window._cmgPeriod || 'all';
-  var today = new Date(); today.setHours(0,0,0,0);
-  var cutoff = null;
-  if (period === 'day')   cutoff = new Date(today); // 오늘
-  if (period === 'week')  { cutoff = new Date(today); cutoff.setDate(cutoff.getDate() - 7); }
-  if (period === 'month') { cutoff = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate()); }
+  if (!window._cmgProgRange) window._cmgProgRange = cmgProgDefaultRange();
+  var range = window._cmgProgRange;
+  var rangeStart = new Date(range.start + 'T00:00:00');
+  var rangeEnd   = new Date(range.end   + 'T23:59:59');
+  if (isNaN(rangeStart) || isNaN(rangeEnd)) { rangeStart = null; rangeEnd = null; }
   var rows = [];
   vacancyRawData.forEach(function(v){
     var cno = String(v.no || '').trim();
@@ -8394,8 +8572,11 @@ function cmgBuildProgress(){
         }
       } catch(e){}
     }
-    // 기간 필터: 시작일이 cutoff 이후인 계약만
-    if (cutoff && (!startDate || startDate < cutoff)) return;
+    // [v82] 입주일 기준 기간 필터 (시작일이 range 안에 포함)
+    if (rangeStart && rangeEnd) {
+      if (!startDate) return; // 시작일 없으면 제외
+      if (startDate < rangeStart || startDate > rangeEnd) return;
+    }
     // 진척 데이터 없는 행 제외 (5개 모두 false면 신규 진행 가능성 — 일단 모두 표시)
     var checks = [v.homeBtn, v.eContract, v.feePaid, v.signed, v.nas];
     var trueCnt = checks.filter(function(x){ return x === true; }).length;
@@ -8468,11 +8649,18 @@ function renderContractMgmtView(){
   });
   if (rows.length > 0) kpi.avgPct = Math.round(sumPct / rows.length);
 
-  var periodHtml = '<div class="cmg-period-row"><span style="font-size:12px;color:#6B7280;font-weight:700;margin-right:4px">기간:</span>'
-    + '<button class="cmg-period-btn ' + (period==='all'?'active':'') + '" onclick="cmgSetPeriod(\'all\')">전체</button>'
-    + '<button class="cmg-period-btn ' + (period==='day'?'active':'') + '" onclick="cmgSetPeriod(\'day\')">오늘</button>'
-    + '<button class="cmg-period-btn ' + (period==='week'?'active':'') + '" onclick="cmgSetPeriod(\'week\')">최근 7일</button>'
-    + '<button class="cmg-period-btn ' + (period==='month'?'active':'') + '" onclick="cmgSetPeriod(\'month\')">최근 1개월</button>'
+  if (!window._cmgProgRange) window._cmgProgRange = cmgProgDefaultRange();
+  var pr = window._cmgProgRange;
+  var periodHtml = '<div class="cmg-period-row">'
+    + '<span style="font-size:12px;color:#6B7280;font-weight:700;margin-right:4px">입주 기간:</span>'
+    + '<input type="date" value="' + pr.start + '" onchange="cmgSetProgRange(\'start\', this.value)" style="padding:4px 8px;border:1px solid #C7D2FE;border-radius:6px;font-size:12px;background:#fff">'
+    + '<span style="margin:0 4px;color:#6B7280;font-weight:700">~</span>'
+    + '<input type="date" value="' + pr.end + '" onchange="cmgSetProgRange(\'end\', this.value)" style="padding:4px 8px;border:1px solid #C7D2FE;border-radius:6px;font-size:12px;background:#fff">'
+    + '<span style="margin-left:10px;color:#9CA3AF;font-size:11px">빠른 선택:</span>'
+    + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'today\')">오늘 입주</button>'
+    + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'3day\')">D-3 (3일 이내)</button>'
+    + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'week\')">1주일</button>'
+    + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'month\')">1개월</button>'
     + '</div>';
 
   var kpiHtml = '<div class="cmg-kpi-row">'
