@@ -8286,13 +8286,20 @@ function cmgRenderPersonStats(){
   var partnerList = Object.keys(partnerCount).sort(function(a, b){
     return partnerCount[b] - partnerCount[a] || a.localeCompare(b);
   });
-  // [v83/v95] 부동산 필터 적용 — 빈 문자열도 전체로 처리
+  // [v83/v95/v97] 부동산 필터 적용 — 빈 문자열은 표 표시 X (디폴트 비움)
   var filter = window._cmgPersonPartnerFilter;
   if (filter && filter !== 'all' && !partnerSet[filter]) {
     // 선택된 파트너가 현재 기간에 없으면 자동 미선택으로 리셋
     window._cmgPersonPartnerFilter = ''; filter = '';
   }
-  var stats = (!filter || filter === 'all') ? statsAll : statsAll.filter(function(p){ return p.partnerName === filter; });
+  var stats;
+  if (!filter) {
+    stats = []; // [v97] 라디오 미선택 시 표 비움
+  } else if (filter === 'all') {
+    stats = statsAll;
+  } else {
+    stats = statsAll.filter(function(p){ return p.partnerName === filter; });
+  }
   var totalCnt = stats.reduce(function(s,p){ return s + p.count; }, 0);
   var totalBrk = stats.reduce(function(s,p){ return s + p.totalBrokerage; }, 0);
   // [v83] 라디오 버튼 행
@@ -8311,14 +8318,23 @@ function cmgRenderPersonStats(){
           + '</label>';
       }).join('')
     + '</div>';
-  var meta = '<div class="cmg-section-meta">'
-    + '<b>' + range.start + ' ~ ' + range.end + '</b>'
-    + (filter !== 'all' ? ' · <span style="color:#16A34A;font-weight:700">[' + filter + ']</span>' : '')
-    + ' · 활성 담당자 <b>' + stats.length + '명</b>'
-    + ' · 총 <b>' + totalCnt + '건</b>'
-    + ' · 중개보수 합계 <b>' + cmgFmtMoney(totalBrk) + '</b>'
-    + ' <span style="color:#9CA3AF">(부동산 계약담당자 기준 — vacancy BM열)</span>'
-    + '</div>';
+  var meta;
+  if (!filter) {
+    // [v97] 디폴트 안내
+    meta = '<div class="cmg-section-meta" style="text-align:left;border-right:0;border-left:3px solid #16A34A;background:#ECFDF5;color:#065F46">'
+      + '<b>👆 위 라디오 버튼에서 부동산을 선택하세요</b>'
+      + ' <span style="font-size:11px;color:#6B7280">("전체"는 활성 담당자 ' + statsAll.length + '명 · ' + statsAll.reduce(function(s,p){return s+p.count;},0) + '건 · 중개보수 ' + cmgFmtMoney(statsAll.reduce(function(s,p){return s+p.totalBrokerage;},0)) + ')</span>'
+      + '</div>';
+  } else {
+    meta = '<div class="cmg-section-meta">'
+      + '<b>' + range.start + ' ~ ' + range.end + '</b>'
+      + (filter !== 'all' ? ' · <span style="color:#16A34A;font-weight:700">[' + filter + ']</span>' : '')
+      + ' · 활성 담당자 <b>' + stats.length + '명</b>'
+      + ' · 총 <b>' + totalCnt + '건</b>'
+      + ' · 중개보수 합계 <b>' + cmgFmtMoney(totalBrk) + '</b>'
+      + ' <span style="color:#9CA3AF">(vacancy BM열)</span>'
+      + '</div>';
+  }
   var tableHtml;
   if (stats.length === 0) {
     tableHtml = '<div class="cmg-empty">선택 기간에 계약 시작 건이 없습니다.</div>';
