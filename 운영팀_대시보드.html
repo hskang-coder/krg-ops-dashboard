@@ -9174,6 +9174,9 @@ function renderContractMgmtView(){
     + '.sum-stat-box.sum-stat-blue{border-color:#93C5FD;background:linear-gradient(to bottom,#fff,#EFF6FF)} .sum-stat-box.sum-stat-blue .sb-val{color:#2563EB}'
     + '.sum-stat-box.sum-stat-amber{border-color:#FCD34D;background:linear-gradient(to bottom,#fff,#FFFBEB)} .sum-stat-box.sum-stat-amber .sb-val{color:#D97706}'
     + '.sum-stat-box.sum-stat-red{border-color:#FCA5A5;background:linear-gradient(to bottom,#fff,#FEF2F2)} .sum-stat-box.sum-stat-red .sb-val{color:#DC2626}'
+    + '.sum-s3-period-btn{padding:3px 10px;font-size:11px;font-weight:600;border:1px solid #D1D5DB;background:#FFF;color:#6B7280;border-radius:14px;cursor:pointer;transition:all .15s}'
+    + '.sum-s3-period-btn:hover{background:#F3F4F6}'
+    + '.sum-s3-period-btn[data-act="true"]{background:#1B3976;color:#FFF;border-color:#1B3976}'
     + '.sum-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}'
     + '.sum-sub-title{font-size:11.5px;font-weight:700;color:#475569;margin-bottom:5px}'
     + '.sum-mini-insight{font-size:10.5px;color:#475569;padding:6px 9px;background:#F0FDF4;border-radius:5px;line-height:1.45;margin-top:8px}'
@@ -9832,6 +9835,17 @@ function sumBuildSection3(){
   if (!Array.isArray(vacancyRawData)) return null;
   var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
   var today = new Date(); today.setHours(0,0,0,0);
+  // [v119] 기간 필터
+  window._sumS3Period = window._sumS3Period || 'all';
+  var s3CutoffMonths = ({ '3m':3, '6m':6, '1y':12, '2y':24 })[window._sumS3Period] || null;
+  var s3Cutoff = null;
+  if (s3CutoffMonths) { s3Cutoff = new Date(today); s3Cutoff.setMonth(s3Cutoff.getMonth() - s3CutoffMonths); s3Cutoff.setHours(0,0,0,0); }
+  var parseAnyDate = function(s){
+    if (!s) return null;
+    var t = String(s).match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+    if (!t) return null;
+    var d = new Date(+t[1], +t[2]-1, +t[3]); d.setHours(0,0,0,0); return isNaN(d) ? null : d;
+  };
   var thisY = today.getFullYear(), thisM = today.getMonth() + 1; // 1~12
   var thisYM = thisY + '-' + String(thisM).padStart(2,'0');
 
@@ -9875,6 +9889,10 @@ function sumBuildSection3(){
   }
 
   vacancyRawData.forEach(function(v){
+    if (s3Cutoff) {
+      var sdF = parseAnyDate(v.startDate);
+      if (!sdF || sdF < s3Cutoff) return;
+    }
     var months = sumCalcResidence(v);
     if (months == null) return;
     if (months <= 12) earlyCnt++;
@@ -9949,7 +9967,11 @@ function sumBuildSection3(){
       var st = String(p['납부상태']||'').trim();
       // 연체 후 회수된 케이스만 (납부상태='연체납부')
       if (st !== '연체납부') return;
-      // 연체일수 컬럼 우선, 없으면 납기일/납부일에서 계산
+      // [v119] 납부일 기간 필터
+      if (s3Cutoff) {
+        var pDateF = parseAnyDate(p['납부일']);
+        if (!pDateF || pDateF < s3Cutoff) return;
+      }
       var days = parseInt(String(p['연체일수']||'').replace(/[^0-9\-]/g,''),10);
       if (isNaN(days) || days <= 0) {
         var dStr = String(p['납기일']||'').replace(/[^0-9.\-\/]/g,'');
@@ -10010,25 +10032,46 @@ function sumRenderSection3Card(){
     +   '<div class="sum-stat-box sum-stat-amber"><div class="sb-label">31~60일 미수</div><div class="sb-val">' + s.unpaidByAge['60'] + '<span class="sb-unit">건</span></div></div>'
     +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">90일+ 미수</div><div class="sb-val">' + s.over90Cnt + '<span class="sb-unit">건</span></div></div>'
     + '</div>'
-    // [v118] 3-컬럼: 차트① / 차트② / Top 5 + warning
-    + '<div style="display:grid;grid-template-columns:1.1fr 1.1fr 1fr;gap:14px;margin-top:6px">'
+    // [v119] 기간 선택 + 2-차트 균형 (Top 5 제거)
+    + sumS3PeriodHtml()
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px">'
     +   '<div>'
-    +     '<div class="sum-sub-title">📍 입주 후 N개월차 첫 연체 분포</div>'
-    +     '<div style="position:relative;height:180px"><canvas id="sumS3_firstDelq"></canvas></div>'
+    +     '<div class="sum-sub-title" style="display:flex;justify-content:space-between;align-items:center;gap:6px">'
+    +       '<span>📍 입주 후 N개월차 첫 연체 분포</span>'
+    +       '<span style="font-size:10.5px;color:#6B7280;font-weight:500">대상 ' + s.earlyCnt.toLocaleString() + '건</span>'
+    +     '</div>'
+    +     '<div style="position:relative;height:200px"><canvas id="sumS3_firstDelq"></canvas></div>'
     +   '</div>'
     +   '<div>'
     +     '<div class="sum-sub-title" style="display:flex;justify-content:space-between;align-items:center;gap:6px">'
     +       '<span>⏱ 납기 후 회수 일수 분포</span>'
-    +       '<span style="font-size:10px;color:#6B7280;font-weight:500;white-space:nowrap">평균 ' + s.recoveryAvg + '일 · 7일내 <b style="color:#10B981">' + s.fastRecoveryRate + '%</b></span>'
+    +       '<span style="font-size:10.5px;color:#6B7280;font-weight:500">총 ' + s.recoveryTotal.toLocaleString() + '건 · 평균 ' + s.recoveryAvg + '일 · 7일내 <b style="color:#10B981">' + s.fastRecoveryRate + '%</b></span>'
     +     '</div>'
-    +     '<div style="position:relative;height:180px"><canvas id="sumS3_recovery"></canvas></div>'
+    +     '<div style="position:relative;height:200px"><canvas id="sumS3_recovery"></canvas></div>'
     +   '</div>'
-    +   '<div>'
-    +     '<div class="sum-sub-title">🆕 이번달 신규 연체 (Top 5)</div>'
-    +     '<div class="sum-newdelq-list">' + listHtml + '</div>'
-    +     '<div class="sum-mini-insight" style="background:#FEF2F2;color:#991B1B">⚠️ 입주 1~3개월 연체는 품질 위험 신호 — 즉시 대응 필요</div>'
-    +   '</div>'
-    + '</div>';
+    + '</div>'
+    + '<div class="sum-mini-insight" style="background:#FEF2F2;color:#991B1B;margin-top:10px">⚠️ 입주 1~3개월 연체는 품질 위험 신호 — 즉시 대응 필요</div>';
+}
+
+// [v119] Section ③ 기간 선택 UI + 핸들러
+function sumS3PeriodHtml(){
+  var current = window._sumS3Period || 'all';
+  var opts = [['all','전체'],['3m','3개월'],['6m','6개월'],['1y','1년'],['2y','2년']];
+  var html = '<div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:8px;font-size:11px">'
+    + '<span style="color:#6B7280;font-weight:600">기간:</span>';
+  for (var i = 0; i < opts.length; i++) {
+    var p = opts[i][0], lbl = opts[i][1];
+    var act = (current === p) ? 'true' : 'false';
+    html += '<button class="sum-s3-period-btn" data-act="' + act + '" onclick="sumSetS3Period(\'' + p + '\')">' + lbl + '</button>';
+  }
+  html += '</div>';
+  return html;
+}
+function sumSetS3Period(p){
+  window._sumS3Period = p;
+  var card = document.querySelector('#summaryView .sum-section-3');
+  if (card) card.innerHTML = sumRenderSection3Card();
+  setTimeout(function(){ if (typeof sumDrawSection3 === 'function') sumDrawSection3(); }, 30);
 }
 
 function sumDrawSection3(){
