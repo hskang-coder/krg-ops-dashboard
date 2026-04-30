@@ -7662,7 +7662,40 @@ function cmgParseAmount(raw){
   return isNaN(n) ? 0 : n;
 }
 
-// [v77] 기간 cutoff
+// [v80] 정산/통계 기간 글로벌 (YYYY-MM ~ YYYY-MM)
+function cmgRangeFromOffset(monthsBack){
+  var t = new Date();
+  var endY = t.getFullYear(), endM = t.getMonth() + 1;
+  var sd = new Date(t.getFullYear(), t.getMonth() - (monthsBack - 1), 1);
+  var startY = sd.getFullYear(), startM = sd.getMonth() + 1;
+  return {
+    start: startY + '-' + String(startM).padStart(2, '0'),
+    end:   endY   + '-' + String(endM).padStart(2, '0')
+  };
+}
+window._cmgStatsRange  = window._cmgStatsRange  || cmgRangeFromOffset(1);  // 부동산/담당자 디폴트 1개월
+window._cmgSettleRange = window._cmgSettleRange || cmgRangeFromOffset(6);  // 정산 디폴트 6개월
+
+function cmgSetStatsRange(which, val){
+  if (which === 'start') window._cmgStatsRange.start = val;
+  if (which === 'end')   window._cmgStatsRange.end   = val;
+  renderContractMgmtView();
+}
+function cmgSetSettleRange(which, val){
+  if (which === 'start') window._cmgSettleRange.start = val;
+  if (which === 'end')   window._cmgSettleRange.end   = val;
+  renderContractMgmtView();
+}
+function cmgQuickRange(target, monthsBack){
+  if (target === 'stats')  window._cmgStatsRange  = cmgRangeFromOffset(monthsBack);
+  if (target === 'settle') window._cmgSettleRange = cmgRangeFromOffset(monthsBack);
+  renderContractMgmtView();
+}
+function cmgYmInRange(ym, range){
+  return ym >= range.start && ym <= range.end;
+}
+
+// [v77] 기간 cutoff (v80: deprecated — 호환용 유지)
 function cmgGetPartnerCutoff(period){
   var t = new Date(); t.setHours(0,0,0,0);
   switch(period) {
@@ -7677,8 +7710,7 @@ function cmgGetPartnerCutoff(period){
 // [v77] 파트너별 통계 빌드
 function cmgBuildPartnerStats(){
   if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) return [];
-  var period = window._cmgPartnerPeriod || 'month';
-  var cutoff = cmgGetPartnerCutoff(period);
+  var range = window._cmgStatsRange || cmgRangeFromOffset(1); // [v80]
   var contractMap = {};
   if (Array.isArray(contractRawData)) {
     contractRawData.forEach(function(c){ contractMap[String(c['계약번호']||'').trim()] = c; });
@@ -7690,7 +7722,9 @@ function cmgBuildPartnerStats(){
     var cno = String(v.no||'').trim();
     var c = contractMap[cno];
     var startDate = c ? cmgParseStartDate(c['시작일']) : null;
-    if (!startDate || startDate < cutoff) return;
+    if (!startDate) return;
+    var ym = startDate.getFullYear() + '-' + String(startDate.getMonth()+1).padStart(2,'0');
+    if (!cmgYmInRange(ym, range)) return; // [v80]
     var dep  = cmgParseAmount(v.deposit);
     var rent = cmgParseAmount(v.monthRent || v.rent);
     var brk  = calcBrokerage(dep, rent, v.housingType);
@@ -7748,19 +7782,23 @@ function cmgTogglePartner(name){
 // [v77] 파트너 통계 카드 렌더
 function cmgRenderPartnerStats(){
   var stats = cmgBuildPartnerStats();
-  var period = window._cmgPartnerPeriod || 'month';
-  var periodLabel = { month:'최근 1개월', quarter:'최근 분기(3개월)', half:'최근 반기(6개월)', year:'최근 1년' }[period] || period;
+  var range = window._cmgStatsRange || cmgRangeFromOffset(1); // [v80]
   var totalCnt = stats.reduce(function(s,p){ return s + p.contracts.length; }, 0);
   var totalBrk = stats.reduce(function(s,p){ return s + p.totalBrokerage; }, 0);
   var totalTrade = stats.reduce(function(s,p){ return s + p.totalTrade; }, 0);
-  var periodHtml = '<div class="cmg-period-row"><span style="font-size:12px;color:#6B7280;font-weight:700;margin-right:4px">기간:</span>'
-    + '<button class="cmg-period-btn ' + (period==='month'?'active':'') + '" onclick="cmgSetPartnerPeriod(\'month\')">1개월</button>'
-    + '<button class="cmg-period-btn ' + (period==='quarter'?'active':'') + '" onclick="cmgSetPartnerPeriod(\'quarter\')">분기</button>'
-    + '<button class="cmg-period-btn ' + (period==='half'?'active':'') + '" onclick="cmgSetPartnerPeriod(\'half\')">반기</button>'
-    + '<button class="cmg-period-btn ' + (period==='year'?'active':'') + '" onclick="cmgSetPartnerPeriod(\'year\')">1년</button>'
+  var periodHtml = '<div class="cmg-period-row">'
+    + '<span style="font-size:12px;color:#6B7280;font-weight:700;margin-right:4px">기간:</span>'
+    + '<input type="month" value="' + range.start + '" onchange="cmgSetStatsRange(\'start\', this.value)" style="padding:4px 8px;border:1px solid #C7D2FE;border-radius:6px;font-size:12px;background:#fff">'
+    + '<span style="margin:0 4px;color:#6B7280;font-weight:700">~</span>'
+    + '<input type="month" value="' + range.end + '" onchange="cmgSetStatsRange(\'end\', this.value)" style="padding:4px 8px;border:1px solid #C7D2FE;border-radius:6px;font-size:12px;background:#fff">'
+    + '<span style="margin-left:10px;color:#9CA3AF;font-size:11px">빠른 선택:</span>'
+    + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'stats\', 1)">1개월</button>'
+    + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'stats\', 3)">분기</button>'
+    + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'stats\', 6)">반기</button>'
+    + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'stats\', 12)">1년</button>'
     + '</div>';
   var meta = '<div class="cmg-section-meta">'
-    + '<b>' + periodLabel + '</b> · 활성 파트너 <b>' + stats.length + '개</b>'
+    + '<b>' + range.start + ' ~ ' + range.end + '</b> · 활성 파트너 <b>' + stats.length + '개</b>'
     + ' · 총 <b>' + totalCnt + '건</b>'
     + ' · 총 거래액 <b>' + cmgFmtMoneyKor(totalTrade) + '</b>'
     + ' · 중개보수 합계 <b>' + cmgFmtMoney(totalBrk) + '</b>'
@@ -7879,8 +7917,7 @@ function cmgPartnerRank(partnerName){
 // [v78] 담당자별 통계 빌드 (partnerPerson = vacancy.BM 기준)
 function cmgBuildPersonStats(){
   if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) return [];
-  var period = window._cmgPartnerPeriod || 'month';
-  var cutoff = cmgGetPartnerCutoff(period);
+  var range = window._cmgStatsRange || cmgRangeFromOffset(1); // [v80]
   var contractMap = {};
   if (Array.isArray(contractRawData)) {
     contractRawData.forEach(function(c){ contractMap[String(c['계약번호']||'').trim()] = c; });
@@ -7893,7 +7930,9 @@ function cmgBuildPersonStats(){
     var cno = String(v.no||'').trim();
     var c = contractMap[cno];
     var startDate = c ? cmgParseStartDate(c['시작일']) : null;
-    if (!startDate || startDate < cutoff) return;
+    if (!startDate) return;
+    var ym = startDate.getFullYear() + '-' + String(startDate.getMonth()+1).padStart(2,'0');
+    if (!cmgYmInRange(ym, range)) return; // [v80]
     var dep  = cmgParseAmount(v.deposit);
     var rent = cmgParseAmount(v.monthRent || v.rent);
     var brk  = calcBrokerage(dep, rent, v.housingType);
@@ -7915,15 +7954,14 @@ function cmgBuildPersonStats(){
 // [v78] 섹션 C 카드 렌더 (담당자별 KPI)
 function cmgRenderPersonStats(){
   var stats = cmgBuildPersonStats();
-  var period = window._cmgPartnerPeriod || 'month';
-  var periodLabel = { month:'최근 1개월', quarter:'최근 분기', half:'최근 반기', year:'최근 1년' }[period] || period;
+  var range = window._cmgStatsRange || cmgRangeFromOffset(1); // [v80]
   var totalCnt = stats.reduce(function(s,p){ return s + p.count; }, 0);
   var totalBrk = stats.reduce(function(s,p){ return s + p.totalBrokerage; }, 0);
   var meta = '<div class="cmg-section-meta">'
-    + '<b>' + periodLabel + '</b> · 활성 담당자 <b>' + stats.length + '명</b>'
+    + '<b>' + range.start + ' ~ ' + range.end + '</b> · 활성 담당자 <b>' + stats.length + '명</b>'
     + ' · 총 <b>' + totalCnt + '건</b>'
     + ' · 중개보수 합계 <b>' + cmgFmtMoney(totalBrk) + '</b>'
-    + ' <span style="color:#9CA3AF">(부동산 계약담당자 기준 — vacancy BM열)</span>'
+    + ' <span style="color:#9CA3AF">(부동산 계약담당자 기준 — vacancy BM열, 부동산별 통계와 동일 기간)</span>'
     + '</div>';
   var tableHtml;
   if (stats.length === 0) {
@@ -8200,14 +8238,25 @@ function cmgBuildSettlement(){
 
 function cmgRenderSettlementCard(){
   var rows = cmgBuildSettlement();
-  // 최근 6개월만 표시
-  var sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  rows = rows.filter(function(r){ return r.startDate && r.startDate >= sixMonthsAgo; });
+  var rng = window._cmgSettleRange || cmgRangeFromOffset(6); // [v80]
+  rows = rows.filter(function(r){ return cmgYmInRange(r.ym, rng); });
   var unpaidCnt = rows.filter(function(r){ return !window._cmgPaidMap[cmgPaidKey(r.partnerName, r.ym)]; }).length;
   var unpaidAmt = rows.reduce(function(s,r){ return window._cmgPaidMap[cmgPaidKey(r.partnerName, r.ym)] ? s : s + r.totalBrokerage; }, 0);
+  var rangeHtml = '<div class="cmg-period-row" style="background:#FEF2F2">'
+    + '<span style="font-size:12px;color:#991B1B;font-weight:700;margin-right:4px">정산 기간:</span>'
+    + '<input type="month" value="' + rng.start + '" onchange="cmgSetSettleRange(\'start\', this.value)" style="padding:4px 8px;border:1px solid #FCA5A5;border-radius:6px;font-size:12px;background:#fff">'
+    + '<span style="margin:0 4px;color:#991B1B;font-weight:700">~</span>'
+    + '<input type="month" value="' + rng.end + '" onchange="cmgSetSettleRange(\'end\', this.value)" style="padding:4px 8px;border:1px solid #FCA5A5;border-radius:6px;font-size:12px;background:#fff">'
+    + '<span style="margin-left:10px;color:#991B1B;font-size:11px">빠른 선택:</span>'
+    + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'settle\', 1)">1개월</button>'
+    + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'settle\', 3)">분기</button>'
+    + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'settle\', 6)">반기</button>'
+    + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'settle\', 12)">1년</button>'
+    + '</div>';
   var html = '<div class="cmg-card">'
-    + '<div class="cmg-card-title"><span class="dot" style="background:#EF4444"></span>💰 정산 워크플로우 (최근 6개월) (6-2)</div>'
-    + '<div class="cmg-section-meta">미지급 <b style="color:#DC2626">' + unpaidCnt + '건</b> · 미지급 합계 <b style="color:#DC2626">' + cmgFmtMoney(unpaidAmt) + '</b> <span style="color:#9CA3AF">(체크박스는 메모리 저장 — 새로고침 시 초기화)</span></div>';
+    + '<div class="cmg-card-title"><span class="dot" style="background:#EF4444"></span>💰 정산 워크플로우 (6-2)</div>'
+    + rangeHtml
+    + '<div class="cmg-section-meta"><b>' + rng.start + ' ~ ' + rng.end + '</b> · 미지급 <b style="color:#DC2626">' + unpaidCnt + '건</b> · 미지급 합계 <b style="color:#DC2626">' + cmgFmtMoney(unpaidAmt) + '</b> <span style="color:#9CA3AF">(체크박스 메모리 저장 — 새로고침 시 초기화)</span></div>';
   if (rows.length === 0) {
     html += '<div class="cmg-empty">최근 6개월 정산 대상이 없습니다.</div>';
   } else {
