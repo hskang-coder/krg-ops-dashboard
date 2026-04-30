@@ -5233,7 +5233,8 @@ function buildAnalysisCol(rows, label, avClass) {
   const barColors = ['#7C3AED','#2563A8','#059669'];
 
   if (!rows.length) {
-    return `
+    // [v121] 빈 데이터일 때도 {statsHtml, suggestHtml} 객체 형태로 반환 (undefined 표시 방지)
+    const emptyStats = `
       <div class="analysis-col-header">
         <div class="analysis-col-avatar ${avClass}">${label === '전체' ? '전' : label[0]}</div>
         <div class="analysis-col-name">${label}</div>
@@ -5241,6 +5242,7 @@ function buildAnalysisCol(rows, label, avClass) {
       <div class="analysis-section">
         <div class="analysis-empty">해당 기간 데이터 없음</div>
       </div>`;
+    return { statsHtml: emptyStats, suggestHtml: '' };
   }
 
   // ── 업무구분(cat) 기반 집계 ─────────────────────────────────────
