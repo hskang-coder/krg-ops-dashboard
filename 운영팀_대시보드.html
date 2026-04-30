@@ -1682,6 +1682,8 @@ function parseDailyReport(resp) {
   const contentIdx = findColIdx(labels, ['대응 상세','대응상세','대응내용','상세내용','내용'], 5);  // F열 (E→F로 이동)
   const billIdx    = findColIdx(labels, ['청구서명','청구'],            -1);
   const stepIdx    = findColIdx(labels, ['단계','step'],                -1);
+  // [v67] F열(5) = 담당자
+  const personIdx  = findColIdx(labels, ['담당자','대응자'],          5);
   // [v44] G열(6) = 갱신상태 (jobType=갱신관리 행에서만 의미 있음)
   const renewalIdx = findColIdx(labels, ['갱신상태','갱신'],            6);
   return (rows||[]).map(row => {
@@ -1697,6 +1699,7 @@ function parseDailyReport(resp) {
       bill:    cell(billIdx),
       content: cell(contentIdx),
       step:    cell(stepIdx),
+      person:  cell(personIdx),         // [v67] F열: 담당자
       renewalStatus: cell(renewalIdx) // [v44] G열
     };
   }).filter(Boolean);
@@ -1911,7 +1914,7 @@ function buildResponseTableHTML(responses) {
           ${r.payDate||'—'}
         </td>
         <td style="font-size:11px">${jt?`<span style="background:${jtBg};color:${jtColor};font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap">${jt}</span>`:'<span style="color:#B0BDCE">—</span>'}</td>
-        <td style="font-size:12px">${r.content||'—'}</td>
+        <td style="font-size:12px">${r.person?`<span style="display:inline-block;background:#F1F5F9;color:#0F766E;font-weight:700;font-size:11px;padding:1px 7px;border-radius:8px;margin-right:6px">${r.person}</span>`:''}${r.content||'—'}</td>
       </tr>`;}).join('')}
       </tbody>
     </table></div>`;
