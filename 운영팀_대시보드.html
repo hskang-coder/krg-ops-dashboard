@@ -1010,6 +1010,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <button class="view-tab active" onclick="switchView('dashboard')">📊 운영관리</button>
     <button class="view-tab"        onclick="switchView('checklist')">✅ 업무루틴관리</button>
     <button class="view-tab"        onclick="switchView('contract')">📋 입주관리</button>
+    <button class="view-tab"        onclick="switchView('contractMgmt')">📑 계약관리</button>
     <button class="view-tab"        onclick="switchView('payment')">💰 수납관리</button>
     <button class="view-tab" onclick="switchView('delinquency')">🚨 연체관리</button>
     <button class="view-tab" onclick="switchView('renewal')">🔄 갱신관리</button>
@@ -1265,6 +1266,11 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   <!-- [v43] 갱신관리 뷰 -->
   <div id="renewalView" class="view-content">
     <div class="rnw-inner"></div>
+  </div>
+
+  <!-- [v74] 계약관리 뷰 -->
+  <div id="contractMgmtView" class="view-content">
+    <div class="cmg-inner"></div>
   </div>
 </div>
 
@@ -1541,17 +1547,19 @@ function switchView(view) {
   document.getElementById('paymentView').classList.toggle('active', view === 'payment');
   document.getElementById('delinquencyView').classList.toggle('active', view === 'delinquency');
   document.getElementById('renewalView').classList.toggle('active', view === 'renewal');  // [v43]
+  document.getElementById('contractMgmtView').classList.toggle('active', view === 'contractMgmt');  // [v74]
   if (view === 'delinquency') renderDelinquency();
   if (view === 'renewal') renderRenewalView();  // [v43]
+  if (view === 'contractMgmt') renderContractMgmtView();  // [v74]
   document.getElementById('personTabsRow').style.display = view === 'checklist' ? 'flex' : 'none';
-  // [v73] contract → 입주관리
-  const titles = { dashboard:'운영팀 대시보드', checklist:'업무 체크리스트', contract:'입주관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리' };
+  // [v74] contractMgmt 추가
+  const titles = { dashboard:'운영팀 대시보드', checklist:'업무 체크리스트', contract:'입주관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리', contractMgmt:'계약관리' };
   document.getElementById('pageTitle').textContent = titles[view] || '';
   document.getElementById('refreshBtn').style.display = view === 'dashboard' ? '' : 'none';
 
-  // [v43] 6개 탭 (dashboard/checklist/contract/payment/delinquency/renewal)
+  // [v74] 7개 탭 (dashboard/checklist/contract/contractMgmt/payment/delinquency/renewal)
   document.querySelectorAll('.view-tab').forEach((btn,i) => {
-    btn.classList.toggle('active', ['dashboard','checklist','contract','payment','delinquency','renewal'][i] === view);
+    btn.classList.toggle('active', ['dashboard','checklist','contract','contractMgmt','payment','delinquency','renewal'][i] === view);
   });
 
   if (view === 'checklist') {
@@ -1792,7 +1800,13 @@ function parseVacancySheet(resp) {
   const endDateIdx    = 23; // X열 (0-based) = 만기일 [v44]
   const tenantRrnIdx  = 47; // AV열 (0-based) = 계약자1 생년월일/주민번호 [v65]
   const coRrnIdx      = 53; // BB열 (0-based) = 계약자2/연대보증인 생년월일/주민번호 [v65]
-  const payConditionIdx = 18; // S열 (0-based) = 납부조건 (분할/일시납/수수료별도 등) [v71]
+  const payConditionIdx = 18; // S열 (0-based) = 납부조건 [v71]
+  // [v74] 입주 전 진척 5개 (TRUE/FALSE)
+  const homeBtnIdx   = 80; // CC열 = 홈버튼등록
+  const eContractIdx = 81; // CD열 = 전자계약
+  const feePaidIdx   = 82; // CE열 = 수수료입금
+  const signedIdx    = 83; // CF열 = 서명
+  const nasIdx       = 86; // CI열 = NAS
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -1826,7 +1840,13 @@ function parseVacancySheet(resp) {
       endDate:      cell(endDateIdx),     // X열: 만기일 [v44]
       tenantRrn:    cell(tenantRrnIdx), // AV열: 계약자1 생년월일/주민번호 [v65]
       coRrn:        cell(coRrnIdx),     // BB열: 계약자2/연대보증인 생년월일/주민번호 [v65]
-      payCondition: cell(payConditionIdx) // S열: 납부조건 [v71]
+      payCondition: cell(payConditionIdx), // S열: 납부조건 [v71]
+      // [v74] 입주 전 진척 5개 (Boolean 변환)
+      homeBtn:    (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[homeBtnIdx] && (c[homeBtnIdx].v != null ? c[homeBtnIdx].v : c[homeBtnIdx].f)),
+      eContract:  (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[eContractIdx] && (c[eContractIdx].v != null ? c[eContractIdx].v : c[eContractIdx].f)),
+      feePaid:    (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[feePaidIdx] && (c[feePaidIdx].v != null ? c[feePaidIdx].v : c[feePaidIdx].f)),
+      signed:     (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[signedIdx] && (c[signedIdx].v != null ? c[signedIdx].v : c[signedIdx].f)),
+      nas:        (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[nasIdx] && (c[nasIdx].v != null ? c[nasIdx].v : c[nasIdx].f))
     };
   }).filter(Boolean);
 }
@@ -7485,6 +7505,208 @@ function rnwRenderCohortChart(cohorts){
   });
 }
 
+// [v74] 계약관리 모듈
+(function injectCmgCSS(){
+  if (document.getElementById('cmg-css')) return;
+  var css = `
+.cmg-inner { padding: 18px 22px 40px; max-width: 1500px; margin: 0 auto; }
+.cmg-card { background:#fff; border:1px solid #E5E7EB; border-radius:10px; padding:16px 18px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+.cmg-card-title { font-size:14px; font-weight:800; color:#1F2937; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+.cmg-card-title .dot { width:8px; height:8px; border-radius:50%; background:#7C3AED; }
+.cmg-period-row { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center; background:#F9FAFB; padding:10px 12px; border-radius:8px; }
+.cmg-period-btn { background:#fff; border:1px solid #E5E7EB; border-radius:14px; padding:5px 12px; font-size:11.5px; font-weight:700; color:#374151; cursor:pointer; }
+.cmg-period-btn.active { background:#7C3AED; color:#fff; border-color:#7C3AED; }
+.cmg-tbl { width:100%; border-collapse:collapse; font-size:12px; min-width:900px; }
+.cmg-tbl thead tr { background:#F9FAFB; }
+.cmg-tbl th { padding:8px 10px; text-align:left; font-weight:700; color:#475569; font-size:11px; border-bottom:2px solid #E5E7EB; white-space:nowrap; }
+.cmg-tbl td { padding:7px 10px; border-bottom:1px solid #F3F4F6; vertical-align:middle; white-space:nowrap; }
+.cmg-tbl tr:hover td { background:#FAF5FF; cursor:pointer; }
+.cmg-chk-yes { display:inline-block; width:22px; height:22px; line-height:22px; text-align:center; background:#DCFCE7; color:#166534; border-radius:50%; font-weight:700; font-size:13px; }
+.cmg-chk-no  { display:inline-block; width:22px; height:22px; line-height:22px; text-align:center; background:#F3F4F6; color:#9CA3AF; border-radius:50%; font-weight:700; font-size:13px; }
+.cmg-pct-bar { display:inline-block; width:80px; height:6px; background:#F3F4F6; border-radius:3px; overflow:hidden; vertical-align:middle; margin-right:6px; }
+.cmg-pct-fill { display:block; height:100%; transition:width .25s; }
+.cmg-empty { text-align:center; color:#9CA3AF; padding:30px 0; font-size:13px; }
+.cmg-kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:18px; }
+.cmg-kpi { background:#fff; border:1px solid #E5E7EB; border-radius:10px; padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+.cmg-kpi-label { font-size:11px; color:#6B7280; font-weight:700; }
+.cmg-kpi-val { font-size:24px; font-weight:800; margin-top:6px; color:#7C3AED; }
+.cmg-kpi-sub { font-size:11px; color:#9CA3AF; margin-top:2px; }
+@media(max-width:900px){ .cmg-kpi-row { grid-template-columns:repeat(2,1fr); } }
+`;
+  var st = document.createElement('style'); st.id = 'cmg-css'; st.textContent = css;
+  document.head.appendChild(st);
+})();
+
+// 기간 필터 상태
+window._cmgPeriod = window._cmgPeriod || 'all';
+function cmgSetPeriod(val){ window._cmgPeriod = val; renderContractMgmtView(); }
+
+// 진척 데이터 빌드 (vacancy + contract 시작일)
+function cmgBuildProgress(){
+  if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) return [];
+  var contractMap = {};
+  if (Array.isArray(contractRawData)) {
+    contractRawData.forEach(function(c){ contractMap[String(c['계약번호']||'').trim()] = c; });
+  }
+  var period = window._cmgPeriod || 'all';
+  var today = new Date(); today.setHours(0,0,0,0);
+  var cutoff = null;
+  if (period === 'day')   cutoff = new Date(today); // 오늘
+  if (period === 'week')  { cutoff = new Date(today); cutoff.setDate(cutoff.getDate() - 7); }
+  if (period === 'month') { cutoff = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate()); }
+  var rows = [];
+  vacancyRawData.forEach(function(v){
+    var cno = String(v.no || '').trim();
+    if (!cno) return;
+    var c = contractMap[cno];
+    var startDate = null;
+    if (c && c['시작일']) {
+      try {
+        var s = String(c['시작일']);
+        var m = s.match(/Date\((\d+),(\d+),(\d+)/);
+        if (m) startDate = new Date(+m[1], +m[2], +m[3]);
+        if (!startDate) {
+          var m2 = s.match(/(\d{4})[\.\-\/]+(\d{1,2})[\.\-\/]+(\d{1,2})/);
+          if (m2) startDate = new Date(+m2[1], +m2[2]-1, +m2[3]);
+        }
+      } catch(e){}
+    }
+    // 기간 필터: 시작일이 cutoff 이후인 계약만
+    if (cutoff && (!startDate || startDate < cutoff)) return;
+    // 진척 데이터 없는 행 제외 (5개 모두 false면 신규 진행 가능성 — 일단 모두 표시)
+    var checks = [v.homeBtn, v.eContract, v.feePaid, v.signed, v.nas];
+    var trueCnt = checks.filter(function(x){ return x === true; }).length;
+    var pct = Math.round(trueCnt / 5 * 100);
+    rows.push({
+      cno: cno,
+      name: v.tenant1Name || v.tenantName || '',
+      tel: v.tenantPhone || '',
+      startDate: startDate,
+      contractStatus: c ? (c['계약상태']||'') : '',
+      checks: checks,
+      trueCnt: trueCnt,
+      pct: pct
+    });
+  });
+  // 진척률 낮은 순 정렬
+  rows.sort(function(a,b){ return a.pct - b.pct; });
+  return rows;
+}
+
+function cmgFmtDate(d){
+  if (!d) return '—';
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  var dd = String(d.getDate()).padStart(2,'0');
+  return d.getFullYear() + '.' + mm + '.' + dd;
+}
+
+function cmgPctColor(p){
+  if (p === 100) return '#16A34A';
+  if (p >= 67)   return '#EAB308';
+  if (p >= 34)   return '#F59E0B';
+  return '#DC2626';
+}
+
+function renderContractMgmtView(){
+  var wrap = document.querySelector('#contractMgmtView .cmg-inner');
+  if (!wrap) return;
+  // 데이터 로드 대기
+  var needLoad = !Array.isArray(vacancyRawData) || !vacancyRawData.length || !crLoaded;
+  if (needLoad) {
+    wrap.innerHTML = '<div class="cmg-empty">📡 계약관리 데이터 로딩 중...</div>';
+    var promises = [];
+    if (!crLoaded) promises.push(Promise.all([fetchSheetByName(CONTRACT_SHEET), fetchSheetByName(INCOME_SHEET)]).then(function(arr){
+      contractRawData = gvizToObjects(arr[0]).filter(function(x){return x['계약번호'];});
+      paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return x['계약번호'];});
+      crLoaded = true;
+    }));
+    if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) promises.push(fetchSheetByGid(VACANCY_GID).then(function(r){ vacancyRawData = parseVacancySheet(r); }));
+    Promise.all(promises).then(function(){ renderContractMgmtView(); }).catch(function(e){
+      wrap.innerHTML = '<div class="cmg-empty">❌ 데이터 로드 실패: ' + e.message + '</div>';
+    });
+    return;
+  }
+  var rows = cmgBuildProgress();
+  var period = window._cmgPeriod || 'all';
+  // KPI
+  var kpi = { total: rows.length, completed: 0, pending: 0, overdue: 0, avgPct: 0 };
+  var sumPct = 0;
+  var todayMid = new Date(); todayMid.setHours(0,0,0,0);
+  rows.forEach(function(r){
+    sumPct += r.pct;
+    if (r.pct === 100) kpi.completed++;
+    else kpi.pending++;
+    // 시작일 D-7 이내 + 진척률 < 80%
+    if (r.startDate) {
+      var diff = Math.floor((r.startDate - todayMid) / (24*3600*1000));
+      if (diff <= 7 && r.pct < 80) kpi.overdue++;
+    }
+  });
+  if (rows.length > 0) kpi.avgPct = Math.round(sumPct / rows.length);
+
+  var periodHtml = '<div class="cmg-period-row"><span style="font-size:12px;color:#6B7280;font-weight:700;margin-right:4px">기간:</span>'
+    + '<button class="cmg-period-btn ' + (period==='all'?'active':'') + '" onclick="cmgSetPeriod(\'all\')">전체</button>'
+    + '<button class="cmg-period-btn ' + (period==='day'?'active':'') + '" onclick="cmgSetPeriod(\'day\')">오늘</button>'
+    + '<button class="cmg-period-btn ' + (period==='week'?'active':'') + '" onclick="cmgSetPeriod(\'week\')">최근 7일</button>'
+    + '<button class="cmg-period-btn ' + (period==='month'?'active':'') + '" onclick="cmgSetPeriod(\'month\')">최근 1개월</button>'
+    + '</div>';
+
+  var kpiHtml = '<div class="cmg-kpi-row">'
+    + '<div class="cmg-kpi"><div class="cmg-kpi-label">전체 계약자</div><div class="cmg-kpi-val">' + kpi.total + '</div><div class="cmg-kpi-sub">선택 기간 기준</div></div>'
+    + '<div class="cmg-kpi"><div class="cmg-kpi-label">진척 완료</div><div class="cmg-kpi-val" style="color:#16A34A">' + kpi.completed + '</div><div class="cmg-kpi-sub">5개 모두 체크</div></div>'
+    + '<div class="cmg-kpi"><div class="cmg-kpi-label">진행 중</div><div class="cmg-kpi-val" style="color:#F59E0B">' + kpi.pending + '</div><div class="cmg-kpi-sub">미완 항목 있음</div></div>'
+    + '<div class="cmg-kpi"><div class="cmg-kpi-label">긴급 대응</div><div class="cmg-kpi-val" style="color:#DC2626">' + kpi.overdue + '</div><div class="cmg-kpi-sub">D-7 + 진척 &lt; 80%</div></div>'
+    + '<div class="cmg-kpi"><div class="cmg-kpi-label">평균 진척률</div><div class="cmg-kpi-val">' + kpi.avgPct + '%</div><div class="cmg-kpi-sub">전체 평균</div></div>'
+    + '</div>';
+
+  var rowsHtml;
+  if (rows.length === 0) {
+    rowsHtml = '<div class="cmg-empty">해당 기간의 계약자 데이터가 없습니다.</div>';
+  } else {
+    rowsHtml = '<div style="overflow-x:auto"><table class="cmg-tbl">'
+      + '<thead><tr>'
+      + '<th>No</th><th>계약번호</th><th>계약자</th><th>연락처</th><th>시작일</th><th>계약상태</th>'
+      + '<th style="text-align:center">홈버튼</th><th style="text-align:center">전자계약</th>'
+      + '<th style="text-align:center">수수료</th><th style="text-align:center">서명</th>'
+      + '<th style="text-align:center">NAS</th><th>진척률</th>'
+      + '</tr></thead><tbody>'
+      + rows.map(function(r, i){
+          var chk = function(b){ return b ? '<span class="cmg-chk-yes">✓</span>' : '<span class="cmg-chk-no">·</span>'; };
+          var color = cmgPctColor(r.pct);
+          var dDay = r.startDate ? Math.floor((r.startDate - todayMid)/(24*3600*1000)) : null;
+          var rowStyle = (dDay !== null && dDay <= 7 && r.pct < 80) ? 'background:#FEF2F2' : '';
+          return '<tr style="' + rowStyle + '" onclick="crNavFromView(\'' + r.cno + '\',\'contractMgmt\')">'
+            + '<td style="color:#8A9AB5;font-size:11px">' + (i+1) + '</td>'
+            + '<td><b style="color:#7C3AED">' + r.cno + '</b></td>'
+            + '<td><b>' + (r.name||'—') + '</b></td>'
+            + '<td style="font-size:11px;color:#6B7280">' + (r.tel||'—') + '</td>'
+            + '<td style="font-size:11px;color:#6B7280">' + cmgFmtDate(r.startDate) + (dDay !== null && dDay <= 7 && r.pct < 80 ? ' <span style="color:#DC2626;font-size:10px;font-weight:700">D' + (dDay >= 0 ? '-'+dDay : '+'+Math.abs(dDay)) + '</span>' : '') + '</td>'
+            + '<td style="font-size:11px;color:#6B7280">' + (r.contractStatus||'—') + '</td>'
+            + '<td style="text-align:center">' + chk(r.checks[0]) + '</td>'
+            + '<td style="text-align:center">' + chk(r.checks[1]) + '</td>'
+            + '<td style="text-align:center">' + chk(r.checks[2]) + '</td>'
+            + '<td style="text-align:center">' + chk(r.checks[3]) + '</td>'
+            + '<td style="text-align:center">' + chk(r.checks[4]) + '</td>'
+            + '<td><span class="cmg-pct-bar"><span class="cmg-pct-fill" style="width:' + r.pct + '%;background:' + color + '"></span></span><span style="font-weight:700;color:' + color + '">' + r.pct + '%</span></td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table></div>';
+  }
+
+  wrap.innerHTML = periodHtml + kpiHtml
+    + '<div class="cmg-card">'
+    + '<div class="cmg-card-title"><span class="dot"></span>📋 입주 전 진척 체크리스트 (홈버튼 / 전자계약 / 수수료 / 서명 / NAS)</div>'
+    + rowsHtml
+    + '</div>'
+    + '<div class="cmg-card" style="background:#FEF3C7;border-color:#FCD34D">'
+    + '<div style="font-size:12px;color:#92400E;line-height:1.7">'
+    + '<b>📌 다음 단계 (Phase 2/3 안내)</b><br>'
+    + '• Phase 2: 부동산별 계약 통계 + 중개보수료 정산 (계약↔파트너 매핑 결정 후 진행)<br>'
+    + '• Phase 3: 담당자별 KPI + 추가 추천 기능 (등급/정산/지역 등 사용자 선택)<br>'
+    + '<b>※ 결정 필요사항(7가지)을 회신하시면 다음 단계 진행합니다.</b>'
+    + '</div>'
+    + '</div>';
+}
 // ═══════════════════════════════════════════
 // ■ [v44] 갱신관리 끝
 // ═══════════════════════════════════════════
