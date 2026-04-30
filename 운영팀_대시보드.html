@@ -7562,6 +7562,23 @@ function rnwRenderCohortChart(cohorts){
 .cmg-section-meta { font-size:12px; color:#475569; margin-bottom:10px; text-align:right; padding:7px 12px; background:linear-gradient(to right, #fff 0%, #F8FAFC 100%); border-right:3px solid #7C3AED; border-radius:6px; }
 .cmg-section-meta b { color:#1F2937; font-size:12.5px; }
 .cmg-section-meta-stats b { color:#7C3AED; }
+.cmg-stat-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; justify-content:flex-end; }
+.cmg-stat-box { background:#fff; border:1.5px solid #E5E7EB; border-radius:9px; padding:8px 14px; min-width:120px; text-align:center; }
+.cmg-stat-box .sb-label { font-size:10.5px; color:#6B7280; font-weight:700; }
+.cmg-stat-box .sb-val   { font-size:18px; font-weight:800; margin-top:2px; color:#1F2937; }
+.cmg-stat-box .sb-sub   { font-size:10px; color:#9CA3AF; margin-top:1px; }
+.cmg-stat-box.sb-purple { border-color:#C4B5FD; background:linear-gradient(to bottom, #fff 0%, #F5F3FF 100%); }
+.cmg-stat-box.sb-purple .sb-val { color:#7C3AED; }
+.cmg-stat-box.sb-blue   { border-color:#93C5FD; background:linear-gradient(to bottom, #fff 0%, #EFF6FF 100%); }
+.cmg-stat-box.sb-blue   .sb-val { color:#2563EB; }
+.cmg-stat-box.sb-amber  { border-color:#FCD34D; background:linear-gradient(to bottom, #fff 0%, #FFFBEB 100%); }
+.cmg-stat-box.sb-amber  .sb-val { color:#D97706; }
+.cmg-stat-box.sb-green  { border-color:#86EFAC; background:linear-gradient(to bottom, #fff 0%, #F0FDF4 100%); }
+.cmg-stat-box.sb-green  .sb-val { color:#16A34A; }
+.cmg-stat-box.sb-red    { border-color:#FCA5A5; background:linear-gradient(to bottom, #fff 0%, #FEF2F2 100%); }
+.cmg-stat-box.sb-red    .sb-val { color:#DC2626; }
+.cmg-stat-period { font-size:11.5px; color:#475569; font-weight:700; margin-bottom:6px; text-align:right; }
+.cmg-stat-period b { color:#1F2937; }
 .cmg-itemcards { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:14px; }
 .cmg-itemcard { background:#fff; border:1.5px solid #E5E7EB; border-radius:9px; padding:10px 12px; cursor:pointer; transition:transform .12s, box-shadow .12s; }
 .cmg-itemcard:hover { transform:translateY(-1px); box-shadow:0 2px 6px rgba(0,0,0,0.08); }
@@ -8096,11 +8113,12 @@ function cmgRenderPartnerStats(){
     + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'stats\', 6)">반기</button>'
     + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'stats\', 12)">1년</button>'
     + '</div>';
-  var meta = '<div class="cmg-section-meta">'
-    + '<b>' + range.start + ' ~ ' + range.end + '</b> · 활성 파트너 <b>' + stats.length + '개</b>'
-    + ' · 총 <b>' + totalCnt + '건</b>'
-    + ' · 총 거래액 <b>' + cmgFmtMoneyKor(totalTrade) + '</b>'
-    + ' · 중개보수 합계 <b>' + cmgFmtMoney(totalBrk) + '</b>'
+  var meta = '<div class="cmg-stat-period">📅 <b>' + range.start + ' ~ ' + range.end + '</b></div>'
+    + '<div class="cmg-stat-row">'
+    + '<div class="cmg-stat-box sb-purple"><div class="sb-label">활성 파트너</div><div class="sb-val">' + stats.length + '<span style="font-size:13px;font-weight:600;color:#7C3AED">개</span></div></div>'
+    + '<div class="cmg-stat-box sb-blue"><div class="sb-label">총 계약 건수</div><div class="sb-val">' + totalCnt + '<span style="font-size:13px;font-weight:600;color:#2563EB">건</span></div></div>'
+    + '<div class="cmg-stat-box sb-amber"><div class="sb-label">총 거래액</div><div class="sb-val">' + cmgFmtMoneyKor(totalTrade) + '</div></div>'
+    + '<div class="cmg-stat-box sb-green"><div class="sb-label">중개보수 합계</div><div class="sb-val">' + cmgFmtMoney(totalBrk) + '</div></div>'
     + '</div>';
   var tableHtml;
   if (stats.length === 0) {
@@ -8333,13 +8351,13 @@ function cmgRenderPersonStats(){
       + ' <span style="font-size:11px;color:#6B7280">("전체"는 활성 담당자 ' + statsAll.length + '명 · ' + statsAll.reduce(function(s,p){return s+p.count;},0) + '건 · 중개보수 ' + cmgFmtMoney(statsAll.reduce(function(s,p){return s+p.totalBrokerage;},0)) + ')</span>'
       + '</div>';
   } else {
-    meta = '<div class="cmg-section-meta">'
-      + '<b>' + range.start + ' ~ ' + range.end + '</b>'
-      + (filter !== 'all' ? ' · <span style="color:#16A34A;font-weight:700">[' + filter + ']</span>' : '')
-      + ' · 활성 담당자 <b>' + stats.length + '명</b>'
-      + ' · 총 <b>' + totalCnt + '건</b>'
-      + ' · 중개보수 합계 <b>' + cmgFmtMoney(totalBrk) + '</b>'
-      + ' <span style="color:#9CA3AF">(vacancy BM열)</span>'
+    meta = '<div class="cmg-stat-period">📅 <b>' + range.start + ' ~ ' + range.end + '</b>'
+      + (filter !== 'all' ? ' · <span style="color:#16A34A">[' + filter + ']</span>' : '')
+      + ' <span style="color:#9CA3AF;font-weight:400">(vacancy BM열 기준)</span></div>'
+      + '<div class="cmg-stat-row">'
+      + '<div class="cmg-stat-box sb-green"><div class="sb-label">활성 담당자</div><div class="sb-val">' + stats.length + '<span style="font-size:13px;font-weight:600;color:#16A34A">명</span></div></div>'
+      + '<div class="cmg-stat-box sb-blue"><div class="sb-label">총 계약 건수</div><div class="sb-val">' + totalCnt + '<span style="font-size:13px;font-weight:600;color:#2563EB">건</span></div></div>'
+      + '<div class="cmg-stat-box sb-purple"><div class="sb-label">중개보수 합계</div><div class="sb-val">' + cmgFmtMoney(totalBrk) + '</div></div>'
       + '</div>';
   }
   var tableHtml;
@@ -8636,6 +8654,9 @@ function cmgRenderSettlementCard(){
   rows = rows.filter(function(r){ return cmgYmInRange(r.ym, rng); });
   var unpaidCnt = rows.filter(function(r){ return !window._cmgPaidMap[cmgPaidKey(r.partnerName, r.ym)]; }).length;
   var unpaidAmt = rows.reduce(function(s,r){ return window._cmgPaidMap[cmgPaidKey(r.partnerName, r.ym)] ? s : s + r.totalBrokerage; }, 0);
+  // [v99] 지급 통계 추가
+  var paidCnt = rows.length - unpaidCnt;
+  var paidAmt = rows.reduce(function(s,r){ return window._cmgPaidMap[cmgPaidKey(r.partnerName, r.ym)] ? s + r.totalBrokerage : s; }, 0);
   var rangeHtml = '<div class="cmg-period-row" style="background:#FEF2F2">'
     + '<span style="font-size:12px;color:#991B1B;font-weight:700;margin-right:4px">정산 기간:</span>'
     + '<input type="month" value="' + rng.start + '" onchange="cmgSetSettleRange(\'start\', this.value)" style="padding:4px 8px;border:1px solid #FCA5A5;border-radius:6px;font-size:12px;background:#fff">'
@@ -8650,7 +8671,7 @@ function cmgRenderSettlementCard(){
   var html = '<div class="cmg-card">'
     + '<div class="cmg-card-title"><span class="dot" style="background:#EF4444"></span>💰 정산 워크플로우 (6-2)</div>'
     + rangeHtml
-    + '<div class="cmg-section-meta"><b>' + rng.start + ' ~ ' + rng.end + '</b> · 미지급 <b style="color:#DC2626">' + unpaidCnt + '건</b> · 미지급 합계 <b style="color:#DC2626">' + cmgFmtMoney(unpaidAmt) + '</b> <span style="color:#16A34A;font-size:11px">✓ 체크 상태는 자동 저장됩니다 (이 브라우저)</span> <button onclick="cmgClearPaidMap()" style="margin-left:6px;padding:2px 8px;font-size:10.5px;border:1px solid #FCA5A5;background:#fff;color:#991B1B;border-radius:5px;cursor:pointer">전체 초기화</button></div>';
+    + '<div class="cmg-stat-period">📅 <b>' + rng.start + ' ~ ' + rng.end + '</b> <span style="color:#16A34A;font-weight:400;font-size:11px">✓ 체크 상태는 자동 저장됩니다 (이 브라우저)</span> <button onclick="cmgClearPaidMap()" style="margin-left:6px;padding:2px 8px;font-size:10.5px;border:1px solid #FCA5A5;background:#fff;color:#991B1B;border-radius:5px;cursor:pointer">전체 초기화</button></div><div class="cmg-stat-row"><div class="cmg-stat-box sb-red"><div class="sb-label">미지급 건수</div><div class="sb-val">' + unpaidCnt + '<span style="font-size:13px;font-weight:600;color:#DC2626">건</span></div></div><div class="cmg-stat-box sb-red"><div class="sb-label">미지급 합계</div><div class="sb-val">' + cmgFmtMoney(unpaidAmt) + '</div></div><div class="cmg-stat-box sb-green"><div class="sb-label">지급 건수</div><div class="sb-val">' + paidCnt + '<span style="font-size:13px;font-weight:600;color:#16A34A">건</span></div></div><div class="cmg-stat-box sb-green"><div class="sb-label">지급 합계</div><div class="sb-val">' + cmgFmtMoney(paidAmt) + '</div></div></div>';
   if (rows.length === 0) {
     html += '<div class="cmg-empty">최근 6개월 정산 대상이 없습니다.</div>';
   } else {
