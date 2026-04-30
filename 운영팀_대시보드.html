@@ -9134,6 +9134,26 @@ function renderContractMgmtView(){
     + '.sum-cfg-sep{display:inline-block;width:1px;height:14px;background:#D1D5DB;margin:0 6px}'
     + '.sum-cfg-row input[type=date]{padding:3px 6px;font-size:10.5px;border:1px solid #C7D2FE;border-radius:5px;background:#fff}'
     + '.sum-cfg-row input[type=number]{padding:3px 5px;font-size:10.5px;border:1px solid #C7D2FE;border-radius:5px;background:#fff;text-align:center}'
+    + '.sum-stat-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}'
+    + '.sum-stat-box{flex:1;min-width:130px;background:#F9FAFB;border-radius:7px;padding:8px 12px;border:1px solid #EAEEF3}'
+    + '.sum-stat-box .sb-label{font-size:10.5px;color:#6B7280;font-weight:700}'
+    + '.sum-stat-box .sb-val{font-size:18px;font-weight:800;margin-top:2px;color:#1F2937}'
+    + '.sum-stat-box .sb-unit{font-size:11px;font-weight:700;color:#6B7280;margin-left:1px}'
+    + '.sum-stat-box.sum-stat-purple{border-color:#C4B5FD;background:linear-gradient(to bottom,#fff,#F5F3FF)} .sum-stat-box.sum-stat-purple .sb-val{color:#7C3AED}'
+    + '.sum-stat-box.sum-stat-green{border-color:#86EFAC;background:linear-gradient(to bottom,#fff,#F0FDF4)} .sum-stat-box.sum-stat-green .sb-val{color:#16A34A}'
+    + '.sum-stat-box.sum-stat-blue{border-color:#93C5FD;background:linear-gradient(to bottom,#fff,#EFF6FF)} .sum-stat-box.sum-stat-blue .sb-val{color:#2563EB}'
+    + '.sum-stat-box.sum-stat-amber{border-color:#FCD34D;background:linear-gradient(to bottom,#fff,#FFFBEB)} .sum-stat-box.sum-stat-amber .sb-val{color:#D97706}'
+    + '.sum-stat-box.sum-stat-red{border-color:#FCA5A5;background:linear-gradient(to bottom,#fff,#FEF2F2)} .sum-stat-box.sum-stat-red .sb-val{color:#DC2626}'
+    + '.sum-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}'
+    + '.sum-sub-title{font-size:11.5px;font-weight:700;color:#475569;margin-bottom:5px}'
+    + '.sum-mini-insight{font-size:10.5px;color:#475569;padding:6px 9px;background:#F0FDF4;border-radius:5px;line-height:1.45;margin-top:8px}'
+    + '.cohort-tbl{width:100%;border-collapse:collapse;font-size:10.5px}'
+    + '.cohort-tbl th, .cohort-tbl td{padding:5px 7px;text-align:center;border-bottom:1px solid #F3F4F6}'
+    + '.cohort-tbl thead{background:#F9FAFB;font-weight:700;color:#475569;font-size:10px}'
+    + '.cohort-cell{display:inline-block;padding:1px 6px;border-radius:4px;font-weight:700;font-size:10px}'
+    + '.cohort-cell.cc-strong{background:#DCFCE7;color:#166534}'
+    + '.cohort-cell.cc-mid{background:#FEF3C7;color:#92400E}'
+    + '.cohort-cell.cc-weak{background:#FEE2E2;color:#991B1B}'
     ;
   document.head.appendChild(style);
 })();
@@ -9183,7 +9203,10 @@ function renderSummaryDashboard(){
 
   wrap.innerHTML = sumPeriodRow() + sumKpiBar(kpi) + sumPlaceholderSections();
   // [v103] 차트 그리기 (DOM 완성 후)
-  setTimeout(sumDrawDailyChart, 50);
+  setTimeout(function(){
+    sumDrawDailyChart();
+    if (typeof sumDrawSection2 === 'function') sumDrawSection2();
+  }, 50);
 }
 
 // [v102] 기간 토글 (디폴트 분기)
@@ -9311,7 +9334,7 @@ window._sumChartCfg = window._sumChartCfg || (function(){
     basis: 'tentative',     // 'tentative' (가계약일 BK) | 'startDate' (입주일 W)
     start: fmt(startD),
     end:   fmt(endD),
-    day1:  5                // 체크포인트: 매월 N일까지 (디폴트 5일)
+    day1:  0                // [v109] 체크포인트: 매월 N일까지 (디폴트 0 = 미사용)
   };
 })();
 
@@ -9394,7 +9417,7 @@ function sumRenderDailyCard(){
     + '</div>'
     + '<div class="sum-cfg-row">'
     +   '<span class="sum-cfg-label">체크포인트:</span>'
-    +   '매월 <input type="number" min="1" max="31" value="' + cfg.day1 + '" onchange="sumSetCfg(\'day1\',Math.max(1,Math.min(31,parseInt(this.value)||5)))" style="width:46px">일까지 누적 (월초 페이스)'
+    +   '매월 <input type="number" min="0" max="31" value="' + cfg.day1 + '" onchange="sumSetCfg(\'day1\',Math.max(0,Math.min(31,parseInt(this.value)||0)))" style="width:46px">일까지 누적 (0=미사용)'
     +   '<span class="sum-cfg-sep"></span>'
     +   '<span style="color:#6B7280;font-size:10.5px">핑크 라인 = <b style="color:#EC4899">오늘(' + todayDay + '일) 자동</b> 기준 누적</span>'
     + '</div>'
@@ -9531,12 +9554,190 @@ function sumDrawDailyChart(){
   }
 }
 
+// [v109] Section ② 거주기간 & 갱신차수 — 데이터 빌드
+function sumBuildSection2(){
+  if (!Array.isArray(vacancyRawData)) return null;
+  var bycycle = [
+    { label: '미갱신',    count: 0, totalMonths: 0 },
+    { label: '1차 갱신', count: 0, totalMonths: 0 },
+    { label: '2차 갱신', count: 0, totalMonths: 0 },
+    { label: '3차+ 갱신',count: 0, totalMonths: 0 }
+  ];
+  var atLeast = { 12: 0, 24: 0, 36: 0, 48: 0 };
+  var retention = { 0:0, 3:0, 6:0, 9:0, 12:0, 18:0, 24:0, 30:0, 36:0, 42:0, 48:0, 60:0 };
+  var totalMonths = 0, count = 0;
+  vacancyRawData.forEach(function(v){
+    var m = sumCalcResidence(v);
+    if (m == null) return;
+    count++;
+    totalMonths += m;
+    var cycleIdx = Math.min(3, Math.floor(m / 12));
+    bycycle[cycleIdx].count++;
+    bycycle[cycleIdx].totalMonths += m;
+    if (m >= 12) atLeast[12]++;
+    if (m >= 24) atLeast[24]++;
+    if (m >= 36) atLeast[36]++;
+    if (m >= 48) atLeast[48]++;
+    Object.keys(retention).forEach(function(mk){ if (m >= +mk) retention[mk]++; });
+  });
+  return {
+    count: count,
+    avgMonths:    count > 0 ? Math.round((totalMonths / count) * 10) / 10 : 0,
+    bycycle: bycycle,
+    atLeast: atLeast,
+    retention: retention,
+    avgUnrenewed: bycycle[0].count > 0 ? Math.round((bycycle[0].totalMonths / bycycle[0].count) * 10) / 10 : 0,
+    avgCycle3plus: bycycle[3].count > 0 ? Math.round((bycycle[3].totalMonths / bycycle[3].count) * 10) / 10 : 0,
+    retention2yr: count > 0 ? Math.round((retention[24] / count) * 100) : 0
+  };
+}
+
+// [v109] Section ② 카드 HTML
+function sumRenderSection2Card(){
+  var s = sumBuildSection2();
+  if (!s || s.count === 0) {
+    return '<div class="sum-card-title"><span class="dot" style="background:#7C3AED"></span>② 거주기간 & 갱신차수 <span class="badge sum-badge-core">CORE LTV</span></div>'
+      + '<div class="sum-empty">📡 vacancy 데이터 로딩 중...</div>';
+  }
+  // 갱신 funnel 전환율
+  var conv12_24 = s.atLeast[12] > 0 ? Math.round((s.atLeast[24] / s.atLeast[12]) * 100) : 0;
+  var conv24_36 = s.atLeast[24] > 0 ? Math.round((s.atLeast[36] / s.atLeast[24]) * 100) : 0;
+  var conv36_48 = s.atLeast[36] > 0 ? Math.round((s.atLeast[48] / s.atLeast[36]) * 100) : 0;
+  var cell = function(p){
+    var cls = p >= 75 ? 'cc-strong' : (p >= 50 ? 'cc-mid' : 'cc-weak');
+    return '<span class="cohort-cell ' + cls + '">' + p + '%</span>';
+  };
+  var html = ''
+    + '<div class="sum-card-title"><span class="dot" style="background:#7C3AED"></span>② 거주기간 & 갱신차수 <span class="badge sum-badge-core">CORE LTV</span></div>'
+    + '<div class="sum-stat-row">'
+    +   '<div class="sum-stat-box sum-stat-purple"><div class="sb-label">평균 거주기간</div><div class="sb-val">' + s.avgMonths + '<span class="sb-unit">개월</span></div></div>'
+    +   '<div class="sum-stat-box sum-stat-green"><div class="sb-label">2년 잔존율</div><div class="sb-val">' + s.retention2yr + '<span class="sb-unit">%</span></div></div>'
+    +   '<div class="sum-stat-box sum-stat-blue"><div class="sb-label">3차+ 갱신자 평균</div><div class="sb-val">' + s.avgCycle3plus + '<span class="sb-unit">개월</span></div></div>'
+    +   '<div class="sum-stat-box sum-stat-amber"><div class="sb-label">미갱신 평균</div><div class="sb-val">' + s.avgUnrenewed + '<span class="sb-unit">개월</span></div></div>'
+    + '</div>'
+    + '<div class="sum-grid-2">'
+    +   '<div>'
+    +     '<div class="sum-sub-title">갱신차수별 평균 거주기간 (' + s.count + '명 분석)</div>'
+    +     '<div style="position:relative;height:180px"><canvas id="sumS2_byCycle"></canvas></div>'
+    +     '<div style="font-size:10.5px;color:#6B7280;margin-top:6px">'
+    +       '미갱신 ' + s.bycycle[0].count + '명 · 1차 ' + s.bycycle[1].count + '명 · 2차 ' + s.bycycle[2].count + '명 · 3차+ ' + s.bycycle[3].count + '명'
+    +     '</div>'
+    +   '</div>'
+    +   '<div>'
+    +     '<div class="sum-sub-title">차수별 갱신 funnel</div>'
+    +     '<table class="cohort-tbl">'
+    +       '<thead><tr><th>전환</th><th>대상</th><th>갱신</th><th>전환율</th></tr></thead>'
+    +       '<tbody>'
+    +         '<tr><td><b>1차→2차</b></td><td>' + s.atLeast[12] + '</td><td>' + s.atLeast[24] + '</td><td>' + cell(conv12_24) + '</td></tr>'
+    +         '<tr><td><b>2차→3차</b></td><td>' + s.atLeast[24] + '</td><td>' + s.atLeast[36] + '</td><td>' + cell(conv24_36) + '</td></tr>'
+    +         '<tr><td><b>3차→4차+</b></td><td>' + s.atLeast[36] + '</td><td>' + s.atLeast[48] + '</td><td>' + cell(conv36_48) + '</td></tr>'
+    +       '</tbody>'
+    +     '</table>'
+    +     '<div class="sum-mini-insight">💡 1차 갱신 유도 = LTV 핵심 (충성도 급상승 구간)</div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="sum-sub-title" style="margin-top:14px">입주 후 N개월차 잔존율 (코호트)</div>'
+    + '<div style="position:relative;height:160px"><canvas id="sumS2_retention"></canvas></div>';
+  return html;
+}
+
+// [v109] Section ② 차트 그리기
+function sumDrawSection2(){
+  if (typeof Chart === 'undefined') return;
+  var s = sumBuildSection2();
+  if (!s || s.count === 0) return;
+
+  // 차수별 평균 거주기간 막대
+  var c1 = document.getElementById('sumS2_byCycle');
+  if (c1) {
+    if (window._sumS2C1) try { window._sumS2C1.destroy(); } catch(e){}
+    var avgs = s.bycycle.map(function(b){ return b.count > 0 ? Math.round((b.totalMonths / b.count) * 10) / 10 : 0; });
+    window._sumS2C1 = new Chart(c1, {
+      type: 'bar',
+      data: {
+        labels: s.bycycle.map(function(b){ return b.label; }),
+        datasets: [{
+          data: avgs,
+          backgroundColor: ['#FCA5A5','#FCD34D','#86EFAC','#A78BFA'],
+          borderRadius: 5
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c){ return c.parsed.y + '개월 (' + s.bycycle[c.dataIndex].count + '명)'; } } }
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { callback: function(v){ return v + '개월'; }, font: { size: 10 } } },
+          x: { ticks: { font: { size: 10.5 } }, grid: { display: false } }
+        }
+      },
+      plugins: [{
+        id: 'sumS2C1Labels',
+        afterDatasetsDraw: function(ch){
+          var ctx = ch.ctx;
+          ch.getDatasetMeta(0).data.forEach(function(point, idx){
+            var v = avgs[idx];
+            if (v == null) return;
+            ctx.save();
+            ctx.fillStyle = '#1F2937';
+            ctx.font = 'bold 11px Pretendard, "Malgun Gothic", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(v + '개월', point.x, point.y - 4);
+            ctx.restore();
+          });
+        }
+      }]
+    });
+  }
+
+  // 잔존율 코호트
+  var c2 = document.getElementById('sumS2_retention');
+  if (c2) {
+    if (window._sumS2C2) try { window._sumS2C2.destroy(); } catch(e){}
+    var marks = [0, 3, 6, 9, 12, 18, 24, 30, 36, 42, 48, 60];
+    var pcts = marks.map(function(mk){ return s.count > 0 ? Math.round((s.retention[mk] / s.count) * 1000) / 10 : 0; });
+    window._sumS2C2 = new Chart(c2, {
+      type: 'line',
+      data: {
+        labels: marks.map(function(m){ return m + '개월'; }),
+        datasets: [{
+          label: '잔존율',
+          data: pcts,
+          borderColor: '#7C3AED',
+          backgroundColor: 'rgba(124,58,237,0.12)',
+          tension: 0.3,
+          fill: true,
+          pointRadius: 3,
+          pointBackgroundColor: '#7C3AED',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1.5,
+          borderWidth: 2.5
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c){ return c.parsed.y + '% (' + s.retention[marks[c.dataIndex]] + '명)'; } } }
+        },
+        scales: {
+          y: { beginAtZero: true, max: 100, ticks: { callback: function(v){ return v + '%'; }, font: { size: 10 } } },
+          x: { ticks: { font: { size: 10 } }, grid: { display: false }, title: { display: true, text: '입주 후 개월', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+}
+
 // [v102] 섹션 placeholder (v103-v105에서 채워짐)
 function sumPlaceholderSections(){
   return '<div class="sum-main-grid">'
     + '<div class="sum-col-stack">'
     +   '<div class="sum-card sum-section-1">' + sumRenderDailyCard() + '</div>'
-    +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#7C3AED"></span>② 거주기간 & 갱신차수 <span class="badge sum-badge-core">CORE LTV</span></div><div class="sum-empty">v104에서 추가 예정 — 갱신차수별 평균 거주기간 + funnel + 잔존율</div></div>'
+    +   '<div class="sum-card sum-section-2">' + sumRenderSection2Card() + '</div>'
     +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#DC2626"></span>③ 초기 연체자 신속 대응 <span class="badge sum-badge-risk">EARLY DETECTION</span></div><div class="sum-empty">v105에서 추가 예정 — 입주 후 N개월차 첫 연체 + 회복 funnel + 신규 연체 리스트</div></div>'
     +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#F59E0B"></span>④ 분할 서비스 수수료 누적 추이 <span class="badge sum-badge-revenue">REVENUE</span></div><div class="sum-empty">v105에서 추가 예정 — 24개월 누적 입금 + 분할 vs 일시불 비율</div></div>'
     + '</div>'
