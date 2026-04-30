@@ -1816,6 +1816,8 @@ function parseVacancySheet(resp) {
   const origDeliveredIdx= 85; // CH열 = 원본도착 (TRUE/FALSE)
   // [v85] 시작일 (W열 = idx 22) — 진척 체크리스트/통계의 출력 기준
   const startDateIdx    = 22;
+  // [v86] 가계약일 (BK열 = idx 62)
+  const tentativeDateIdx= 62;
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -1864,7 +1866,9 @@ function parseVacancySheet(resp) {
       contractKind:  cell(contractKindIdx),  // K열: 계약종류
       origDelivered: (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[origDeliveredIdx] && (c[origDeliveredIdx].v != null ? c[origDeliveredIdx].v : c[origDeliveredIdx].f)),
       // [v85] 시작일 (W열) — 진척/통계의 출력 기준
-      startDate:     cell(startDateIdx)
+      startDate:     cell(startDateIdx),
+      // [v86] 가계약일 (BK열)
+      tentativeDate: cell(tentativeDateIdx)
     };
   }).filter(Boolean);
 }
@@ -7702,14 +7706,18 @@ function cmgFindPartner(name){
   return partnerRawData.find(function(p){ return p.shortName === n || p.fullName === n; }) || null;
 }
 
-// [v77] 시작일 파싱
+// [v77/v86] 시작일 파싱 — 공백 포함 포맷도 처리
 function cmgParseStartDate(raw){
-  if (!raw) return null;
-  var s = String(raw);
-  var m1 = s.match(/Date\((\d+),(\d+),(\d+)/);
+  if (raw == null || raw === '') return null;
+  var s = String(raw).trim();
+  if (!s || s === '-') return null;
+  // Date(YYYY,M,D,...) — Google Sheets gviz raw
+  var m1 = s.match(/Date\((\d+),\s*(\d+),\s*(\d+)/);
   if (m1) return new Date(+m1[1], +m1[2], +m1[3]);
-  var m2 = s.match(/(\d{4})[\.\-\/]+(\d{1,2})[\.\-\/]+(\d{1,2})/);
+  // YYYY.MM.DD / YYYY-MM-DD / YYYY/MM/DD / "2026. 04. 28."
+  var m2 = s.match(/(\d{4})[\s.\-\/]+(\d{1,2})[\s.\-\/]+(\d{1,2})/);
   if (m2) return new Date(+m2[1], +m2[2]-1, +m2[3]);
+  // YYYY-MM-DD ISO
   var d = new Date(s);
   return isNaN(d) ? null : d;
 }
@@ -8606,7 +8614,9 @@ function cmgBuildProgress(){
       cno: cno,
       name: v.tenant1Name || v.tenantName || '',
       tel: v.tenantPhone || '',
+      contractInfo: v.contractInfo || '', // [v86] O열 계약정보
       startDate: startDate,
+      tentativeDate: v.tentativeDate || '', // [v86] BK열 가계약일
       contractStatus: c ? (c['계약상태']||'') : '',
       checks: checks,
       trueCnt: trueCnt,
@@ -8699,7 +8709,9 @@ function renderContractMgmtView(){
   } else {
     rowsHtml = '<div style="overflow-x:auto"><table class="cmg-tbl">'
       + '<thead><tr>'
-      + '<th>No</th><th>계약번호</th><th>계약자</th><th>연락처</th><th>시작일</th><th>계약상태</th>'
+      + '<th>No</th><th>계약번호</th><th>계약자</th><th>연락처</th>'
+      + '<th>계약정보</th><th>시작일</th><th>가계약일</th>'
+      + '<th>계약상태</th>'
       + '<th style="text-align:center">홈버튼</th><th style="text-align:center">전자계약</th>'
       + '<th style="text-align:center">수수료</th><th style="text-align:center">서명</th>'
       + '<th style="text-align:center">NAS</th><th>진척률</th>'
@@ -8714,7 +8726,9 @@ function renderContractMgmtView(){
             + '<td><b style="color:#7C3AED">' + r.cno + '</b></td>'
             + '<td><b>' + (r.name||'—') + '</b></td>'
             + '<td style="font-size:11px;color:#6B7280">' + (r.tel||'—') + '</td>'
+            + '<td style="font-size:11px;color:#6B7280">' + (r.contractInfo||'—') + '</td>'
             + '<td style="font-size:11px;color:#6B7280">' + cmgFmtDate(r.startDate) + (dDay !== null && dDay <= 7 && r.pct < 80 ? ' <span style="color:#DC2626;font-size:10px;font-weight:700">D' + (dDay >= 0 ? '-'+dDay : '+'+Math.abs(dDay)) + '</span>' : '') + '</td>'
+            + '<td style="font-size:11px;color:#6B7280">' + (r.tentativeDate||'—') + '</td>'
             + '<td style="font-size:11px;color:#6B7280">' + (r.contractStatus||'—') + '</td>'
             + '<td style="text-align:center">' + chk(r.checks[0]) + '</td>'
             + '<td style="text-align:center">' + chk(r.checks[1]) + '</td>'
