@@ -9154,6 +9154,26 @@ function renderContractMgmtView(){
     + '.cohort-cell.cc-strong{background:#DCFCE7;color:#166534}'
     + '.cohort-cell.cc-mid{background:#FEF3C7;color:#92400E}'
     + '.cohort-cell.cc-weak{background:#FEE2E2;color:#991B1B}'
+    + '.sum-grid-2-wide{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-top:6px}'
+    + '.sum-newdelq-list{display:flex;flex-direction:column;gap:4px;max-height:140px;overflow-y:auto}'
+    + '.sum-newdelq-item{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 9px;background:#FEF2F2;border-radius:5px;font-size:11px}'
+    + '.sum-newdelq-item .dq-name{flex:1;font-weight:700;color:#1F2937}'
+    + '.sum-newdelq-item .dq-amt{font-weight:700;color:#DC2626}'
+    + '.sum-alert-list{display:flex;flex-direction:column;gap:5px}'
+    + '.sum-alert{display:flex;align-items:center;padding:7px 10px;border-radius:7px;border-left:3px solid;cursor:pointer}'
+    + '.sum-alert:hover{background:rgba(0,0,0,0.02)}'
+    + '.sum-alert.urgent{background:#FEF2F2;border-color:#DC2626}'
+    + '.sum-alert.warn{background:#FEF3C7;border-color:#F59E0B}'
+    + '.sum-alert.info{background:#EFF6FF;border-color:#3B82F6}'
+    + '.sum-alert .alert-text{flex:1;font-size:10.5px;font-weight:700;color:#1F2937;line-height:1.3}'
+    + '.sum-alert .alert-text small{display:block;font-size:9.5px;color:#6B7280;font-weight:500;margin-top:1px}'
+    + '.sum-alert .alert-cnt{font-size:15px;font-weight:800;color:#DC2626;margin-right:7px;min-width:26px;text-align:right}'
+    + '.sum-alert.warn .alert-cnt{color:#D97706}'
+    + '.sum-alert.info .alert-cnt{color:#2563EB}'
+    + '.sum-fin-row{display:flex;justify-content:space-between;padding:5px 0;font-size:11.5px;border-bottom:1px solid #F3F4F6}'
+    + '.sum-fin-row:last-child{border-bottom:0}'
+    + '.sum-tp-item{display:flex;justify-content:space-between;padding:5px 0;font-size:11px;border-bottom:1px solid #F3F4F6}'
+    + '.sum-tp-item:last-child{border-bottom:0}'
     ;
   document.head.appendChild(style);
 })();
@@ -9202,10 +9222,12 @@ function renderSummaryDashboard(){
   var kpi = sumCalcKpi();
 
   wrap.innerHTML = sumPeriodRow() + sumKpiBar(kpi) + sumPlaceholderSections();
-  // [v103] 차트 그리기 (DOM 완성 후)
+  // [v103/v109/v110] 차트 그리기 (DOM 완성 후)
   setTimeout(function(){
     sumDrawDailyChart();
     if (typeof sumDrawSection2 === 'function') sumDrawSection2();
+    if (typeof sumDrawSection3 === 'function') sumDrawSection3();
+    if (typeof sumDrawSection4 === 'function') sumDrawSection4();
   }, 50);
 }
 
@@ -9732,18 +9754,398 @@ function sumDrawSection2(){
   }
 }
 
+// =================================================================
+// [v110] Section ③ 초기 연체자 신속 대응
+// =================================================================
+function sumBuildSection3(){
+  if (!Array.isArray(vacancyRawData)) return null;
+  var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
+  var today = new Date(); today.setHours(0,0,0,0);
+  var thisYM = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0');
+
+  // 활성 계약 중 거주개월 1~12 그룹
+  var earlyCnt = 0, earlyDelqCnt = 0;
+  var firstDelqByMonth = { '0': 0, '1': 0, '2': 0, '3': 0, '4': 0 }; // ~1m, 1~3m, 3~6m, 6~12m, 12m+
+  // 신규 연체 리스트 (이번달 청구 + 연체상태)
+  var newDelqList = [];
+  var unpaidByAge = { '30': 0, '60': 0, '90': 0 }; // 1~30, 31~60, 61~90, 90+
+
+  // 계약번호 → 가장 빠른 연체 청구년월
+  var earliestDelqByCno = {};
+  if (Array.isArray(paymentRawData)) {
+    paymentRawData.forEach(function(p){
+      var st = String(p['납부상태']||'').trim();
+      if (st.indexOf('연체') < 0 && st.indexOf('분납') < 0) return;
+      var cno = String(p['계약번호']||'').trim();
+      if (!cno) return;
+      var ym = String(p['청구년월']||'').trim();
+      if (!earliestDelqByCno[cno] || ym < earliestDelqByCno[cno]) earliestDelqByCno[cno] = ym;
+    });
+  }
+
+  vacancyRawData.forEach(function(v){
+    var months = sumCalcResidence(v);
+    if (months == null) return;
+    if (months <= 12) earlyCnt++;
+    var cno = String(v.no||'').trim();
+    var firstDelq = earliestDelqByCno[cno];
+    if (firstDelq) {
+      // 첫 연체까지 개월수
+      var sd = cmgParseStartDate(v.startDate);
+      var fdM = firstDelq.match(/(\d{4})[\.\-]?(\d{1,2})/);
+      if (sd && fdM) {
+        var fdDate = new Date(+fdM[1], +fdM[2]-1, 1);
+        var monthsUntilDelq = (fdDate.getFullYear() - sd.getFullYear()) * 12 + (fdDate.getMonth() - sd.getMonth());
+        var bucket = '4';
+        if (monthsUntilDelq <= 1) bucket = '0';
+        else if (monthsUntilDelq <= 3) bucket = '1';
+        else if (monthsUntilDelq <= 6) bucket = '2';
+        else if (monthsUntilDelq <= 12) bucket = '3';
+        firstDelqByMonth[bucket]++;
+        if (months <= 3 && monthsUntilDelq <= 3) earlyDelqCnt++;
+      }
+    }
+  });
+
+  // 신규 연체 + 연체 일수 분포 (paymentRawData 기반)
+  if (Array.isArray(paymentRawData)) {
+    paymentRawData.forEach(function(p){
+      var st = String(p['납부상태']||'').trim();
+      if (st.indexOf('연체') < 0 && st.indexOf('분납') < 0) return;
+      var ym = String(p['청구년월']||'').trim();
+      var amt = parseAmt(p['미수금']) || parseAmt(p['미수액']) || parseAmt(p['청구액']);
+      // 신규 연체 (이번달 청구분)
+      if (ym.indexOf(thisYM.replace('-','')) >= 0 || ym.indexOf(thisYM) >= 0) {
+        var cno = String(p['계약번호']||'').trim();
+        var v = vacancyRawData.find(function(x){ return String(x.no||'').trim() === cno; });
+        var name = v ? (v.tenantName || v.tenant1Name || cno) : cno;
+        if (newDelqList.length < 5) newDelqList.push({ cno: cno, name: name, amt: amt });
+      }
+      // 연체 경과 일수 = today - 청구일(청구년월의 1일 가정)
+      var ymM = ym.match(/(\d{4})[\.\-]?(\d{1,2})/);
+      if (ymM) {
+        var billDate = new Date(+ymM[1], +ymM[2]-1, 1);
+        var ageDays = Math.floor((today - billDate) / 86400000);
+        if (ageDays > 90) unpaidByAge['90']++;
+        else if (ageDays > 60) unpaidByAge['60']++;
+        else if (ageDays > 30) unpaidByAge['30']++;
+      }
+    });
+  }
+
+  return {
+    earlyDelqRate: earlyCnt > 0 ? Math.round((earlyDelqCnt / earlyCnt) * 1000) / 10 : 0,
+    earlyCnt: earlyCnt, earlyDelqCnt: earlyDelqCnt,
+    newDelqCnt: newDelqList.length,
+    newDelqList: newDelqList,
+    over90Cnt: unpaidByAge['90'],
+    firstDelqByMonth: firstDelqByMonth,
+    unpaidByAge: unpaidByAge
+  };
+}
+
+function sumRenderSection3Card(){
+  var s = sumBuildSection3();
+  if (!s) return '<div class="sum-card-title"><span class="dot" style="background:#DC2626"></span>③ 초기 연체자 신속 대응 <span class="badge sum-badge-risk">EARLY DETECTION</span></div><div class="sum-empty">데이터 로딩 중...</div>';
+  var listHtml = s.newDelqList.length === 0
+    ? '<div style="font-size:11px;color:#9CA3AF;padding:10px;text-align:center">이번달 신규 연체 없음 ✓</div>'
+    : s.newDelqList.map(function(d){
+        return '<div class="sum-newdelq-item">'
+          + '<div class="dq-name"><b>' + (d.name||'-') + '</b> <small style="color:#6B7280">(' + d.cno + ')</small></div>'
+          + '<div class="dq-amt">₩' + (Math.round(d.amt)).toLocaleString() + '</div>'
+          + '</div>';
+      }).join('');
+  return ''
+    + '<div class="sum-card-title"><span class="dot" style="background:#DC2626"></span>③ 초기 연체자 신속 대응 <span class="badge sum-badge-risk">EARLY DETECTION</span></div>'
+    + '<div class="sum-stat-row">'
+    +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">조기 연체율 (1~3m)</div><div class="sb-val">' + s.earlyDelqRate + '<span class="sb-unit">%</span></div></div>'
+    +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">신규 연체 (이번달)</div><div class="sb-val">' + s.newDelqCnt + '<span class="sb-unit">건</span></div></div>'
+    +   '<div class="sum-stat-box sum-stat-amber"><div class="sb-label">31~60일 미수</div><div class="sb-val">' + s.unpaidByAge['60'] + '<span class="sb-unit">건</span></div></div>'
+    +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">90일+ 미수</div><div class="sb-val">' + s.over90Cnt + '<span class="sb-unit">건</span></div></div>'
+    + '</div>'
+    + '<div class="sum-grid-2">'
+    +   '<div>'
+    +     '<div class="sum-sub-title">📍 입주 후 N개월차 첫 연체 분포</div>'
+    +     '<div style="position:relative;height:180px"><canvas id="sumS3_firstDelq"></canvas></div>'
+    +   '</div>'
+    +   '<div>'
+    +     '<div class="sum-sub-title">🆕 이번달 신규 연체 (Top 5)</div>'
+    +     '<div class="sum-newdelq-list">' + listHtml + '</div>'
+    +     '<div class="sum-mini-insight" style="background:#FEF2F2;color:#991B1B">⚠️ 입주 1~3개월 연체는 품질 위험 신호 — 즉시 대응 필요</div>'
+    +   '</div>'
+    + '</div>';
+}
+
+function sumDrawSection3(){
+  if (typeof Chart === 'undefined') return;
+  var s = sumBuildSection3();
+  if (!s) return;
+  var c = document.getElementById('sumS3_firstDelq');
+  if (!c) return;
+  if (window._sumS3C1) try { window._sumS3C1.destroy(); } catch(e){}
+  var labels = ['~1m','1~3m','3~6m','6~12m','12m+'];
+  var data = [s.firstDelqByMonth['0'], s.firstDelqByMonth['1'], s.firstDelqByMonth['2'], s.firstDelqByMonth['3'], s.firstDelqByMonth['4']];
+  window._sumS3C1 = new Chart(c, {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#DC2626','#EF4444','#F59E0B','#FCD34D','#A78BFA'], borderRadius: 5 }] },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { font:{size:10} } }, x: { ticks:{font:{size:10.5}}, grid:{display:false} } }
+    },
+    plugins: [{
+      id: 'sumS3C1Lbl',
+      afterDatasetsDraw: function(ch){
+        var ctx = ch.ctx;
+        ch.getDatasetMeta(0).data.forEach(function(p, i){
+          var v = data[i]; if (!v) return;
+          ctx.save(); ctx.fillStyle='#1F2937'; ctx.font='bold 11px Pretendard,sans-serif';
+          ctx.textAlign='center'; ctx.textBaseline='bottom';
+          ctx.fillText(v + '건', p.x, p.y - 4);
+          ctx.restore();
+        });
+      }
+    }]
+  });
+}
+
+// =================================================================
+// [v110] Section ④ 분할 서비스 수수료 (REVENUE)
+// =================================================================
+function sumBuildSection4(){
+  if (!Array.isArray(vacancyRawData)) return null;
+  var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
+  var today = new Date(); today.setHours(0,0,0,0);
+  var thisYM = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0');
+
+  // 분할 vs 일시불
+  var installCnt = 0, lumpCnt = 0;
+  var totalFee = 0, installFee = 0;
+  vacancyRawData.forEach(function(v){
+    var pc = String(v.payCondition||'').trim();
+    var fee = parseAmt(v.fee);
+    totalFee += fee;
+    if (pc && pc.indexOf('일시납') < 0) {
+      installCnt++;
+      installFee += fee;
+    } else {
+      lumpCnt++;
+    }
+  });
+
+  // 24개월 누적 입금 (paymentRawData 기반 — 분할 수수료 입금만)
+  // 단순화: payment 데이터에서 정상 납부된 항목 월별 입금액 합계 (분할/일시불 구분 없이)
+  var months24 = [];
+  for (var i = 23; i >= 0; i--) {
+    var d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    var ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    months24.push({ ym: ym, label: (d.getFullYear()%100) + '.' + String(d.getMonth()+1).padStart(2,'0'), amount: 0 });
+  }
+  var idx = {}; months24.forEach(function(m, i){ idx[m.ym] = i; });
+  if (Array.isArray(paymentRawData)) {
+    paymentRawData.forEach(function(p){
+      var ym = String(p['청구년월']||'').replace(/(\d{4})\.?(\d{2})/, '$1-$2').slice(0, 7);
+      if (idx[ym] === undefined) return;
+      var paid = parseAmt(p['입금액']) || parseAmt(p['실입금액']) || 0;
+      months24[idx[ym]].amount += paid;
+    });
+  }
+
+  // 미수 잔액 (분납중 상태의 미수금 합계)
+  var unpaidBalance = 0, delayCnt = 0;
+  if (Array.isArray(paymentRawData)) {
+    paymentRawData.forEach(function(p){
+      var st = String(p['납부상태']||'').trim();
+      if (st.indexOf('분납') >= 0) {
+        unpaidBalance += parseAmt(p['미수금']) || parseAmt(p['청구액']) - parseAmt(p['입금액']);
+        // 7일 지연
+        var ym = String(p['청구년월']||'').match(/(\d{4})[\.\-]?(\d{1,2})/);
+        if (ym) {
+          var billDate = new Date(+ym[1], +ym[2]-1, 1);
+          var ageDays = Math.floor((today - billDate) / 86400000);
+          if (ageDays > 7) delayCnt++;
+        }
+      }
+    });
+  }
+
+  // 이번달 입금 (분할 + 일반)
+  var thisMonthIncome = months24.length > 0 ? months24[months24.length-1].amount : 0;
+  // 회수율 (단순 — 청구 대비 입금)
+  var totalCharged = 0, totalPaid = 0;
+  if (Array.isArray(paymentRawData)) {
+    paymentRawData.forEach(function(p){
+      totalCharged += parseAmt(p['청구액']);
+      totalPaid += parseAmt(p['입금액']);
+    });
+  }
+  var recoveryRate = totalCharged > 0 ? Math.round((totalPaid / totalCharged) * 1000) / 10 : 0;
+
+  return {
+    installCnt: installCnt, lumpCnt: lumpCnt,
+    installRatio: (installCnt + lumpCnt) > 0 ? Math.round((installCnt / (installCnt + lumpCnt)) * 100) : 0,
+    months24: months24,
+    unpaidBalance: unpaidBalance,
+    thisMonthIncome: thisMonthIncome,
+    delayCnt: delayCnt,
+    recoveryRate: recoveryRate
+  };
+}
+
+function sumRenderSection4Card(){
+  var s = sumBuildSection4();
+  if (!s) return '<div class="sum-card-title"><span class="dot" style="background:#F59E0B"></span>④ 분할 서비스 수수료 누적 추이 <span class="badge sum-badge-revenue">REVENUE</span></div><div class="sum-empty">데이터 로딩 중...</div>';
+  var fmtMoney = function(n){ n=+n||0; if (n>=1e8) return '₩'+(n/1e8).toFixed(1).replace(/\.0$/,'')+'억'; if (n>=1e4) return '₩'+Math.round(n/1e4).toLocaleString()+'만'; return '₩'+Math.round(n).toLocaleString(); };
+  return ''
+    + '<div class="sum-card-title"><span class="dot" style="background:#F59E0B"></span>④ 분할 서비스 수수료 누적 추이 <span class="badge sum-badge-revenue">REVENUE</span></div>'
+    + '<div class="sum-stat-row">'
+    +   '<div class="sum-stat-box sum-stat-amber"><div class="sb-label">미수 잔액</div><div class="sb-val">' + fmtMoney(s.unpaidBalance) + '</div></div>'
+    +   '<div class="sum-stat-box sum-stat-green"><div class="sb-label">이번달 입금</div><div class="sb-val">' + fmtMoney(s.thisMonthIncome) + '</div></div>'
+    +   '<div class="sum-stat-box sum-stat-blue"><div class="sb-label">분할 약정 활성</div><div class="sb-val">' + s.installCnt + '<span class="sb-unit">건</span></div></div>'
+    +   '<div class="sum-stat-box sum-stat-green"><div class="sb-label">회수율</div><div class="sb-val">' + s.recoveryRate + '<span class="sb-unit">%</span></div></div>'
+    +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">지연 (D+7)</div><div class="sb-val">' + s.delayCnt + '<span class="sb-unit">건</span></div></div>'
+    + '</div>'
+    + '<div class="sum-grid-2-wide">'
+    +   '<div>'
+    +     '<div class="sum-sub-title">월별 누적 입금 추이 (24개월)</div>'
+    +     '<div style="position:relative;height:200px"><canvas id="sumS4_monthly"></canvas></div>'
+    +   '</div>'
+    +   '<div>'
+    +     '<div class="sum-sub-title">분할 vs 일시불 비율</div>'
+    +     '<div style="position:relative;height:200px"><canvas id="sumS4_ratio"></canvas></div>'
+    +     '<div class="sum-mini-insight" style="background:#FFFBEB;color:#92400E">💡 분할 ' + s.installRatio + '% — 장기 수익 안정성 (분할 ' + s.installCnt + '건 / 일시 ' + s.lumpCnt + '건)</div>'
+    +   '</div>'
+    + '</div>';
+}
+
+function sumDrawSection4(){
+  if (typeof Chart === 'undefined') return;
+  var s = sumBuildSection4();
+  if (!s) return;
+  // 월별 누적 입금
+  var c1 = document.getElementById('sumS4_monthly');
+  if (c1) {
+    if (window._sumS4C1) try { window._sumS4C1.destroy(); } catch(e){}
+    var amounts = s.months24.map(function(m){ return Math.round(m.amount / 1e6); }); // 백만원 단위
+    var cumArr = [];
+    var cum = 0;
+    s.months24.forEach(function(m){ cum += m.amount; cumArr.push(Math.round(cum / 1e8 * 10) / 10); }); // 억 단위
+    window._sumS4C1 = new Chart(c1, {
+      type: 'bar',
+      data: {
+        labels: s.months24.map(function(m){ return m.label; }),
+        datasets: [
+          { type:'bar', label:'월 입금 (백만원)', data: amounts, backgroundColor:'#FCD34D', borderRadius:2, yAxisID:'y' },
+          { type:'line', label:'누적 (억원)', data: cumArr, borderColor:'#F59E0B', backgroundColor:'rgba(245,158,11,0.1)', tension:0.25, fill:true, yAxisID:'y1', pointRadius:1, borderWidth:2 }
+        ]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', align: 'end', labels: { boxWidth: 8, font: { size: 9 } } } },
+        scales: {
+          y: { position: 'left', beginAtZero: true, ticks: { font: { size: 9 } } },
+          y1: { position: 'right', beginAtZero: true, grid: { display: false }, ticks: { font: { size: 9 } } },
+          x: { ticks: { font: { size: 9 } } }
+        }
+      }
+    });
+  }
+  // 분할 vs 일시 도넛
+  var c2 = document.getElementById('sumS4_ratio');
+  if (c2) {
+    if (window._sumS4C2) try { window._sumS4C2.destroy(); } catch(e){}
+    window._sumS4C2 = new Chart(c2, {
+      type: 'doughnut',
+      data: { labels: ['분할 약정', '일시납'], datasets: [{ data: [s.installCnt, s.lumpCnt], backgroundColor: ['#F59E0B', '#86EFAC'], borderWidth: 0 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }, cutout: '55%' }
+    });
+  }
+}
+
+// =================================================================
+// [v110] Sticky Sidebar — Risk Alerts + 재무 요약 + 파트너 TOP 3
+// =================================================================
+function sumBuildSidebar(){
+  var s2 = sumBuildSection2();
+  var s3 = sumBuildSection3();
+  var s4 = sumBuildSection4();
+  var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
+  // MRR (활성 계약 월세 합)
+  var mrr = 0, aum = 0;
+  if (Array.isArray(vacancyRawData)) {
+    vacancyRawData.forEach(function(v){
+      var st = String(v.status||'').trim();
+      var isActive = !st || (st.indexOf('종료') < 0 && st.indexOf('만기') < 0 && st.indexOf('퇴실') < 0);
+      if (!isActive) return;
+      mrr += parseAmt(v.monthRent || v.rent);
+      aum += parseAmt(v.deposit);
+    });
+  }
+  // 파트너 TOP 3
+  var byPartner = {};
+  if (Array.isArray(vacancyRawData)) {
+    vacancyRawData.forEach(function(v){
+      var pn = String(v.partnerName||'').trim();
+      if (!pn) return;
+      if (!byPartner[pn]) byPartner[pn] = { name: pn, count: 0, fee: 0 };
+      byPartner[pn].count++;
+      var dep = parseAmt(v.deposit), rent = parseAmt(v.monthRent || v.rent);
+      if (typeof calcBrokerage === 'function') byPartner[pn].fee += calcBrokerage(dep, rent, v.housingType);
+    });
+  }
+  var partnerTop3 = Object.values(byPartner).sort(function(a,b){ return b.fee - a.fee; }).slice(0, 3);
+  // Risk Alerts
+  var alerts = {
+    newDelq: s3 ? s3.newDelqCnt : 0,
+    earlyDelq: s3 ? s3.earlyDelqCnt : 0,
+    over90: s3 ? s3.over90Cnt : 0,
+    delay: s4 ? s4.delayCnt : 0
+  };
+  return { mrr: mrr, aum: aum, partnerTop3: partnerTop3, alerts: alerts };
+}
+
+function sumRenderSidebar(){
+  var s = sumBuildSidebar();
+  var fmtMoney = function(n){ n=+n||0; if (n>=1e8) return '₩'+(n/1e8).toFixed(1).replace(/\.0$/,'')+'억'; if (n>=1e4) return '₩'+Math.round(n/1e4).toLocaleString()+'만'; return '₩'+Math.round(n).toLocaleString(); };
+  var partnerHtml = s.partnerTop3.length === 0
+    ? '<div style="color:#9CA3AF;font-size:11px;padding:6px 0">데이터 없음</div>'
+    : s.partnerTop3.map(function(p, i){
+        return '<div class="sum-tp-item">'
+          + '<span><b>' + (i+1) + '. ' + p.name + '</b> <small style="color:#6B7280">(' + p.count + '건)</small></span>'
+          + '<b style="color:#7C3AED">' + fmtMoney(p.fee) + '</b>'
+          + '</div>';
+      }).join('');
+  return ''
+    + '<div class="sum-card">'
+    +   '<div class="sum-card-title"><span class="dot" style="background:#DC2626"></span>⚠️ Risk Alerts <span class="badge sum-badge-risk">행동</span></div>'
+    +   '<div class="sum-alert-list">'
+    +     '<div class="sum-alert urgent"><div class="alert-cnt">' + s.alerts.newDelq + '</div><div class="alert-text">🔴 이번달 신규 연체<small>즉시 1차 안내</small></div></div>'
+    +     '<div class="sum-alert urgent"><div class="alert-cnt">' + s.alerts.earlyDelq + '</div><div class="alert-text">🔴 조기 연체 (1~3개월)<small>품질 위험 점검</small></div></div>'
+    +     '<div class="sum-alert urgent"><div class="alert-cnt">' + s.alerts.over90 + '</div><div class="alert-text">연체 90일 초과<small>내용증명 검토</small></div></div>'
+    +     '<div class="sum-alert warn"><div class="alert-cnt">' + s.alerts.delay + '</div><div class="alert-text">분할 수수료 D+7 지연<small>회수 액션</small></div></div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="sum-card">'
+    +   '<div class="sum-card-title"><span class="dot" style="background:#0891B2"></span>💵 재무 요약</div>'
+    +   '<div class="sum-fin-row"><span style="color:#6B7280">MRR (월 임대료)</span><b style="color:#2563EB">' + fmtMoney(s.mrr) + '</b></div>'
+    +   '<div class="sum-fin-row"><span style="color:#6B7280">AUM (보증금 총액)</span><b style="color:#F59E0B">' + fmtMoney(s.aum) + '</b></div>'
+    + '</div>'
+    + '<div class="sum-card">'
+    +   '<div class="sum-card-title"><span class="dot" style="background:#8B5CF6"></span>🏆 파트너 TOP 3</div>'
+    +   partnerHtml
+    + '</div>';
+}
+
 // [v102] 섹션 placeholder (v103-v105에서 채워짐)
 function sumPlaceholderSections(){
   return '<div class="sum-main-grid">'
     + '<div class="sum-col-stack">'
     +   '<div class="sum-card sum-section-1">' + sumRenderDailyCard() + '</div>'
     +   '<div class="sum-card sum-section-2">' + sumRenderSection2Card() + '</div>'
-    +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#DC2626"></span>③ 초기 연체자 신속 대응 <span class="badge sum-badge-risk">EARLY DETECTION</span></div><div class="sum-empty">v105에서 추가 예정 — 입주 후 N개월차 첫 연체 + 회복 funnel + 신규 연체 리스트</div></div>'
-    +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#F59E0B"></span>④ 분할 서비스 수수료 누적 추이 <span class="badge sum-badge-revenue">REVENUE</span></div><div class="sum-empty">v105에서 추가 예정 — 24개월 누적 입금 + 분할 vs 일시불 비율</div></div>'
+    +   '<div class="sum-card sum-section-3">' + sumRenderSection3Card() + '</div>'
+    +   '<div class="sum-card sum-section-4">' + sumRenderSection4Card() + '</div>'
     + '</div>'
-    + '<div class="sum-sticky">'
-    +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#DC2626"></span>⚠️ Risk Alerts</div><div class="sum-empty" style="padding:24px 0">v105에서 추가</div></div>'
-    + '</div>'
+    + '<div class="sum-sticky">' + sumRenderSidebar() + '</div>'
     + '</div>';
 }
 
