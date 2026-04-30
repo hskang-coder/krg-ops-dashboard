@@ -1814,6 +1814,8 @@ function parseVacancySheet(resp) {
   // [v81] 계약종류, 원본도착
   const contractKindIdx = 10; // K열 = 계약종류
   const origDeliveredIdx= 85; // CH열 = 원본도착 (TRUE/FALSE)
+  // [v85] 시작일 (W열 = idx 22) — 진척 체크리스트/통계의 출력 기준
+  const startDateIdx    = 22;
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -1860,7 +1862,9 @@ function parseVacancySheet(resp) {
       partnerPerson: cell(partnerPersonIdx), // BM열: 부동산 계약담당자
       // [v81]
       contractKind:  cell(contractKindIdx),  // K열: 계약종류
-      origDelivered: (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[origDeliveredIdx] && (c[origDeliveredIdx].v != null ? c[origDeliveredIdx].v : c[origDeliveredIdx].f))
+      origDelivered: (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[origDeliveredIdx] && (c[origDeliveredIdx].v != null ? c[origDeliveredIdx].v : c[origDeliveredIdx].f)),
+      // [v85] 시작일 (W열) — 진척/통계의 출력 기준
+      startDate:     cell(startDateIdx)
     };
   }).filter(Boolean);
 }
@@ -7776,7 +7780,8 @@ function cmgBuildPartnerStats(){
     if (!pn) return;
     var cno = String(v.no||'').trim();
     var c = contractMap[cno];
-    var startDate = c ? cmgParseStartDate(c['시작일']) : null;
+    // [v85] vacancy.startDate (W열) 사용
+    var startDate = cmgParseStartDate(v.startDate);
     if (!startDate) return;
     var ym = startDate.getFullYear() + '-' + String(startDate.getMonth()+1).padStart(2,'0');
     if (!cmgYmInRange(ym, range)) return; // [v80]
@@ -8091,11 +8096,9 @@ function cmgPartnerRank(partnerName){
   vacancyRawData.forEach(function(v){
     if (String(v.partnerName||'').trim() !== partnerName) return;
     cnt++;
-    var c = contractMap[String(v.no||'').trim()];
-    if (c) {
-      var sd = cmgParseStartDate(c['시작일']);
-      if (sd && sd >= sixMonthsAgo) recentCnt++;
-    }
+    // [v85] vacancy.startDate (W열) 사용
+    var sd = cmgParseStartDate(v.startDate);
+    if (sd && sd >= sixMonthsAgo) recentCnt++;
   });
   if (cnt >= 30 && recentCnt > 0) return 'A';
   if (cnt >= 10) return 'B';
@@ -8122,7 +8125,8 @@ function cmgBuildPersonStats(){
     if (!person) return;
     var cno = String(v.no||'').trim();
     var c = contractMap[cno];
-    var startDate = c ? cmgParseStartDate(c['시작일']) : null;
+    // [v85] vacancy.startDate (W열) 사용
+    var startDate = cmgParseStartDate(v.startDate);
     if (!startDate) return;
     var ym = startDate.getFullYear() + '-' + String(startDate.getMonth()+1).padStart(2,'0');
     if (!cmgYmInRange(ym, range)) return; // [v80]
@@ -8442,8 +8446,8 @@ function cmgBuildSettlement(){
     var pn = String(v.partnerName||'').trim();
     if (!pn) return;
     var c = contractMap[String(v.no||'').trim()];
-    if (!c) return;
-    var sd = cmgParseStartDate(c['시작일']);
+    // [v85] vacancy.startDate (W열) 사용 — contract 매칭 안 돼도 진행
+    var sd = cmgParseStartDate(v.startDate);
     if (!sd) return;
     var ym = sd.getFullYear() + '-' + String(sd.getMonth()+1).padStart(2,'0');
     var dep = cmgParseAmount(v.deposit);
@@ -8586,18 +8590,8 @@ function cmgBuildProgress(){
     var cno = String(v.no || '').trim();
     if (!cno) return;
     var c = contractMap[cno];
-    var startDate = null;
-    if (c && c['시작일']) {
-      try {
-        var s = String(c['시작일']);
-        var m = s.match(/Date\((\d+),(\d+),(\d+)/);
-        if (m) startDate = new Date(+m[1], +m[2], +m[3]);
-        if (!startDate) {
-          var m2 = s.match(/(\d{4})[\.\-\/]+(\d{1,2})[\.\-\/]+(\d{1,2})/);
-          if (m2) startDate = new Date(+m2[1], +m2[2]-1, +m2[3]);
-        }
-      } catch(e){}
-    }
+    // [v85] 시작일은 vacancy.startDate (W열) 사용
+    var startDate = cmgParseStartDate(v.startDate);
     // [v82] 입주일 기준 기간 필터 (시작일이 range 안에 포함)
     if (rangeStart && rangeEnd) {
       if (!startDate) return; // 시작일 없으면 제외
@@ -8619,8 +8613,8 @@ function cmgBuildProgress(){
       pct: pct
     });
   });
-  // 진척률 낮은 순 정렬
-  rows.sort(function(a,b){ return a.pct - b.pct; });
+  // [v85] 계약번호 오름차순 정렬
+  rows.sort(function(a,b){ return String(a.cno).localeCompare(String(b.cno)); });
   return rows;
 }
 
