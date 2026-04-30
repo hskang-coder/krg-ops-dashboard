@@ -7597,9 +7597,11 @@ function cmgSetPersonPartnerFilter(val){
 }
 // [v82] 진척 체크리스트 — 입주일 기준 기간 (디폴트: 1개월 후까지)
 function cmgProgDefaultRange(){
+  // [v84] 앞뒤 30일 양방향 (-30 ~ +30) — 최근 입주자 + 입주 예정자 모두 포함
   var t = new Date(); t.setHours(0,0,0,0);
-  var end = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 30);
-  return { start: cmgDateInputFmt(t), end: cmgDateInputFmt(end) };
+  var start = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 30);
+  var end   = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 30);
+  return { start: cmgDateInputFmt(start), end: cmgDateInputFmt(end) };
 }
 function cmgDateInputFmt(d){
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -7612,15 +7614,27 @@ function cmgSetProgRange(which, val){
   renderContractMgmtView();
 }
 function cmgProgQuick(kind){
+  // [v84] 양방향 윈도우 (오늘 기준 앞뒤 N일)
   var t = new Date(); t.setHours(0,0,0,0);
-  var s = cmgDateInputFmt(t);
-  var e;
+  var s, e;
+  if (kind === 'all') {
+    window._cmgProgRange = { start: '', end: '' }; // [v84] 전체: 빈 문자열로 필터 무효화
+    renderContractMgmtView();
+    return;
+  }
   switch(kind){
-    case 'today':  e = cmgDateInputFmt(t); break;
-    case '3day':   e = cmgDateInputFmt(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 3)); break;
-    case 'week':   e = cmgDateInputFmt(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 7)); break;
+    case 'today':
+      s = cmgDateInputFmt(t); e = cmgDateInputFmt(t); break;
+    case '3day':
+      s = cmgDateInputFmt(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 3));
+      e = cmgDateInputFmt(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 3)); break;
+    case 'week':
+      s = cmgDateInputFmt(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 7));
+      e = cmgDateInputFmt(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 7)); break;
     case 'month':
-    default:       e = cmgDateInputFmt(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 30)); break;
+    default:
+      s = cmgDateInputFmt(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 30));
+      e = cmgDateInputFmt(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 30)); break;
   }
   window._cmgProgRange = { start: s, end: e };
   renderContractMgmtView();
@@ -8134,10 +8148,16 @@ function cmgBuildPersonStats(){
 function cmgRenderPersonStats(){
   var statsAll = cmgBuildPersonStats();
   var range = window._cmgStatsRange || cmgRangeFromOffset(1); // [v80]
-  // [v83] 활성 파트너 목록 (현재 기간 기준, 알파벳 정렬)
-  var partnerSet = {};
-  statsAll.forEach(function(p){ if (p.partnerName) partnerSet[p.partnerName] = true; });
-  var partnerList = Object.keys(partnerSet).sort();
+  // [v84] 활성 파트너 목록 — 계약건수 내림차순 정렬
+  var partnerCount = {};
+  statsAll.forEach(function(p){
+    if (!p.partnerName) return;
+    partnerCount[p.partnerName] = (partnerCount[p.partnerName] || 0) + p.count;
+  });
+  var partnerSet = partnerCount; // 호환 유지 (truthy 체크용)
+  var partnerList = Object.keys(partnerCount).sort(function(a, b){
+    return partnerCount[b] - partnerCount[a] || a.localeCompare(b);
+  });
   // [v83] 부동산 필터 적용
   var filter = window._cmgPersonPartnerFilter || 'all';
   if (filter !== 'all' && !partnerSet[filter]) {
@@ -8156,8 +8176,10 @@ function cmgRenderPersonStats(){
     + partnerList.map(function(pn){
         var pnEsc = pn.replace(/'/g, "\\'").replace(/"/g, '&quot;');
         var checked = filter === pn;
+        var cnt = partnerCount[pn] || 0;
         return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;font-weight:' + (checked?'700':'500') + ';color:' + (checked?'#16A34A':'#374151') + '">'
           + '<input type="radio" name="cmgPersonPF" ' + (checked?'checked':'') + ' onchange="cmgSetPersonPartnerFilter(\'' + pnEsc + '\')"> ' + pn
+          + ' <span style="color:#9CA3AF;font-size:10px">(' + cnt + ')</span>'
           + '</label>';
       }).join('')
     + '</div>';
@@ -8552,9 +8574,13 @@ function cmgBuildProgress(){
   }
   if (!window._cmgProgRange) window._cmgProgRange = cmgProgDefaultRange();
   var range = window._cmgProgRange;
-  var rangeStart = new Date(range.start + 'T00:00:00');
-  var rangeEnd   = new Date(range.end   + 'T23:59:59');
-  if (isNaN(rangeStart) || isNaN(rangeEnd)) { rangeStart = null; rangeEnd = null; }
+  var rangeStart = null, rangeEnd = null;
+  // [v84] 빈 문자열 = '전체' 모드 (필터 비활성)
+  if (range.start && range.end) {
+    rangeStart = new Date(range.start + 'T00:00:00');
+    rangeEnd   = new Date(range.end   + 'T23:59:59');
+    if (isNaN(rangeStart) || isNaN(rangeEnd)) { rangeStart = null; rangeEnd = null; }
+  }
   var rows = [];
   vacancyRawData.forEach(function(v){
     var cno = String(v.no || '').trim();
@@ -8577,6 +8603,7 @@ function cmgBuildProgress(){
       if (!startDate) return; // 시작일 없으면 제외
       if (startDate < rangeStart || startDate > rangeEnd) return;
     }
+    // [v84] 전체 모드(rangeStart/End null)면 시작일 없는 것도 포함
     // 진척 데이터 없는 행 제외 (5개 모두 false면 신규 진행 가능성 — 일단 모두 표시)
     var checks = [v.homeBtn, v.eContract, v.feePaid, v.signed, v.nas];
     var trueCnt = checks.filter(function(x){ return x === true; }).length;
@@ -8658,9 +8685,10 @@ function renderContractMgmtView(){
     + '<input type="date" value="' + pr.end + '" onchange="cmgSetProgRange(\'end\', this.value)" style="padding:4px 8px;border:1px solid #C7D2FE;border-radius:6px;font-size:12px;background:#fff">'
     + '<span style="margin-left:10px;color:#9CA3AF;font-size:11px">빠른 선택:</span>'
     + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'today\')">오늘 입주</button>'
-    + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'3day\')">D-3 (3일 이내)</button>'
-    + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'week\')">1주일</button>'
-    + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'month\')">1개월</button>'
+    + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'3day\')">±3일</button>'
+    + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'week\')">±1주일</button>'
+    + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'month\')">±1개월</button>'
+    + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'all\')">전체</button>'
     + '</div>';
 
   var kpiHtml = '<div class="cmg-kpi-row">'
