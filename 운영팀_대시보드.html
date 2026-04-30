@@ -3247,7 +3247,7 @@ function selectContractRow(no) {
   // 돌아가기 버튼 표시 여부
   var btn = document.getElementById('crBackBtn');
   if (btn) {
-    var labels = { payment:'← 수납관리로 돌아가기', delinquency:'← 연체관리로 돌아가기', renewal:'← 갱신관리로 돌아가기' };
+    var labels = { payment:'← 수납관리로 돌아가기', delinquency:'← 연체관리로 돌아가기', renewal:'← 갱신관리로 돌아가기', contractMgmt:'← 계약관리로 돌아가기' };
     if (window._crPrevView && labels[window._crPrevView]) {
       btn.textContent = labels[window._crPrevView];
       btn.classList.add('visible');
@@ -7615,12 +7615,18 @@ function cmgSetProgSort(val){
   window._cmgProgSort = val;
   renderContractMgmtView();
 }
+// [v89] 진척 KPI 카드 클릭 필터 (all / completed / pending / overdue)
+window._cmgProgKpiFilter = window._cmgProgKpiFilter || 'all';
+function cmgSetProgKpiFilter(val){
+  window._cmgProgKpiFilter = (window._cmgProgKpiFilter === val) ? 'all' : val;
+  renderContractMgmtView();
+}
 // [v82] 진척 체크리스트 — 입주일 기준 기간 (디폴트: 1개월 후까지)
 function cmgProgDefaultRange(){
-  // [v84] 앞뒤 30일 양방향 (-30 ~ +30) — 최근 입주자 + 입주 예정자 모두 포함
+  // [v89] 디폴트 ±3일 양방향 (-3 ~ +3)
   var t = new Date(); t.setHours(0,0,0,0);
-  var start = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 30);
-  var end   = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 30);
+  var start = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 3);
+  var end   = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 3);
   return { start: cmgDateInputFmt(start), end: cmgDateInputFmt(end) };
 }
 function cmgDateInputFmt(d){
@@ -8690,6 +8696,21 @@ function cmgBuildProgress(){
     var filterIdx = idxMap[unchecked];
     rows = rows.filter(function(r){ return r.checks[filterIdx] === false; });
   }
+  // [v89] KPI 카드 필터 적용
+  var kpiF = window._cmgProgKpiFilter || 'all';
+  if (kpiF !== 'all') {
+    var todayMid = new Date(); todayMid.setHours(0,0,0,0);
+    rows = rows.filter(function(r){
+      if (kpiF === 'completed') return r.pct === 100;
+      if (kpiF === 'pending')   return r.pct < 100;
+      if (kpiF === 'overdue') {
+        if (!r.startDate) return false;
+        var diff = Math.floor((r.startDate - todayMid) / (24*3600*1000));
+        return diff <= 7 && r.pct < 80;
+      }
+      return true;
+    });
+  }
   // [v88] 정렬 기준
   var sortKey = window._cmgProgSort || 'cno';
   rows.sort(function(a, b){
@@ -8779,12 +8800,25 @@ function renderContractMgmtView(){
     + '<button class="cmg-period-btn" onclick="cmgProgQuick(\'all\')">전체</button>'
     + '</div>';
 
+  // [v89] KPI 카드 클릭으로 필터 토글 — 활성 시 테두리 강조
+  var kf = window._cmgProgKpiFilter || 'all';
+  var kpiCard = function(key, label, val, color, sub){
+    var active = (kf === key);
+    var border = active ? 'border:2px solid ' + (color||'#7C3AED') + ';box-shadow:0 0 0 2px rgba(124,58,237,0.15)' : '';
+    var cursor = key ? 'cursor:pointer' : '';
+    var click  = key ? 'onclick="cmgSetProgKpiFilter(\'' + key + '\')"' : '';
+    return '<div class="cmg-kpi" style="' + border + ';' + cursor + '" ' + click + '>'
+      + '<div class="cmg-kpi-label">' + label + (active ? ' <span style="color:' + (color||'#7C3AED') + ';font-size:10px">(필터 적용)</span>' : '') + '</div>'
+      + '<div class="cmg-kpi-val"' + (color ? ' style="color:' + color + '"' : '') + '>' + val + '</div>'
+      + '<div class="cmg-kpi-sub">' + sub + '</div>'
+      + '</div>';
+  };
   var kpiHtml = '<div class="cmg-kpi-row">'
-    + '<div class="cmg-kpi"><div class="cmg-kpi-label">전체 계약자</div><div class="cmg-kpi-val">' + kpi.total + '</div><div class="cmg-kpi-sub">선택 기간 기준</div></div>'
-    + '<div class="cmg-kpi"><div class="cmg-kpi-label">진척 완료</div><div class="cmg-kpi-val" style="color:#16A34A">' + kpi.completed + '</div><div class="cmg-kpi-sub">5개 모두 체크</div></div>'
-    + '<div class="cmg-kpi"><div class="cmg-kpi-label">진행 중</div><div class="cmg-kpi-val" style="color:#F59E0B">' + kpi.pending + '</div><div class="cmg-kpi-sub">미완 항목 있음</div></div>'
-    + '<div class="cmg-kpi"><div class="cmg-kpi-label">긴급 대응</div><div class="cmg-kpi-val" style="color:#DC2626">' + kpi.overdue + '</div><div class="cmg-kpi-sub">D-7 + 진척 &lt; 80%</div></div>'
-    + '<div class="cmg-kpi"><div class="cmg-kpi-label">평균 진척률</div><div class="cmg-kpi-val">' + kpi.avgPct + '%</div><div class="cmg-kpi-sub">전체 평균</div></div>'
+    + kpiCard('all',       '전체 계약자',  kpi.total,     null,      '선택 기간 기준')
+    + kpiCard('completed', '진척 완료',    kpi.completed, '#16A34A', '5개 모두 체크')
+    + kpiCard('pending',   '진행 중',      kpi.pending,   '#F59E0B', '미완 항목 있음')
+    + kpiCard('overdue',   '긴급 대응',    kpi.overdue,   '#DC2626', 'D-7 + 진척 &lt; 80%')
+    + kpiCard(null,        '평균 진척률',  kpi.avgPct + '%', null,   '전체 평균')
     + '</div>';
 
   var rowsHtml;
