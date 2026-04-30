@@ -7803,7 +7803,8 @@ function cmgRangeFromOffset(monthsBack){
     end:   endY   + '-' + String(endM).padStart(2, '0')
   };
 }
-window._cmgStatsRange  = window._cmgStatsRange  || cmgRangeFromOffset(1);  // 부동산/담당자 디폴트 1개월
+window._cmgStatsRange  = window._cmgStatsRange  || cmgRangeFromOffset(1);  // 부동산 디폴트 1개월
+window._cmgPersonRange = window._cmgPersonRange || cmgRangeFromOffset(1);  // [v98] 담당자 KPI 별도 기간 — 디폴트 1개월
 // [v95] 정산 디폴트 — 전월 단일
 function cmgSettleDefaultRange(){
   var t = new Date();
@@ -7818,6 +7819,11 @@ function cmgSetStatsRange(which, val){
   if (which === 'end')   window._cmgStatsRange.end   = val;
   renderContractMgmtView();
 }
+function cmgSetPersonRange(which, val){
+  if (which === 'start') window._cmgPersonRange.start = val;
+  if (which === 'end')   window._cmgPersonRange.end   = val;
+  renderContractMgmtView();
+}
 function cmgSetSettleRange(which, val){
   if (which === 'start') window._cmgSettleRange.start = val;
   if (which === 'end')   window._cmgSettleRange.end   = val;
@@ -7825,6 +7831,7 @@ function cmgSetSettleRange(which, val){
 }
 function cmgQuickRange(target, monthsBack){
   if (target === 'stats')  window._cmgStatsRange  = cmgRangeFromOffset(monthsBack);
+  if (target === 'person') window._cmgPersonRange = cmgRangeFromOffset(monthsBack); // [v98]
   if (target === 'settle') window._cmgSettleRange = cmgRangeFromOffset(monthsBack);
   renderContractMgmtView();
 }
@@ -8237,7 +8244,7 @@ function cmgPartnerRank(partnerName){
 // [v78] 담당자별 통계 빌드 (partnerPerson = vacancy.BM 기준)
 function cmgBuildPersonStats(){
   if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) return [];
-  var range = window._cmgStatsRange || cmgRangeFromOffset(1); // [v80]
+  var range = window._cmgPersonRange || cmgRangeFromOffset(1); // [v98] 담당자 KPI 자체 기간
   var contractMap = {};
   if (Array.isArray(contractRawData)) {
     contractRawData.forEach(function(c){ contractMap[String(c['계약번호']||'').trim()] = c; });
@@ -8275,7 +8282,7 @@ function cmgBuildPersonStats(){
 // [v78] 섹션 C 카드 렌더 (담당자별 KPI)
 function cmgRenderPersonStats(){
   var statsAll = cmgBuildPersonStats();
-  var range = window._cmgStatsRange || cmgRangeFromOffset(1); // [v80]
+  var range = window._cmgPersonRange || cmgRangeFromOffset(1); // [v98] 담당자 KPI 자체 기간
   // [v84] 활성 파트너 목록 — 계약건수 내림차순 정렬
   var partnerCount = {};
   statsAll.forEach(function(p){
@@ -8359,8 +8366,21 @@ function cmgRenderPersonStats(){
         }).join('')
       + '</tbody></table></div>';
   }
+  // [v98] 담당자 KPI 자체 기간 input + 빠른선택 버튼
+  var personPeriodHtml = '<div class="cmg-period-row">'
+    + '<span style="font-size:12px;color:#6B7280;font-weight:700;margin-right:4px">기간:</span>'
+    + '<input type="month" value="' + range.start + '" onchange="cmgSetPersonRange(\'start\', this.value)" style="padding:4px 8px;border:1px solid #C7D2FE;border-radius:6px;font-size:12px;background:#fff">'
+    + '<span style="margin:0 4px;color:#6B7280;font-weight:700">~</span>'
+    + '<input type="month" value="' + range.end + '" onchange="cmgSetPersonRange(\'end\', this.value)" style="padding:4px 8px;border:1px solid #C7D2FE;border-radius:6px;font-size:12px;background:#fff">'
+    + '<span style="margin-left:10px;color:#9CA3AF;font-size:11px">빠른 선택:</span>'
+    + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'person\', 1)">1개월</button>'
+    + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'person\', 3)">분기</button>'
+    + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'person\', 6)">반기</button>'
+    + '<button class="cmg-period-btn" onclick="cmgQuickRange(\'person\', 12)">1년</button>'
+    + '</div>';
   return '<div class="cmg-card">'
     + '<div class="cmg-card-title"><span class="dot" style="background:#10B981"></span>👤 담당자별 계약 KPI</div>'
+    + personPeriodHtml
     + radioHtml
     + meta
     + tableHtml
