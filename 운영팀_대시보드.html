@@ -1792,6 +1792,7 @@ function parseVacancySheet(resp) {
   const endDateIdx    = 23; // X열 (0-based) = 만기일 [v44]
   const tenantRrnIdx  = 47; // AV열 (0-based) = 계약자1 생년월일/주민번호 [v65]
   const coRrnIdx      = 53; // BB열 (0-based) = 계약자2/연대보증인 생년월일/주민번호 [v65]
+  const payConditionIdx = 18; // S열 (0-based) = 납부조건 (분할/일시납/수수료별도 등) [v71]
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -1824,7 +1825,8 @@ function parseVacancySheet(resp) {
       billCount:    cell(billCountIdx),  // BS열: 청구횟수
       endDate:      cell(endDateIdx),     // X열: 만기일 [v44]
       tenantRrn:    cell(tenantRrnIdx), // AV열: 계약자1 생년월일/주민번호 [v65]
-      coRrn:        cell(coRrnIdx)      // BB열: 계약자2/연대보증인 생년월일/주민번호 [v65]
+      coRrn:        cell(coRrnIdx),     // BB열: 계약자2/연대보증인 생년월일/주민번호 [v65]
+      payCondition: cell(payConditionIdx) // S열: 납부조건 [v71]
     };
   }).filter(Boolean);
 }
@@ -3473,10 +3475,17 @@ function renderContractRecord(c, payments, responses = []) {
       <div class="cr-info-section">
         <div class="cr-info-title">금액 정보</div>
         <div class="cr-field"><span class="cr-field-label">보증금/원상회복</span><span class="cr-field-val"><span style="white-space:nowrap"><span style="color:#6B7280;font-size:10px;font-weight:700;margin-right:5px">보증금</span>${fmtMoneyZ(__vacRow.deposit || c['보증금(원)'])}</span><span style="color:#D1D5DB;font-weight:600;margin:0 14px">/</span><span style="white-space:nowrap"><span style="color:#6B7280;font-size:10px;font-weight:700;margin-right:5px">원상회복담보금</span>${fmtMoneyZ(__vacRow.depositRecov)}</span></span></div>
-        <div class="cr-field"><span class="cr-field-label">월세</span><span class="cr-field-val">${fmtMoney(c['월세'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">관리비</span><span class="cr-field-val">${fmtMoney(c['관리비'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">부가세</span><span class="cr-field-val">${fmtMoney(c['부가세'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">수수료</span><span class="cr-field-val">${fmtMoney(c['수수료'])}</span></div>
+        ${(() => {
+          var payCond = String((__vacRow.payCondition||c['납부조건']||'')).trim();
+          var rentNum = parseFloat(String(__vacRow.rent || c['임대료'] || 0).replace(/[^0-9.-]/g,'')) || 0;
+          var feeNum  = parseFloat(String(__vacRow.fee || c['수수료'] || 0).replace(/[^0-9.-]/g,'')) || 0;
+          var includeSvcFee = (payCond === '분할' || payCond === '수수료별도');
+          var monthlyTotal = rentNum + (includeSvcFee ? feeNum : 0);
+          return `<div class="cr-field"><span class="cr-field-label">임대료</span><span class="cr-field-val">${fmtMoney(rentNum)}</span></div>
+        <div class="cr-field"><span class="cr-field-label">월세</span><span class="cr-field-val">${fmtMoney(c['월세'])} <span style="color:#6B7280;font-size:11px;font-weight:500">(부가세 ${fmtMoney(c['부가세'])})</span><span style="color:#D1D5DB;margin:0 8px">|</span>관리비 ${fmtMoney(c['관리비'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">수수료</span><span class="cr-field-val">${fmtMoney(feeNum)}${payCond?` <span style="color:#6B7280;font-size:11px;font-weight:500;background:#F3F4F6;padding:1px 7px;border-radius:8px;margin-left:4px">${payCond}</span>`:''}</span></div>
+        <div class="cr-field"><span class="cr-field-label">월납부금액</span><span class="cr-field-val" style="color:#1B3976;font-weight:700">${fmtMoney(monthlyTotal)}</span></div>`;
+        })()}
       </div>
       <div class="cr-info-section">
         <div class="cr-info-title">계약자 정보</div>
