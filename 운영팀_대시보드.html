@@ -992,7 +992,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <div class="header-top">
       <div>
         <div class="brand">KRG그룹 · 개런티즈서비스팀</div>
-        <div class="dash-title" id="pageTitle">운영팀 대시보드</div>
+        <div class="dash-title" id="pageTitle">K.R.G. Enterprize</div>
       </div>
       <div class="header-right">
         <span class="date-badge" id="dateBadge">—</span>
@@ -1007,7 +1007,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 
   <!-- View toggle -->
   <div class="view-tabs">
-    <button class="view-tab active" onclick="switchView('summary')">📈 K.R.G. Enterprize</button>
+    <button class="view-tab active" onclick="switchView('summary')">📈 DashBoard</button>
     <button class="view-tab"        onclick="switchView('dashboard')">📊 운영관리</button>
     <button class="view-tab"        onclick="switchView('checklist')">✅ 업무루틴관리</button>
     <button class="view-tab"        onclick="switchView('contractMgmt')">📑 계약관리</button>
@@ -1559,7 +1559,7 @@ function switchView(view) {
   if (view === 'summary') renderSummaryDashboard(); // [v102]
   document.getElementById('personTabsRow').style.display = view === 'checklist' ? 'flex' : 'none';
   // [v74] contractMgmt 추가
-  const titles = { dashboard:'운영팀 대시보드', checklist:'업무 체크리스트', contract:'입주관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리', contractMgmt:'계약관리', summary:'📈 K.R.G. Enterprize' };
+  const titles = { dashboard:'운영관리', checklist:'업무 체크리스트', contract:'입주관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리', contractMgmt:'계약관리', summary:'K.R.G. Enterprize' };
   document.getElementById('pageTitle').textContent = titles[view] || '';
   document.getElementById('refreshBtn').style.display = view === 'dashboard' ? '' : 'none';
 
@@ -5870,10 +5870,9 @@ renderCkProgress();
 loadData();
 // 1분마다 날짜·체크리스트 갱신
 setInterval(() => { updateDateBadge(); renderCkProgress(); }, 60000);
-// [v104/v113] 첫 화면을 종합 대시보드로 — 즉시 전환 + pre-fetch
+// [v104/v116] 첫 화면을 K.R.G. Enterprize로 — 100ms 지연 + prefetch 제거 (중복 fetch 방지)
 if (typeof switchView === 'function') {
-  if (typeof window.sumPrefetch === 'function') window.sumPrefetch();
-  switchView('summary'); // 즉시
+  setTimeout(function(){ switchView('summary'); }, 100);
 }
 // 5분마다 Sheets 데이터 자동 재로드
 setInterval(() => { loadData(); }, 5 * 60 * 1000);
