@@ -9785,12 +9785,16 @@ function sumBuildSection3(){
   var newDelqList = [];
   var unpaidByAge = { '30': 0, '60': 0, '90': 0 }; // 1~30, 31~60, 61~90, 90+
 
+  // [v112] '연체중'/'분납중' 만 매칭 (연체납부=완납 제외)
+  var isDelq = function(p){
+    var st = String(p['납부상태']||'').trim();
+    return (st === '연체중' || st === '분납중');
+  };
   // 계약번호 → 가장 빠른 연체 청구 YYYY-MM
   var earliestDelqByCno = {};
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
-      var st = String(p['납부상태']||'').trim();
-      if (st.indexOf('연체') < 0 && st.indexOf('분납') < 0) return;
+      if (!isDelq(p)) return;
       var cno = String(p['계약번호']||'').trim();
       if (!cno) return;
       var ym = extractYM(p);
@@ -9826,14 +9830,13 @@ function sumBuildSection3(){
   // 신규 연체 + 연체 일수 분포 (paymentRawData 기반)
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
-      var st = String(p['납부상태']||'').trim();
-      if (st.indexOf('연체') < 0 && st.indexOf('분납') < 0) return;
+      if (!isDelq(p)) return;
       var ym = extractYM(p);
-      // [v111] 금액: v104 fallback (미수금 → 미수액 → 청구액-입금액)
-      var amt = parseAmt(p['미수금']) || parseAmt(p['미수액']) || parseAmt(p['연체금액']) || parseAmt(p['잔액']);
+      // [v112] 실제 컬럼: '미납(연체)금액(원)' → '청구원금' → 최종 청구금액 fallback
+      var amt = parseAmt(p['미납(연체)금액(원)']) || parseAmt(p['미수금']) || parseAmt(p['미수액']);
       if (!amt) {
-        var charged = parseAmt(p['청구액']) || parseAmt(p['청구금액']);
-        var paid    = parseAmt(p['입금액']) || parseAmt(p['실입금액']);
+        var charged = parseAmt(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) || parseAmt(p['청구원금']) || parseAmt(p['청구액']);
+        var paid    = parseAmt(p['납부금액(원)']) || parseAmt(p['입금액']);
         amt = Math.max(0, charged - paid);
       }
       // 신규 연체 (이번달 청구분)
@@ -9967,13 +9970,22 @@ function sumBuildSection4(){
     if (nM) return nM[1] + '-' + String(+nM[2]).padStart(2,'0');
     return null;
   };
-  // [v111] 금액 fallback (v104 패턴)
-  var getCharged = function(p){ return parseAmt(p['청구액']) || parseAmt(p['실청구액']) || parseAmt(p['청구금액']); };
-  var getPaid    = function(p){ return parseAmt(p['입금액']) || parseAmt(p['실입금액']) || parseAmt(p['납부액']); };
+  // [v112] 실제 컬럼명 매핑
+  var getCharged = function(p){
+    return parseAmt(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) || parseAmt(p['청구원금']) || parseAmt(p['청구액']) || parseAmt(p['청구금액']);
+  };
+  var getPaid    = function(p){
+    return parseAmt(p['납부금액(원)']) || parseAmt(p['입금액']) || parseAmt(p['실입금액']);
+  };
   var getUnpaid  = function(p){
-    var u = parseAmt(p['미수금']) || parseAmt(p['미수액']) || parseAmt(p['연체금액']) || parseAmt(p['잔액']) || parseAmt(p['미납액']);
+    var u = parseAmt(p['미납(연체)금액(원)']) || parseAmt(p['미수금']) || parseAmt(p['미수액']);
     if (u) return u;
     return Math.max(0, getCharged(p) - getPaid(p));
+  };
+  // [v112] '연체중'/'분납중'만 (연체납부=완납 제외)
+  var isDelq2 = function(p){
+    var st = String(p['납부상태']||'').trim();
+    return (st === '연체중' || st === '분납중');
   };
 
   // 24개월 누적 입금 (paymentRawData 기반 — 분할 수수료 입금만)
@@ -9993,22 +10005,20 @@ function sumBuildSection4(){
     });
   }
 
-  // 미수 잔액 (연체중 + 분납중 상태의 미수금 합계)
+  // [v112] 미수 잔액 (연체중/분납중만 — 연체납부 제외)
   var unpaidBalance = 0, delayCnt = 0;
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
-      var st = String(p['납부상태']||'').trim();
-      if (st.indexOf('분납') >= 0 || st.indexOf('연체') >= 0) {
-        unpaidBalance += getUnpaid(p);
-        // 7일 지연 — 납기일 또는 청구서명에서 추출
-        var ym = extractYM(p);
-        if (ym) {
-          var ymM = ym.match(/(\d{4})-(\d{2})/);
-          if (ymM) {
-            var billDate = new Date(+ymM[1], +ymM[2]-1, 1);
-            var ageDays = Math.floor((today - billDate) / 86400000);
-            if (ageDays > 7) delayCnt++;
-          }
+      if (!isDelq2(p)) return;
+      unpaidBalance += getUnpaid(p);
+      // 7일 지연 — 납기일 우선
+      var ym = extractYM(p);
+      if (ym) {
+        var ymM = ym.match(/(\d{4})-(\d{2})/);
+        if (ymM) {
+          var billDate = new Date(+ymM[1], +ymM[2]-1, 1);
+          var ageDays = Math.floor((today - billDate) / 86400000);
+          if (ageDays > 7) delayCnt++;
         }
       }
     });
