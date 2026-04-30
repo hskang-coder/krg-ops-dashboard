@@ -7630,7 +7630,7 @@ function cmgClearPaidMap(){
   renderContractMgmtView();
 }
 window._cmgPaidMap = window._cmgPaidMap || cmgLoadPaidMap(); // [v93] localStorage 복원
-window._cmgPersonPartnerFilter = window._cmgPersonPartnerFilter || 'all'; // [v83] 담당자 KPI 부동산 필터
+window._cmgPersonPartnerFilter = (window._cmgPersonPartnerFilter == null) ? '' : window._cmgPersonPartnerFilter; // [v95] 디폴트 빈 문자열(선택 안 함) — 빈 값이면 전체 표시 + 라디오 미선택
 function cmgSetPersonPartnerFilter(val){
   window._cmgPersonPartnerFilter = val;
   renderContractMgmtView();
@@ -7803,7 +7803,14 @@ function cmgRangeFromOffset(monthsBack){
   };
 }
 window._cmgStatsRange  = window._cmgStatsRange  || cmgRangeFromOffset(1);  // 부동산/담당자 디폴트 1개월
-window._cmgSettleRange = window._cmgSettleRange || cmgRangeFromOffset(6);  // 정산 디폴트 6개월
+// [v95] 정산 디폴트 — 전월 단일
+function cmgSettleDefaultRange(){
+  var t = new Date();
+  var prev = new Date(t.getFullYear(), t.getMonth() - 1, 1);
+  var ym = prev.getFullYear() + '-' + String(prev.getMonth()+1).padStart(2,'0');
+  return { start: ym, end: ym };
+}
+window._cmgSettleRange = window._cmgSettleRange || cmgSettleDefaultRange();
 
 function cmgSetStatsRange(which, val){
   if (which === 'start') window._cmgStatsRange.start = val;
@@ -8278,19 +8285,19 @@ function cmgRenderPersonStats(){
   var partnerList = Object.keys(partnerCount).sort(function(a, b){
     return partnerCount[b] - partnerCount[a] || a.localeCompare(b);
   });
-  // [v83] 부동산 필터 적용
-  var filter = window._cmgPersonPartnerFilter || 'all';
-  if (filter !== 'all' && !partnerSet[filter]) {
-    // 선택된 파트너가 현재 기간에 없으면 자동 'all'로 리셋
-    window._cmgPersonPartnerFilter = 'all'; filter = 'all';
+  // [v83/v95] 부동산 필터 적용 — 빈 문자열도 전체로 처리
+  var filter = window._cmgPersonPartnerFilter;
+  if (filter && filter !== 'all' && !partnerSet[filter]) {
+    // 선택된 파트너가 현재 기간에 없으면 자동 미선택으로 리셋
+    window._cmgPersonPartnerFilter = ''; filter = '';
   }
-  var stats = (filter === 'all') ? statsAll : statsAll.filter(function(p){ return p.partnerName === filter; });
+  var stats = (!filter || filter === 'all') ? statsAll : statsAll.filter(function(p){ return p.partnerName === filter; });
   var totalCnt = stats.reduce(function(s,p){ return s + p.count; }, 0);
   var totalBrk = stats.reduce(function(s,p){ return s + p.totalBrokerage; }, 0);
   // [v83] 라디오 버튼 행
   var radioHtml = '<div class="cmg-period-row" style="background:#ECFDF5;flex-wrap:wrap">'
     + '<span style="font-size:12px;color:#065F46;font-weight:700;margin-right:4px">부동산 필터:</span>'
-    + '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;font-weight:700;color:' + (filter==='all'?'#16A34A':'#6B7280') + '">'
+    + '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;font-weight:' + (filter==='all'?'700':'500') + ';color:' + (filter==='all'?'#16A34A':'#6B7280') + '">'
     + '<input type="radio" name="cmgPersonPF" ' + (filter==='all'?'checked':'') + ' onchange="cmgSetPersonPartnerFilter(\'all\')"> 전체'
     + '</label>'
     + partnerList.map(function(pn){
@@ -8588,7 +8595,7 @@ function cmgBuildSettlement(){
 
 function cmgRenderSettlementCard(){
   var rows = cmgBuildSettlement();
-  var rng = window._cmgSettleRange || cmgRangeFromOffset(6); // [v80]
+  var rng = window._cmgSettleRange || cmgSettleDefaultRange(); // [v95] 디폴트 전월
   rows = rows.filter(function(r){ return cmgYmInRange(r.ym, rng); });
   var unpaidCnt = rows.filter(function(r){ return !window._cmgPaidMap[cmgPaidKey(r.partnerName, r.ym)]; }).length;
   var unpaidAmt = rows.reduce(function(s,r){ return window._cmgPaidMap[cmgPaidKey(r.partnerName, r.ym)] ? s : s + r.totalBrokerage; }, 0);
@@ -9000,8 +9007,7 @@ function renderContractMgmtView(){
     + cmgRenderPartnerStats() // [v77] 섹션 B
     + cmgRenderPersonStats() // [v78] 섹션 C
     + cmgRenderSettlementCard() // [v79] 6-2
-    + cmgRenderOnboardingCard() // [v79] 6-4
-    + cmgRenderRegionCard(); // [v79] 6-5
+    + cmgRenderRegionCard(); // [v79] 6-5 (v95: 6-4 온보딩 삭제)
 }
 // ═══════════════════════════════════════════
 // ■ [v44] 갱신관리 끝
