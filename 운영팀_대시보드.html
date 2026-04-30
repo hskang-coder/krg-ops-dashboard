@@ -9761,7 +9761,22 @@ function sumBuildSection3(){
   if (!Array.isArray(vacancyRawData)) return null;
   var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
   var today = new Date(); today.setHours(0,0,0,0);
-  var thisYM = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0');
+  var thisY = today.getFullYear(), thisM = today.getMonth() + 1; // 1~12
+  var thisYM = thisY + '-' + String(thisM).padStart(2,'0');
+
+  // [v111] paymentRawData에서 청구 년/월 추출 — 납기일 우선, 청구서명 fallback
+  // 반환: 'YYYY-MM' 문자열 또는 null
+  var extractYM = function(p){
+    // 1. 납기일 (예: "2026.03.15", "2026-03-15", "2026/3/15")
+    var due = String(p['납기일']||'').trim();
+    var dM = due.match(/(\d{4})[.\-\/](\d{1,2})/);
+    if (dM) return dM[1] + '-' + String(+dM[2]).padStart(2,'0');
+    // 2. 청구서명 (예: "2026년 3월 임대료")
+    var nm = String(p['청구서명']||p['납부종류']||'');
+    var nM = nm.match(/(\d{4}).*?(\d{1,2})\s*월/);
+    if (nM) return nM[1] + '-' + String(+nM[2]).padStart(2,'0');
+    return null;
+  };
 
   // 활성 계약 중 거주개월 1~12 그룹
   var earlyCnt = 0, earlyDelqCnt = 0;
@@ -9770,7 +9785,7 @@ function sumBuildSection3(){
   var newDelqList = [];
   var unpaidByAge = { '30': 0, '60': 0, '90': 0 }; // 1~30, 31~60, 61~90, 90+
 
-  // 계약번호 → 가장 빠른 연체 청구년월
+  // 계약번호 → 가장 빠른 연체 청구 YYYY-MM
   var earliestDelqByCno = {};
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
@@ -9778,7 +9793,8 @@ function sumBuildSection3(){
       if (st.indexOf('연체') < 0 && st.indexOf('분납') < 0) return;
       var cno = String(p['계약번호']||'').trim();
       if (!cno) return;
-      var ym = String(p['청구년월']||'').trim();
+      var ym = extractYM(p);
+      if (!ym) return;
       if (!earliestDelqByCno[cno] || ym < earliestDelqByCno[cno]) earliestDelqByCno[cno] = ym;
     });
   }
@@ -9792,7 +9808,7 @@ function sumBuildSection3(){
     if (firstDelq) {
       // 첫 연체까지 개월수
       var sd = cmgParseStartDate(v.startDate);
-      var fdM = firstDelq.match(/(\d{4})[\.\-]?(\d{1,2})/);
+      var fdM = firstDelq.match(/(\d{4})-(\d{2})/);
       if (sd && fdM) {
         var fdDate = new Date(+fdM[1], +fdM[2]-1, 1);
         var monthsUntilDelq = (fdDate.getFullYear() - sd.getFullYear()) * 12 + (fdDate.getMonth() - sd.getMonth());
@@ -9812,23 +9828,31 @@ function sumBuildSection3(){
     paymentRawData.forEach(function(p){
       var st = String(p['납부상태']||'').trim();
       if (st.indexOf('연체') < 0 && st.indexOf('분납') < 0) return;
-      var ym = String(p['청구년월']||'').trim();
-      var amt = parseAmt(p['미수금']) || parseAmt(p['미수액']) || parseAmt(p['청구액']);
+      var ym = extractYM(p);
+      // [v111] 금액: v104 fallback (미수금 → 미수액 → 청구액-입금액)
+      var amt = parseAmt(p['미수금']) || parseAmt(p['미수액']) || parseAmt(p['연체금액']) || parseAmt(p['잔액']);
+      if (!amt) {
+        var charged = parseAmt(p['청구액']) || parseAmt(p['청구금액']);
+        var paid    = parseAmt(p['입금액']) || parseAmt(p['실입금액']);
+        amt = Math.max(0, charged - paid);
+      }
       // 신규 연체 (이번달 청구분)
-      if (ym.indexOf(thisYM.replace('-','')) >= 0 || ym.indexOf(thisYM) >= 0) {
+      if (ym === thisYM) {
         var cno = String(p['계약번호']||'').trim();
-        var v = vacancyRawData.find(function(x){ return String(x.no||'').trim() === cno; });
-        var name = v ? (v.tenantName || v.tenant1Name || cno) : cno;
+        var vc = vacancyRawData.find(function(x){ return String(x.no||'').trim() === cno; });
+        var name = vc ? (vc.tenantName || vc.tenant1Name || cno) : cno;
         if (newDelqList.length < 5) newDelqList.push({ cno: cno, name: name, amt: amt });
       }
-      // 연체 경과 일수 = today - 청구일(청구년월의 1일 가정)
-      var ymM = ym.match(/(\d{4})[\.\-]?(\d{1,2})/);
-      if (ymM) {
-        var billDate = new Date(+ymM[1], +ymM[2]-1, 1);
-        var ageDays = Math.floor((today - billDate) / 86400000);
-        if (ageDays > 90) unpaidByAge['90']++;
-        else if (ageDays > 60) unpaidByAge['60']++;
-        else if (ageDays > 30) unpaidByAge['30']++;
+      // 연체 경과 일수
+      if (ym) {
+        var ymM = ym.match(/(\d{4})-(\d{2})/);
+        if (ymM) {
+          var billDate = new Date(+ymM[1], +ymM[2]-1, 1);
+          var ageDays = Math.floor((today - billDate) / 86400000);
+          if (ageDays > 90) unpaidByAge['90']++;
+          else if (ageDays > 60) unpaidByAge['60']++;
+          else if (ageDays > 30) unpaidByAge['30']++;
+        }
       }
     });
   }
@@ -9933,6 +9957,25 @@ function sumBuildSection4(){
     }
   });
 
+  // [v111] 청구 년/월 추출 (납기일 우선, 청구서명 fallback)
+  var extractYM = function(p){
+    var due = String(p['납기일']||'').trim();
+    var dM = due.match(/(\d{4})[.\-\/](\d{1,2})/);
+    if (dM) return dM[1] + '-' + String(+dM[2]).padStart(2,'0');
+    var nm = String(p['청구서명']||p['납부종류']||'');
+    var nM = nm.match(/(\d{4}).*?(\d{1,2})\s*월/);
+    if (nM) return nM[1] + '-' + String(+nM[2]).padStart(2,'0');
+    return null;
+  };
+  // [v111] 금액 fallback (v104 패턴)
+  var getCharged = function(p){ return parseAmt(p['청구액']) || parseAmt(p['실청구액']) || parseAmt(p['청구금액']); };
+  var getPaid    = function(p){ return parseAmt(p['입금액']) || parseAmt(p['실입금액']) || parseAmt(p['납부액']); };
+  var getUnpaid  = function(p){
+    var u = parseAmt(p['미수금']) || parseAmt(p['미수액']) || parseAmt(p['연체금액']) || parseAmt(p['잔액']) || parseAmt(p['미납액']);
+    if (u) return u;
+    return Math.max(0, getCharged(p) - getPaid(p));
+  };
+
   // 24개월 누적 입금 (paymentRawData 기반 — 분할 수수료 입금만)
   // 단순화: payment 데이터에서 정상 납부된 항목 월별 입금액 합계 (분할/일시불 구분 없이)
   var months24 = [];
@@ -9944,26 +9987,28 @@ function sumBuildSection4(){
   var idx = {}; months24.forEach(function(m, i){ idx[m.ym] = i; });
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
-      var ym = String(p['청구년월']||'').replace(/(\d{4})\.?(\d{2})/, '$1-$2').slice(0, 7);
-      if (idx[ym] === undefined) return;
-      var paid = parseAmt(p['입금액']) || parseAmt(p['실입금액']) || 0;
-      months24[idx[ym]].amount += paid;
+      var ym = extractYM(p);
+      if (!ym || idx[ym] === undefined) return;
+      months24[idx[ym]].amount += getPaid(p);
     });
   }
 
-  // 미수 잔액 (분납중 상태의 미수금 합계)
+  // 미수 잔액 (연체중 + 분납중 상태의 미수금 합계)
   var unpaidBalance = 0, delayCnt = 0;
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
       var st = String(p['납부상태']||'').trim();
-      if (st.indexOf('분납') >= 0) {
-        unpaidBalance += parseAmt(p['미수금']) || parseAmt(p['청구액']) - parseAmt(p['입금액']);
-        // 7일 지연
-        var ym = String(p['청구년월']||'').match(/(\d{4})[\.\-]?(\d{1,2})/);
+      if (st.indexOf('분납') >= 0 || st.indexOf('연체') >= 0) {
+        unpaidBalance += getUnpaid(p);
+        // 7일 지연 — 납기일 또는 청구서명에서 추출
+        var ym = extractYM(p);
         if (ym) {
-          var billDate = new Date(+ym[1], +ym[2]-1, 1);
-          var ageDays = Math.floor((today - billDate) / 86400000);
-          if (ageDays > 7) delayCnt++;
+          var ymM = ym.match(/(\d{4})-(\d{2})/);
+          if (ymM) {
+            var billDate = new Date(+ymM[1], +ymM[2]-1, 1);
+            var ageDays = Math.floor((today - billDate) / 86400000);
+            if (ageDays > 7) delayCnt++;
+          }
         }
       }
     });
@@ -9975,8 +10020,8 @@ function sumBuildSection4(){
   var totalCharged = 0, totalPaid = 0;
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
-      totalCharged += parseAmt(p['청구액']);
-      totalPaid += parseAmt(p['입금액']);
+      totalCharged += getCharged(p);
+      totalPaid += getPaid(p);
     });
   }
   var recoveryRate = totalCharged > 0 ? Math.round((totalPaid / totalCharged) * 1000) / 10 : 0;
