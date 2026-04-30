@@ -1007,6 +1007,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 
   <!-- View toggle -->
   <div class="view-tabs">
+    <button class="view-tab"        onclick="switchView('summary')">📈 대시보드</button>
     <button class="view-tab active" onclick="switchView('dashboard')">📊 운영관리</button>
     <button class="view-tab"        onclick="switchView('checklist')">✅ 업무루틴관리</button>
     <button class="view-tab"        onclick="switchView('contractMgmt')">📑 계약관리</button>
@@ -1271,6 +1272,9 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   <!-- [v74] 계약관리 뷰 -->
   <div id="contractMgmtView" class="view-content">
     <div class="cmg-inner"></div>
+  </div>
+  <div id="summaryView" class="view-content">
+    <div class="sum-inner"></div>
   </div>
 </div>
 
@@ -1548,19 +1552,21 @@ function switchView(view) {
   document.getElementById('delinquencyView').classList.toggle('active', view === 'delinquency');
   document.getElementById('renewalView').classList.toggle('active', view === 'renewal');  // [v43]
   document.getElementById('contractMgmtView').classList.toggle('active', view === 'contractMgmt');  // [v74]
+  document.getElementById('summaryView').classList.toggle('active', view === 'summary'); // [v102]
   if (view === 'delinquency') renderDelinquency();
   if (view === 'renewal') renderRenewalView();  // [v43]
   if (view === 'contractMgmt') renderContractMgmtView();  // [v74]
+  if (view === 'summary') renderSummaryDashboard(); // [v102]
   document.getElementById('personTabsRow').style.display = view === 'checklist' ? 'flex' : 'none';
   // [v74] contractMgmt 추가
-  const titles = { dashboard:'운영팀 대시보드', checklist:'업무 체크리스트', contract:'입주관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리', contractMgmt:'계약관리' };
+  const titles = { dashboard:'운영팀 대시보드', checklist:'업무 체크리스트', contract:'입주관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리', contractMgmt:'계약관리', summary:'📈 종합 대시보드' };
   document.getElementById('pageTitle').textContent = titles[view] || '';
   document.getElementById('refreshBtn').style.display = view === 'dashboard' ? '' : 'none';
 
   // [v74] 7개 탭 (dashboard/checklist/contract/contractMgmt/payment/delinquency/renewal)
   document.querySelectorAll('.view-tab').forEach((btn,i) => {
     // [v101] DOM 순서와 일치 (v94: dashboard/checklist/contractMgmt/contract/renewal/payment/delinquency)
-    btn.classList.toggle('active', ['dashboard','checklist','contractMgmt','contract','renewal','payment','delinquency'][i] === view);
+    btn.classList.toggle('active', ['summary','dashboard','checklist','contractMgmt','contract','renewal','payment','delinquency'][i] === view);
   });
 
   if (view === 'checklist') {
@@ -1819,6 +1825,8 @@ function parseVacancySheet(resp) {
   const startDateIdx    = 22;
   // [v86] 가계약일 (BK열 = idx 62)
   const tentativeDateIdx= 62;
+  // [v102] 실제 퇴실일 (Z열 = idx 25) — 거주기간/갱신차수 계산 기준
+  const actualExitDateIdx = 25;
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -1869,7 +1877,9 @@ function parseVacancySheet(resp) {
       // [v85] 시작일 (W열) — 진척/통계의 출력 기준
       startDate:     cell(startDateIdx),
       // [v86] 가계약일 (BK열)
-      tentativeDate: cell(tentativeDateIdx)
+      tentativeDate: cell(tentativeDateIdx),
+      // [v102] 실제 퇴실일 (Z열) — 거주기간/갱신차수 계산
+      actualExitDate: cell(actualExitDateIdx)
     };
   }).filter(Boolean);
 }
@@ -9068,6 +9078,213 @@ function renderContractMgmtView(){
 // ═══════════════════════════════════════════
 // ■ [v44] 갱신관리 끝
 // ═══════════════════════════════════════════
+
+// ═══════════════════════════════════════════
+// ■ [v102] 종합 대시보드 (Executive Summary)
+// ═══════════════════════════════════════════
+
+// CSS 동적 주입 (간소)
+(function injectSummaryCSS(){
+  if (document.getElementById('sum-css-injected')) return;
+  var style = document.createElement('style');
+  style.id = 'sum-css-injected';
+  style.textContent = ''
+    + '.sum-inner{padding:14px 18px 30px;max-width:1700px;margin:0 auto}'
+    + '.sum-period-row{display:flex;gap:8px;align-items:center;background:#fff;padding:8px 14px;border-radius:8px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,0.04);font-size:11.5px}'
+    + '.sum-period-btn{background:#fff;border:1px solid #E5E7EB;padding:5px 12px;font-size:11px;font-weight:700;color:#374151;border-radius:12px;cursor:pointer}'
+    + '.sum-period-btn.active{background:#7C3AED;color:#fff;border-color:#7C3AED}'
+    + '.sum-kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px}'
+    + '.sum-kpi-card{background:#fff;border-radius:9px;padding:11px 13px;box-shadow:0 1px 3px rgba(0,0,0,0.04);border:1px solid #EAEEF3;position:relative}'
+    + '.sum-kpi-card.priority{border:2px solid #7C3AED}'
+    + '.sum-kpi-card.priority::before{content:"\2605";position:absolute;top:4px;right:6px;font-size:10px;color:#7C3AED;font-weight:800}'
+    + '.sum-kpi-label{font-size:10.5px;color:#6B7280;font-weight:700}'
+    + '.sum-kpi-value{font-size:21px;font-weight:800;color:#1F2937;line-height:1.1;margin-top:3px}'
+    + '.sum-kpi-unit{font-size:12px;font-weight:700;color:#6B7280}'
+    + '.sum-kpi-trend{font-size:10px;font-weight:700;margin-top:2px}'
+    + '.sum-kpi-trend.up{color:#16A34A}'
+    + '.sum-kpi-trend.down{color:#DC2626}'
+    + '.sum-kpi-trend.neutral{color:#6B7280}'
+    + '.sum-main-grid{display:grid;grid-template-columns:1fr 280px;gap:12px}'
+    + '.sum-col-stack{display:flex;flex-direction:column;gap:10px}'
+    + '.sum-card{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.04);border:1px solid #EAEEF3}'
+    + '.sum-card-title{font-size:13px;font-weight:800;margin-bottom:10px;color:#1F2937;display:flex;align-items:center;gap:6px}'
+    + '.sum-card-title .dot{width:8px;height:8px;border-radius:50%;display:inline-block}'
+    + '.sum-card-title .badge{font-size:9px;font-weight:700;padding:1px 7px;border-radius:8px;margin-left:auto;letter-spacing:0.3px;color:#fff}'
+    + '.sum-badge-core{background:#7C3AED}'
+    + '.sum-badge-risk{background:#DC2626}'
+    + '.sum-badge-revenue{background:#F59E0B}'
+    + '.sum-badge-sales{background:#0EA5E9}'
+    + '.sum-empty{text-align:center;color:#9CA3AF;padding:40px 0;font-size:13px;font-style:italic}'
+    + '.sum-sticky{position:sticky;top:10px;align-self:start}'
+    + '.sum-loading{text-align:center;padding:60px 0;color:#6B7280;font-size:14px}'
+    ;
+  document.head.appendChild(style);
+})();
+
+// [v102] 거주개월수 계산 (시작일~퇴실일 또는 시작일~today)
+function sumCalcResidence(v){
+  var sd = cmgParseStartDate(v && v.startDate);
+  if (!sd) return null;
+  var ed = cmgParseStartDate(v && v.actualExitDate);
+  if (!ed) ed = new Date(); // 진행중 = today 기준
+  ed.setHours(0,0,0,0); sd.setHours(0,0,0,0);
+  var months = (ed.getFullYear() - sd.getFullYear()) * 12 + (ed.getMonth() - sd.getMonth());
+  if (ed.getDate() < sd.getDate()) months--;
+  return Math.max(0, months);
+}
+
+// [v102] 갱신차수 = 거주개월수 ÷ 12
+//   0~11 = 0차(미갱신), 12~23 = 1차, 24~35 = 2차, 36~47 = 3차, 48+ = 4차+
+function sumCalcCycle(months){
+  if (months == null || months < 0) return 0;
+  return Math.floor(months / 12);
+}
+
+// [v102] 종합 대시보드 메인 렌더
+function renderSummaryDashboard(){
+  var wrap = document.querySelector('#summaryView .sum-inner');
+  if (!wrap) return;
+  // 데이터 로드 대기
+  var needLoad = !Array.isArray(vacancyRawData) || !vacancyRawData.length || !crLoaded;
+  if (needLoad) {
+    wrap.innerHTML = '<div class="sum-loading">📡 종합 대시보드 데이터 로딩 중...</div>';
+    var promises = [];
+    if (!crLoaded) promises.push(Promise.all([fetchSheetByName(CONTRACT_SHEET), fetchSheetByName(INCOME_SHEET)]).then(function(arr){
+      contractRawData = gvizToObjects(arr[0]).filter(function(x){return x['계약번호'];});
+      paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return x['계약번호'];});
+      crLoaded = true;
+    }));
+    if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) promises.push(fetchSheetByGid(VACANCY_GID).then(function(r){ vacancyRawData = parseVacancySheet(r); }));
+    Promise.all(promises).then(function(){ renderSummaryDashboard(); }).catch(function(e){
+      wrap.innerHTML = '<div class="sum-empty">❌ 데이터 로드 실패: ' + e.message + '</div>';
+    });
+    return;
+  }
+
+  // KPI 계산
+  var kpi = sumCalcKpi();
+
+  wrap.innerHTML = sumPeriodRow() + sumKpiBar(kpi) + sumPlaceholderSections();
+}
+
+// [v102] 기간 토글 (디폴트 분기)
+window._sumPeriod = window._sumPeriod || 'quarter';
+function sumSetPeriod(val){ window._sumPeriod = val; renderSummaryDashboard(); }
+function sumPeriodRow(){
+  var p = window._sumPeriod;
+  return '<div class="sum-period-row">'
+    + '<span style="color:#6B7280;font-weight:700;font-size:11.5px">기간:</span>'
+    + '<button class="sum-period-btn ' + (p==='month'?'active':'') + '" onclick="sumSetPeriod(\'month\')">월</button>'
+    + '<button class="sum-period-btn ' + (p==='quarter'?'active':'') + '" onclick="sumSetPeriod(\'quarter\')">분기</button>'
+    + '<button class="sum-period-btn ' + (p==='half'?'active':'') + '" onclick="sumSetPeriod(\'half\')">반기</button>'
+    + '<button class="sum-period-btn ' + (p==='year'?'active':'') + '" onclick="sumSetPeriod(\'year\')">연</button>'
+    + '<span style="margin-left:10px;color:#6B7280;font-size:11px">최고 의사결정자용 · ' + new Date().toISOString().slice(0,10) + ' 기준</span>'
+    + '</div>';
+}
+
+// [v102] KPI 계산 (실제 데이터 기반)
+function sumCalcKpi(){
+  var kpi = {
+    avgResidence: 0,        // 평균 거주개월수
+    earlyDelqRate: 0,       // 조기 연체율 (입주 1~3개월 내 연체)
+    delqAmount: 0,          // 연체 금액
+    newTentative: 0,        // 신규 가계약 (이번달)
+    installmentDue: 0,      // 분할 수수료 미수 (단순화: 분할 약정 활성 건수 표시)
+    activeContracts: 0      // 활성 계약
+  };
+  if (!Array.isArray(vacancyRawData)) return kpi;
+
+  // 평균 거주기간
+  var totalMonths = 0, residenceCount = 0;
+  vacancyRawData.forEach(function(v){
+    var m = sumCalcResidence(v);
+    if (m != null && m > 0) { totalMonths += m; residenceCount++; }
+  });
+  kpi.avgResidence = residenceCount > 0 ? Math.round((totalMonths / residenceCount) * 10) / 10 : 0;
+
+  // 활성 계약 (계약상태가 종료/만기 아닌 것)
+  kpi.activeContracts = vacancyRawData.filter(function(v){
+    var s = String(v.status||'').trim();
+    return s && s.indexOf('종료') < 0 && s.indexOf('만기') < 0 && s.indexOf('퇴실') < 0;
+  }).length;
+
+  // 신규 가계약 (이번달 — BK열 tentativeDate가 이번달)
+  var today = new Date();
+  var thisYM = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0');
+  kpi.newTentative = vacancyRawData.filter(function(v){
+    var d = cmgParseStartDate(v.tentativeDate);
+    if (!d) return false;
+    var ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    return ym === thisYM;
+  }).length;
+
+  // 연체 금액 (paymentRawData에서 연체중/분납중)
+  if (Array.isArray(paymentRawData)) {
+    kpi.delqAmount = paymentRawData.reduce(function(sum, p){
+      var st = String(p['납부상태']||'').trim();
+      if (st.indexOf('연체중') >= 0 || st.indexOf('분납중') >= 0) {
+        var amt = parseFloat(String(p['미수금']||p['청구액']||0).replace(/[^0-9.\-]/g,'')) || 0;
+        return sum + amt;
+      }
+      return sum;
+    }, 0);
+  }
+
+  // 조기 연체율: 입주 1~3개월 내 첫 연체 발생 비율 (간이 계산 — 첫 연체 시점 추적은 v105에서 정밀화)
+  // 임시: 활성 계약 중 거주개월 1~3 + paymentRawData 연체기록 보유
+  var earlyTotal = 0, earlyDelq = 0;
+  vacancyRawData.forEach(function(v){
+    var m = sumCalcResidence(v);
+    if (m == null || m > 12) return; // 입주 12개월 이내만 대상
+    earlyTotal++;
+    var cno = String(v.no||'').trim();
+    if (Array.isArray(paymentRawData)) {
+      var hasEarlyDelq = paymentRawData.some(function(p){
+        if (String(p['계약번호']||'').trim() !== cno) return false;
+        var st = String(p['납부상태']||'').trim();
+        return st.indexOf('연체') >= 0 || st.indexOf('분납') >= 0;
+      });
+      if (hasEarlyDelq && m <= 3) earlyDelq++;
+    }
+  });
+  kpi.earlyDelqRate = earlyTotal > 0 ? Math.round((earlyDelq / earlyTotal) * 1000) / 10 : 0;
+
+  // 분할 약정 활성 건수 (S열 payCondition !== 일시납)
+  kpi.installmentDue = vacancyRawData.filter(function(v){
+    var pc = String(v.payCondition||'').trim();
+    return pc && pc.indexOf('일시납') < 0;
+  }).length;
+
+  return kpi;
+}
+
+// [v102] Top KPI Bar
+function sumKpiBar(kpi){
+  var fmtKor = function(n){ n=+n||0; if (n>=1e8) return '₩'+(n/1e8).toFixed(1).replace(/\.0$/,'')+'억'; if (n>=1e4) return '₩'+Math.round(n/1e4).toLocaleString()+'만'; return '₩'+Math.round(n).toLocaleString(); };
+  return '<div class="sum-kpi-grid">'
+    + '<div class="sum-kpi-card priority"><div class="sum-kpi-label">평균 거주기간</div><div class="sum-kpi-value">' + kpi.avgResidence + '<span class="sum-kpi-unit">개월</span></div><div class="sum-kpi-trend up">LTV 핵심 지표</div></div>'
+    + '<div class="sum-kpi-card priority"><div class="sum-kpi-label">조기 연체율 (1~3개월)</div><div class="sum-kpi-value" style="color:#DC2626">' + kpi.earlyDelqRate + '<span class="sum-kpi-unit">%</span></div><div class="sum-kpi-trend down">위험 조기 식별</div></div>'
+    + '<div class="sum-kpi-card priority"><div class="sum-kpi-label">연체 금액</div><div class="sum-kpi-value" style="color:#DC2626">' + fmtKor(kpi.delqAmount) + '</div><div class="sum-kpi-trend down">즉시 회수 대상</div></div>'
+    + '<div class="sum-kpi-card"><div class="sum-kpi-label">신규 가계약 (이번달)</div><div class="sum-kpi-value">' + kpi.newTentative + '<span class="sum-kpi-unit">건</span></div><div class="sum-kpi-trend neutral">BK열 기준</div></div>'
+    + '<div class="sum-kpi-card"><div class="sum-kpi-label">분할 약정 활성</div><div class="sum-kpi-value" style="color:#F59E0B">' + kpi.installmentDue + '<span class="sum-kpi-unit">건</span></div><div class="sum-kpi-trend neutral">수익 파이프라인</div></div>'
+    + '<div class="sum-kpi-card"><div class="sum-kpi-label">활성 계약</div><div class="sum-kpi-value">' + kpi.activeContracts + '<span class="sum-kpi-unit">건</span></div><div class="sum-kpi-trend neutral">현재 진행중</div></div>'
+    + '</div>';
+}
+
+// [v102] 섹션 placeholder (v103-v105에서 채워짐)
+function sumPlaceholderSections(){
+  return '<div class="sum-main-grid">'
+    + '<div class="sum-col-stack">'
+    +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#0EA5E9"></span>① 일별 가계약 추이 <span class="badge sum-badge-sales">SALES</span></div><div class="sum-empty">v103에서 추가 예정 — 일별 누적 + 3 month 비교 + 로그스케일</div></div>'
+    +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#7C3AED"></span>② 거주기간 & 갱신차수 <span class="badge sum-badge-core">CORE LTV</span></div><div class="sum-empty">v104에서 추가 예정 — 갱신차수별 평균 거주기간 + funnel + 잔존율</div></div>'
+    +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#DC2626"></span>③ 초기 연체자 신속 대응 <span class="badge sum-badge-risk">EARLY DETECTION</span></div><div class="sum-empty">v105에서 추가 예정 — 입주 후 N개월차 첫 연체 + 회복 funnel + 신규 연체 리스트</div></div>'
+    +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#F59E0B"></span>④ 분할 서비스 수수료 누적 추이 <span class="badge sum-badge-revenue">REVENUE</span></div><div class="sum-empty">v105에서 추가 예정 — 24개월 누적 입금 + 분할 vs 일시불 비율</div></div>'
+    + '</div>'
+    + '<div class="sum-sticky">'
+    +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#DC2626"></span>⚠️ Risk Alerts</div><div class="sum-empty" style="padding:24px 0">v105에서 추가</div></div>'
+    + '</div>'
+    + '</div>';
+}
 
 </script>
 </body>
