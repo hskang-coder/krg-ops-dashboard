@@ -9941,6 +9941,41 @@ function sumBuildSection3(){
     });
   }
 
+  // [v117] 납기 후 회수 일수 분포 — 연체납부(완납) 건들의 연체일수 버킷
+  var recoveryDays = { '0': 0, '1': 0, '2': 0, '3': 0, '4': 0 }; // 0~3 / 4~7 / 8~14 / 15~30 / 31+
+  var recoveryTotal = 0, recoverySum = 0; // 평균용
+  if (Array.isArray(paymentRawData)) {
+    paymentRawData.forEach(function(p){
+      var st = String(p['납부상태']||'').trim();
+      // 연체 후 회수된 케이스만 (납부상태='연체납부')
+      if (st !== '연체납부') return;
+      // 연체일수 컬럼 우선, 없으면 납기일/납부일에서 계산
+      var days = parseInt(String(p['연체일수']||'').replace(/[^0-9\-]/g,''),10);
+      if (isNaN(days) || days <= 0) {
+        var dStr = String(p['납기일']||'').replace(/[^0-9.\-\/]/g,'');
+        var pStr = String(p['납부일']||'').replace(/[^0-9.\-\/]/g,'');
+        var dM = dStr.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+        var pM = pStr.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+        if (dM && pM) {
+          var dDate = new Date(+dM[1], +dM[2]-1, +dM[3]);
+          var pDate = new Date(+pM[1], +pM[2]-1, +pM[3]);
+          days = Math.floor((pDate - dDate) / 86400000);
+        }
+      }
+      if (isNaN(days) || days < 0) return;
+      recoveryTotal++;
+      recoverySum += days;
+      var b = '4';
+      if (days <= 3) b = '0';
+      else if (days <= 7) b = '1';
+      else if (days <= 14) b = '2';
+      else if (days <= 30) b = '3';
+      recoveryDays[b]++;
+    });
+  }
+  var recoveryAvg = recoveryTotal > 0 ? Math.round(recoverySum / recoveryTotal * 10) / 10 : 0;
+  var fastRecoveryRate = recoveryTotal > 0 ? Math.round((recoveryDays['0'] + recoveryDays['1']) / recoveryTotal * 1000) / 10 : 0;
+
   return {
     earlyDelqRate: earlyCnt > 0 ? Math.round((earlyDelqCnt / earlyCnt) * 1000) / 10 : 0,
     earlyCnt: earlyCnt, earlyDelqCnt: earlyDelqCnt,
@@ -9948,7 +9983,11 @@ function sumBuildSection3(){
     newDelqList: newDelqList,
     over90Cnt: unpaidByAge['90'],
     firstDelqByMonth: firstDelqByMonth,
-    unpaidByAge: unpaidByAge
+    unpaidByAge: unpaidByAge,
+    recoveryDays: recoveryDays,
+    recoveryTotal: recoveryTotal,
+    recoveryAvg: recoveryAvg,
+    fastRecoveryRate: fastRecoveryRate
   };
 }
 
@@ -9981,6 +10020,14 @@ function sumRenderSection3Card(){
     +     '<div class="sum-newdelq-list">' + listHtml + '</div>'
     +     '<div class="sum-mini-insight" style="background:#FEF2F2;color:#991B1B">⚠️ 입주 1~3개월 연체는 품질 위험 신호 — 즉시 대응 필요</div>'
     +   '</div>'
+    + '</div>'
+    // [v117] 납기 후 회수 일수 분포
+    + '<div style="margin-top:14px;border-top:1px dashed #E5E7EB;padding-top:12px">'
+    +   '<div class="sum-sub-title" style="display:flex;justify-content:space-between;align-items:center">'
+    +     '<span>⏱ 납기 후 회수 일수 분포</span>'
+    +     '<span style="font-size:11px;color:#6B7280;font-weight:500">총 회수 ' + s.recoveryTotal.toLocaleString() + '건 · 평균 ' + s.recoveryAvg + '일 · 7일 내 회수 <b style="color:#10B981">' + s.fastRecoveryRate + '%</b></span>'
+    +   '</div>'
+    +   '<div style="position:relative;height:170px"><canvas id="sumS3_recovery"></canvas></div>'
     + '</div>';
 }
 
@@ -9988,6 +10035,37 @@ function sumDrawSection3(){
   if (typeof Chart === 'undefined') return;
   var s = sumBuildSection3();
   if (!s) return;
+  // [v117] 두 번째 차트: 회수 일수 분포
+  var c2 = document.getElementById('sumS3_recovery');
+  if (c2) {
+    if (window._sumS3C2) try { window._sumS3C2.destroy(); } catch(e){}
+    var rLabels = ['0~3일','4~7일','8~14일','15~30일','31일+'];
+    var rData = [s.recoveryDays['0'], s.recoveryDays['1'], s.recoveryDays['2'], s.recoveryDays['3'], s.recoveryDays['4']];
+    var rColors = ['#10B981','#34D399','#FCD34D','#F59E0B','#DC2626']; // 빠를수록 초록, 늦을수록 빨강
+    window._sumS3C2 = new Chart(c2, {
+      type: 'bar',
+      data: { labels: rLabels, datasets: [{ data: rData, backgroundColor: rColors, borderRadius: 5 }] },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { font:{size:10} } }, x: { ticks:{font:{size:10.5}}, grid:{display:false} } }
+      },
+      plugins: [{
+        id: 'sumS3C2Lbl',
+        afterDatasetsDraw: function(ch){
+          var ctx = ch.ctx, total = rData.reduce(function(a,b){return a+b;}, 0);
+          ch.getDatasetMeta(0).data.forEach(function(p, i){
+            var v = rData[i]; if (!v) return;
+            var pct = total > 0 ? Math.round(v/total*100) : 0;
+            ctx.save(); ctx.fillStyle='#1F2937'; ctx.font='bold 11px Pretendard,sans-serif';
+            ctx.textAlign='center'; ctx.textBaseline='bottom';
+            ctx.fillText(v + '건 (' + pct + '%)', p.x, p.y - 4);
+            ctx.restore();
+          });
+        }
+      }]
+    });
+  }
   var c = document.getElementById('sumS3_firstDelq');
   if (!c) return;
   if (window._sumS3C1) try { window._sumS3C1.destroy(); } catch(e){}
