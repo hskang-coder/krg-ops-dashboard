@@ -9117,6 +9117,13 @@ function renderContractMgmtView(){
     + '.sum-empty{text-align:center;color:#9CA3AF;padding:40px 0;font-size:13px;font-style:italic}'
     + '.sum-sticky{position:sticky;top:10px;align-self:start}'
     + '.sum-loading{text-align:center;padding:60px 0;color:#6B7280;font-size:14px}'
+    + '.sum-compare-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:6px 10px;background:#F9FAFB;border-radius:6px;font-size:11px}'
+    + '.sum-compare-row label{color:#6B7280;font-weight:700;font-size:10.5px}'
+    + '.sum-compare-row input[type=month]{padding:3px 6px;font-size:10.5px;border:1px solid #C7D2FE;border-radius:5px;background:#fff}'
+    + '.sum-scale-toggle{display:flex;gap:4px;margin-left:auto;align-items:center}'
+    + '.sum-scale-toggle button{padding:3px 8px;font-size:10px;font-weight:700;border:1px solid #C7D2FE;border-radius:5px;background:#fff;cursor:pointer;color:#475569}'
+    + '.sum-scale-toggle button.active{background:#7C3AED;color:#fff;border-color:#7C3AED}'
+    + '.sum-insight-row{display:flex;flex-wrap:wrap;gap:14px;margin-top:6px;padding:8px 10px;background:#F0F9FF;border-radius:6px;font-size:11px}'
     ;
   document.head.appendChild(style);
 })();
@@ -9165,6 +9172,8 @@ function renderSummaryDashboard(){
   var kpi = sumCalcKpi();
 
   wrap.innerHTML = sumPeriodRow() + sumKpiBar(kpi) + sumPlaceholderSections();
+  // [v103] 차트 그리기 (DOM 완성 후)
+  setTimeout(sumDrawDailyChart, 50);
 }
 
 // [v102] 기간 토글 (디폴트 분기)
@@ -9271,11 +9280,149 @@ function sumKpiBar(kpi){
     + '</div>';
 }
 
+// [v103] Section ① 일별 가계약 추이 — 글로벌 상태
+window._sumDailyMonths = window._sumDailyMonths || (function(){
+  var t = new Date();
+  var ym = function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
+  return [ym(t), ym(new Date(t.getFullYear(), t.getMonth()-1, 1)), ym(new Date(t.getFullYear(), t.getMonth()-2, 1))];
+})();
+window._sumDailyScale = window._sumDailyScale || 'log';
+
+function sumSetDailyMonth(idx, val){
+  if (!val) return;
+  window._sumDailyMonths[idx] = val;
+  renderSummaryDashboard();
+}
+function sumSetDailyScale(s){
+  window._sumDailyScale = s;
+  renderSummaryDashboard();
+}
+
+// [v103] 특정 월(YYYY-MM)의 일별 누적 가계약 카운트
+function sumBuildDailyData(ym){
+  var counts = new Array(31).fill(0);
+  if (!Array.isArray(vacancyRawData) || !ym) return counts;
+  vacancyRawData.forEach(function(v){
+    var d = cmgParseStartDate(v.tentativeDate);
+    if (!d) return;
+    var dym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    if (dym !== ym) return;
+    var day = d.getDate();
+    if (day >= 1 && day <= 31) counts[day-1]++;
+  });
+  // cumulative
+  var cum = 0;
+  return counts.map(function(c){ cum += c; return cum; });
+}
+
+// [v103] Section ① 카드 HTML
+function sumRenderDailyCard(){
+  var months = window._sumDailyMonths;
+  var scale = window._sumDailyScale;
+  var html = ''
+    + '<div class="sum-card-title"><span class="dot" style="background:#0EA5E9"></span>① 일별 가계약 추이 (BK열) <span class="badge sum-badge-sales">SALES</span></div>'
+    + '<div class="sum-compare-row">'
+    +   '<label>비교 1:</label>'
+    +   '<input type="month" value="' + months[0] + '" onchange="sumSetDailyMonth(0,this.value)">'
+    +   '<label>비교 2:</label>'
+    +   '<input type="month" value="' + months[1] + '" onchange="sumSetDailyMonth(1,this.value)">'
+    +   '<label>비교 3:</label>'
+    +   '<input type="month" value="' + months[2] + '" onchange="sumSetDailyMonth(2,this.value)">'
+    +   '<div class="sum-scale-toggle">'
+    +     '<span style="font-size:10.5px;color:#6B7280">Y축:</span>'
+    +     '<button class="' + (scale==='linear'?'active':'') + '" onclick="sumSetDailyScale(\'linear\')">Linear</button>'
+    +     '<button class="' + (scale==='log'?'active':'') + '" onclick="sumSetDailyScale(\'log\')">Log</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="position:relative;height:300px"><canvas id="sumDailyChart"></canvas></div>'
+    + '<div class="sum-insight-row" id="sumDailyInsight"></div>';
+  return html;
+}
+
+// [v103] Section ① 차트 그리기 (DOM 완성 후)
+function sumDrawDailyChart(){
+  var canvas = document.getElementById('sumDailyChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  if (window._sumDailyChartInstance) {
+    try { window._sumDailyChartInstance.destroy(); } catch(e){}
+  }
+  var months = window._sumDailyMonths;
+  var scale = window._sumDailyScale;
+  var data1 = sumBuildDailyData(months[0]);
+  var data2 = sumBuildDailyData(months[1]);
+  var data3 = sumBuildDailyData(months[2]);
+
+  // 당월(현재월)이면 오늘 이후는 null로 처리
+  var today = new Date();
+  var todayYM = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0');
+  var todayDay = today.getDate();
+  var trim = function(arr, ym){
+    if (ym !== todayYM) return arr;
+    return arr.map(function(v, i){ return (i+1) > todayDay ? null : v; });
+  };
+  var d1 = trim(data1, months[0]);
+  var d2 = trim(data2, months[1]);
+  var d3 = trim(data3, months[2]);
+  // log 스케일에서 0 처리: 0.5 대체 (시각적으로 0근처 표현)
+  if (scale === 'log') {
+    d1 = d1.map(function(v){ return v === null ? null : (v === 0 ? 0.5 : v); });
+    d2 = d2.map(function(v){ return v === null ? null : (v === 0 ? 0.5 : v); });
+    d3 = d3.map(function(v){ return v === null ? null : (v === 0 ? 0.5 : v); });
+  }
+  var labels = Array.from({length: 31}, function(_, i){ return (i+1)+'일'; });
+  var lbl = function(ym){ return ym + (ym === todayYM ? ' (당월)' : ''); };
+
+  window._sumDailyChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {label: lbl(months[0]), data: d1, borderColor:'#7C3AED', borderWidth:2.8, tension:0.2, pointRadius:2.5, fill:false},
+        {label: lbl(months[1]), data: d2, borderColor:'#0EA5E9', borderWidth:2, tension:0.2, pointRadius:1.5, borderDash:[6,3], fill:false},
+        {label: lbl(months[2]), data: d3, borderColor:'#94A3B8', borderWidth:1.6, tension:0.2, pointRadius:1.5, borderDash:[3,3], fill:false}
+      ]
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {position:'top', align:'end', labels:{boxWidth:10, font:{size:10.5}}},
+        tooltip: {mode:'index', intersect:false, callbacks:{label:function(c){
+          var v = c.parsed.y;
+          return c.dataset.label + ': ' + (v == null ? '-' : (v < 1 ? 0 : Math.round(v))) + '건';
+        }}}
+      },
+      scales: {
+        y: scale === 'log'
+          ? {type:'logarithmic', min:0.5, ticks:{font:{size:10}, callback:function(v){
+              if (v === 0.5 || v === 1 || v === 2 || v === 5 || v === 10 || v === 20 || v === 50 || v === 100 || v === 200 || v === 500) return v + '건';
+              return '';
+            }}, title:{display:true, text:'누적 (로그)'}}
+          : {type:'linear', beginAtZero:true, ticks:{font:{size:10}, callback:function(v){ return v + '건'; }}, title:{display:true, text:'누적 (선형)'}},
+        x: {ticks:{font:{size:10}}}
+      }
+    }
+  });
+
+  // 인사이트 텍스트 (월별 누적)
+  var ins = document.getElementById('sumDailyInsight');
+  if (ins) {
+    var last = function(arr, ym){
+      if (ym === todayYM) return arr[todayDay - 1] || 0;
+      return arr[arr.length-1] || 0;
+    };
+    var t1 = last(data1, months[0]), t2 = last(data2, months[1]), t3 = last(data3, months[2]);
+    ins.innerHTML = ''
+      + '<div><span style="color:#6B7280">' + months[0] + ':</span> <b style="color:#7C3AED">' + t1 + '건</b></div>'
+      + '<div><span style="color:#6B7280">' + months[1] + ':</span> <b>' + t2 + '건</b></div>'
+      + '<div><span style="color:#6B7280">' + months[2] + ':</span> <b>' + t3 + '건</b></div>';
+  }
+}
+
 // [v102] 섹션 placeholder (v103-v105에서 채워짐)
 function sumPlaceholderSections(){
   return '<div class="sum-main-grid">'
     + '<div class="sum-col-stack">'
-    +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#0EA5E9"></span>① 일별 가계약 추이 <span class="badge sum-badge-sales">SALES</span></div><div class="sum-empty">v103에서 추가 예정 — 일별 누적 + 3 month 비교 + 로그스케일</div></div>'
+    +   '<div class="sum-card sum-section-1">' + sumRenderDailyCard() + '</div>'
     +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#7C3AED"></span>② 거주기간 & 갱신차수 <span class="badge sum-badge-core">CORE LTV</span></div><div class="sum-empty">v104에서 추가 예정 — 갱신차수별 평균 거주기간 + funnel + 잔존율</div></div>'
     +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#DC2626"></span>③ 초기 연체자 신속 대응 <span class="badge sum-badge-risk">EARLY DETECTION</span></div><div class="sum-empty">v105에서 추가 예정 — 입주 후 N개월차 첫 연체 + 회복 funnel + 신규 연체 리스트</div></div>'
     +   '<div class="sum-card"><div class="sum-card-title"><span class="dot" style="background:#F59E0B"></span>④ 분할 서비스 수수료 누적 추이 <span class="badge sum-badge-revenue">REVENUE</span></div><div class="sum-empty">v105에서 추가 예정 — 24개월 누적 입금 + 분할 vs 일시불 비율</div></div>'
