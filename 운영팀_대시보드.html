@@ -9312,7 +9312,26 @@ function renderSummaryDashboard(){
 
 // [v102] 기간 토글 (디폴트 분기)
 window._sumPeriod = window._sumPeriod || 'quarter';
-function sumSetPeriod(val){ window._sumPeriod = val; renderSummaryDashboard(); }
+function sumSetPeriod(val){
+  window._sumPeriod = val;
+  // [v124] 상단 기간 토글 → Section ① 날짜 범위 자동 연동
+  var t = new Date(); t.setHours(0,0,0,0);
+  var fmt = function(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+  var startD, endD;
+  // 월=1개월, 분기=3개월, 반기=6개월, 연=12개월
+  var monthsBack = ({ month:1, quarter:3, half:6, year:12 })[val] || 3;
+  startD = new Date(t.getFullYear(), t.getMonth() - (monthsBack - 1), 1);
+  endD   = new Date(t.getFullYear(), t.getMonth() + 1, 0); // 이번달 말일
+  if (window._sumChartCfg) {
+    window._sumChartCfg.start = fmt(startD);
+    window._sumChartCfg.end   = fmt(endD);
+    // 단위는 자동 — 1개월=일, 3개월=주, 6/12개월=월
+    if (val === 'month') window._sumChartCfg.unit = 'day';
+    else if (val === 'quarter') window._sumChartCfg.unit = 'week';
+    else window._sumChartCfg.unit = 'month';
+  }
+  renderSummaryDashboard();
+}
 function sumPeriodRow(){
   var p = window._sumPeriod;
   return '<div class="sum-period-row">'
@@ -9484,9 +9503,17 @@ function sumBuildMonthlyData(){
     bucketKey = function(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
     bucketLabel = function(d){ return (d.getMonth()+1) + '/' + d.getDate(); };
   } else if (unit === 'week') {
-    weekStart = function(d){ var x = new Date(d); var dow = x.getDay(); var diff = (dow + 6) % 7; x.setDate(x.getDate() - diff); x.setHours(0,0,0,0); return x; }; // 월요일 시작
+    // [v124] 일요일 시작
+    weekStart = function(d){ var x = new Date(d); x.setDate(x.getDate() - x.getDay()); x.setHours(0,0,0,0); return x; };
+    // [v124] 주차 = 해당 연도 1월 1일 기준 주 번호 (Sunday-based)
+    var getWeekNum = function(d){
+      var jan1 = new Date(d.getFullYear(), 0, 1);
+      var jan1Dow = jan1.getDay();
+      var dayOfYear = Math.floor((d - jan1) / 86400000) + 1;
+      return Math.ceil((dayOfYear + jan1Dow) / 7);
+    };
     bucketKey = function(d){ var w = weekStart(d); return w.getFullYear() + '-' + String(w.getMonth()+1).padStart(2,'0') + '-' + String(w.getDate()).padStart(2,'0'); };
-    bucketLabel = function(d){ var w = weekStart(d); return (w.getMonth()+1) + '/' + w.getDate() + '~'; };
+    bucketLabel = function(d){ var w = weekStart(d); return getWeekNum(w) + 'W(' + (w.getMonth()+1) + '/' + String(w.getDate()).padStart(2,'0') + ')'; };
   } else {
     bucketKey = function(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); };
     bucketLabel = function(d){ return (d.getFullYear()%100) + '.' + String(d.getMonth()+1).padStart(2,'0'); };
