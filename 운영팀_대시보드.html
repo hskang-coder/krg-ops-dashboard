@@ -2985,15 +2985,69 @@ function downloadPtExcel() {
   if (!data || !data.length) { alert('다운로드할 데이터가 없습니다.'); return; }
   if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 시도해 주세요.'); return; }
   const ws = XLSX.utils.json_to_sheet(data);
-  // 컬럼 너비 설정
+  // 컬럼 너비 설정 (v125: 공실상태 컬럼 추가)
   ws['!cols'] = [
-    {wch:10},{wch:16},{wch:14},{wch:8},{wch:12},
-    {wch:12},{wch:12},{wch:12},{wch:30},{wch:10}
+    {wch:10},{wch:16},{wch:14},{wch:8},{wch:18},
+    {wch:12},{wch:12},{wch:12},{wch:12},{wch:30},{wch:10}
   ];
   const wb = XLSX.utils.book_new();
   const today = (() => { const d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
   XLSX.utils.book_append_sheet(wb, ws, '수납관리');
   XLSX.writeFile(wb, `수납관리_${today}.xlsx`);
+}
+
+// [v125] 갱신관리 엑셀 다운로드
+function rnwDownloadExcel() {
+  if (typeof rnwBuildEnriched !== 'function') { alert('데이터 로딩 중입니다.'); return; }
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로딩 중입니다.'); return; }
+  var enriched = rnwBuildEnriched();
+  // 현재 필터(승인/조건부/거절) 적용
+  var jf = window._rnwJudgeFilter || 'all';
+  var filtered = (jf === 'all') ? enriched : enriched.filter(function(e){
+    if (jf === 'app') return e.judge === 'approve';
+    if (jf === 'cond') return e.judge === 'conditional';
+    if (jf === 'deny') return e.judge === 'deny';
+    return true;
+  });
+  if (!filtered.length) { alert('다운로드할 데이터가 없습니다.'); return; }
+  var fmtDate = function(d){
+    if (!d) return '';
+    if (typeof d === 'string') return d;
+    if (d instanceof Date) return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    return String(d);
+  };
+  var rows = filtered.map(function(e, idx){
+    return {
+      'No': idx + 1,
+      '계약번호': e.cno || '',
+      '그룹': e.group || '',
+      '계약상태': e.contractStatus || '',
+      '공실상태': e.vacancyStatus || '',
+      '갱신심사결과': ({approve:'승인', conditional:'조건부승인', deny:'거절'})[e.judge] || e.judge || '',
+      '임차인': e.name || '',
+      '연락처': e.tel || '',
+      '갱신기한': fmtDate(e.deadline),
+      '만기일': fmtDate(e.endDate),
+      'D-Day': (e.dday < 0 ? 'D+' + Math.abs(e.dday) : 'D-' + e.dday),
+      '회차': e.round + '회차',
+      '연체횟수': e.metrics.count + '/' + e.metrics.total,
+      '누적일': e.metrics.sumDays + '일',
+      '연체율(%)': e.metrics.rate,
+      '진행상태': ({hope:'갱신희망', imp:'묵시적갱신대상', imp_cand:'묵시적갱신후보', exit:'퇴실', ended:'계약종료', rej:'갱신거절', cond_progress:'조건부진행', na:'미해당'})[e.progress] || e.progress || '',
+      '대응일': e.confirmDate || '',
+      '최근 대응 내용': e.latestContent || ''
+    };
+  });
+  var ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    {wch:5},{wch:10},{wch:12},{wch:10},{wch:18},
+    {wch:14},{wch:12},{wch:14},{wch:12},{wch:12},
+    {wch:8},{wch:8},{wch:10},{wch:8},{wch:9},{wch:14},{wch:12},{wch:35}
+  ];
+  var wb = XLSX.utils.book_new();
+  var today = (function(){ var d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
+  XLSX.utils.book_append_sheet(wb, ws, '갱신관리');
+  XLSX.writeFile(wb, '갱신관리_' + today + '.xlsx');
 }
 
 function renderPaymentTargets() {
@@ -3186,6 +3240,7 @@ function renderPaymentTargets() {
       '임차인명': x.name,
       '연락처': x.phone,
       '청구횟수': vacancy.billCount ? String(vacancy.billCount).replace(/회+$/,'')+'회' : '—',
+      '공실상태': vacancy.status || '—',
       '당월납부상태': r.payStatus || '—',
       '수납대상여부': catLabel,
       '납기일': r.dueDate || '—',
@@ -3252,6 +3307,7 @@ function renderPaymentTargets() {
       <div style="overflow-x:auto"><table class="pt-table">
         <thead><tr>
           <th>계약번호</th><th>임차인명</th><th>연락처</th><th>청구횟수</th>
+          <th>공실상태</th>
           <th>당월납부상태</th><th>수납대상여부</th>
           <th>납기일</th><th>최근 대응일</th><th>최근 대응내용</th><th>수납 대상</th>
         </tr></thead>
@@ -7249,6 +7305,7 @@ function renderRenewalView(){
     + '<button onclick="rnwGenerateMsg(\'expired\')" style="background:#F59E0B;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 만기퇴실 문자</button>'
     + '<button onclick="rnwGenerateMsg(\'conditional\')" style="background:#0EA5E9;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 조건부승인 문자</button>'
     + '<button onclick="rnwGenerateMsg(\'denied\')" style="background:#DC2626;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 갱신불가 문자</button>'
+    + '<button onclick="rnwDownloadExcel()" style="background:#1d4ed8;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">⬇️ 엑셀 다운로드</button>'
     + '</div>'
     + '</div>';
 
