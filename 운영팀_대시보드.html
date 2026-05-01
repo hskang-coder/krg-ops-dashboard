@@ -9179,6 +9179,9 @@ function renderContractMgmtView(){
     + '.sum-s3-period-btn{padding:3px 10px;font-size:11px;font-weight:600;border:1px solid #D1D5DB;background:#FFF;color:#6B7280;border-radius:14px;cursor:pointer;transition:all .15s}'
     + '.sum-s3-period-btn:hover{background:#F3F4F6}'
     + '.sum-s3-period-btn[data-act="true"]{background:#1B3976;color:#FFF;border-color:#1B3976}'
+    + '.sum-unit-btn{padding:3px 12px;font-size:11px;font-weight:600;border:1px solid #D1D5DB;background:#FFF;color:#6B7280;border-radius:14px;cursor:pointer;margin-right:3px;transition:all .15s}'
+    + '.sum-unit-btn:hover{background:#F3F4F6}'
+    + '.sum-unit-btn[data-act="true"]{background:#0EA5E9;color:#FFF;border-color:#0EA5E9}'
     + '.sum-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}'
     + '.sum-sub-title{font-size:11.5px;font-weight:700;color:#475569;margin-bottom:5px}'
     + '.sum-mini-insight{font-size:10.5px;color:#475569;padding:6px 9px;background:#F0FDF4;border-radius:5px;line-height:1.45;margin-top:8px}'
@@ -9432,65 +9435,117 @@ window._sumChartCfg = window._sumChartCfg || (function(){
     basis: 'tentative',     // 'tentative' (가계약일 BK) | 'startDate' (입주일 W)
     start: fmt(startD),
     end:   fmt(endD),
-    day1:  0                // [v109] 체크포인트: 매월 N일까지 (디폴트 0 = 미사용)
+    day1:  0,               // [v109] 체크포인트: 매월 N일까지 (디폴트 0 = 미사용)
+    unit:  'month'          // [v123] 'day' | 'week' | 'month'
   };
 })();
 
 function sumSetCfg(key, val){
   if (window._sumChartCfg[key] !== undefined) {
     window._sumChartCfg[key] = val;
+    // [v123] unit 변경 시 디폴트 기간 자동 조정
+    if (key === 'unit') {
+      var t = new Date(); t.setHours(0,0,0,0);
+      var fmt = function(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+      var startD, endD;
+      if (val === 'day') {
+        endD = new Date(t);
+        startD = new Date(t); startD.setDate(startD.getDate() - 29); // 최근 30일
+      } else if (val === 'week') {
+        endD = new Date(t);
+        startD = new Date(t); startD.setDate(startD.getDate() - 83); // 최근 12주 (84일)
+      } else { // month
+        startD = new Date(t.getFullYear(), t.getMonth() - 11, 1);
+        endD = new Date(t.getFullYear(), t.getMonth() + 1, 0);
+      }
+      window._sumChartCfg.start = fmt(startD);
+      window._sumChartCfg.end   = fmt(endD);
+    }
     renderSummaryDashboard();
   }
 }
 
-// [v105/v106] Section ① 월별 데이터 빌드 — config 기반
+// [v105/v106/v123] Section ① 데이터 빌드 — unit별 버킷 (일/주/월)
 function sumBuildMonthlyData(){
   if (!Array.isArray(vacancyRawData)) return [];
   var cfg = window._sumChartCfg;
+  var unit = cfg.unit || 'month';
   var startD = cmgParseStartDate(cfg.start) || new Date();
   var endD   = cmgParseStartDate(cfg.end)   || new Date();
   startD.setHours(0,0,0,0); endD.setHours(0,0,0,0);
-  // 월 리스트 (start의 월 ~ end의 월)
-  var months = [];
-  var cur = new Date(startD.getFullYear(), startD.getMonth(), 1);
-  var endMonth = new Date(endD.getFullYear(), endD.getMonth(), 1);
-  while (cur <= endMonth) {
-    var ym = cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0');
-    months.push({ ym: ym, label: (cur.getFullYear()%100) + '.' + String(cur.getMonth()+1).padStart(2,'0'),
-                  total: 0, day1: 0, day2: 0,
-                  seg1: 0, seg2: 0, seg3: 0 }); // [v108] stacked bar segments
-    cur.setMonth(cur.getMonth()+1);
-  }
-  var idx = {};
-  months.forEach(function(m, i){ idx[m.ym] = i; });
-
   var today = new Date(); today.setHours(0,0,0,0);
   var todayDay = today.getDate();
-
-  // [v108] segment 경계: lower = min(checkpoint, today), upper = max
   var lower = Math.min(cfg.day1, todayDay);
   var upper = Math.max(cfg.day1, todayDay);
+
+  // 버킷 키/라벨 헬퍼
+  var bucketKey, bucketLabel, weekStart;
+  if (unit === 'day') {
+    bucketKey = function(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+    bucketLabel = function(d){ return (d.getMonth()+1) + '/' + d.getDate(); };
+  } else if (unit === 'week') {
+    weekStart = function(d){ var x = new Date(d); var dow = x.getDay(); var diff = (dow + 6) % 7; x.setDate(x.getDate() - diff); x.setHours(0,0,0,0); return x; }; // 월요일 시작
+    bucketKey = function(d){ var w = weekStart(d); return w.getFullYear() + '-' + String(w.getMonth()+1).padStart(2,'0') + '-' + String(w.getDate()).padStart(2,'0'); };
+    bucketLabel = function(d){ var w = weekStart(d); return (w.getMonth()+1) + '/' + w.getDate() + '~'; };
+  } else {
+    bucketKey = function(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); };
+    bucketLabel = function(d){ return (d.getFullYear()%100) + '.' + String(d.getMonth()+1).padStart(2,'0'); };
+  }
+
+  // 버킷 리스트 생성 (start ~ end)
+  var buckets = [];
+  var idx = {};
+  var cur;
+  if (unit === 'day') {
+    cur = new Date(startD);
+    while (cur <= endD) {
+      var k = bucketKey(cur), l = bucketLabel(cur);
+      idx[k] = buckets.length;
+      buckets.push({ ym: k, label: l, total: 0, day1: 0, day2: 0, seg1: 0, seg2: 0, seg3: 0 });
+      cur.setDate(cur.getDate() + 1);
+    }
+  } else if (unit === 'week') {
+    cur = weekStart(startD);
+    var endW = weekStart(endD);
+    while (cur <= endW) {
+      var k = bucketKey(cur), l = bucketLabel(cur);
+      idx[k] = buckets.length;
+      buckets.push({ ym: k, label: l, total: 0, day1: 0, day2: 0, seg1: 0, seg2: 0, seg3: 0 });
+      cur.setDate(cur.getDate() + 7);
+    }
+  } else {
+    cur = new Date(startD.getFullYear(), startD.getMonth(), 1);
+    var endMonth = new Date(endD.getFullYear(), endD.getMonth(), 1);
+    while (cur <= endMonth) {
+      var k = bucketKey(cur), l = bucketLabel(cur);
+      idx[k] = buckets.length;
+      buckets.push({ ym: k, label: l, total: 0, day1: 0, day2: 0, seg1: 0, seg2: 0, seg3: 0 });
+      cur.setMonth(cur.getMonth() + 1);
+    }
+  }
 
   vacancyRawData.forEach(function(v){
     var rawDate = (cfg.basis === 'startDate') ? v.startDate : v.tentativeDate;
     var d = cmgParseStartDate(rawDate);
     if (!d) return;
     if (d < startD || d > endD) return;
-    var ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-    if (idx[ym] === undefined) return;
-    var day = d.getDate();
-    var m = months[idx[ym]];
+    var k = bucketKey(d);
+    if (idx[k] === undefined) return;
+    var m = buckets[idx[k]];
     m.total++;
-    // 체크포인트 누적 (1~체크포인트일)
-    if (day <= cfg.day1) m.day1++;
-    // [v108] today day-of-month 누적 — 모든 월에 today day 적용 (사용자 요청: 1일이면 모든 월 1일까지)
-    if (day <= todayDay) m.day2++;
-    // [v108] stacked segments (1~lower / lower+1~upper / upper+1~end)
-    if (day <= lower) m.seg1++;
-    else if (day <= upper) m.seg2++;
-    else m.seg3++;
+    // 월 단위에서만 segments 의미 있음
+    if (unit === 'month') {
+      var day = d.getDate();
+      if (day <= cfg.day1) m.day1++;
+      if (day <= todayDay) m.day2++;
+      if (day <= lower) m.seg1++;
+      else if (day <= upper) m.seg2++;
+      else m.seg3++;
+    } else {
+      m.seg1 = m.total; // 단일 색상으로 표시되도록
+    }
   });
-  return months;
+  return buckets;
 }
 
 // [v105/v106] Section ① 카드 HTML — 컨트롤 + 막대+라인 차트
@@ -9501,9 +9556,19 @@ function sumRenderDailyCard(){
   var today = new Date();
   var todayDay = today.getDate();
   var d2Label = cfg.day2Mode === 'today' ? ('오늘 (' + todayDay + '일) 자동') : ('매월 ' + cfg.day2Fixed + '일');
+  // [v123] unit 토글
+  var unit = cfg.unit || 'month';
+  var unitLabel = ({day:'일별', week:'주별', month:'월별'})[unit];
+  var unitBtns = ['day','week','month'].map(function(u){
+    var lbl = ({day:'일',week:'주',month:'월'})[u];
+    var act = (unit === u) ? 'true' : 'false';
+    return '<button class="sum-unit-btn" data-act="' + act + '" onclick="sumSetCfg(\'unit\',\'' + u + '\')">' + lbl + '</button>';
+  }).join('');
   var html = ''
-    + '<div class="sum-card-title"><span class="dot" style="background:#0EA5E9"></span>① 월별 ' + titleVerb + ' 추이 (' + basisLabel + ') <span class="badge sum-badge-sales">SALES</span></div>'
+    + '<div class="sum-card-title"><span class="dot" style="background:#0EA5E9"></span>① ' + unitLabel + ' ' + titleVerb + ' 추이 (' + basisLabel + ') <span class="badge sum-badge-sales">SALES</span></div>'
     + '<div class="sum-cfg-row">'
+    +   '<span class="sum-cfg-label">단위:</span>' + unitBtns
+    +   '<span class="sum-cfg-sep"></span>'
     +   '<span class="sum-cfg-label">기준:</span>'
     +   '<label class="sum-cfg-radio"><input type="radio" name="sumBasis" value="tentative" ' + (cfg.basis==='tentative'?'checked':'') + ' onchange="sumSetCfg(\'basis\',\'tentative\')"> 가계약일(BK)</label>'
     +   '<label class="sum-cfg-radio"><input type="radio" name="sumBasis" value="startDate" ' + (cfg.basis==='startDate'?'checked':'') + ' onchange="sumSetCfg(\'basis\',\'startDate\')"> 입주일(W)</label>'
@@ -9513,13 +9578,14 @@ function sumRenderDailyCard(){
     +   '<span style="color:#6B7280">~</span>'
     +   '<input type="date" value="' + cfg.end + '" onchange="sumSetCfg(\'end\',this.value)">'
     + '</div>'
-    + '<div class="sum-cfg-row">'
+    + (unit === 'month' ? ('<div class="sum-cfg-row">'
     +   '<span class="sum-cfg-label">체크포인트:</span>'
     +   '매월 <input type="number" min="0" max="31" value="' + cfg.day1 + '" onchange="sumSetCfg(\'day1\',Math.max(0,Math.min(31,parseInt(this.value)||0)))" style="width:46px">일까지 누적 (0=미사용)'
     +   '<span class="sum-cfg-sep"></span>'
     +   '<span style="color:#6B7280;font-size:10.5px">핑크 라인 = <b style="color:#EC4899">오늘(' + todayDay + '일) 자동</b> 기준 누적</span>'
     + '</div>'
-    + '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 누적 막대 — 진한 색 ' + titleVerb + ' (체크포인트 ' + cfg.day1 + '일까지) · 중간 색 (오늘 ' + todayDay + '일까지) · 연한 색 (오늘 이후, 미래 영업)</div>'
+    + '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 누적 막대 — 진한 색 ' + titleVerb + ' (체크포인트 ' + cfg.day1 + '일까지) · 중간 색 (오늘 ' + todayDay + '일까지) · 연한 색 (오늘 이후, 미래 영업)</div>') : '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 ' + unitLabel + ' ' + titleVerb + ' 건수</div>')
+    + ''
     + '<div style="position:relative;height:380px"><canvas id="sumDailyChart"></canvas></div>'
     + '<div class="sum-insight-row" id="sumDailyInsight"></div>';
   return html;
@@ -9596,12 +9662,15 @@ function sumDrawDailyChart(){
 
   window._sumDailyChartInstance = new Chart(canvas, {
     type: 'bar',
+    // [v123] unit별 datasets
     data: {
       labels: labels,
-      datasets: [
+      datasets: (cfg.unit === 'month') ? [
         { label: labelSeg1, data: seg1s, backgroundColor: '#F59E0B', stack: 'monthly', borderRadius: { topLeft:0, topRight:0, bottomLeft:5, bottomRight:5 } },
         { label: labelSeg2, data: seg2s, backgroundColor: '#FCD34D', stack: 'monthly' },
         { label: labelSeg3, data: seg3s, backgroundColor: '#FEE7B0', stack: 'monthly', borderRadius: { topLeft:5, topRight:5, bottomLeft:0, bottomRight:0 } }
+      ] : [
+        { label: '건수', data: totals, backgroundColor: '#0EA5E9', stack: 'monthly', borderRadius: 5 }
       ]
     },
     options: {
@@ -9644,11 +9713,22 @@ function sumDrawDailyChart(){
     var avgCp = Math.round(months.reduce(function(s,m){return s+m.day1;},0)/n);
     var avgTd = Math.round(months.reduce(function(s,m){return s+m.day2;},0)/n);
     var avgTotal = Math.round(months.reduce(function(s,m){return s+m.total;},0)/n);
-    ins.innerHTML = ''
-      + '<div><span style="color:#6B7280">최근 3개월 합계:</span> <b style="color:#1F2937">' + last3.reduce(function(s,m){return s+m.total;}, 0) + '건</b></div>'
-      + '<div><span style="color:#6B7280">이번달 (' + thisM.ym + '):</span> <b style="color:#7C3AED">' + thisM.total + '건</b> (오늘 ' + thisM.day2 + '건)</div>'
-      + '<div><span style="color:#6B7280">전월 대비:</span> <b style="color:' + trendColor + '">' + trendArrow + ' ' + Math.abs(trend) + '%</b></div>'
-      + '<div style="margin-left:auto;color:#9CA3AF;font-size:10px">월평균: ' + avgTotal + '건 · ' + cfg.day1 + '일까지 ' + avgCp + '건 · 오늘(' + todayDay + '일)까지 ' + avgTd + '건</div>';
+    var unitLbl = ({day:'일',week:'주',month:'월'})[cfg.unit||'month'];
+    var trendLbl = ({day:'전일',week:'전주',month:'전월'})[cfg.unit||'month'];
+    var lastLbl = ({day:'오늘',week:'이번주',month:'이번달'})[cfg.unit||'month'];
+    if (cfg.unit === 'month') {
+      ins.innerHTML = ''
+        + '<div><span style="color:#6B7280">최근 3' + unitLbl + ' 합계:</span> <b style="color:#1F2937">' + last3.reduce(function(s,m){return s+m.total;}, 0) + '건</b></div>'
+        + '<div><span style="color:#6B7280">' + lastLbl + ' (' + thisM.ym + '):</span> <b style="color:#7C3AED">' + thisM.total + '건</b> (오늘 ' + thisM.day2 + '건)</div>'
+        + '<div><span style="color:#6B7280">' + trendLbl + ' 대비:</span> <b style="color:' + trendColor + '">' + trendArrow + ' ' + Math.abs(trend) + '%</b></div>'
+        + '<div style="margin-left:auto;color:#9CA3AF;font-size:10px">' + unitLbl + '평균: ' + avgTotal + '건 · ' + cfg.day1 + '일까지 ' + avgCp + '건 · 오늘(' + todayDay + '일)까지 ' + avgTd + '건</div>';
+    } else {
+      ins.innerHTML = ''
+        + '<div><span style="color:#6B7280">최근 3' + unitLbl + ' 합계:</span> <b style="color:#1F2937">' + last3.reduce(function(s,m){return s+m.total;}, 0) + '건</b></div>'
+        + '<div><span style="color:#6B7280">' + lastLbl + ' (' + thisM.label + '):</span> <b style="color:#7C3AED">' + thisM.total + '건</b></div>'
+        + '<div><span style="color:#6B7280">' + trendLbl + ' 대비:</span> <b style="color:' + trendColor + '">' + trendArrow + ' ' + Math.abs(trend) + '%</b></div>'
+        + '<div style="margin-left:auto;color:#9CA3AF;font-size:10px">' + unitLbl + '평균: ' + avgTotal + '건</div>';
+    }
   }
 }
 
