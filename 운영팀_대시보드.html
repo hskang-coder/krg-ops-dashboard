@@ -2433,6 +2433,209 @@ function dlqUpdateSelInfo() {
   if (info) info.textContent = n > 0 ? n + '명 선택됨' : '체크박스로 연체자 선택 후 발행';
 }
 
+// [v130] 방문대응 — Google Maps URL 멀티 경유지 길찾기
+window._dlqAddressMap = null; // 계약번호 → 주소 매핑 캐시
+async function dlqLoadAddressMap() {
+  if (window._dlqAddressMap) return window._dlqAddressMap;
+  try {
+    const resp = await fetchSheetByGid('418937767');
+    if (!resp || !resp.table) return {};
+    const rows = resp.table.rows || [];
+    const map = {};
+    rows.forEach(row => {
+      const c = row.c || [];
+      const cno = c[2] ? String(c[2].f != null ? c[2].f : c[2].v != null ? c[2].v : '').trim() : '';
+      const building = c[8] ? String(c[8].f != null ? c[8].f : c[8].v != null ? c[8].v : '').trim() : '';
+      const addr = c[9] ? String(c[9].f != null ? c[9].f : c[9].v != null ? c[9].v : '').trim() : '';
+      if (cno) map[cno] = { building: building, address: addr };
+    });
+    window._dlqAddressMap = map;
+    return map;
+  } catch(e) { console.warn('주소 매핑 로드 실패:', e); return {}; }
+}
+
+async function dlqOpenVisitModal() {
+  const sel = Array.from(window._dlqSelectedCnos || []);
+  if (!sel.length) { alert('방문 대상을 먼저 체크박스로 선택해주세요.'); return; }
+  if (sel.length > 9) { alert('Google Maps 길찾기는 한 번에 최대 9곳까지 경유 가능합니다.\n현재 ' + sel.length + '곳 선택 — 9개 이하로 줄여주세요.'); return; }
+
+  const addrMap = await dlqLoadAddressMap();
+  // rows: 선택된 계약번호 → 임차인 + 주소
+  const rows = (window._dlqTableRows || []).filter(r => sel.includes(String(r.cno)));
+  const items = sel.map((cno, i) => {
+    const r = rows.find(x => String(x.cno) === cno) || {};
+    const a = addrMap[cno] || {};
+    return {
+      idx: i,
+      cno: cno,
+      name: r.name || r.tenant || r.tenantName || '—',
+      building: a.building || '—',
+      address: a.address || ''
+    };
+  });
+
+  // 마지막 사용한 출발/종료 기억 (localStorage)
+  const lastOrigin = localStorage.getItem('dlq_visit_origin') || '';
+  const lastDest = localStorage.getItem('dlq_visit_dest') || '';
+
+  // 모달
+  const overlay = document.createElement('div');
+  overlay.id = 'dlqVisitModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:12px;width:100%;max-width:760px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:14px 20px;background:linear-gradient(135deg,#059669,#10B981);color:#fff;display:flex;align-items:center;gap:10px">
+        <div style="font-size:18px;font-weight:800;flex:1">🚗 방문대응 — 동선 길찾기</div>
+        <button onclick="dlqCloseVisitModal()" style="background:rgba(255,255,255,.2);border:none;width:30px;height:30px;border-radius:50%;color:#fff;font-size:16px;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:18px 20px;overflow-y:auto;flex:1">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px">📍 출발지</label>
+            <input type="text" id="dlqVisitOrigin" placeholder="예: 서울 강남구 테헤란로 1 또는 KRG 사무실" value="${lastOrigin.replace(/"/g,'&quot;')}" style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px">🏁 종료지</label>
+            <input type="text" id="dlqVisitDest" placeholder="비어두면 출발지와 동일 (왕복)" value="${lastDest.replace(/"/g,'&quot;')}" style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px">
+          </div>
+        </div>
+        <div style="font-size:12px;color:#6B7280;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+          <span style="font-weight:700">📋 경유지 (${items.length}곳)</span>
+          <span>— 드래그로 순서 변경 또는 순서대로 방문</span>
+          <button onclick="dlqClearOriginDest()" style="margin-left:auto;background:#F3F4F6;border:1px solid #D1D5DB;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;color:#6B7280">기억 삭제</button>
+        </div>
+        <div id="dlqVisitList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+          ${items.map((it, i) => `
+            <div class="visit-row" data-idx="${i}" draggable="true" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;cursor:move">
+              <div style="width:28px;height:28px;background:#059669;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0" class="visit-num">${i+1}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700;color:#1F2937;font-size:13px"><span style="color:#0E7490">${it.cno}</span> · ${it.name} <span style="color:#6B7280;font-weight:500;font-size:11px">${it.building}</span></div>
+                <div style="font-size:11px;color:${it.address ? '#6B7280' : '#DC2626'};margin-top:2px">${it.address || '⚠ 주소 없음 (Google Maps에서 빠짐)'}</div>
+              </div>
+              <button onclick="dlqVisitMoveUp(${i})" style="background:#FFF;border:1px solid #D1D5DB;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:13px" title="위로">↑</button>
+              <button onclick="dlqVisitMoveDown(${i})" style="background:#FFF;border:1px solid #D1D5DB;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:13px" title="아래로">↓</button>
+              <button onclick="dlqVisitRemove(${i})" style="background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:11px" title="제거">✕</button>
+            </div>
+          `).join('')}
+        </div>
+        <div style="background:#EFF6FF;border-left:3px solid #3B82F6;padding:10px 12px;border-radius:6px;font-size:11.5px;color:#1E40AF;margin-bottom:10px">
+          💡 Google Maps에서 열린 후 좌측 패널의 [경로 옵션] → [경로 최적화]로 더 효율적인 동선으로 자동 재정렬할 수 있습니다.
+        </div>
+      </div>
+      <div style="padding:12px 20px;background:#F9FAFB;border-top:1px solid #E5E7EB;display:flex;gap:8px">
+        <button onclick="dlqCopyAddresses()" style="background:#FFF;color:#374151;border:1px solid #D1D5DB;padding:9px 16px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">📋 주소 복사</button>
+        <button onclick="dlqCloseVisitModal()" style="background:#FFF;color:#6B7280;border:1px solid #D1D5DB;padding:9px 16px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;margin-left:auto">취소</button>
+        <button onclick="dlqLaunchGoogleMaps()" style="background:#059669;color:#fff;border:none;padding:9px 18px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">🗺️ Google Maps 길찾기 열기</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  window._dlqVisitItems = items;
+
+  // 드래그앤드롭 순서 변경
+  let dragIdx = null;
+  overlay.querySelectorAll('.visit-row').forEach(el => {
+    el.addEventListener('dragstart', e => { dragIdx = +el.dataset.idx; el.style.opacity = '0.4'; });
+    el.addEventListener('dragend', e => { el.style.opacity = '1'; });
+    el.addEventListener('dragover', e => { e.preventDefault(); el.style.boxShadow = 'inset 0 -2px 0 #059669'; });
+    el.addEventListener('dragleave', e => { el.style.boxShadow = ''; });
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      el.style.boxShadow = '';
+      const dropIdx = +el.dataset.idx;
+      if (dragIdx === null || dragIdx === dropIdx) return;
+      const moved = window._dlqVisitItems.splice(dragIdx, 1)[0];
+      window._dlqVisitItems.splice(dropIdx, 0, moved);
+      dlqVisitRerender();
+    });
+  });
+}
+
+function dlqCloseVisitModal(){ const m = document.getElementById('dlqVisitModal'); if (m) m.remove(); }
+function dlqClearOriginDest(){
+  localStorage.removeItem('dlq_visit_origin');
+  localStorage.removeItem('dlq_visit_dest');
+  document.getElementById('dlqVisitOrigin').value = '';
+  document.getElementById('dlqVisitDest').value = '';
+}
+function dlqVisitMoveUp(i){
+  if (i <= 0) return;
+  const arr = window._dlqVisitItems;
+  [arr[i-1], arr[i]] = [arr[i], arr[i-1]];
+  dlqVisitRerender();
+}
+function dlqVisitMoveDown(i){
+  const arr = window._dlqVisitItems;
+  if (i >= arr.length - 1) return;
+  [arr[i+1], arr[i]] = [arr[i], arr[i+1]];
+  dlqVisitRerender();
+}
+function dlqVisitRemove(i){
+  window._dlqVisitItems.splice(i, 1);
+  dlqVisitRerender();
+}
+function dlqVisitRerender(){
+  const list = document.getElementById('dlqVisitList');
+  if (!list) return;
+  const items = window._dlqVisitItems;
+  list.innerHTML = items.map((it, i) => `
+    <div class="visit-row" data-idx="${i}" draggable="true" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;cursor:move">
+      <div style="width:28px;height:28px;background:#059669;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">${i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;color:#1F2937;font-size:13px"><span style="color:#0E7490">${it.cno}</span> · ${it.name} <span style="color:#6B7280;font-weight:500;font-size:11px">${it.building}</span></div>
+        <div style="font-size:11px;color:${it.address ? '#6B7280' : '#DC2626'};margin-top:2px">${it.address || '⚠ 주소 없음'}</div>
+      </div>
+      <button onclick="dlqVisitMoveUp(${i})" style="background:#FFF;border:1px solid #D1D5DB;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:13px">↑</button>
+      <button onclick="dlqVisitMoveDown(${i})" style="background:#FFF;border:1px solid #D1D5DB;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:13px">↓</button>
+      <button onclick="dlqVisitRemove(${i})" style="background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:11px">✕</button>
+    </div>
+  `).join('');
+  // 드래그 다시 바인딩
+  let dragIdx = null;
+  list.querySelectorAll('.visit-row').forEach(el => {
+    el.addEventListener('dragstart', e => { dragIdx = +el.dataset.idx; el.style.opacity = '0.4'; });
+    el.addEventListener('dragend', e => { el.style.opacity = '1'; });
+    el.addEventListener('dragover', e => { e.preventDefault(); el.style.boxShadow = 'inset 0 -2px 0 #059669'; });
+    el.addEventListener('dragleave', e => { el.style.boxShadow = ''; });
+    el.addEventListener('drop', e => {
+      e.preventDefault(); el.style.boxShadow = '';
+      const dropIdx = +el.dataset.idx;
+      if (dragIdx === null || dragIdx === dropIdx) return;
+      const moved = window._dlqVisitItems.splice(dragIdx, 1)[0];
+      window._dlqVisitItems.splice(dropIdx, 0, moved);
+      dlqVisitRerender();
+    });
+  });
+}
+function dlqCopyAddresses(){
+  const items = window._dlqVisitItems || [];
+  const text = items.map((it, i) => (i+1) + '. ' + it.name + ' (' + it.cno + ') — ' + (it.address || '주소 없음')).join('\n');
+  navigator.clipboard.writeText(text).then(() => { alert('주소 ' + items.length + '곳을 클립보드에 복사했습니다.'); });
+}
+function dlqLaunchGoogleMaps(){
+  const origin = document.getElementById('dlqVisitOrigin').value.trim();
+  if (!origin) { alert('출발지를 입력해주세요.'); return; }
+  let dest = document.getElementById('dlqVisitDest').value.trim();
+  const items = (window._dlqVisitItems || []).filter(it => it.address); // 주소 있는 것만
+  if (!items.length) { alert('주소가 있는 경유지가 없습니다.'); return; }
+
+  // 출발/종료 localStorage 저장
+  localStorage.setItem('dlq_visit_origin', origin);
+  localStorage.setItem('dlq_visit_dest', dest);
+
+  // 종료지 비어있으면 출발지와 동일 (왕복)
+  if (!dest) dest = origin;
+
+  // Google Maps URL — origin/destination/waypoints 인코딩
+  const enc = encodeURIComponent;
+  const waypoints = items.map(it => it.address).join('|');
+  const url = 'https://www.google.com/maps/dir/?api=1'
+    + '&origin=' + enc(origin)
+    + '&destination=' + enc(dest)
+    + '&waypoints=' + enc(waypoints)
+    + '&travelmode=driving';
+  window.open(url, '_blank', 'noopener');
+}
+
 async function dlqGenerateDoc(type) {
   var sel = Array.from(window._dlqSelectedCnos);
   if (!sel.length) { alert('연체자를 먼저 체크박스로 선택해주세요.'); return; }
@@ -4762,6 +4965,7 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-doc-btn" id="dlqDocBtn2" onclick="dlqGenerateDoc('civil')">📄 내용증명 (민사)</button>
           <button class="dlq-doc-btn" id="dlqDocBtn3" onclick="dlqGenerateDoc('civil_criminal')">📄 내용증명 (민사&형사)</button>
           <button class="dlq-doc-btn" id="dlqDocBtn4" onclick="dlqGenerateDoc('sms')">📄 내용증명 문자 발송</button>
+          <button class="dlq-doc-btn" id="dlqVisitBtn" onclick="dlqOpenVisitModal()" style="background:#059669;color:#fff;border-color:#059669">🚗 방문대응</button>
           <span class="dlq-sel-info" id="dlqSelInfo" style="font-size:11px;color:#6366f1;font-weight:700;white-space:nowrap"></span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
