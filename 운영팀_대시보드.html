@@ -2537,6 +2537,7 @@ async function dlqOpenVisitModal() {
         <button onclick="dlqCopyAddresses()" style="background:#FFF;color:#374151;border:1px solid #D1D5DB;padding:9px 16px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">📋 주소 복사</button>
         <button onclick="dlqCloseVisitModal()" style="background:#FFF;color:#6B7280;border:1px solid #D1D5DB;padding:9px 16px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;margin-left:auto">취소</button>
         <button onclick="dlqLaunchGoogleMaps()" style="background:#059669;color:#fff;border:none;padding:9px 18px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">🗺️ Google Maps 길찾기 열기</button>
+        <button onclick="dlqDownloadVisitExcel()" style="background:#1d4ed8;color:#fff;border:none;padding:9px 18px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">⬇️ 엑셀</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -2653,6 +2654,34 @@ function dlqCopyAddresses(){
     alert('방문 정보 ' + items.length + '곳을 클립보드에 복사했습니다.\n(엑셀/문서에 붙여넣으면 표 형식으로 표시됩니다)');
   }).catch(() => { alert('클립보드 복사 실패'); });
 }
+// [v133] 방문대응 엑셀 다운로드
+function dlqDownloadVisitExcel(){
+  const items = window._dlqVisitItems || [];
+  if (!items.length) { alert('다운로드할 데이터가 없습니다.'); return; }
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로딩 중입니다.'); return; }
+  const origin = (document.getElementById('dlqVisitOrigin')||{}).value || 'krg사무실';
+  const dest = (document.getElementById('dlqVisitDest')||{}).value || 'krg사무실';
+  const rows = items.map((it, i) => ({
+    'No': i + 1,
+    '계약번호': it.cno || '',
+    '이름': it.name || '',
+    '연락처': dlqFmtPhone(it.tenantPhone),
+    '임대인': it.landlordName || '',
+    '임대인연락처': dlqFmtPhone(it.landlordPhone),
+    '건물명': it.building || '',
+    '주소': it.address || ''
+  }));
+  // 출발/종료지 메타 추가
+  rows.unshift({ 'No': '', '계약번호': '【출발지】', '이름': origin, '연락처': '', '임대인': '', '임대인연락처': '', '건물명': '', '주소': '' });
+  rows.push({ 'No': '', '계약번호': '【종료지】', '이름': dest, '연락처': '', '임대인': '', '임대인연락처': '', '건물명': '', '주소': '' });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:5},{wch:12},{wch:14},{wch:14},{wch:12},{wch:14},{wch:18},{wch:40}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '방문동선');
+  const today = (function(){ var d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
+  XLSX.writeFile(wb, '방문동선_' + today + '.xlsx');
+}
+
 function dlqLaunchGoogleMaps(){
   // [v132] 빈 입력 시 "krg사무실" 디폴트
   let origin = document.getElementById('dlqVisitOrigin').value.trim() || 'krg사무실';
