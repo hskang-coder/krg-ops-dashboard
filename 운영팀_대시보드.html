@@ -2442,12 +2442,20 @@ async function dlqLoadAddressMap() {
     if (!resp || !resp.table) return {};
     const rows = resp.table.rows || [];
     const map = {};
+    // [v131] D/E (임대인 명/연락처), N/P (계약자 명/연락처) 추가
+    const cell = (c, i) => c[i] ? String(c[i].f != null ? c[i].f : c[i].v != null ? c[i].v : '').trim() : '';
     rows.forEach(row => {
       const c = row.c || [];
-      const cno = c[2] ? String(c[2].f != null ? c[2].f : c[2].v != null ? c[2].v : '').trim() : '';
-      const building = c[8] ? String(c[8].f != null ? c[8].f : c[8].v != null ? c[8].v : '').trim() : '';
-      const addr = c[9] ? String(c[9].f != null ? c[9].f : c[9].v != null ? c[9].v : '').trim() : '';
-      if (cno) map[cno] = { building: building, address: addr };
+      const cno = cell(c, 2);
+      if (!cno) return;
+      map[cno] = {
+        building: cell(c, 8),
+        address: cell(c, 9),
+        landlordName: cell(c, 3),    // D열
+        landlordPhone: cell(c, 4),   // E열
+        tenantName: cell(c, 13),     // N열
+        tenantPhone: cell(c, 15)     // P열
+      };
     });
     window._dlqAddressMap = map;
     return map;
@@ -2468,9 +2476,12 @@ async function dlqOpenVisitModal() {
     return {
       idx: i,
       cno: cno,
-      name: r.name || r.tenant || r.tenantName || '—',
+      name: a.tenantName || r.name || r.tenant || r.tenantName || '—',
       building: a.building || '—',
-      address: a.address || ''
+      address: a.address || '',
+      tenantPhone: a.tenantPhone || '',
+      landlordName: a.landlordName || '',
+      landlordPhone: a.landlordPhone || ''
     };
   });
 
@@ -2606,10 +2617,40 @@ function dlqVisitRerender(){
     });
   });
 }
+// [v131] 전화번호 포맷 — "1081232673" → "010-8123-2673" / "021234567" → "02-123-4567"
+function dlqFmtPhone(p){
+  if (!p) return '';
+  var s = String(p).replace(/[^0-9]/g, '');
+  if (!s) return '';
+  // 0이 빠진 휴대폰 (10/11자리, 1로 시작)
+  if (/^1\d{9}$/.test(s)) s = '0' + s;
+  if (/^010\d{8}$/.test(s)) return s.slice(0,3) + '-' + s.slice(3,7) + '-' + s.slice(7);
+  if (/^01[16-9]\d{7,8}$/.test(s)) return s.slice(0,3) + '-' + s.slice(3, s.length-4) + '-' + s.slice(-4);
+  if (/^02\d{7,8}$/.test(s)) return s.slice(0,2) + '-' + s.slice(2, s.length-4) + '-' + s.slice(-4);
+  if (/^0\d{2}\d{6,8}$/.test(s)) return s.slice(0,3) + '-' + s.slice(3, s.length-4) + '-' + s.slice(-4);
+  return s;
+}
 function dlqCopyAddresses(){
   const items = window._dlqVisitItems || [];
-  const text = items.map((it, i) => (i+1) + '. ' + it.name + ' (' + it.cno + ') — ' + (it.address || '주소 없음')).join('\n');
-  navigator.clipboard.writeText(text).then(() => { alert('주소 ' + items.length + '곳을 클립보드에 복사했습니다.'); });
+  if (!items.length) { alert('복사할 데이터가 없습니다.'); return; }
+  // [v131] 헤더 + 정보 풍부한 형식 — TSV (탭 구분, 엑셀 붙여넣기 호환)
+  const lines = ['No\t계약번호\t이름\t연락처\t임대인\t임대인연락처\t건물명\t주소'];
+  items.forEach((it, i) => {
+    lines.push([
+      i+1,
+      it.cno,
+      it.name || '',
+      dlqFmtPhone(it.tenantPhone),
+      it.landlordName || '',
+      dlqFmtPhone(it.landlordPhone),
+      it.building || '',
+      it.address || '주소 없음'
+    ].join('\t'));
+  });
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    alert('방문 정보 ' + items.length + '곳을 클립보드에 복사했습니다.\n(엑셀/문서에 붙여넣으면 표 형식으로 표시됩니다)');
+  }).catch(() => { alert('클립보드 복사 실패'); });
 }
 function dlqLaunchGoogleMaps(){
   const origin = document.getElementById('dlqVisitOrigin').value.trim();
