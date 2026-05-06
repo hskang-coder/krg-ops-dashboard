@@ -2529,10 +2529,11 @@ async function dlqOpenVisitModal() {
             <input type="text" id="dlqVisitDest" placeholder="비어두면 출발지와 동일 (왕복)" value="${lastDest.replace(/"/g,'&quot;')}" style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px">
           </div>
         </div>
-        <div style="font-size:12px;color:#6B7280;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+        <div style="font-size:12px;color:#6B7280;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-weight:700">📋 경유지 (${items.length}곳)</span>
-          <span>— 드래그로 순서 변경 또는 순서대로 방문</span>
-          <button onclick="dlqClearOriginDest()" style="margin-left:auto;background:#F3F4F6;border:1px solid #D1D5DB;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;color:#6B7280">기억 삭제</button>
+          <span>— 드래그로 순서 변경</span>
+          <button onclick="dlqOptimizeRoute()" style="margin-left:auto;background:#059669;color:#fff;border:none;border-radius:6px;padding:4px 11px;font-size:11.5px;font-weight:700;cursor:pointer">🤖 자동 정렬 (출발지→가까운 순)</button>
+          <button onclick="dlqClearOriginDest()" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;color:#6B7280">기억 삭제</button>
         </div>
         <div id="dlqVisitList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
           ${items.map((it, i) => `
@@ -2594,6 +2595,91 @@ async function dlqOpenVisitModal() {
 function dlqCloseVisitModal(){
   const m = document.getElementById('dlqVisitModal');
   if (m) m.remove();
+}
+
+// [v139] 자동 동선 최적화 — 시·구 기반 좌표 테이블 + nearest-neighbor TSP
+// 좌표는 각 시·구의 행정중심 위치 (정확도 ±1km, 동선 최적화 용도로 충분)
+const DLQ_DISTRICT_COORDS = {
+  // 서울 25 자치구
+  '강남구': [37.5172, 127.0473], '강동구': [37.5301, 127.1238], '강북구': [37.6396, 127.0257],
+  '강서구': [37.5509, 126.8495], '관악구': [37.4784, 126.9516], '광진구': [37.5384, 127.0822],
+  '구로구': [37.4954, 126.8874], '금천구': [37.4519, 126.9018], '노원구': [37.6542, 127.0568],
+  '도봉구': [37.6688, 127.0471], '동대문구': [37.5744, 127.0398], '동작구': [37.5124, 126.9393],
+  '마포구': [37.5663, 126.9019], '서대문구': [37.5791, 126.9368], '서초구': [37.4837, 127.0324],
+  '성동구': [37.5634, 127.0367], '성북구': [37.5894, 127.0167], '송파구': [37.5145, 127.1059],
+  '양천구': [37.5170, 126.8665], '영등포구': [37.5263, 126.8962], '용산구': [37.5384, 126.9654],
+  '은평구': [37.6027, 126.9290], '종로구': [37.5728, 126.9794], '중구': [37.5641, 126.9979],
+  '중랑구': [37.6063, 127.0925],
+  // 인천 8 자치구·군
+  '미추홀구': [37.4633, 126.6505], '연수구': [37.4101, 126.6783], '남동구': [37.4470, 126.7335],
+  '부평구': [37.5071, 126.7218], '계양구': [37.5374, 126.7375], '서구': [37.5455, 126.6755],
+  '동구': [37.4738, 126.6432],
+  // 경기도 주요 시
+  '수원시': [37.2636, 127.0286], '성남시': [37.4201, 127.1265], '안양시': [37.3943, 126.9568],
+  '고양시': [37.6584, 126.8320], '용인시': [37.2411, 127.1776], '부천시': [37.5035, 126.7660],
+  '안산시': [37.3219, 126.8309], '의정부시': [37.7381, 127.0337], '광명시': [37.4795, 126.8645],
+  '시흥시': [37.3800, 126.8030], '평택시': [36.9921, 127.1129], '하남시': [37.5392, 127.2148],
+  '구리시': [37.5944, 127.1296], '남양주시': [37.6360, 127.2165], '파주시': [37.7600, 126.7800],
+  '김포시': [37.6151, 126.7156], '광주시': [37.4296, 127.2552], '화성시': [37.1996, 126.8311]
+};
+// "krg사무실" 또는 빈 값일 때 디폴트 좌표 (신논현역)
+const DLQ_DEFAULT_ORIGIN = [37.5045, 127.0249];
+
+// 주소에서 시·구 추출 후 좌표 lookup
+function dlqAddrToCoord(addr) {
+  if (!addr) return null;
+  // 특별한 키워드 처리
+  if (/krg|krg사무실|신논현/i.test(addr)) return DLQ_DEFAULT_ORIGIN;
+  const reg = dlqExtractRegion(addr);
+  if (reg.sigungu && DLQ_DISTRICT_COORDS[reg.sigungu]) return DLQ_DISTRICT_COORDS[reg.sigungu];
+  return null;
+}
+
+// Haversine 거리 (km)
+function dlqHaversine(c1, c2) {
+  if (!c1 || !c2) return 9999;
+  const R = 6371;
+  const dLat = (c2[0] - c1[0]) * Math.PI / 180;
+  const dLon = (c2[1] - c1[1]) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(c1[0]*Math.PI/180) * Math.cos(c2[0]*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+// Nearest-neighbor TSP — 출발지에서 가까운 순으로 정렬
+function dlqOptimizeRoute() {
+  const origin = (document.getElementById('dlqVisitOrigin')||{}).value || 'krg사무실';
+  const originCoord = dlqAddrToCoord(origin) || DLQ_DEFAULT_ORIGIN;
+  const items = window._dlqVisitItems || [];
+  if (items.length < 2) { alert('정렬할 경유지가 2곳 이상 필요합니다.'); return; }
+  // 좌표 매핑
+  const withCoord = items.map((it, i) => ({ it, coord: dlqAddrToCoord(it.address), origIdx: i }));
+  const noCoord = withCoord.filter(x => !x.coord);
+  const hasCoord = withCoord.filter(x => x.coord);
+  if (hasCoord.length === 0) { alert('주소에서 시·구를 인식할 수 없어 자동 정렬 불가합니다.'); return; }
+  // Nearest-neighbor
+  const ordered = [];
+  let current = originCoord;
+  const remaining = hasCoord.slice();
+  while (remaining.length > 0) {
+    let minDist = Infinity, minIdx = 0;
+    remaining.forEach((x, i) => {
+      const d = dlqHaversine(current, x.coord);
+      if (d < minDist) { minDist = d; minIdx = i; }
+    });
+    const next = remaining.splice(minIdx, 1)[0];
+    ordered.push(next.it);
+    current = next.coord;
+  }
+  // 좌표 없는 항목은 끝에 (원래 순서 유지)
+  noCoord.forEach(x => ordered.push(x.it));
+  window._dlqVisitItems = ordered;
+  dlqVisitRerender();
+  dlqRenderRoutePreview();
+  // 알림
+  const skipped = noCoord.length;
+  const msg = '✅ 자동 정렬 완료 — 출발지(' + origin + ')에서 가까운 순으로 ' + ordered.length + '곳 재배치'
+    + (skipped > 0 ? '\n⚠ 좌표 인식 실패 ' + skipped + '곳은 끝에 배치됨 — 수동 조정 권장' : '');
+  alert(msg);
 }
 
 // [v136] 주소에서 시·도 / 시·군·구 추출
