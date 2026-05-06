@@ -982,9 +982,6 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-tbl-count { padding:8px 14px; font-size:12px; color:#9ca3af; text-align:right; }
 
 </style>
-<!-- [v135] Leaflet — 방문대응 미니 지도용 (무료, API 키 불필요) -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
 <!-- v1776817031 -->
 </head>
 <body>
@@ -2541,15 +2538,8 @@ async function dlqOpenVisitModal() {
         <div style="background:#EFF6FF;border-left:3px solid #3B82F6;padding:10px 12px;border-radius:6px;font-size:11.5px;color:#1E40AF;margin-bottom:10px">
           💡 Google Maps에서 열린 후 좌측 패널의 [경로 옵션] → [경로 최적화]로 더 효율적인 동선으로 자동 재정렬할 수 있습니다.
         </div>
-        <!-- [v135] 미니 지도 미리보기 -->
-        <div style="margin-top:10px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <span style="font-size:12px;font-weight:700;color:#374151">🗺️ 동선 미리보기</span>
-            <span id="dlqMapStatus" style="font-size:10.5px;color:#9CA3AF">주소 좌표 변환 중...</span>
-          </div>
-          <div id="dlqMapPreview" style="height:280px;border-radius:8px;border:1px solid #E5E7EB;background:#F3F4F6"></div>
-          <div style="font-size:10.5px;color:#9CA3AF;margin-top:4px">※ 직선 연결 (실제 도로 경로 아님) · 정확한 경로는 Google Maps에서 확인</div>
-        </div>
+        <!-- [v136] 동선 미리보기 — 스키매틱 다이어그램 + 지역 요약 (지도 API 불필요) -->
+        <div id="dlqRoutePreview" style="margin-top:10px"></div>
       </div>
       <div style="padding:12px 20px;background:#F9FAFB;border-top:1px solid #E5E7EB;display:flex;gap:8px">
         <button onclick="dlqCopyAddresses()" style="background:#FFF;color:#374151;border:1px solid #D1D5DB;padding:9px 16px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">📋 주소 복사</button>
@@ -2579,120 +2569,162 @@ async function dlqOpenVisitModal() {
     });
   });
 
-  // [v135] 미니 지도 자동 렌더링 (모달 열린 직후)
-  setTimeout(dlqRenderMiniMap, 200);
-  // 출발/종료지 변경 시 지도 재렌더 (debounce 1.5s)
-  let debounceTimer;
+  // [v136] 스키매틱 동선 자동 렌더링 (즉시)
+  dlqRenderRoutePreview();
+  // 출발/종료지 변경 시 재렌더
   ['dlqVisitOrigin', 'dlqVisitDest'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('blur', () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(dlqRenderMiniMap, 1500);
-    });
+    if (el) el.addEventListener('input', dlqRenderRoutePreview);
   });
 }
 
 function dlqCloseVisitModal(){
   const m = document.getElementById('dlqVisitModal');
   if (m) m.remove();
-  // [v135] 지도 인스턴스 정리
-  if (window._dlqMap) { try { window._dlqMap.remove(); } catch(e){} window._dlqMap = null; }
 }
 
-// [v135] 미니 지도 — Leaflet + Nominatim (무료, API 키 불필요)
-window._dlqGeoCache = window._dlqGeoCache || {}; // localStorage + memory 캐시
-async function dlqGeocode(addr){
-  if (!addr) return null;
-  if (window._dlqGeoCache[addr]) return window._dlqGeoCache[addr];
-  // localStorage 캐시
-  try {
-    const cached = localStorage.getItem('geo_' + addr);
-    if (cached) { const o = JSON.parse(cached); window._dlqGeoCache[addr] = o; return o; }
-  } catch(e){}
-  try {
-    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=ko&q=' + encodeURIComponent(addr);
-    const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
-    const data = await r.json();
-    if (data && data[0]) {
-      const pt = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-      window._dlqGeoCache[addr] = pt;
-      try { localStorage.setItem('geo_' + addr, JSON.stringify(pt)); } catch(e){}
-      return pt;
-    }
-  } catch(e) { console.warn('Geocode fail:', addr, e); }
-  return null;
+// [v136] 주소에서 시·도 / 시·군·구 추출
+function dlqExtractRegion(addr){
+  if (!addr) return { sido: '', sigungu: '' };
+  // 풀네임: "서울특별시 관악구 ..."
+  let m = addr.match(/(서울특별시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원특별자치도|강원도|충청북도|충청남도|전라북도|전북특별자치도|전라남도|경상북도|경상남도|제주특별자치도)\s+([가-힣]+(?:시|군|구))/);
+  if (m) return { sido: m[1], sigungu: m[2] };
+  // 약어: "서울 관악구 ..."
+  const SIDO_MAP = { '서울':'서울특별시','부산':'부산광역시','대구':'대구광역시','인천':'인천광역시','광주':'광주광역시','대전':'대전광역시','울산':'울산광역시','세종':'세종특별자치시','경기':'경기도','강원':'강원특별자치도','충북':'충청북도','충남':'충청남도','전북':'전라북도','전남':'전라남도','경북':'경상북도','경남':'경상남도','제주':'제주특별자치도' };
+  m = addr.match(/^(\S+)\s+([가-힣]+(?:시|군|구))/);
+  if (m && SIDO_MAP[m[1]]) return { sido: SIDO_MAP[m[1]], sigungu: m[2] };
+  return { sido: '', sigungu: '' };
 }
 
-async function dlqRenderMiniMap(){
-  if (typeof L === 'undefined') {
-    setTimeout(dlqRenderMiniMap, 500); // Leaflet 로딩 대기
-    return;
-  }
-  const mapDiv = document.getElementById('dlqMapPreview');
-  const status = document.getElementById('dlqMapStatus');
-  if (!mapDiv) return;
+// [v136] 시·구별 색상 매핑 (15가지 파스텔)
+const DLQ_DISTRICT_COLORS = [
+  { bg: '#DBEAFE', text: '#1E40AF', border: '#93C5FD' },
+  { bg: '#DCFCE7', text: '#166534', border: '#86EFAC' },
+  { bg: '#FEF3C7', text: '#92400E', border: '#FCD34D' },
+  { bg: '#FCE7F3', text: '#9D174D', border: '#F9A8D4' },
+  { bg: '#EDE9FE', text: '#5B21B6', border: '#C4B5FD' },
+  { bg: '#FED7AA', text: '#9A3412', border: '#FDBA74' },
+  { bg: '#FECDD3', text: '#9F1239', border: '#FDA4AF' },
+  { bg: '#CFFAFE', text: '#155E75', border: '#67E8F9' },
+  { bg: '#E0E7FF', text: '#3730A3', border: '#A5B4FC' },
+  { bg: '#FAE8FF', text: '#86198F', border: '#E879F9' },
+  { bg: '#D1FAE5', text: '#065F46', border: '#6EE7B7' },
+  { bg: '#FEE2E2', text: '#991B1B', border: '#FCA5A5' },
+  { bg: '#FFE4E6', text: '#881337', border: '#FECACA' },
+  { bg: '#E0F2FE', text: '#075985', border: '#7DD3FC' },
+  { bg: '#FFEDD5', text: '#7C2D12', border: '#FED7AA' }
+];
+
+function dlqRenderRoutePreview(){
+  const wrap = document.getElementById('dlqRoutePreview');
+  if (!wrap) return;
   const items = window._dlqVisitItems || [];
   const origin = (document.getElementById('dlqVisitOrigin')||{}).value || 'krg사무실';
   const dest = (document.getElementById('dlqVisitDest')||{}).value || 'krg사무실';
 
-  // 기존 지도 제거
-  if (window._dlqMap) { try { window._dlqMap.remove(); } catch(e){} window._dlqMap = null; }
-  mapDiv.innerHTML = '';
-
-  // 지오코딩 — 출발지 + 경유지들 + 종료지
-  const stops = [{ label: '출발 — ' + origin, addr: origin, isEnd: false, num: 0 }];
-  items.forEach((it, i) => stops.push({ label: (i+1) + '. ' + (it.name||'') + ' (' + it.cno + ')', addr: it.address, isEnd: false, num: i+1 }));
-  if (dest !== origin) stops.push({ label: '종료 — ' + dest, addr: dest, isEnd: true, num: items.length+1 });
-
-  if (status) status.textContent = '주소 좌표 변환 중... (0/' + stops.length + ')';
-  const points = [];
-  for (let i = 0; i < stops.length; i++) {
-    const s = stops[i];
-    if (status) status.textContent = '주소 좌표 변환 중... (' + (i+1) + '/' + stops.length + ')';
-    const pt = await dlqGeocode(s.addr);
-    if (pt) points.push({ ...s, lat: pt.lat, lon: pt.lon });
-    // Nominatim rate limit: 1 req/sec
-    if (i < stops.length - 1) await new Promise(r => setTimeout(r, 1100));
-  }
-  if (!points.length) {
-    if (status) status.textContent = '⚠ 좌표 변환 실패';
-    mapDiv.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9CA3AF;font-size:12px">주소를 좌표로 변환할 수 없습니다.</div>';
-    return;
-  }
-  if (status) status.textContent = '✓ ' + points.length + '곳 표시';
-
-  // 지도 생성
-  const map = L.map(mapDiv, { zoomControl: true, scrollWheelZoom: false });
-  window._dlqMap = map;
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap', maxZoom: 19
-  }).addTo(map);
-
-  // 마커
-  const latlngs = [];
-  points.forEach(p => {
-    latlngs.push([p.lat, p.lon]);
-    const isStart = p.num === 0;
-    const color = isStart ? '#3B82F6' : (p.isEnd ? '#DC2626' : '#059669');
-    const numText = isStart ? 'S' : (p.isEnd ? 'E' : String(p.num));
-    const icon = L.divIcon({
-      html: '<div style="background:' + color + ';color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.3)">' + numText + '</div>',
-      className: '', iconSize: [28, 28], iconAnchor: [14, 14]
-    });
-    L.marker([p.lat, p.lon], { icon: icon }).addTo(map).bindPopup('<b>' + p.label + '</b><br><span style="font-size:11px;color:#6B7280">' + p.addr + '</span>');
+  // 시·구별 매핑 + 색상 할당
+  const districtMap = {}; // key="시도|시구" → color idx
+  let colorIdx = 0;
+  items.forEach(it => {
+    const reg = dlqExtractRegion(it.address);
+    if (!reg.sigungu) return;
+    const key = reg.sido + '|' + reg.sigungu;
+    if (!(key in districtMap)) {
+      districtMap[key] = colorIdx % DLQ_DISTRICT_COLORS.length;
+      colorIdx++;
+    }
   });
 
-  // 폴리라인 (직선 연결)
-  if (latlngs.length >= 2) {
-    L.polyline(latlngs, { color: '#059669', weight: 3, opacity: 0.7, dashArray: '8,4' }).addTo(map);
+  // 지역 요약 (시도별 그룹)
+  const sidoGroup = {};
+  items.forEach(it => {
+    const reg = dlqExtractRegion(it.address);
+    const sido = reg.sido || '미분류';
+    const sigungu = reg.sigungu || '?';
+    if (!sidoGroup[sido]) sidoGroup[sido] = {};
+    sidoGroup[sido][sigungu] = (sidoGroup[sido][sigungu] || 0) + 1;
+  });
+  const sidoList = Object.entries(sidoGroup).map(([sido, gugun]) => {
+    const total = Object.values(gugun).reduce((a,b)=>a+b, 0);
+    const detail = Object.entries(gugun).map(([g, c]) => g + ' ' + c).join(', ');
+    return { sido, total, detail };
+  }).sort((a,b) => b.total - a.total);
+  const maxTotal = Math.max(...sidoList.map(s => s.total), 1);
+
+  // 지역 요약 HTML
+  const summaryHtml = sidoList.length === 0 ? '' : (''
+    + '<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px;margin-bottom:10px">'
+    +   '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px">📊 지역 분포 — 총 ' + items.length + '곳</div>'
+    +   sidoList.map(s => {
+        const w = Math.round(s.total / maxTotal * 100);
+        return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;font-size:11.5px">'
+          + '<span style="width:90px;color:#374151;font-weight:600;flex-shrink:0">' + s.sido + '</span>'
+          + '<div style="flex:1;background:#E5E7EB;border-radius:3px;height:14px;overflow:hidden"><div style="width:' + w + '%;height:100%;background:#1B3976;border-radius:3px"></div></div>'
+          + '<span style="width:38px;text-align:right;font-weight:700;color:#1B3976;flex-shrink:0">' + s.total + '곳</span>'
+          + '<span style="font-size:10.5px;color:#6B7280;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + s.detail + '">' + s.detail + '</span>'
+          + '</div>';
+      }).join('')
+    + '</div>');
+
+  // 흐름도 — 출발 → 경유지들 → 종료
+  let prevSido = null;
+  const stopsHtml = [];
+  // 출발
+  stopsHtml.push(''
+    + '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#DBEAFE;border:1px solid #93C5FD;border-radius:8px">'
+    + '<div style="width:28px;height:28px;background:#3B82F6;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0">S</div>'
+    + '<div style="flex:1;min-width:0"><div style="font-weight:800;color:#1E40AF;font-size:12.5px">출발</div><div style="font-size:11px;color:#1E40AF;margin-top:1px">' + origin + '</div></div>'
+    + '</div>');
+  // 경유지
+  items.forEach((it, i) => {
+    const reg = dlqExtractRegion(it.address);
+    const key = reg.sido + '|' + reg.sigungu;
+    const c = (key in districtMap) ? DLQ_DISTRICT_COLORS[districtMap[key]] : { bg: '#F3F4F6', text: '#6B7280', border: '#D1D5DB' };
+    // 시·도 변경 표시
+    let arrowExtra = '';
+    if (prevSido !== null && reg.sido && reg.sido !== prevSido) {
+      arrowExtra = '<div style="text-align:center;margin:2px 0;font-size:11px;color:#DC2626;font-weight:700">🚗 시·도 이동: ' + (prevSido || '?') + ' → ' + reg.sido + '</div>';
+    }
+    if (reg.sido) prevSido = reg.sido;
+    stopsHtml.push(''
+      + '<div style="text-align:center;color:#9CA3AF;font-size:14px;margin:1px 0">↓</div>'
+      + arrowExtra
+      + '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:8px">'
+      + '<div style="width:28px;height:28px;background:#059669;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">' + (i+1) + '</div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+      +     '<span style="font-weight:800;color:' + c.text + ';font-size:12.5px">' + (it.name||'-') + '</span>'
+      +     '<span style="color:#6B7280;font-size:11px">(' + it.cno + ')</span>'
+      +     (reg.sigungu ? '<span style="background:' + c.text + ';color:#fff;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700">' + reg.sigungu + '</span>' : '<span style="background:#F3F4F6;color:#9CA3AF;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:600">미분류</span>')
+      +   '</div>'
+      +   '<div style="font-size:11px;color:#6B7280;margin-top:2px">' + (it.building || '') + '</div>'
+      +   '<div style="font-size:10.5px;color:#9CA3AF;margin-top:1px">' + (it.address || '⚠ 주소 없음') + '</div>'
+      + '</div>'
+      + '</div>');
+  });
+  // 종료
+  if (dest && dest !== origin) {
+    stopsHtml.push(''
+      + '<div style="text-align:center;color:#9CA3AF;font-size:14px;margin:1px 0">↓</div>'
+      + '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:8px">'
+      + '<div style="width:28px;height:28px;background:#DC2626;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0">E</div>'
+      + '<div style="flex:1;min-width:0"><div style="font-weight:800;color:#991B1B;font-size:12.5px">종료</div><div style="font-size:11px;color:#991B1B;margin-top:1px">' + dest + '</div></div>'
+      + '</div>');
+  } else if (dest === origin && items.length) {
+    stopsHtml.push(''
+      + '<div style="text-align:center;color:#9CA3AF;font-size:14px;margin:1px 0">↓</div>'
+      + '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#DBEAFE;border:1px solid #93C5FD;border-radius:8px">'
+      + '<div style="width:28px;height:28px;background:#3B82F6;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0">E</div>'
+      + '<div style="flex:1;min-width:0"><div style="font-weight:800;color:#1E40AF;font-size:12.5px">종료 (출발지로 복귀)</div><div style="font-size:11px;color:#1E40AF;margin-top:1px">' + origin + '</div></div>'
+      + '</div>');
   }
 
-  // 화면에 모든 포인트 fit
-  if (latlngs.length === 1) {
-    map.setView(latlngs[0], 14);
-  } else {
-    map.fitBounds(latlngs, { padding: [30, 30] });
-  }
+  wrap.innerHTML = ''
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    +   '<span style="font-size:12px;font-weight:700;color:#374151">🗺️ 동선 미리보기 — 같은 색상 = 같은 시·구</span>'
+    + '</div>'
+    + summaryHtml
+    + '<div style="display:flex;flex-direction:column;gap:0;padding:6px 0">' + stopsHtml.join('') + '</div>';
 }
 function dlqClearOriginDest(){
   localStorage.removeItem('dlq_visit_origin');
@@ -2706,19 +2738,19 @@ function dlqVisitMoveUp(i){
   const arr = window._dlqVisitItems;
   [arr[i-1], arr[i]] = [arr[i], arr[i-1]];
   dlqVisitRerender();
-  setTimeout(dlqRenderMiniMap, 100); // [v135] 지도 재렌더
+  dlqRenderRoutePreview(); // [v136] // [v135] 지도 재렌더
 }
 function dlqVisitMoveDown(i){
   const arr = window._dlqVisitItems;
   if (i >= arr.length - 1) return;
   [arr[i+1], arr[i]] = [arr[i], arr[i+1]];
   dlqVisitRerender();
-  setTimeout(dlqRenderMiniMap, 100);
+  dlqRenderRoutePreview(); // [v136]
 }
 function dlqVisitRemove(i){
   window._dlqVisitItems.splice(i, 1);
   dlqVisitRerender();
-  setTimeout(dlqRenderMiniMap, 100);
+  dlqRenderRoutePreview(); // [v136]
 }
 function dlqVisitRerender(){
   const list = document.getElementById('dlqVisitList');
