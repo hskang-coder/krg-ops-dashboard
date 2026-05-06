@@ -982,6 +982,9 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-tbl-count { padding:8px 14px; font-size:12px; color:#9ca3af; text-align:right; }
 
 </style>
+<!-- [v135] Leaflet — 방문대응 미니 지도용 (무료, API 키 불필요) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
 <!-- v1776817031 -->
 </head>
 <body>
@@ -2538,6 +2541,15 @@ async function dlqOpenVisitModal() {
         <div style="background:#EFF6FF;border-left:3px solid #3B82F6;padding:10px 12px;border-radius:6px;font-size:11.5px;color:#1E40AF;margin-bottom:10px">
           💡 Google Maps에서 열린 후 좌측 패널의 [경로 옵션] → [경로 최적화]로 더 효율적인 동선으로 자동 재정렬할 수 있습니다.
         </div>
+        <!-- [v135] 미니 지도 미리보기 -->
+        <div style="margin-top:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:12px;font-weight:700;color:#374151">🗺️ 동선 미리보기</span>
+            <span id="dlqMapStatus" style="font-size:10.5px;color:#9CA3AF">주소 좌표 변환 중...</span>
+          </div>
+          <div id="dlqMapPreview" style="height:280px;border-radius:8px;border:1px solid #E5E7EB;background:#F3F4F6"></div>
+          <div style="font-size:10.5px;color:#9CA3AF;margin-top:4px">※ 직선 연결 (실제 도로 경로 아님) · 정확한 경로는 Google Maps에서 확인</div>
+        </div>
       </div>
       <div style="padding:12px 20px;background:#F9FAFB;border-top:1px solid #E5E7EB;display:flex;gap:8px">
         <button onclick="dlqCopyAddresses()" style="background:#FFF;color:#374151;border:1px solid #D1D5DB;padding:9px 16px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">📋 주소 복사</button>
@@ -2566,9 +2578,122 @@ async function dlqOpenVisitModal() {
       dlqVisitRerender();
     });
   });
+
+  // [v135] 미니 지도 자동 렌더링 (모달 열린 직후)
+  setTimeout(dlqRenderMiniMap, 200);
+  // 출발/종료지 변경 시 지도 재렌더 (debounce 1.5s)
+  let debounceTimer;
+  ['dlqVisitOrigin', 'dlqVisitDest'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('blur', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(dlqRenderMiniMap, 1500);
+    });
+  });
 }
 
-function dlqCloseVisitModal(){ const m = document.getElementById('dlqVisitModal'); if (m) m.remove(); }
+function dlqCloseVisitModal(){
+  const m = document.getElementById('dlqVisitModal');
+  if (m) m.remove();
+  // [v135] 지도 인스턴스 정리
+  if (window._dlqMap) { try { window._dlqMap.remove(); } catch(e){} window._dlqMap = null; }
+}
+
+// [v135] 미니 지도 — Leaflet + Nominatim (무료, API 키 불필요)
+window._dlqGeoCache = window._dlqGeoCache || {}; // localStorage + memory 캐시
+async function dlqGeocode(addr){
+  if (!addr) return null;
+  if (window._dlqGeoCache[addr]) return window._dlqGeoCache[addr];
+  // localStorage 캐시
+  try {
+    const cached = localStorage.getItem('geo_' + addr);
+    if (cached) { const o = JSON.parse(cached); window._dlqGeoCache[addr] = o; return o; }
+  } catch(e){}
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=ko&q=' + encodeURIComponent(addr);
+    const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    const data = await r.json();
+    if (data && data[0]) {
+      const pt = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+      window._dlqGeoCache[addr] = pt;
+      try { localStorage.setItem('geo_' + addr, JSON.stringify(pt)); } catch(e){}
+      return pt;
+    }
+  } catch(e) { console.warn('Geocode fail:', addr, e); }
+  return null;
+}
+
+async function dlqRenderMiniMap(){
+  if (typeof L === 'undefined') {
+    setTimeout(dlqRenderMiniMap, 500); // Leaflet 로딩 대기
+    return;
+  }
+  const mapDiv = document.getElementById('dlqMapPreview');
+  const status = document.getElementById('dlqMapStatus');
+  if (!mapDiv) return;
+  const items = window._dlqVisitItems || [];
+  const origin = (document.getElementById('dlqVisitOrigin')||{}).value || 'krg사무실';
+  const dest = (document.getElementById('dlqVisitDest')||{}).value || 'krg사무실';
+
+  // 기존 지도 제거
+  if (window._dlqMap) { try { window._dlqMap.remove(); } catch(e){} window._dlqMap = null; }
+  mapDiv.innerHTML = '';
+
+  // 지오코딩 — 출발지 + 경유지들 + 종료지
+  const stops = [{ label: '출발 — ' + origin, addr: origin, isEnd: false, num: 0 }];
+  items.forEach((it, i) => stops.push({ label: (i+1) + '. ' + (it.name||'') + ' (' + it.cno + ')', addr: it.address, isEnd: false, num: i+1 }));
+  if (dest !== origin) stops.push({ label: '종료 — ' + dest, addr: dest, isEnd: true, num: items.length+1 });
+
+  if (status) status.textContent = '주소 좌표 변환 중... (0/' + stops.length + ')';
+  const points = [];
+  for (let i = 0; i < stops.length; i++) {
+    const s = stops[i];
+    if (status) status.textContent = '주소 좌표 변환 중... (' + (i+1) + '/' + stops.length + ')';
+    const pt = await dlqGeocode(s.addr);
+    if (pt) points.push({ ...s, lat: pt.lat, lon: pt.lon });
+    // Nominatim rate limit: 1 req/sec
+    if (i < stops.length - 1) await new Promise(r => setTimeout(r, 1100));
+  }
+  if (!points.length) {
+    if (status) status.textContent = '⚠ 좌표 변환 실패';
+    mapDiv.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9CA3AF;font-size:12px">주소를 좌표로 변환할 수 없습니다.</div>';
+    return;
+  }
+  if (status) status.textContent = '✓ ' + points.length + '곳 표시';
+
+  // 지도 생성
+  const map = L.map(mapDiv, { zoomControl: true, scrollWheelZoom: false });
+  window._dlqMap = map;
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 19
+  }).addTo(map);
+
+  // 마커
+  const latlngs = [];
+  points.forEach(p => {
+    latlngs.push([p.lat, p.lon]);
+    const isStart = p.num === 0;
+    const color = isStart ? '#3B82F6' : (p.isEnd ? '#DC2626' : '#059669');
+    const numText = isStart ? 'S' : (p.isEnd ? 'E' : String(p.num));
+    const icon = L.divIcon({
+      html: '<div style="background:' + color + ';color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.3)">' + numText + '</div>',
+      className: '', iconSize: [28, 28], iconAnchor: [14, 14]
+    });
+    L.marker([p.lat, p.lon], { icon: icon }).addTo(map).bindPopup('<b>' + p.label + '</b><br><span style="font-size:11px;color:#6B7280">' + p.addr + '</span>');
+  });
+
+  // 폴리라인 (직선 연결)
+  if (latlngs.length >= 2) {
+    L.polyline(latlngs, { color: '#059669', weight: 3, opacity: 0.7, dashArray: '8,4' }).addTo(map);
+  }
+
+  // 화면에 모든 포인트 fit
+  if (latlngs.length === 1) {
+    map.setView(latlngs[0], 14);
+  } else {
+    map.fitBounds(latlngs, { padding: [30, 30] });
+  }
+}
 function dlqClearOriginDest(){
   localStorage.removeItem('dlq_visit_origin');
   localStorage.removeItem('dlq_visit_dest');
@@ -2581,16 +2706,19 @@ function dlqVisitMoveUp(i){
   const arr = window._dlqVisitItems;
   [arr[i-1], arr[i]] = [arr[i], arr[i-1]];
   dlqVisitRerender();
+  setTimeout(dlqRenderMiniMap, 100); // [v135] 지도 재렌더
 }
 function dlqVisitMoveDown(i){
   const arr = window._dlqVisitItems;
   if (i >= arr.length - 1) return;
   [arr[i+1], arr[i]] = [arr[i], arr[i+1]];
   dlqVisitRerender();
+  setTimeout(dlqRenderMiniMap, 100);
 }
 function dlqVisitRemove(i){
   window._dlqVisitItems.splice(i, 1);
   dlqVisitRerender();
+  setTimeout(dlqRenderMiniMap, 100);
 }
 function dlqVisitRerender(){
   const list = document.getElementById('dlqVisitList');
