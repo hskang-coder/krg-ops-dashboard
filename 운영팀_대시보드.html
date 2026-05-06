@@ -2168,15 +2168,20 @@ function _renderSrTable() {
   const rows = filtered.map(c => {
     const g = String(c['연체등급']||'').replace(/등급$/,'').trim();
     const s = String(c['계약상태']||'').trim();
+    // [v138] 계약부동산 + 계약담당자
+    const broker = c['부동산명'] || '—';
+    const agent = c['계약담당자'] || '—';
     return `<tr onclick="selectContractRow('${String(c['계약번호']).trim()}')">
       <td><b>${c['계약번호']}</b></td>
       <td>${c['임차인명']||c['임차인']||'—'}</td>
       <td>${c['건물명']||'—'} ${c['호수']||''}</td>
+      <td style="font-size:11px;color:#5A6A8A">${broker}</td>
+      <td style="font-size:11px;color:#5A6A8A">${agent}</td>
       <td style="font-size:11px;color:#5A6A8A">${c['시작일']||'—'} ~ ${c['종료일']||'—'}</td>
       <td><span style="font-size:11px;font-weight:700;color:${statusColor(s)}">${s||'—'}</span></td>
       <td><span class="cr-grade-pill" style="background:${gradeColor(g)}22;color:${gradeColor(g)}">${g||'—'}등급</span></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="6" style="text-align:center;color:#B0BDCE;padding:20px">결과 없음</td></tr>';
+  }).join('') || '<tr><td colspan="8" style="text-align:center;color:#B0BDCE;padding:20px">결과 없음</td></tr>';
 
   // [v128] 엑셀 다운로드용 데이터 보관
   window._crSearchFiltered = filtered;
@@ -2189,7 +2194,7 @@ function _renderSrTable() {
         <button onclick="crSearchDownloadExcel()" style="margin-left:auto;background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ 엑셀 다운로드</button>
       </div>
       <div style="overflow-x:auto"><table class="cr-list-table">
-        <thead><tr><th>계약번호</th><th>임차인명</th><th>건물명/호수</th><th>계약기간</th><th>계약상태</th><th>등급</th></tr></thead>
+        <thead><tr><th>계약번호</th><th>임차인명</th><th>건물명/호수</th><th>부동산</th><th>계약담당자</th><th>계약기간</th><th>계약상태</th><th>등급</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
     </div>`;
@@ -2205,6 +2210,8 @@ function crSearchDownloadExcel() {
     '임차인명': c['임차인명'] || c['임차인'] || '',
     '건물명': c['건물명'] || '',
     '호수': c['호수'] || '',
+    '부동산': c['부동산명'] || '',
+    '계약담당자': c['계약담당자'] || '',
     '시작일': c['시작일'] || '',
     '종료일': c['종료일'] || '',
     '계약상태': c['계약상태'] || '',
@@ -2217,7 +2224,7 @@ function crSearchDownloadExcel() {
     '보증금': c['보증금'] || ''
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [{wch:10},{wch:14},{wch:18},{wch:10},{wch:12},{wch:12},{wch:10},{wch:8},{wch:14},{wch:12},{wch:14},{wch:11},{wch:11},{wch:13}];
+  ws['!cols'] = [{wch:10},{wch:14},{wch:18},{wch:10},{wch:14},{wch:20},{wch:12},{wch:12},{wch:10},{wch:8},{wch:14},{wch:12},{wch:14},{wch:11},{wch:11},{wch:13}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '계약검색결과');
   const today = (function(){ var d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
