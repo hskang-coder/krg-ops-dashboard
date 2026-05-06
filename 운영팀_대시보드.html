@@ -2485,9 +2485,9 @@ async function dlqOpenVisitModal() {
     };
   });
 
-  // 마지막 사용한 출발/종료 기억 (localStorage)
-  const lastOrigin = localStorage.getItem('dlq_visit_origin') || '';
-  const lastDest = localStorage.getItem('dlq_visit_dest') || '';
+  // 마지막 사용한 출발/종료 기억 (localStorage) — 비어있으면 디폴트 "krg사무실"
+  const lastOrigin = localStorage.getItem('dlq_visit_origin') || 'krg사무실';
+  const lastDest = localStorage.getItem('dlq_visit_dest') || 'krg사무실';
 
   // 모달
   const overlay = document.createElement('div');
@@ -2565,8 +2565,9 @@ function dlqCloseVisitModal(){ const m = document.getElementById('dlqVisitModal'
 function dlqClearOriginDest(){
   localStorage.removeItem('dlq_visit_origin');
   localStorage.removeItem('dlq_visit_dest');
-  document.getElementById('dlqVisitOrigin').value = '';
-  document.getElementById('dlqVisitDest').value = '';
+  // [v132] 디폴트 "krg사무실"로 복구
+  document.getElementById('dlqVisitOrigin').value = 'krg사무실';
+  document.getElementById('dlqVisitDest').value = 'krg사무실';
 }
 function dlqVisitMoveUp(i){
   if (i <= 0) return;
@@ -2653,9 +2654,9 @@ function dlqCopyAddresses(){
   }).catch(() => { alert('클립보드 복사 실패'); });
 }
 function dlqLaunchGoogleMaps(){
-  const origin = document.getElementById('dlqVisitOrigin').value.trim();
-  if (!origin) { alert('출발지를 입력해주세요.'); return; }
-  let dest = document.getElementById('dlqVisitDest').value.trim();
+  // [v132] 빈 입력 시 "krg사무실" 디폴트
+  let origin = document.getElementById('dlqVisitOrigin').value.trim() || 'krg사무실';
+  let dest = document.getElementById('dlqVisitDest').value.trim() || 'krg사무실';
   const items = (window._dlqVisitItems || []).filter(it => it.address); // 주소 있는 것만
   if (!items.length) { alert('주소가 있는 경유지가 없습니다.'); return; }
 
