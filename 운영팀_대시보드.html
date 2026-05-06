@@ -2442,14 +2442,20 @@ async function dlqLoadAddressMap() {
     if (!resp || !resp.table) return {};
     const rows = resp.table.rows || [];
     const map = {};
-    // [v131] D/E (임대인 명/연락처), N/P (계약자 명/연락처) 추가
+    // [v131/v134] D/E (임대인 명/연락처), N/P (계약자 명/연락처), K (동/번지) 추가
     const cell = (c, i) => c[i] ? String(c[i].f != null ? c[i].f : c[i].v != null ? c[i].v : '').trim() : '';
     rows.forEach(row => {
       const c = row.c || [];
       const cno = cell(c, 2);
       if (!cno) return;
+      const buildingI = cell(c, 8);    // I열: 건물명
+      const dongK = cell(c, 10);       // K열: 동/번지
+      // I + K 결합 (둘 다 있으면 공백으로 연결)
+      const buildingDisplay = [buildingI, dongK].filter(Boolean).join(' ');
       map[cno] = {
-        building: cell(c, 8),
+        building: buildingDisplay,    // "건물명 동" 형태
+        buildingName: buildingI,      // 건물명만 (필요 시 분리 사용)
+        dong: dongK,                  // K열 값만
         address: cell(c, 9),
         landlordName: cell(c, 3),    // D열
         landlordPhone: cell(c, 4),   // E열
