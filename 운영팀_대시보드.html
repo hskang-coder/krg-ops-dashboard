@@ -2442,7 +2442,7 @@ async function dlqLoadAddressMap() {
     if (!resp || !resp.table) return {};
     const rows = resp.table.rows || [];
     const map = {};
-    // [v131/v134] D/E (임대인 명/연락처), N/P (계약자 명/연락처), K (동/번지) 추가
+    // [v131/v134/v137] D/E (임대인 명/연락처), N/P (계약자 명/연락처), K (동/번지), L (호수) 추가
     const cell = (c, i) => c[i] ? String(c[i].f != null ? c[i].f : c[i].v != null ? c[i].v : '').trim() : '';
     rows.forEach(row => {
       const c = row.c || [];
@@ -2450,13 +2450,19 @@ async function dlqLoadAddressMap() {
       if (!cno) return;
       const buildingI = cell(c, 8);    // I열: 건물명
       const dongK = cell(c, 10);       // K열: 동/번지
+      const roomL = cell(c, 11);       // L열: 호수
       // I + K 결합 (둘 다 있으면 공백으로 연결)
       const buildingDisplay = [buildingI, dongK].filter(Boolean).join(' ');
+      // 주소 + ", 호수" 결합 (호수가 있을 때만)
+      const baseAddr = cell(c, 9);
+      const addrWithRoom = (baseAddr && roomL) ? (baseAddr + ', ' + roomL.replace(/\s+/g, '')) : baseAddr;
       map[cno] = {
         building: buildingDisplay,    // "건물명 동" 형태
-        buildingName: buildingI,      // 건물명만 (필요 시 분리 사용)
-        dong: dongK,                  // K열 값만
-        address: cell(c, 9),
+        buildingName: buildingI,      // 건물명만
+        dong: dongK,                  // K열
+        roomNo: roomL,                // L열 — 호수
+        address: addrWithRoom,        // "주소, 000호" 형태 (자동 결합)
+        addressOnly: baseAddr,        // 주소만 (필요 시 분리 사용)
         landlordName: cell(c, 3),    // D열
         landlordPhone: cell(c, 4),   // E열
         tenantName: cell(c, 13),     // N열
