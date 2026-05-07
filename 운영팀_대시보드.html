@@ -1604,9 +1604,10 @@ function switchView(view) {
 // ■ CONTRACT RECORD
 // ═══════════════════════════════════════════
 
+// [v145] 시트의 액티브 필터·정렬을 우회 — range=A:ZZ 명시 시 gviz가 raw 시트 데이터를 반환
 async function fetchSheetByName(sheetName) {
   const enc = encodeURIComponent(sheetName);
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${enc}`;
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${enc}&range=A:ZZ`;
   const res = await fetch(url);
   const text = await res.text();
   const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
@@ -1615,7 +1616,7 @@ async function fetchSheetByName(sheetName) {
 }
 
 async function fetchSheetByGid(gid) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${gid}`;
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${gid}&range=A:ZZ`;
   const res = await fetch(url);
   const text = await res.text();
   const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
