@@ -8042,12 +8042,10 @@ function rnwSetSearch(val){
     if (el) { el.focus(); var v = el.value; el.setSelectionRange(v.length, v.length); }
   }, 200);
 }
-// [v158] 검색용 계약종료일 범위 (디폴트: today -36개월 ~ today +12개월)
+// [v158/v162] 계약종료일 범위 — 항상 적용. 디폴트는 광범위(2015~2099)로 영향 없음. 사용자가 좁히면 추가 필터 작용.
 (function(){
-  var t = new Date();
-  var ymOffset = function(off){ var d = new Date(t.getFullYear(), t.getMonth()+off, 1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); };
-  if (!window._rnwSearchEndStart) window._rnwSearchEndStart = ymOffset(-36);
-  if (!window._rnwSearchEndEnd)   window._rnwSearchEndEnd   = ymOffset(12);
+  if (!window._rnwSearchEndStart) window._rnwSearchEndStart = '2015-01';
+  if (!window._rnwSearchEndEnd)   window._rnwSearchEndEnd   = '2099-12';
 })();
 function rnwSetSearchEndPeriod(which, val){
   if (which === 'start') window._rnwSearchEndStart = val;
@@ -8479,22 +8477,25 @@ function renderRenewalView(){
     return;
   }
 
-  var enriched = rnwBuildEnriched();
+  // [v162] 모집단 빌드:
+  //   1) 계약자 전체 토글 ON  → 심사진행기간/계약종료일 모두 무시 (전체 데이터)
+  //   2) 토글 OFF              → 심사진행기간으로 1차 필터 + 계약종료일로 2차 AND 필터
+  var enriched;
+  if (window._rnwSearchAll) {
+    enriched = rnwBuildEnriched('2015-01', '2099-12');
+  } else {
+    enriched = rnwBuildEnriched();  // 심사진행기간 적용
+    // 계약종료일 (= 만기일) 추가 AND 필터
+    var endRange = rnwMonthRange(window._rnwSearchEndStart, window._rnwSearchEndEnd);
+    if (endRange && endRange.start && endRange.end) {
+      enriched = enriched.filter(function(e){
+        return e.endDate >= endRange.start && e.endDate <= endRange.end;
+      });
+    }
+  }
   var filter = window._rnwFilter || 'all';
   var kpiFilter = window._rnwKpiFilter || 'all';
-  // [v158] 검색어가 있으면 검색용 별도 모집단(검색 종료일 범위) 사용
-  // [v159] 전체 검색 토글이 켜져있으면 모든 기간 필터 무시 (광범위 범위 사용)
-  var sqRaw = String(window._rnwSearch||'').trim();
-  var filtered;
-  if (sqRaw) {
-    if (window._rnwSearchAll) {
-      filtered = rnwBuildEnriched('2015-01', '2099-12');
-    } else {
-      filtered = rnwBuildEnriched(window._rnwSearchEndStart, window._rnwSearchEndEnd);
-    }
-  } else {
-    filtered = enriched;
-  }
+  var filtered = enriched;
   // [v62/v63] KPI 필터 (진행상태 기준)
   if (kpiFilter === 'hope') filtered = filtered.filter(function(e){ return e.progress === 'hope'; });
   else if (kpiFilter === 'imp')  filtered = filtered.filter(function(e){ return e.progress === 'imp' || e.progress === 'imp_cand' || e.progress === 'na' || e.progress === 'cond_progress'; });
