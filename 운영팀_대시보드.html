@@ -6839,9 +6839,21 @@ function generateIncomeReceipt(contractNo){
   var contractInfo = vac
     ? [vac.propAddr, vac.propBuilding, vac.propRoom].filter(Boolean).join(' ')
     : ((contract['건물명']||'') + ' ' + (contract['호수']||''));
-  var contractStatusStr = vac
-    ? (vac.contractKind || vac.jValue || contract['계약상태'] || '-')
-    : (contract['계약상태'] || '-');
+  // [v150] 계약상태 = K열(계약상태) + J열(중도퇴실)/F열(공실상태) 결합
+  // 예: "정상 (중도퇴실 확정)", "종료 (퇴실완료)", "정상 (퇴실상태(공실)대응중)"
+  var contractStatusStr;
+  if (vac) {
+    var _k  = String(vac.contractKind||'').trim();
+    var _jv = String(vac.jValue||'').trim();
+    var _fv = String(vac.status||'').trim();
+    var _isMeaningful = function(s){ return s && s !== '-' && s !== '--'; };
+    var _sub = _isMeaningful(_jv) ? _jv : (_isMeaningful(_fv) ? _fv : '');
+    contractStatusStr = _sub
+      ? (_isMeaningful(_k) ? (_k + ' (' + _sub + ')') : _sub)
+      : (_isMeaningful(_k) ? _k : (contract['계약상태'] || '-'));
+  } else {
+    contractStatusStr = contract['계약상태'] || '-';
+  }
   var period = (contract['시작일']||'') + ' ~ ' + (contract['종료일']||'');
   var landlord = contract['임대인명'] || '-';
   var tenant = contract['임차인명'] || contract['임차인'] || '-';
