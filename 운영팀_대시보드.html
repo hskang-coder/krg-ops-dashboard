@@ -1199,6 +1199,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         <button class="cr-contract-pdf-btn" id="crContractPdfBtn" onclick="openContractPdfModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능">📄 계약서 발행</button>
         <button class="cr-contract-pdf-btn" id="crSubAgreementBtn" onclick="generateSubAgreement(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:8px;">📋 부속합의서 발행</button>
         <button class="cr-contract-pdf-btn" id="crIncomeReceiptBtn" onclick="openIncomeReceiptModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:8px;background:#059669;color:#fff;border-color:#059669">💰 입금확인발행</button>
+        <button class="cr-contract-pdf-btn" id="crFeeCalcBtn" onclick="openFeeCalcModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:8px;background:#7C3AED;color:#fff;border-color:#7C3AED">🧮 수수료&일할계산</button>
       </div>
       <div id="crListBox" style="display:none">
         <div class="cr-list-filter">
@@ -3942,6 +3943,8 @@ function selectContractRow(no) {
   if (subBtn) { subBtn.disabled = false; subBtn.title = '부속합의서 발행 (계약번호: ' + no + ')'; }
   var rcptBtn = document.getElementById('crIncomeReceiptBtn');
   if (rcptBtn) { rcptBtn.disabled = false; rcptBtn.title = '입금확인발행 (계약번호: ' + no + ')'; }
+  var feeCalcBtn = document.getElementById('crFeeCalcBtn');
+  if (feeCalcBtn) { feeCalcBtn.disabled = false; feeCalcBtn.title = '수수료&일할계산 (계약번호: ' + no + ')'; }
   const contract = contractRawData.find(r => String(r['계약번호']).trim() === no);
   if (!contract) return;
   const payments  = paymentRawData.filter(r => String(r['계약번호']).trim() === no);
@@ -6981,6 +6984,219 @@ function generateIncomeReceipt(contractNo){
   if (!win) { alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.'); return; }
   win.document.write(html);
   win.document.close();
+}
+
+// ==================== [v149] 수수료&일할계산 모달 ====================
+// 카드 수수료 요율표 (분할개월수 → 요율%)
+var FEE_RATE_TABLE = {
+  1: 3.86, 2: 3.86, 3: 3.86, 4: 3.86, 5: 3.86, 6: 3.86,
+  7: 3.94, 8: 4.31, 9: 4.70, 10: 5.17, 11: 5.54, 12: 5.95
+};
+
+function closeFeeCalcModal(){
+  var m = document.getElementById('feeCalcModal');
+  if (m) m.remove();
+}
+
+function openFeeCalcModal(contractNo){
+  if (!contractNo) { alert('먼저 계약을 검색해주세요.'); return; }
+  var contract = (contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim() === String(contractNo); });
+  if (!contract) { alert('계약 데이터 없음'); return; }
+
+  // 청구금액 자동 계산: 임대료 + 서비스 수수료 (vacancy 데이터 우선)
+  var vac = (vacancyRawData||[]).find(function(v){ return String(v.no||'').trim() === String(contractNo); });
+  var rentRaw = vac && vac.rent ? vac.rent : (contract['임대료']||contract['월임대료']||'');
+  var feeRaw  = vac && vac.fee  ? vac.fee  : (contract['서비스 수수료']||contract['수수료']||'');
+  var mgmtRaw = vac && vac.mgmtFee ? vac.mgmtFee : (contract['관리비']||contract['월관리비']||'');
+  var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
+  var rentNum = parseAmt(rentRaw);
+  var feeNum  = parseAmt(feeRaw);
+  var mgmtNum = parseAmt(mgmtRaw);
+  var billAuto = rentNum + feeNum;
+
+  closeFeeCalcModal();
+  var m = document.createElement('div');
+  m.id = 'feeCalcModal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;font-family:"Noto Sans KR","Malgun Gothic",sans-serif';
+
+  var todayStr = (function(){ var t=new Date(); return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); })();
+
+  m.innerHTML =
+      '<div style="background:#fff;border-radius:12px;width:780px;max-width:96vw;max-height:92vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)">'
+    +   '<div style="padding:18px 24px;background:linear-gradient(135deg,#7C3AED,#5B21B6);color:#fff;display:flex;align-items:center;justify-content:space-between;border-radius:12px 12px 0 0">'
+    +     '<div style="font-size:17px;font-weight:800">🧮 수수료 & 일할계산 <span style="font-size:12px;font-weight:500;opacity:.85;margin-left:8px">계약번호: '+contractNo+'</span></div>'
+    +     '<button onclick="closeFeeCalcModal()" style="background:rgba(255,255,255,.2);color:#fff;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px">✕</button>'
+    +   '</div>'
+    +   '<div style="padding:6px 24px 0;display:flex;border-bottom:1px solid #E5E7EB">'
+    +     '<button id="fcTab1" onclick="switchFeeCalcTab(1)" style="flex:1;padding:14px 12px;background:transparent;border:none;border-bottom:3px solid #7C3AED;color:#5B21B6;font-weight:800;font-size:13.5px;cursor:pointer">💳 카드 수수료 계산</button>'
+    +     '<button id="fcTab2" onclick="switchFeeCalcTab(2)" style="flex:1;padding:14px 12px;background:transparent;border:none;border-bottom:3px solid transparent;color:#6B7280;font-weight:700;font-size:13.5px;cursor:pointer">📅 일할 계산</button>'
+    +   '</div>'
+
+    // ====== 탭1: 카드 수수료 ======
+    +   '<div id="fcSection1" style="padding:18px 24px">'
+    +     '<div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:11.5px;color:#5B21B6;line-height:1.55">'
+    +       '<b>요율표:</b> 1~6개월 3.86% · 7개월 3.94% · 8개월 4.31% · 9개월 4.70% · 10개월 5.17% · 11개월 5.54% · 12개월 5.95%'
+    +     '</div>'
+
+    // 입력 패턴 선택
+    +     '<div style="display:flex;gap:10px;margin-bottom:14px">'
+    +       '<label style="flex:1;padding:10px 12px;border:2px solid #7C3AED;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;background:#F5F3FF" id="fcP1Label">'
+    +         '<input type="radio" name="fcPattern" value="1" checked onchange="switchFeePattern(1)"><b style="color:#5B21B6;font-size:12.5px">패턴1: 검색결과 사용</b>'
+    +       '</label>'
+    +       '<label style="flex:1;padding:10px 12px;border:2px solid #E5E7EB;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px" id="fcP2Label">'
+    +         '<input type="radio" name="fcPattern" value="2" onchange="switchFeePattern(2)"><b style="color:#374151;font-size:12.5px">패턴2: 직접 입력</b>'
+    +       '</label>'
+    +     '</div>'
+
+    // 청구금액 입력
+    +     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
+    +       '<div>'
+    +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">청구금액 (임대료+수수료)</label>'
+    +         '<input id="fcBillAmt" type="text" value="'+(billAuto>0?billAuto.toLocaleString():'')+'" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcFee()">'
+    +         '<div style="font-size:10.5px;color:#6B7280;margin-top:4px" id="fcBillHint">' + (billAuto>0 ? ('임대료 ₩'+rentNum.toLocaleString()+' + 수수료 ₩'+feeNum.toLocaleString()) : '검색 결과 없음 — 직접 입력') + '</div>'
+    +       '</div>'
+    +       '<div>'
+    +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">분할 개월수 (1~12)</label>'
+    +         '<input id="fcMonths" type="number" min="1" max="12" value="3" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcFee()">'
+    +         '<div style="font-size:10.5px;color:#6B7280;margin-top:4px" id="fcRateHint"></div>'
+    +       '</div>'
+    +     '</div>'
+
+    // 결과 출력
+    +     '<div id="fcResult" style="background:#F0FDF4;border:2px solid #10B981;border-radius:8px;padding:14px 18px;margin-top:8px"></div>'
+    +   '</div>'
+
+    // ====== 탭2: 일할 계산 ======
+    +   '<div id="fcSection2" style="padding:18px 24px;display:none">'
+    +     '<div style="display:flex;gap:10px;margin-bottom:14px">'
+    +       '<label style="flex:1;padding:10px 12px;border:2px solid #7C3AED;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;background:#F5F3FF" id="fcDP1Label">'
+    +         '<input type="radio" name="fcDayPattern" value="1" checked onchange="switchDayPattern(1)"><b style="color:#5B21B6;font-size:12.5px">패턴1: 월 기준</b>'
+    +         '<span style="font-size:10.5px;color:#6B7280;margin-left:auto">임대료÷해당월일수</span>'
+    +       '</label>'
+    +       '<label style="flex:1;padding:10px 12px;border:2px solid #E5E7EB;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px" id="fcDP2Label">'
+    +         '<input type="radio" name="fcDayPattern" value="2" onchange="switchDayPattern(2)"><b style="color:#374151;font-size:12.5px">패턴2: 연 기준</b>'
+    +         '<span style="font-size:10.5px;color:#6B7280;margin-left:auto">임대료×12÷365</span>'
+    +       '</label>'
+    +     '</div>'
+
+    +     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
+    +       '<div>'
+    +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">임대료 (월)</label>'
+    +         '<input id="fcDayRent" type="text" value="'+(rentNum>0?rentNum.toLocaleString():'')+'" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcDay()">'
+    +       '</div>'
+    +       '<div>'
+    +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">관리비 (월)</label>'
+    +         '<input id="fcDayMgmt" type="text" value="'+(mgmtNum>0?mgmtNum.toLocaleString():'')+'" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcDay()">'
+    +       '</div>'
+    +     '</div>'
+
+    +     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
+    +       '<div>'
+    +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">일할 시작일</label>'
+    +         '<input id="fcDayFrom" type="date" value="'+todayStr+'" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcDay()">'
+    +       '</div>'
+    +       '<div>'
+    +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">일할 종료일</label>'
+    +         '<input id="fcDayTo" type="date" value="'+todayStr+'" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcDay()">'
+    +       '</div>'
+    +     '</div>'
+
+    +     '<div id="fcDayResult" style="background:#F0FDF4;border:2px solid #10B981;border-radius:8px;padding:14px 18px;margin-top:8px"></div>'
+    +   '</div>'
+
+    +   '<div style="padding:12px 24px 18px;text-align:right;border-top:1px solid #E5E7EB">'
+    +     '<button onclick="closeFeeCalcModal()" style="background:#6B7280;color:#fff;border:none;padding:9px 18px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">닫기</button>'
+    +   '</div>'
+    + '</div>';
+
+  document.body.appendChild(m);
+  m.addEventListener('click', function(e){ if (e.target === m) closeFeeCalcModal(); });
+  recalcFee();
+  recalcDay();
+}
+
+function switchFeeCalcTab(idx){
+  document.getElementById('fcSection1').style.display = idx===1 ? 'block':'none';
+  document.getElementById('fcSection2').style.display = idx===2 ? 'block':'none';
+  var t1 = document.getElementById('fcTab1'), t2 = document.getElementById('fcTab2');
+  if (idx===1) { t1.style.borderBottomColor='#7C3AED'; t1.style.color='#5B21B6'; t1.style.fontWeight='800'; t2.style.borderBottomColor='transparent'; t2.style.color='#6B7280'; t2.style.fontWeight='700'; }
+  else { t2.style.borderBottomColor='#7C3AED'; t2.style.color='#5B21B6'; t2.style.fontWeight='800'; t1.style.borderBottomColor='transparent'; t1.style.color='#6B7280'; t1.style.fontWeight='700'; }
+}
+
+function switchFeePattern(p){
+  var lab1 = document.getElementById('fcP1Label'), lab2 = document.getElementById('fcP2Label');
+  if (p===1) { lab1.style.borderColor='#7C3AED'; lab1.style.background='#F5F3FF'; lab2.style.borderColor='#E5E7EB'; lab2.style.background='#fff'; }
+  else { lab2.style.borderColor='#7C3AED'; lab2.style.background='#F5F3FF'; lab1.style.borderColor='#E5E7EB'; lab1.style.background='#fff'; }
+  // 패턴1은 청구금액 readonly 비슷하게(편집은 가능하되 hint 표시), 패턴2는 hint를 비움
+  var hint = document.getElementById('fcBillHint');
+  if (hint) hint.textContent = (p===1) ? '검색결과 자동입력 — 필요 시 수정 가능' : '직접 입력';
+  recalcFee();
+}
+
+function switchDayPattern(p){
+  var lab1 = document.getElementById('fcDP1Label'), lab2 = document.getElementById('fcDP2Label');
+  if (p===1) { lab1.style.borderColor='#7C3AED'; lab1.style.background='#F5F3FF'; lab2.style.borderColor='#E5E7EB'; lab2.style.background='#fff'; }
+  else { lab2.style.borderColor='#7C3AED'; lab2.style.background='#F5F3FF'; lab1.style.borderColor='#E5E7EB'; lab1.style.background='#fff'; }
+  recalcDay();
+}
+
+function recalcFee(){
+  var box = document.getElementById('fcResult'); if (!box) return;
+  var amt = parseFloat(String((document.getElementById('fcBillAmt')||{}).value||'').replace(/[^0-9.\-]/g,''))||0;
+  var months = parseInt((document.getElementById('fcMonths')||{}).value||0,10);
+  if (months<1) months=1; if (months>12) months=12;
+  var rate = FEE_RATE_TABLE[months] || 0;
+  document.getElementById('fcRateHint').textContent = '적용 요율: ' + rate.toFixed(2) + '%';
+  if (amt<=0) { box.innerHTML = '<div style="color:#6B7280;font-size:12px;text-align:center">청구금액을 입력해주세요</div>'; return; }
+  var feeAmt = Math.round(amt * rate / 100);
+  var totalAmt = amt + feeAmt;
+  var perMonth = Math.round(totalAmt / months);
+  var fmt = function(n){ return '₩' + n.toLocaleString(); };
+  box.innerHTML =
+      '<div style="font-size:13px;font-weight:800;color:#065F46;margin-bottom:10px">💳 카드 수수료 계산 결과</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">'
+    +   '<div style="padding:6px 8px;background:#fff;border-radius:5px"><span style="color:#6B7280">청구원금</span> <b style="float:right">'+fmt(amt)+'</b></div>'
+    +   '<div style="padding:6px 8px;background:#fff;border-radius:5px"><span style="color:#6B7280">수수료('+rate.toFixed(2)+'%)</span> <b style="float:right;color:#DC2626">'+fmt(feeAmt)+'</b></div>'
+    +   '<div style="padding:6px 8px;background:#FEF3C7;border-radius:5px"><span style="color:#92400E">최종 청구금액</span> <b style="float:right;color:#B45309">'+fmt(totalAmt)+'</b></div>'
+    +   '<div style="padding:6px 8px;background:#DBEAFE;border-radius:5px"><span style="color:#1E40AF">월 분할금액 ('+months+'개월)</span> <b style="float:right;color:#1E3A8A">'+fmt(perMonth)+'</b></div>'
+    + '</div>';
+}
+
+function recalcDay(){
+  var box = document.getElementById('fcDayResult'); if (!box) return;
+  var p = parseInt((document.querySelector('input[name="fcDayPattern"]:checked')||{}).value||1,10);
+  var rent = parseFloat(String((document.getElementById('fcDayRent')||{}).value||'').replace(/[^0-9.\-]/g,''))||0;
+  var mgmt = parseFloat(String((document.getElementById('fcDayMgmt')||{}).value||'').replace(/[^0-9.\-]/g,''))||0;
+  var fromV = (document.getElementById('fcDayFrom')||{}).value;
+  var toV   = (document.getElementById('fcDayTo')||{}).value;
+  if (!fromV || !toV) { box.innerHTML = '<div style="color:#6B7280;font-size:12px;text-align:center">시작일과 종료일을 입력해주세요</div>'; return; }
+  var fromD = new Date(fromV+'T00:00:00'), toD = new Date(toV+'T00:00:00');
+  if (isNaN(fromD.getTime())||isNaN(toD.getTime())||toD<fromD) { box.innerHTML = '<div style="color:#DC2626;font-size:12px;text-align:center">날짜를 다시 확인해주세요</div>'; return; }
+  var days = Math.floor((toD - fromD)/86400000) + 1; // 시작일·종료일 양쪽 포함
+  var fmt = function(n){ return '₩' + Math.round(n).toLocaleString(); };
+  var rentDaily, mgmtDaily, formula;
+  if (p===1) {
+    // 월 기준: 시작일이 속한 월의 일수 사용 (양 일자 동월일 때 자연; 다월일 경우 시작월 기준)
+    var y = fromD.getFullYear(), mo = fromD.getMonth();
+    var dim = new Date(y, mo+1, 0).getDate(); // 해당 월 일수
+    rentDaily = rent / dim;
+    mgmtDaily = mgmt / dim;
+    formula = '월 기준 — '+(mo+1)+'월('+dim+'일) 기준 일할';
+  } else {
+    rentDaily = rent * 12 / 365;
+    mgmtDaily = mgmt * 12 / 365;
+    formula = '연 기준 — (월액×12)÷365';
+  }
+  var rentTotal = rentDaily * days;
+  var mgmtTotal = mgmtDaily * days;
+  box.innerHTML =
+      '<div style="font-size:13px;font-weight:800;color:#065F46;margin-bottom:6px">📅 '+days+'일 일할 계산 결과</div>'
+    + '<div style="font-size:11px;color:#6B7280;margin-bottom:10px">'+formula+' · '+fromV+' ~ '+toV+'</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">'
+    +   '<div style="padding:8px 10px;background:#fff;border-radius:5px"><div style="color:#6B7280;font-size:11px">'+days+'일 임대료</div><b style="font-size:15px;color:#065F46">'+fmt(rentTotal)+'</b><div style="font-size:10px;color:#9CA3AF;margin-top:2px">일 ₩'+Math.round(rentDaily).toLocaleString()+' × '+days+'일</div></div>'
+    +   '<div style="padding:8px 10px;background:#fff;border-radius:5px"><div style="color:#6B7280;font-size:11px">'+days+'일 관리비</div><b style="font-size:15px;color:#1E40AF">'+fmt(mgmtTotal)+'</b><div style="font-size:10px;color:#9CA3AF;margin-top:2px">일 ₩'+Math.round(mgmtDaily).toLocaleString()+' × '+days+'일</div></div>'
+    + '</div>'
+    + '<div style="margin-top:10px;padding:8px 10px;background:#FEF3C7;border-radius:5px;font-size:12.5px"><span style="color:#92400E">'+days+'일 합계 (임대료+관리비)</span> <b style="float:right;color:#B45309">'+fmt(rentTotal+mgmtTotal)+'</b></div>';
 }
 
 function generateSubAgreement(contractNo) {
