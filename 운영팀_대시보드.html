@@ -6600,22 +6600,78 @@ function openContractPdfModal(contractNo) {
   if (existing) existing.remove();
   var modal = document.createElement('div');
   modal.id = 'cG_modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
-  modal.innerHTML = '<div style="background:#fff;border-radius:14px;padding:28px;width:520px;max-width:92vw;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:24px 0;overflow-y:auto';
+  modal.innerHTML = '<div style="background:#fff;border-radius:14px;padding:28px;width:560px;max-width:94vw;max-height:calc(100vh - 48px);overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
     + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">'
     + '<div style="background:#1B3976;color:#fff;width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:19px;font-style:italic">K</div>'
     + '<div><div style="font-size:15px;font-weight:700;color:#1B3976">개런티즈 계약서 발행</div>'
     + '<div style="font-size:12px;color:#9ca3af;margin-top:2px">계약번호 ' + contractNo + '</div></div></div>'
+
+    // ── 1. 특약사항 (기존) ──
     + '<label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">특약사항 · 1단계 (자유 입력, 없으면 비워두세요)</label>'
-    + '<textarea id="cG_special" rows="4" placeholder="추가 특약 내용을 입력하세요..." style="width:100%;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px 12px;font-size:13px;resize:vertical;outline:none;font-family:inherit;line-height:1.6;box-sizing:border-box"></textarea>'
-    + '<div style="background:#f0f4ff;border-radius:8px;padding:10px 14px;font-size:11.5px;color:#374151;line-height:1.7;margin:12px 0 16px">'
+    + '<textarea id="cG_special" rows="3" placeholder="추가 특약 내용을 입력하세요..." style="width:100%;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px 12px;font-size:13px;resize:vertical;outline:none;font-family:inherit;line-height:1.6;box-sizing:border-box"></textarea>'
+    + '<div style="background:#f0f4ff;border-radius:8px;padding:10px 14px;font-size:11.5px;color:#374151;line-height:1.7;margin:10px 0 14px">'
     + '<b>📋 자동 추가:</b> 납부조건별 고정 특약 + 공동전차인/연대보증인 위약금 조항 자동 삽입</div>'
-    + '<div style="display:flex;gap:8px;justify-content:flex-end">'
+
+    // ── 2. [v156] 계약자추가 섹션 ──
+    + '<div style="border-top:1px dashed #d1d5db;padding-top:14px;margin-top:6px">'
+    +   '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    +     '<label style="font-size:12px;font-weight:700;color:#1B3976">👥 계약자 추가 (선택사항)</label>'
+    +     '<button type="button" onclick="addExtraParty()" style="padding:6px 12px;background:#7C3AED;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700">+ 계약자추가</button>'
+    +   '</div>'
+    +   '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">공동명의계약인 또는 연대보증인을 추가하면 계약서의 빈 양식 영역에 자동 입력됩니다.</div>'
+    +   '<div id="cG_extraList"></div>'
+    + '</div>'
+
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:14px">'
     + '<button onclick="document.getElementById(\'cG_modal\').remove()" style="padding:9px 18px;border:1.5px solid #d1d5db;background:#fff;border-radius:8px;cursor:pointer;font-size:13px">취소</button>'
     + '<button onclick="generateGuaranteezPdf(\'' + contractNo + '\')" style="padding:9px 22px;background:#1B3976;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">📄 계약서 생성</button>'
     + '</div></div>';
   document.body.appendChild(modal);
   setTimeout(function() { var el = document.getElementById('cG_special'); if (el) el.focus(); }, 100);
+}
+
+// [v156] 추가 계약자 카드 1개 삽입
+var cG_extraSeq = 0;
+function addExtraParty(){
+  var list = document.getElementById('cG_extraList'); if (!list) return;
+  var idx = ++cG_extraSeq;
+  var card = document.createElement('div');
+  card.id = 'cG_extra_' + idx;
+  card.dataset.extraIdx = idx;
+  card.style.cssText = 'border:1.5px solid #DDD6FE;background:#F5F3FF;border-radius:8px;padding:12px;margin-bottom:10px';
+  card.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    +   '<div style="display:flex;gap:14px;align-items:center">'
+    +     '<label style="font-size:11.5px;font-weight:700;color:#5B21B6;display:flex;align-items:center;gap:5px"><input type="radio" name="cG_extraType_'+idx+'" value="공동명의계약인" checked>공동명의계약인</label>'
+    +     '<label style="font-size:11.5px;font-weight:700;color:#5B21B6;display:flex;align-items:center;gap:5px"><input type="radio" name="cG_extraType_'+idx+'" value="연대보증인">연대보증인</label>'
+    +   '</div>'
+    +   '<button type="button" onclick="document.getElementById(\'cG_extra_'+idx+'\').remove()" style="background:#FEE2E2;color:#991B1B;border:none;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:13px;font-weight:700">×</button>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +   '<div style="grid-column:span 2"><label style="font-size:10.5px;font-weight:600;color:#374151;display:block;margin-bottom:3px">주소</label><input type="text" data-field="addr" placeholder="서울특별시 ..." style="width:100%;padding:7px 9px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box"></div>'
+    +   '<div><label style="font-size:10.5px;font-weight:600;color:#374151;display:block;margin-bottom:3px">연락처</label><input type="text" data-field="phone" placeholder="010-0000-0000" style="width:100%;padding:7px 9px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box"></div>'
+    +   '<div><label style="font-size:10.5px;font-weight:600;color:#374151;display:block;margin-bottom:3px">주민번호 / 사업자번호</label><input type="text" data-field="rrn" placeholder="000000-0000000" style="width:100%;padding:7px 9px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box"></div>'
+    +   '<div style="grid-column:span 2"><label style="font-size:10.5px;font-weight:600;color:#374151;display:block;margin-bottom:3px">이름 / 법인명</label><input type="text" data-field="name" placeholder="홍길동 또는 ㈜개런티즈" style="width:100%;padding:7px 9px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box"></div>'
+    + '</div>';
+  list.appendChild(card);
+}
+
+// [v156] 모달에서 추가된 계약자 정보 수집
+function collectExtraParties(){
+  var list = document.getElementById('cG_extraList'); if (!list) return [];
+  var cards = list.querySelectorAll('[data-extra-idx]');
+  var arr = [];
+  cards.forEach(function(card){
+    var idx = card.dataset.extraIdx;
+    var t = card.querySelector('input[name="cG_extraType_'+idx+'"]:checked');
+    var get = function(f){ var el = card.querySelector('input[data-field="'+f+'"]'); return el ? (el.value||'').trim() : ''; };
+    var name = get('name'), addr = get('addr'), phone = get('phone'), rrn = get('rrn');
+    // 모든 필드 비어있으면 스킵
+    if (!name && !addr && !phone && !rrn) return;
+    arr.push({ type: t ? t.value : '공동명의계약인', addr: addr, phone: phone, rrn: rrn, name: name });
+  });
+  return arr;
 }
 
 // ── Google Sheets 데이터 조회 ──────────────────────────────
@@ -6690,6 +6746,8 @@ function generateGuaranteezPdf(contractNo) {
   var specialNotes = '';
   var el = document.getElementById('cG_special');
   if (el) specialNotes = el.value || '';
+  // [v156] 추가 계약자 수집 (모달 닫기 전)
+  var extraParties = (typeof collectExtraParties === 'function') ? collectExtraParties() : [];
   var modal = document.getElementById('cG_modal');
   if (modal) modal.remove();
 
@@ -6703,7 +6761,7 @@ function generateGuaranteezPdf(contractNo) {
     var loaderEl = document.getElementById('cG_loader');
     if (loaderEl) loaderEl.remove();
     if (!data) { alert('계약 데이터를 찾을 수 없습니다. (계약번호: ' + contractNo + ')'); return; }
-    var html = buildGuaranteezContractHtml(data, specialNotes);
+    var html = buildGuaranteezContractHtml(data, specialNotes, extraParties);
     var win = window.open('', '_blank', 'width=960,height=900,scrollbars=yes');
     if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
     win.document.write(html);
@@ -7529,7 +7587,28 @@ function cG_buildTerms() {
 }
 
 // ── 메인 HTML 빌더 ────────────────────────────────────────
-function buildGuaranteezContractHtml(d, specialNotes) {
+// [v156] 추가 계약자 카드 1개 HTML — Page 2/4의 빈 양식 영역 대체
+function cG_buildExtraPartyCard(party, fontSize) {
+  fontSize = fontSize || '8pt';
+  var esc = function(s){ return String(s||'').replace(/[<>]/g, function(m){ return m==='<'?'&lt;':'&gt;'; }); };
+  var typeLabel = party.type || '공동명의계약인';
+  var bg = party.type === '연대보증인' ? '#7c3aed' : '#4b5563';
+  return '<div style="border:2px solid '+bg+';border-radius:6px;padding:7px 10px;margin-top:8px;break-inside:avoid;page-break-inside:avoid">'
+    + '<div class="sig-ttl" style="background:'+bg+'">'+esc(typeLabel)+'</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 60px;margin-top:4px">'
+    + '<table class="sg-tbl" style="font-size:'+fontSize+'">'
+    + '<colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">주소</td><td colspan="3" style="border:1px dashed #c0c0c0;padding:3px 7px;height:20px">'+esc(party.addr)+'</td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">'+esc(party.phone)+'</td><td class="sg-lbl" style="padding:3px 7px">국적</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">-</td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">주민번호<br>(사업자번호)</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">'+esc(party.rrn)+'</td><td class="sg-lbl" style="padding:3px 7px">긴급연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
+    + '<tr><td class="sg-lbl" style="padding:3px 7px">이름(법인명)</td><td colspan="3" style="border:1px dashed #c0c0c0;padding:3px 7px">'+esc(party.name)+'</td></tr>'
+    + '</table>'
+    + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:6px;border-left:1px dashed #c0c0c0;margin-left:5px">서명<br>혹은 인</div>'
+    + '</div></div>';
+}
+
+function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
+  extraParties = Array.isArray(extraParties) ? extraParties : [];
   var refNo         = cG_refNo(d.contractNo);
   var startDate     = cG_fmtDate(d.startDate);
   var endDate       = cG_fmtDate(d.endDate);
@@ -7718,24 +7797,33 @@ function buildGuaranteezContractHtml(d, specialNotes) {
     + '</div>';  // cG-page 끝
 
   // ── Page 2: 을 + 병 + 체크리스트 + 기타 공동계약자 ──────
+  // [v156] 추가 계약자가 있으면 입력 데이터로 채운 블록을, 없으면 빈 양식 1개를 노출
+  var extraBlocksHtml;
+  if (extraParties.length > 0) {
+    extraBlocksHtml = extraParties.map(function(p){ return cG_buildExtraPartyCard(p, '8pt'); }).join('');
+  } else {
+    extraBlocksHtml = ''
+      + '<div style="border:2px solid #4b5563;border-radius:6px;padding:7px 10px;margin-top:8px">'
+      + '<div class="sig-ttl" style="background:#4b5563">공동명의계약인</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 60px;margin-top:4px">'
+      + '<table class="sg-tbl" style="font-size:8pt">'
+      + '<colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>'
+      + '<tr><td class="sg-lbl" style="padding:3px 7px">주소</td><td colspan="3" style="border:1px dashed #c0c0c0;padding:3px 7px;height:20px"></td></tr>'
+      + '<tr><td class="sg-lbl" style="padding:3px 7px">연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td><td class="sg-lbl" style="padding:3px 7px">국적</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">-</td></tr>'
+      + '<tr><td class="sg-lbl" style="padding:3px 7px">주민등록번호</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td><td class="sg-lbl" style="padding:3px 7px">긴급연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
+      + '<tr><td class="sg-lbl" style="padding:3px 7px" rowspan="2">이름(법인명)</td><td rowspan="2" style="border:1px dashed #c0c0c0;padding:3px 7px"></td><td class="sg-lbl" style="padding:3px 7px">관계</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
+      + '<tr><td class="sg-lbl" style="padding:3px 7px">이름</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
+      + '</table>'
+      + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:6px;border-left:1px dashed #c0c0c0;margin-left:5px">서명<br>혹은 인</div>'
+      + '</div></div>';
+  }
+
   var p_parties = '<div class="cG-page">'
     // 병
     + cG_buildCoParty(hasCoParty, coTitle, d)
     // 기타 공동계약자
     + '<div style="margin-top:12px;font-size:11pt;font-weight:700;text-align:center;color:#1B3976">기타 공동계약자</div>'
-    + '<div style="border:2px solid #4b5563;border-radius:6px;padding:7px 10px;margin-top:8px">'
-    + '<div class="sig-ttl" style="background:#4b5563">공동명의계약인</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 60px;margin-top:4px">'
-    + '<table class="sg-tbl" style="font-size:8pt">'
-    + '<colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>'
-    + '<tr><td class="sg-lbl" style="padding:3px 7px">주소</td><td colspan="3" style="border:1px dashed #c0c0c0;padding:3px 7px;height:20px"></td></tr>'
-    + '<tr><td class="sg-lbl" style="padding:3px 7px">연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td><td class="sg-lbl" style="padding:3px 7px">국적</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">-</td></tr>'
-    + '<tr><td class="sg-lbl" style="padding:3px 7px">주민등록번호</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td><td class="sg-lbl" style="padding:3px 7px">긴급연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
-    + '<tr><td class="sg-lbl" style="padding:3px 7px" rowspan="2">이름(법인명)</td><td rowspan="2" style="border:1px dashed #c0c0c0;padding:3px 7px"></td><td class="sg-lbl" style="padding:3px 7px">관계</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
-    + '<tr><td class="sg-lbl" style="padding:3px 7px">이름</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
-    + '</table>'
-    + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:6px;border-left:1px dashed #c0c0c0;margin-left:5px">서명<br>혹은 인</div>'
-    + '</div></div>'
+    + extraBlocksHtml
     // 체크리스트
     + '<div class="ck-hdr" style="margin-top:14px">'
     + '<div style="display:flex;align-items:center"><span style="font-size:8.5pt;opacity:.8">KRG GROUP · GUARANTEEZ SERVICE</span><span style="margin-left:auto;font-size:8pt;opacity:.8">버전 1.0 / 2026년 기준</span></div>'
