@@ -1755,9 +1755,11 @@ function parseDailyReport(resp) {
 }
 
 // 구 파서 (대응관리 시트용 — 대시보드 메인에서 사용)
+// [v155] 시트 스키마 변경 반영 (2026-05): 계약번호/연락처 컬럼 제거 → J~ 좌측 이동
 // 시트 표준 컬럼 위치 (헤더 사라져도 동작):
-//   B=일자(1), C=시작, D=종료, F=구분(5), G=담당자(6), H=TELL분(7), I=업무분(8),
-//   J=계약번호(9), K=대상구분(10), L=연락처(11), M=업무구분(12), N=하위구분(13), O=업무내용(14)
+//   B=일자(1), C=통화개시(2), D=통화종료(3), E=대응종료(4), F=구분(5), G=담당자(6),
+//   H=TELL분(7), I=업무분(8), J=대상구분(9), K=업무구분(10), L=하위구분(11),
+//   M=업무내용(12), N=Check(13), O=다음업무(14), P=업무진척(15)
 function parseDaeungFull(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
@@ -1767,20 +1769,21 @@ function parseDaeungFull(resp) {
   const personIdx  = findColIdx(labels, ['담당자','대응자'],      6);
   const tellIdx    = findColIdx(labels, ['TELL대응','Tell대응','TELL'], 7);
   const workIdx    = findColIdx(labels, ['업무대응','업무시간'],  8);
-  const noIdx      = findColIdx(labels, ['계약번호','계약'],      9);
-  const targetIdx  = findColIdx(labels, ['대상구분','대상'],     10);
-  const contactIdx = findColIdx(labels, ['연락자','연락처'],     11);
-  const catIdx     = findColIdx(labels, ['업무구분','카테고리'], 12);
-  const subIdx     = findColIdx(labels, ['하위구분','세부'],     13);
-  const contentIdx = findColIdx(labels, ['업무내용','내용'],     14);
-  const nextIdx    = findColIdx(labels, ['다음업무'],            15);
-  const jinIdx     = findColIdx(labels, ['업무진척'],            16);
+  const noIdx      = findColIdx(labels, ['계약번호','계약'],     -1);  // [v155] 시트에서 제거됨
+  const targetIdx  = findColIdx(labels, ['대상구분','대상'],      9);  // [v155] 10→9
+  const contactIdx = findColIdx(labels, ['연락자','연락처'],     -1);  // [v155] 시트에서 제거됨
+  const catIdx     = findColIdx(labels, ['업무구분','카테고리'], 10);  // [v155] 12→10
+  const subIdx     = findColIdx(labels, ['하위구분','세부'],     11);  // [v155] 13→11
+  const contentIdx = findColIdx(labels, ['업무내용','내용'],     12);  // [v155] 14→12
+  const nextIdx    = findColIdx(labels, ['다음업무'],            14);  // [v155] 15→14
+  const jinIdx     = findColIdx(labels, ['업무진척'],            15);  // [v155] 16→15
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
     const num  = i => parseFloat(cell(i).replace(/[^0-9.]/g,'')) || 0;
     const no = cell(noIdx);
-    if (!no || !cell(dateIdx)) return null;
+    // [v155] 계약번호가 시트에서 제거됨 — date+person 만 가지고 행 유효성 판단
+    if (!cell(dateIdx) || !cell(personIdx)) return null;
     return {
       date: cell(dateIdx), type: cell(typeIdx), person: cell(personIdx),
       tell: num(tellIdx), work: num(workIdx),
@@ -4714,8 +4717,9 @@ function fetchSheetJSONP(gid) {
 }
 
 // 메인 대응내역 시트 파서 — 헤더 의존 제거 + 절대 위치 fallback
+// [v155] 시트 스키마 변경 반영 (2026-05): 계약번호/연락처 컬럼 제거로 J~ 컬럼이 좌측으로 이동
 // 시트 표준 컬럼: B=일자(1), F=구분(5), G=담당자(6), H=TELL분(7), I=업무분(8),
-//                K=대상구분(10), M=업무구분(12), N=하위구분(13), O=업무내용(14)
+//                J=대상구분(9), K=업무구분(10), L=하위구분(11), M=업무내용(12)
 function parseGVizTable(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
@@ -4726,10 +4730,10 @@ function parseGVizTable(resp) {
   const personIdx  = findColIdx(labels, ['담당자','대응자'],      6);
   const tellIdx    = findColIdx(labels, ['TELL대응','Tell대응','TELL','전화시간'], 7);
   const workIdx    = findColIdx(labels, ['업무대응','업무시간'],  8);
-  const targetIdx  = findColIdx(labels, ['대상구분','대상'],     10);
-  const catIdx     = findColIdx(labels, ['업무구분','카테고리'], 12);
-  const subIdx     = findColIdx(labels, ['하위구분','세부'],     13);
-  const contentIdx = findColIdx(labels, ['업무내용','내용'],     14);
+  const targetIdx  = findColIdx(labels, ['대상구분','대상'],      9);  // [v155] 10→9
+  const catIdx     = findColIdx(labels, ['업무구분','카테고리'], 10);  // [v155] 12→10
+  const subIdx     = findColIdx(labels, ['하위구분','세부'],     11);  // [v155] 13→11
+  const contentIdx = findColIdx(labels, ['업무내용','내용'],     12);  // [v155] 14→12
 
   // 디버그: 매핑 모드 기록 (window.__sheetMapDebug 로 확인 가능)
   try {
