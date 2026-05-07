@@ -8042,17 +8042,13 @@ function rnwSetSearch(val){
     if (el) { el.focus(); var v = el.value; el.setSelectionRange(v.length, v.length); }
   }, 200);
 }
-// [v158/v162] 계약종료일 범위 — 항상 적용. 디폴트는 광범위(2015~2099)로 영향 없음. 사용자가 좁히면 추가 필터 작용.
-(function(){
-  if (!window._rnwSearchEndStart) window._rnwSearchEndStart = '2015-01';
-  if (!window._rnwSearchEndEnd)   window._rnwSearchEndEnd   = '2099-12';
-})();
-function rnwSetSearchEndPeriod(which, val){
-  if (which === 'start') window._rnwSearchEndStart = val;
-  else if (which === 'end') window._rnwSearchEndEnd = val;
+// [v163] 필터 모드 — 'review' (심사진행기간, +3월 오프셋) | 'endDate' (계약종료일, 직접 매칭)
+window._rnwFilterMode = window._rnwFilterMode || 'review';
+function rnwSetFilterMode(mode){
+  window._rnwFilterMode = (mode === 'endDate') ? 'endDate' : 'review';
   renderRenewalView();
 }
-// [v159] 전체 계약자 검색 토글 — 켜지면 심사진행기간/계약종료기간 모두 무시
+// [v159] 전체 계약자 검색 토글 — 켜지면 모드/기간 모두 무시
 window._rnwSearchAll = !!window._rnwSearchAll;
 function rnwToggleSearchAll(checked){
   window._rnwSearchAll = !!checked;
@@ -8144,6 +8140,16 @@ function rnwMonthRange(startMonthStr, endMonthStr){
   var startEffective = new Date(sY, sM - 1 + 3, 1);
   // 종료월 +3월의 말일
   var endEffective = new Date(eY, eM + 3, 0); // day=0 → 전월 말일 = +3월의 말일
+  return { start: startEffective, end: endEffective };
+}
+// [v163] 계약종료일 모드 — 직접 매칭 (오프셋 없음)
+function rnwMonthRangeDirect(startMonthStr, endMonthStr){
+  if (!startMonthStr || !endMonthStr) return null;
+  var sP = startMonthStr.split('-'); var eP = endMonthStr.split('-');
+  var sY = +sP[0], sM = +sP[1];
+  var eY = +eP[0], eM = +eP[1];
+  var startEffective = new Date(sY, sM - 1, 1);
+  var endEffective = new Date(eY, eM, 0); // 해당월 말일
   return { start: startEffective, end: endEffective };
 }
 
@@ -8305,16 +8311,17 @@ function rnwRenewalRound(startDate, endDate){
 }
 
 // === 갱신 대상자 빌드 (기간 필터 적용) ===
-function rnwBuildTargets(startMonth, endMonth){
+function rnwBuildTargets(startMonth, endMonth, mode){
   var targets = [];
   if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) return targets;
   var vacancyMap = {};
   vacancyRawData.forEach(function(v){ vacancyMap[String(v.no||'').trim()] = v; });
 
-  // [v158] startMonth/endMonth 인자가 주어지면 그 값을 사용 (검색용 별도 범위)
+  // [v158] startMonth/endMonth 인자가 주어지면 그 값을 사용
+  // [v163] mode = 'endDate' → 직접 매칭, 'review'/기본 → +3월 오프셋
   var sm = startMonth || window._rnwStartMonth;
   var em = endMonth   || window._rnwEndMonth;
-  var range = rnwMonthRange(sm, em);
+  var range = (mode === 'endDate') ? rnwMonthRangeDirect(sm, em) : rnwMonthRange(sm, em);
   var sheetMap = rnwBuildSheetMap();
 
   vacancyRawData.forEach(function(v){
@@ -8393,8 +8400,8 @@ function rnwBuildCohorts(){
 }
 
 // === enriched (심사 결과 + 진행상태 결합) ===
-function rnwBuildEnriched(startMonth, endMonth){
-  var targets = rnwBuildTargets(startMonth, endMonth);
+function rnwBuildEnriched(startMonth, endMonth, mode){
+  var targets = rnwBuildTargets(startMonth, endMonth, mode);
   // [v45] 계약상태 필터 적용
   var cf = window._rnwContractFilter || 'all';
   if (cf !== 'all') {
@@ -8477,21 +8484,16 @@ function renderRenewalView(){
     return;
   }
 
-  // [v162] 모집단 빌드:
-  //   1) 계약자 전체 토글 ON  → 심사진행기간/계약종료일 모두 무시 (전체 데이터)
-  //   2) 토글 OFF              → 심사진행기간으로 1차 필터 + 계약종료일로 2차 AND 필터
+  // [v163] 모드 기반 모집단 빌드 (OR 방식 — 한 번에 한 가지 필터만 작용):
+  //   1) 계약자 전체 토글 ON → 모드/기간 무시 (전체 데이터)
+  //   2) 토글 OFF + 'review' 모드  → 심사진행기간 (+3월 오프셋)
+  //   3) 토글 OFF + 'endDate' 모드 → 계약종료일 (직접 매칭)
+  var mode = window._rnwFilterMode || 'review';
   var enriched;
   if (window._rnwSearchAll) {
-    enriched = rnwBuildEnriched('2015-01', '2099-12');
+    enriched = rnwBuildEnriched('2015-01', '2099-12', 'endDate');
   } else {
-    enriched = rnwBuildEnriched();  // 심사진행기간 적용
-    // 계약종료일 (= 만기일) 추가 AND 필터
-    var endRange = rnwMonthRange(window._rnwSearchEndStart, window._rnwSearchEndEnd);
-    if (endRange && endRange.start && endRange.end) {
-      enriched = enriched.filter(function(e){
-        return e.endDate >= endRange.start && e.endDate <= endRange.end;
-      });
-    }
+    enriched = rnwBuildEnriched(window._rnwStartMonth, window._rnwEndMonth, mode);
   }
   var filter = window._rnwFilter || 'all';
   var kpiFilter = window._rnwKpiFilter || 'all';
@@ -8518,17 +8520,27 @@ function renderRenewalView(){
 
   var kpi = rnwCountKPI(enriched);
   var cohorts = rnwBuildCohorts();
-  var range = rnwMonthRange(window._rnwStartMonth, window._rnwEndMonth);
+  // [v163] 모드별 effective range
+  var range = (mode === 'endDate')
+    ? rnwMonthRangeDirect(window._rnwStartMonth, window._rnwEndMonth)
+    : rnwMonthRange(window._rnwStartMonth, window._rnwEndMonth);
+  var infoText = (mode === 'endDate')
+    ? ('→ 계약종료일 <b>' + rnwFmtDate(range.start) + ' ~ ' + rnwFmtDate(range.end) + '</b> 도래자 출력')
+    : ('→ 만기일 <b>' + rnwFmtDate(range.start) + ' ~ ' + rnwFmtDate(range.end) + '</b> 도래자 출력');
 
   // [v45] 기간 카드 안에 계약상태 필터 함께 표시 (우측)
   var contractFilterPills = rnwBuildContractFilterPills();
   var periodHtml = '<div class="rnw-period-row" style="justify-content:space-between">'
     + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
-    + '<label>심사 진행 기간:</label>'
+    // [v163] 모드 드롭다운 (필터 기준 선택)
+    + '<select onchange="rnwSetFilterMode(this.value)" style="padding:5px 10px;border:1.5px solid #1B3976;border-radius:6px;font-size:12px;font-weight:700;color:#1B3976;background:#fff;cursor:pointer">'
+    +   '<option value="review"' + (mode==='review'?' selected':'') + '>심사 진행 기간</option>'
+    +   '<option value="endDate"' + (mode==='endDate'?' selected':'') + '>계약종료일</option>'
+    + '</select>'
     + '<select onchange="rnwSetPeriod(\'start\', this.value)">' + rnwMonthOptions(window._rnwStartMonth) + '</select>'
     + '<span style="color:#9CA3AF">~</span>'
     + '<select onchange="rnwSetPeriod(\'end\', this.value)">' + rnwMonthOptions(window._rnwEndMonth) + '</select>'
-    + '<span class="rnw-period-info">→ 만기일 <b>' + rnwFmtDate(range.start) + ' ~ ' + rnwFmtDate(range.end) + '</b> 도래자 출력</span>'
+    + '<span class="rnw-period-info">' + infoText + '</span>'
     + '</div>'
     + contractFilterPills
     + '</div>';
@@ -8545,10 +8557,9 @@ function renderRenewalView(){
     + '<div class="rnw-kpi k-ended" style="' + kStyle(kf==='ended') + '" onclick="rnwSetKpiFilter(\'ended\')"><div class="rnw-kpi-label">계약종료</div><div class="rnw-kpi-val">' + kpi.ended + '명</div><div class="rnw-kpi-sub">중도퇴실 + 만기퇴실</div></div>'
     + '</div>';
 
-  // [v160] 레이아웃 재구성 — Row 1: 계약상태 + 심사결과 + 검색그룹 / Row 2: 액션 버튼 (우측 정렬)
+  // [v160/v163] 레이아웃 — Row 1: 계약상태 + 심사결과 + 검색그룹(검색input + 계약자전체 토글) / Row 2: 액션 버튼
   var searchAll = !!window._rnwSearchAll;
   var togStyle = 'display:flex;align-items:center;gap:4px;border:1.5px solid ' + (searchAll?'#10B981':'#D1D5DB') + ';border-radius:5px;padding:0 8px;height:24px;font-size:10.5px;font-weight:700;cursor:pointer;background:' + (searchAll?'#ECFDF5':'#fff') + ';color:' + (searchAll?'#065F46':'#374151');
-  var periodSectionStyle = 'display:flex;align-items:center;gap:4px;padding:0 10px;' + (searchAll?'opacity:.5;pointer-events:none':'');
   var btnAct = function(bg, label, onclick){
     return '<button onclick="' + onclick + '" style="background:' + bg + ';color:#fff;border:none;padding:0 14px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;height:28px;line-height:1;white-space:nowrap">' + label + '</button>';
   };
@@ -8564,7 +8575,7 @@ function renderRenewalView(){
     +     '<button class="rnw-filter-btn ' + (filter==='cond'?'active':'') + '" onclick="rnwSetFilter(\'cond\')">조건부승인</button>'
     +     '<button class="rnw-filter-btn ' + (filter==='deny'?'active':'') + '" onclick="rnwSetFilter(\'deny\')">거절</button>'
     +   '</div>'
-    // 검색 그룹 박스 (옵션 B 스타일)
+    // 검색 그룹 박스 — 검색 input + 계약자 전체 토글만 (계약종료일은 v163에서 상단 모드로 이동)
     +   '<div style="display:flex;align-items:center;gap:0;padding:5px 10px;height:36px;background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:8px">'
     +     '<div style="display:flex;align-items:center;gap:6px;padding:0 10px">'
     +       '<span style="font-size:11px;font-weight:700;color:#374151">🔍 검색</span>'
@@ -8573,13 +8584,6 @@ function renderRenewalView(){
     +     '<div style="width:1px;height:18px;background:#E5E7EB"></div>'
     +     '<div style="display:flex;align-items:center;gap:6px;padding:0 10px">'
     +       '<label style="' + togStyle + '"><input type="checkbox"' + (searchAll?' checked':'') + ' onchange="rnwToggleSearchAll(this.checked)" style="margin:0">계약자 전체</label>'
-    +     '</div>'
-    +     '<div style="width:1px;height:18px;background:#E5E7EB"></div>'
-    +     '<div style="' + periodSectionStyle + '">'
-    +       '<span style="font-size:10.5px;color:#6B7280;font-weight:600">계약종료일</span>'
-    +       '<select onchange="rnwSetSearchEndPeriod(\'start\', this.value)" style="padding:0 6px;border:1px solid #D1D5DB;border-radius:4px;background:#fff;font-size:10.5px;height:22px">' + rnwMonthOptions(window._rnwSearchEndStart) + '</select>'
-    +       '<span style="color:#9CA3AF;font-size:10.5px">~</span>'
-    +       '<select onchange="rnwSetSearchEndPeriod(\'end\', this.value)" style="padding:0 6px;border:1px solid #D1D5DB;border-radius:4px;background:#fff;font-size:10.5px;height:22px">' + rnwMonthOptions(window._rnwSearchEndEnd) + '</select>'
     +     '</div>'
     +   '</div>'
     + '</div>'
