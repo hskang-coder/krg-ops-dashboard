@@ -10107,18 +10107,25 @@ function cmgRenderSettlementCard(){
   } else {
     html += '<table class="cmg-onboard-tbl"><thead><tr>'
       + '<th>월</th><th>파트너</th><th class="cmg-num">건수</th>'
-      + '<th class="cmg-num">중개보수 합계</th><th>입금완료</th><th>상태</th>'
+      + '<th class="cmg-num">공급가액</th><th class="cmg-num">부가세</th><th class="cmg-num">중개보수(VAT포함)</th>'
+      + '<th>입금완료</th><th>상태</th>'
       + '</tr></thead><tbody>';
     html += rows.map(function(r){
       var paid = !!window._cmgPaidMap[cmgPaidKey(r.partnerName, r.ym)];
       var partner = cmgFindPartner(r.partnerName);
       var hasBizNo = partner && partner.bizNo;
       var pnEsc = r.partnerName.replace(/'/g, "\\'");
+      // [v167] 중개보수(VAT포함) 분해 — 공급가액 = VAT포함 / 1.1, 부가세 = VAT포함 - 공급가액
+      var vatIncl = r.totalBrokerage || 0;
+      var supply  = Math.round(vatIncl / 1.1);
+      var vat     = vatIncl - supply;
       return '<tr class="' + (paid ? '' : 'cmg-warn') + '">'
         + '<td><b>' + r.ym + '</b></td>'
         + '<td>' + r.partnerName + (!hasBizNo ? ' <span style="color:#9CA3AF;font-size:10px">(등록번호 없음)</span>' : '') + '</td>'
         + '<td class="cmg-num">' + r.count + '건</td>'
-        + '<td class="cmg-num cmg-money">' + cmgFmtMoney(r.totalBrokerage) + '</td>'
+        + '<td class="cmg-num cmg-money">' + cmgFmtMoney(supply) + '</td>'
+        + '<td class="cmg-num cmg-money" style="color:#6B7280">' + cmgFmtMoney(vat) + '</td>'
+        + '<td class="cmg-num cmg-money"><b>' + cmgFmtMoney(vatIncl) + '</b></td>'
         + '<td><input type="checkbox" class="cmg-paid-cb" ' + (paid ? 'checked' : '') + ' onchange="cmgTogglePaid(\'' + pnEsc + '\',\'' + r.ym + '\',this)"></td>'
         + '<td>' + (paid ? '<span class="cmg-paid-true">✓ 지급완료</span>' : '<span class="cmg-paid-false">미지급</span>') + '</td>'
         + '</tr>';
