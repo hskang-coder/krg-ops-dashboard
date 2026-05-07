@@ -7053,10 +7053,10 @@ function openFeeCalcModal(contractNo){
     // 입력 패턴 선택
     +     '<div style="display:flex;gap:10px;margin-bottom:14px">'
     +       '<label style="flex:1;padding:10px 12px;border:2px solid #7C3AED;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;background:#F5F3FF" id="fcP1Label">'
-    +         '<input type="radio" name="fcPattern" value="1" checked onchange="switchFeePattern(1)"><b style="color:#5B21B6;font-size:12.5px">패턴1: 검색결과 사용</b>'
+    +         '<input type="radio" name="fcPattern" value="1" checked onchange="switchFeePattern(1)"><b style="color:#5B21B6;font-size:12.5px">검색결과</b>'
     +       '</label>'
     +       '<label style="flex:1;padding:10px 12px;border:2px solid #E5E7EB;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px" id="fcP2Label">'
-    +         '<input type="radio" name="fcPattern" value="2" onchange="switchFeePattern(2)"><b style="color:#374151;font-size:12.5px">패턴2: 직접 입력</b>'
+    +         '<input type="radio" name="fcPattern" value="2" onchange="switchFeePattern(2)"><b style="color:#374151;font-size:12.5px">직접입력</b>'
     +       '</label>'
     +     '</div>'
 
@@ -7082,11 +7082,11 @@ function openFeeCalcModal(contractNo){
     +   '<div id="fcSection2" style="padding:18px 24px;display:none">'
     +     '<div style="display:flex;gap:10px;margin-bottom:14px">'
     +       '<label style="flex:1;padding:10px 12px;border:2px solid #7C3AED;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;background:#F5F3FF" id="fcDP1Label">'
-    +         '<input type="radio" name="fcDayPattern" value="1" checked onchange="switchDayPattern(1)"><b style="color:#5B21B6;font-size:12.5px">패턴1: 월 기준</b>'
+    +         '<input type="radio" name="fcDayPattern" value="1" checked onchange="switchDayPattern(1)"><b style="color:#5B21B6;font-size:12.5px">월 기준</b>'
     +         '<span style="font-size:10.5px;color:#6B7280;margin-left:auto">임대료÷해당월일수</span>'
     +       '</label>'
     +       '<label style="flex:1;padding:10px 12px;border:2px solid #E5E7EB;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px" id="fcDP2Label">'
-    +         '<input type="radio" name="fcDayPattern" value="2" onchange="switchDayPattern(2)"><b style="color:#374151;font-size:12.5px">패턴2: 연 기준</b>'
+    +         '<input type="radio" name="fcDayPattern" value="2" onchange="switchDayPattern(2)"><b style="color:#374151;font-size:12.5px">연 기준</b>'
     +         '<span style="font-size:10.5px;color:#6B7280;margin-left:auto">임대료×12÷365</span>'
     +       '</label>'
     +     '</div>'
@@ -7122,7 +7122,7 @@ function openFeeCalcModal(contractNo){
     + '</div>';
 
   document.body.appendChild(m);
-  m.addEventListener('click', function(e){ if (e.target === m) closeFeeCalcModal(); });
+  // [v153] 백드롭 클릭 닫힘 제거 — 입력 도중 의도치 않게 닫히는 현상 방지. 닫기는 ✕ / 닫기 버튼만 사용.
   recalcFee();
   recalcDay();
 }
