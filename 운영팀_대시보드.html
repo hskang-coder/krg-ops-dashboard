@@ -9014,6 +9014,11 @@ window._cmgPeriod = window._cmgPeriod || 'month'; // [v76] (deprecated, v82)
 window._cmgPartnerPeriod = window._cmgPartnerPeriod || 'month';
 // [v93] 정산 입금완료 — localStorage 영구 저장
 const CMG_PAID_KEY = 'krg.cmgPaidMap.v1';
+// [v169] 정산_입금완료 시트 (gid=1365484721) — 모든 사용자가 같은 데이터 공유
+const CMG_PAID_SHEET_GID = '1365484721';
+const CMG_PAID_SHEET_URL = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/edit?gid=' + CMG_PAID_SHEET_GID + '#gid=' + CMG_PAID_SHEET_GID;
+window._cmgPaidSyncedAt = window._cmgPaidSyncedAt || '';
+
 function cmgLoadPaidMap(){
   try {
     var raw = localStorage.getItem(CMG_PAID_KEY);
@@ -9033,7 +9038,69 @@ function cmgClearPaidMap(){
   cmgSavePaidMap();
   renderContractMgmtView();
 }
+
+// [v169] 정산_입금완료 시트에서 paidMap 가져와 병합 — 모든 사용자가 공유
+async function cmgFetchPaidFromSheet(){
+  try {
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+            + '/gviz/tq?tqx=out:json&gid=' + CMG_PAID_SHEET_GID + '&range=A:D&headers=0';
+    var res = await fetch(url);
+    var txt = await res.text();
+    var m = txt.match(/setResponse\((\{[\s\S]+\})\)/);
+    if (!m) return false;
+    var resp = JSON.parse(m[1]);
+    var rows = (resp && resp.table && resp.table.rows) || [];
+    var sheetMap = {};
+    rows.forEach(function(row){
+      var c = row.c || [];
+      var key = c[0] && (c[0].f || c[0].v);
+      var paid = c[1] && (c[1].v != null ? c[1].v : c[1].f);
+      if (!key) return;
+      key = String(key).trim();
+      if (key === '키' || key === 'key') return; // 헤더 스킵
+      var paidBool = (paid === true || String(paid).toUpperCase() === 'TRUE' || String(paid).toUpperCase() === 'O');
+      if (paidBool) sheetMap[key] = true;
+    });
+    // 시트가 진실 — 시트 데이터로 _cmgPaidMap 덮어씀
+    window._cmgPaidMap = sheetMap;
+    cmgSavePaidMap();
+    var t = new Date();
+    window._cmgPaidSyncedAt = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+    return true;
+  } catch(e) { console.warn('cmgFetchPaidFromSheet failed:', e); return false; }
+}
+
+// [v169] 현재 paidMap을 TSV로 만들어 클립보드에 복사 — 마스터가 시트에 붙여넣기
+async function cmgExportPaidToSheet(){
+  var map = window._cmgPaidMap || {};
+  var keys = Object.keys(map).filter(function(k){ return map[k]; });
+  if (keys.length === 0) {
+    if (!confirm('체크된 항목이 없습니다. 시트를 열기만 할까요?')) return;
+  } else {
+    keys.sort();
+    var ts = new Date(); var tsStr = ts.getFullYear()+'-'+String(ts.getMonth()+1).padStart(2,'0')+'-'+String(ts.getDate()).padStart(2,'0')+' '+String(ts.getHours()).padStart(2,'0')+':'+String(ts.getMinutes()).padStart(2,'0');
+    var who = '운영책임자';
+    var tsv = keys.map(function(k){ return [k, 'TRUE', tsStr, who].join('\t'); }).join('\n');
+    try {
+      await navigator.clipboard.writeText(tsv);
+      alert('✅ 클립보드에 복사 완료 ('+keys.length+'건)\n\n[다음 단계]\n1) "정산_입금완료" 시트가 새 탭으로 열립니다\n2) A2 셀 클릭 → Cmd+V (붙여넣기)\n3) 저장 후 다른 직원이 새로고침하면 동일하게 보임\n\n※ 헤더(A1~D1: 키/입금완료/체크일시/체크자) 가 비어있으면 한 번만 직접 입력해주세요.');
+    } catch(e) {
+      alert('클립보드 복사 실패. 수동 복사하세요:\n\n' + tsv);
+    }
+  }
+  window.open(CMG_PAID_SHEET_URL, '_blank');
+}
+
 window._cmgPaidMap = window._cmgPaidMap || cmgLoadPaidMap(); // [v93] localStorage 복원
+// [v169] 페이지 로드 시 시트에서 최신 데이터 가져와 병합 (백그라운드)
+if (typeof cmgFetchPaidFromSheet === 'function') {
+  cmgFetchPaidFromSheet().then(function(ok){
+    if (ok && typeof renderContractMgmtView === 'function') {
+      var view = document.getElementById('contractMgmtView');
+      if (view && view.style.display !== 'none') renderContractMgmtView();
+    }
+  });
+}
 window._cmgPersonPartnerFilter = (window._cmgPersonPartnerFilter == null) ? '' : window._cmgPersonPartnerFilter; // [v95] 디폴트 빈 문자열(선택 안 함) — 빈 값이면 전체 표시 + 라디오 미선택
 function cmgSetPersonPartnerFilter(val){
   window._cmgPersonPartnerFilter = val;
@@ -10097,7 +10164,11 @@ function cmgRenderSettlementCard(){
     + '</div>';
   var html = '<div class="cmg-card">'
     + '<div class="cmg-card-title"><span class="dot" style="background:#EF4444"></span>💰 정산 워크플로우 (6-2)</div>'
-    + '<div class="cmg-stat-period">📅 <b>' + rng.start + ' ~ ' + rng.end + '</b> <span style="color:#16A34A;font-weight:400;font-size:11px">✓ 체크 상태는 자동 저장됩니다 (이 브라우저)</span> <button onclick="cmgClearPaidMap()" style="margin-left:6px;padding:2px 8px;font-size:10.5px;border:1px solid #FCA5A5;background:#fff;color:#991B1B;border-radius:5px;cursor:pointer">전체 초기화</button></div><div class="cmg-stat-row"><div class="cmg-stat-box sb-red"><div class="sb-label">미지급 건수</div><div class="sb-val">' + unpaidCnt + '<span style="font-size:13px;font-weight:600;color:#DC2626">건</span></div></div><div class="cmg-stat-box sb-red"><div class="sb-label">미지급 합계</div><div class="sb-val">' + cmgFmtMoney(unpaidAmt) + '</div></div><div class="cmg-stat-box sb-green"><div class="sb-label">지급 건수</div><div class="sb-val">' + paidCnt + '<span style="font-size:13px;font-weight:600;color:#16A34A">건</span></div></div><div class="cmg-stat-box sb-green"><div class="sb-label">지급 합계</div><div class="sb-val">' + cmgFmtMoney(paidAmt) + '</div></div></div>' + rangeHtml;
+    + '<div class="cmg-stat-period">📅 <b>' + rng.start + ' ~ ' + rng.end + '</b> '
+    + '<span style="color:#1B3976;font-weight:600;font-size:11px">🔄 시트와 공유 중' + (window._cmgPaidSyncedAt ? ' (마지막 동기화: ' + window._cmgPaidSyncedAt + ')' : '') + '</span>'
+    + ' <button onclick="cmgFetchPaidFromSheet().then(function(){renderContractMgmtView()})" style="margin-left:6px;padding:2px 8px;font-size:10.5px;border:1px solid #93C5FD;background:#fff;color:#1B3976;border-radius:5px;cursor:pointer" title="시트에서 최신 데이터 다시 받기">↻ 새로고침</button>'
+    + ' <button onclick="cmgExportPaidToSheet()" style="margin-left:4px;padding:2px 8px;font-size:10.5px;border:1px solid #10B981;background:#ECFDF5;color:#065F46;border-radius:5px;cursor:pointer" title="현재 체크된 내역을 시트에 붙여넣을 수 있도록 클립보드에 복사 + 시트 새 탭 열기">📋 시트 내보내기</button>'
+    + ' <button onclick="cmgClearPaidMap()" style="margin-left:4px;padding:2px 8px;font-size:10.5px;border:1px solid #FCA5A5;background:#fff;color:#991B1B;border-radius:5px;cursor:pointer">전체 초기화</button></div><div class="cmg-stat-row"><div class="cmg-stat-box sb-red"><div class="sb-label">미지급 건수</div><div class="sb-val">' + unpaidCnt + '<span style="font-size:13px;font-weight:600;color:#DC2626">건</span></div></div><div class="cmg-stat-box sb-red"><div class="sb-label">미지급 합계</div><div class="sb-val">' + cmgFmtMoney(unpaidAmt) + '</div></div><div class="cmg-stat-box sb-green"><div class="sb-label">지급 건수</div><div class="sb-val">' + paidCnt + '<span style="font-size:13px;font-weight:600;color:#16A34A">건</span></div></div><div class="cmg-stat-box sb-green"><div class="sb-label">지급 합계</div><div class="sb-val">' + cmgFmtMoney(paidAmt) + '</div></div></div>' + rangeHtml;
   if (rows.length === 0) {
     html += '<div class="cmg-empty">최근 6개월 정산 대상이 없습니다.</div>';
   } else {
