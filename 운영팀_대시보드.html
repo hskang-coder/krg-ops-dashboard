@@ -9386,7 +9386,11 @@ function cmgBuildPartnerStats(){
     if (!cmgYmInRange(ym, range)) return; // [v80]
     var dep  = cmgParseAmount(v.deposit);
     var rent = cmgParseAmount(v.monthRent || v.rent);
-    var brk  = calcBrokerage(dep, rent, v.housingType);
+    // [v170] 계약기간 12개월 미만은 중개보수 계산 제외 (0원)
+    var endDateForCalc = cmgParseStartDate(v.endDate);
+    var monthsForCalc = cmgMonthsBetween(startDate, endDateForCalc);
+    var isShortContract = monthsForCalc > 0 && monthsForCalc < 12;
+    var brk  = isShortContract ? 0 : calcBrokerage(dep, rent, v.housingType);
     var trade = dep + rent * 100;
     if (!byPartner[pn]) {
       byPartner[pn] = {
@@ -9402,7 +9406,16 @@ function cmgBuildPartnerStats(){
     var addr = c ? [c['계약지주소'], c['건물명'], c['호수']].filter(Boolean).join(' ') : '';
     byPartner[pn].contracts.push({
       cno: cno,
-      tenant: v.tenantName || v.tenant1Name || '', // [v81] AT열 우선
+      // [v170] 계약자명: C열(tenant1Name) 우선 — AT열은 종종 사업자번호가 채워져 있음
+      // 숫자 13자리만 있으면 사업자번호이므로 제외
+      tenant: (function(){
+        var c1 = String(v.tenant1Name||'').trim();
+        var atRaw = String(v.tenantName||'').trim();
+        var atIsNumeric = /^[\d\-\s]{10,}$/.test(atRaw);
+        if (c1) return c1;
+        if (atRaw && !atIsNumeric) return atRaw;
+        return '';
+      })(),
       person: v.partnerPerson || '',
       contractKind: v.contractKind || '',
       housingType: v.housingType || '',
@@ -9426,11 +9439,14 @@ function cmgBuildPartnerStats(){
   return arr;
 }
 
-// [v82] 두 날짜 사이 개월수 (절대값 양수)
+// [v82/v170] 두 날짜 사이 개월수 — 시트 수식 =DATEDIF(시작, 종료+1, "m") 와 동일하게 맞춤
+// 종료일을 +1일 보정해 만 개월수 산정 (예: 5/1~4/30 = 12개월, 5/1~5/15(11개월차) = 11개월)
 function cmgMonthsBetween(start, end){
   if (!start || !end) return 0;
-  var months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-  if (end.getDate() < start.getDate()) months--;
+  // end + 1 day
+  var ePlus = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1);
+  var months = (ePlus.getFullYear() - start.getFullYear()) * 12 + (ePlus.getMonth() - start.getMonth());
+  if (ePlus.getDate() < start.getDate()) months--;
   return Math.max(0, months);
 }
 
@@ -9666,28 +9682,35 @@ function cmgRenderPartnerStats(){
               + '<th>주소</th>'
               + '</tr></thead><tbody>'
               + expContracts.map(function(ct, idx){
-                  var supply = Math.round(ct.brokerage);
-                  var vat    = Math.round(ct.brokerage * 0.1);
-                  var total  = supply + vat;
                   var endDateObj = ct.endDate ? cmgParseStartDate(ct.endDate) : null;
                   var months = cmgMonthsBetween(ct.startDate, endDateObj);
+                  // [v170] 12개월 미만은 중개보수료 계산 제외 (0원)
+                  var isShort = months > 0 && months < 12;
+                  var supply = isShort ? 0 : Math.round(ct.brokerage);
+                  var vat    = isShort ? 0 : Math.round(ct.brokerage * 0.1);
+                  var total  = supply + vat;
                   var origMark = ct.origDelivered
                     ? '<span style="color:#16A34A;font-weight:700">✓</span>'
                     : '<span style="color:#DC2626;font-weight:700">✗</span>';
                   var kind = (ct.contractKind || '') + (ct.contractKind && ct.housingType ? ' / ' : '') + (ct.housingType || '') || '—';
+                  // [v170] 12개월 미만 행: 계약기간 셀 빨간색
+                  var monthsStyle = isShort ? 'color:#DC2626;text-align:center;font-weight:700' : 'color:#374151;text-align:center;font-weight:700';
+                  var monthsText = months > 0 ? (months + '개월' + (isShort ? ' ⚠' : '')) : '—';
+                  // 중개보수 0원이면 회색
+                  var brkMuted = isShort ? 'color:#9CA3AF;text-decoration:line-through' : '';
                   return '<tr style="cursor:pointer">'
-                    + '<td style="text-align:center" onclick="event.stopPropagation()"><input type="checkbox" class="cmg-pdf-cb" data-pn="' + p.partnerName.replace(/"/g,'&quot;') + '" value="' + ct.cno + '"></td>'
+                    + '<td style="text-align:center" onclick="event.stopPropagation()"><input type="checkbox" class="cmg-pdf-cb" data-pn="' + p.partnerName.replace(/"/g,'&quot;') + '" value="' + ct.cno + '"' + (isShort ? ' disabled title="12개월 미만 — 중개보수 제외"' : '') + '></td>'
                     + '<td style="text-align:center;color:#8A9AB5;font-size:11px" onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')">' + (idx+1) + '</td>'
                     + '<td style="text-align:center" onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')">' + origMark + '</td>'
                     + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')"><b style="color:#7C3AED">' + ct.cno + '</b></td>'
                     + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')"><b>' + (ct.tenant||'—') + '</b></td>'
                     + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="color:#6B7280">' + kind + '</td>'
                     + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="color:#6B7280;font-size:11px">' + cmgFmtDate(ct.startDate) + '</td>'
-                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="color:#374151;text-align:center;font-weight:700">' + (months > 0 ? months + '개월' : '—') + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="' + monthsStyle + '">' + monthsText + '</td>'
                     + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" class="cmg-num">' + cmgFmtMoneyKor(ct.rent) + '</td>'
-                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" class="cmg-num">' + cmgFmtMoney(supply) + '</td>'
-                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" class="cmg-num" style="color:#6B7280">' + cmgFmtMoney(vat) + '</td>'
-                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" class="cmg-num cmg-money">' + cmgFmtMoney(total) + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" class="cmg-num" style="' + brkMuted + '">' + (isShort ? '—' : cmgFmtMoney(supply)) + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" class="cmg-num" style="color:#6B7280' + (isShort ? ';text-decoration:line-through' : '') + '">' + (isShort ? '—' : cmgFmtMoney(vat)) + '</td>'
+                    + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" class="cmg-num cmg-money" style="' + brkMuted + '">' + (isShort ? '—' : cmgFmtMoney(total)) + '</td>'
                     + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="color:#6B7280">' + (ct.person||'—') + '</td>'
                     + '<td onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')" style="color:#6B7280;font-size:11px">' + (ct.address||'—') + '</td>'
                     + '</tr>';
@@ -9777,6 +9800,10 @@ function cmgBuildPersonStats(){
     if (!cmgYmInRange(ym, range)) return; // [v80]
     var dep  = cmgParseAmount(v.deposit);
     var rent = cmgParseAmount(v.monthRent || v.rent);
+    // [v170] 계약기간 12개월 미만은 중개보수 계산 제외
+    var endDateForCalc = cmgParseStartDate(v.endDate);
+    var monthsForCalc = cmgMonthsBetween(startDate, endDateForCalc);
+    if (monthsForCalc > 0 && monthsForCalc < 12) return; // 통계에서 아예 제외
     var brk  = calcBrokerage(dep, rent, v.housingType);
     var trade = dep + rent * 100;
     var key = person + '|' + pn; // 담당자 + 파트너 조합
@@ -10125,6 +10152,10 @@ function cmgBuildSettlement(){
     var ym = sd.getFullYear() + '-' + String(sd.getMonth()+1).padStart(2,'0');
     var dep = cmgParseAmount(v.deposit);
     var rent = cmgParseAmount(v.monthRent || v.rent);
+    // [v170] 12개월 미만 계약은 정산 대상 제외
+    var endDateForCalc = cmgParseStartDate(v.endDate);
+    var monthsForCalc = cmgMonthsBetween(sd, endDateForCalc);
+    if (monthsForCalc > 0 && monthsForCalc < 12) return;
     var brk = calcBrokerage(dep, rent, v.housingType);
     var key = pn + '|' + ym;
     if (!byPartnerYM[key]) byPartnerYM[key] = { partnerName: pn, ym: ym, count: 0, totalBrokerage: 0, startDate: sd };
