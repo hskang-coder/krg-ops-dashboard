@@ -8556,42 +8556,38 @@ function renderRenewalView(){
     + '<div class="rnw-kpi k-ended" style="' + kStyle(kf==='ended') + '" onclick="rnwSetKpiFilter(\'ended\')"><div class="rnw-kpi-label">계약종료</div><div class="rnw-kpi-val">' + kpi.ended + '명</div><div class="rnw-kpi-sub">중도퇴실 + 만기퇴실</div></div>'
     + '</div>';
 
-  // [v160/v163] 레이아웃 — Row 1: 계약상태 + 심사결과 + 검색그룹(검색input + 계약자전체 토글) / Row 2: 액션 버튼
+  // [v165] 한 줄 통합 — 좌측: 계약상태 + 심사결과 + 검색 + 계약자전체 / 우측: 액션 버튼
   var searchAll = !!window._rnwSearchAll;
-  var togStyle = 'display:flex;align-items:center;gap:4px;border:1.5px solid ' + (searchAll?'#10B981':'#D1D5DB') + ';border-radius:5px;padding:0 8px;height:24px;font-size:10.5px;font-weight:700;cursor:pointer;background:' + (searchAll?'#ECFDF5':'#fff') + ';color:' + (searchAll?'#065F46':'#374151');
+  var togStyle = 'display:flex;align-items:center;gap:4px;border:1.5px solid ' + (searchAll?'#10B981':'#D1D5DB') + ';border-radius:5px;padding:0 8px;height:28px;font-size:10.5px;font-weight:700;cursor:pointer;background:' + (searchAll?'#ECFDF5':'#fff') + ';color:' + (searchAll?'#065F46':'#374151');
   var btnAct = function(bg, label, onclick){
-    return '<button onclick="' + onclick + '" style="background:' + bg + ';color:#fff;border:none;padding:0 14px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;height:28px;line-height:1;white-space:nowrap">' + label + '</button>';
+    return '<button onclick="' + onclick + '" style="background:' + bg + ';color:#fff;border:none;padding:0 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;height:28px;line-height:1;white-space:nowrap">' + label + '</button>';
   };
 
   var filterHtml = ''
-    // ── Row 1: 계약상태 + 심사결과 + 검색그룹 ──
-    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;padding-bottom:10px">'
-    +   contractFilterPills
-    +   '<div class="rnw-filter-row" style="margin-bottom:0">'
-    +     '<span style="font-size:11.5px;color:#6B7280;font-weight:700;align-self:center;margin-right:4px">심사결과:</span>'
-    +     '<button class="rnw-filter-btn ' + (filter==='all'?'active':'') + '" onclick="rnwSetFilter(\'all\')">전체 (' + enriched.length + ')</button>'
-    +     '<button class="rnw-filter-btn ' + (filter==='app'?'active':'') + '" onclick="rnwSetFilter(\'app\')">승인</button>'
-    +     '<button class="rnw-filter-btn ' + (filter==='cond'?'active':'') + '" onclick="rnwSetFilter(\'cond\')">조건부승인</button>'
-    +     '<button class="rnw-filter-btn ' + (filter==='deny'?'active':'') + '" onclick="rnwSetFilter(\'deny\')">거절</button>'
-    +   '</div>'
-    // 검색 그룹 박스 — 검색 input + 계약자 전체 토글만 (계약종료일은 v163에서 상단 모드로 이동)
-    +   '<div style="display:flex;align-items:center;gap:0;padding:5px 10px;height:36px;background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:8px">'
-    +     '<div style="display:flex;align-items:center;gap:6px;padding:0 10px">'
-    +       '<span style="font-size:11px;font-weight:700;color:#374151">🔍 검색</span>'
-    +       '<input id="rnwSearchInput" type="text" value="' + String(window._rnwSearch||'').replace(/"/g,'&quot;') + '" oninput="rnwSetSearch(this.value)" placeholder="계약자명·번호·연락처" style="padding:0 10px;border:1.5px solid #E5E7EB;border-radius:5px;font-size:11.5px;height:24px;outline:none;background:#fff;width:170px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;margin-bottom:10px">'
+    // ── 좌측: 필터 + 검색 ──
+    +   '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">'
+    +     contractFilterPills
+    +     '<div class="rnw-filter-row" style="margin-bottom:0">'
+    +       '<span style="font-size:11.5px;color:#6B7280;font-weight:700;align-self:center;margin-right:4px">심사결과:</span>'
+    +       '<button class="rnw-filter-btn ' + (filter==='all'?'active':'') + '" onclick="rnwSetFilter(\'all\')">전체 (' + enriched.length + ')</button>'
+    +       '<button class="rnw-filter-btn ' + (filter==='app'?'active':'') + '" onclick="rnwSetFilter(\'app\')">승인</button>'
+    +       '<button class="rnw-filter-btn ' + (filter==='cond'?'active':'') + '" onclick="rnwSetFilter(\'cond\')">조건부승인</button>'
+    +       '<button class="rnw-filter-btn ' + (filter==='deny'?'active':'') + '" onclick="rnwSetFilter(\'deny\')">거절</button>'
     +     '</div>'
-    +     '<div style="width:1px;height:18px;background:#E5E7EB"></div>'
-    +     '<div style="display:flex;align-items:center;gap:6px;padding:0 10px">'
+    +     '<div style="display:flex;align-items:center;gap:6px">'
+    +       '<span style="font-size:11px;font-weight:700;color:#374151">🔍 검색</span>'
+    +       '<input id="rnwSearchInput" type="text" value="' + String(window._rnwSearch||'').replace(/"/g,'&quot;') + '" oninput="rnwSetSearch(this.value)" placeholder="계약자명·번호·연락처" style="padding:0 10px;border:1.5px solid #D1D5DB;border-radius:5px;font-size:11.5px;height:28px;outline:none;background:#fff;width:170px">'
     +       '<label style="' + togStyle + '"><input type="checkbox"' + (searchAll?' checked':'') + ' onchange="rnwToggleSearchAll(this.checked)" style="margin:0">계약자 전체</label>'
     +     '</div>'
     +   '</div>'
-    + '</div>'
-    // ── Row 2: 액션 버튼 (우측 정렬, dashed top border) ──
-    + '<div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;padding-top:10px;border-top:1px dashed #E5E7EB;margin-bottom:10px">'
-    +   btnAct('#F59E0B', '📨 만기퇴실', "rnwGenerateMsg('expired')")
-    +   btnAct('#0EA5E9', '📨 조건부승인', "rnwGenerateMsg('conditional')")
-    +   btnAct('#DC2626', '📨 갱신불가', "rnwGenerateMsg('denied')")
-    +   btnAct('#1d4ed8', '⬇️ 엑셀', "rnwDownloadExcel()")
+    // ── 우측: 액션 버튼 4개 ──
+    +   '<div style="display:flex;align-items:center;gap:6px">'
+    +     btnAct('#F59E0B', '📨 만기퇴실', "rnwGenerateMsg('expired')")
+    +     btnAct('#0EA5E9', '📨 조건부승인', "rnwGenerateMsg('conditional')")
+    +     btnAct('#DC2626', '📨 갱신불가', "rnwGenerateMsg('denied')")
+    +     btnAct('#1d4ed8', '⬇️ 엑셀', "rnwDownloadExcel()")
+    +   '</div>'
     + '</div>';
 
   var rowsHtml;
