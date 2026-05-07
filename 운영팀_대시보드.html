@@ -8335,17 +8335,65 @@ function cmgSetPersonPartnerFilter(val){
   window._cmgPersonPartnerFilter = val;
   renderContractMgmtView();
 }
-// [v88] 진척 체크리스트 — 미완료 항목 필터 (all / homeBtn / eContract / feePaid / signed / nas)
-window._cmgProgUnchecked = window._cmgProgUnchecked || 'all';
-function cmgSetProgUnchecked(val){
-  window._cmgProgUnchecked = val;
+// [v88/v140] 진척 체크리스트 — 미완료 항목 필터 (다중선택 체크박스)
+// 'all' = 빈 배열로 처리. 배열에 들어있으면 OR 조건 (해당 항목 중 하나라도 false면 표시)
+window._cmgProgUnchecked = window._cmgProgUnchecked || [];
+function cmgToggleProgUnchecked(val){
+  // 'all' 클릭 시 전체 해제
+  if (val === 'all') { window._cmgProgUnchecked = []; renderContractMgmtView(); return; }
+  if (!Array.isArray(window._cmgProgUnchecked)) window._cmgProgUnchecked = [];
+  var arr = window._cmgProgUnchecked;
+  var i = arr.indexOf(val);
+  if (i >= 0) arr.splice(i, 1); else arr.push(val);
   renderContractMgmtView();
 }
+// 호환성 유지 (기존 라디오 핸들러 호출 보호)
+function cmgSetProgUnchecked(val){ cmgToggleProgUnchecked(val); }
 // [v88] 진척 체크리스트 — 정렬 기준 (cno / tentative / startDate / pct)
 window._cmgProgSort = window._cmgProgSort || 'cno';
 function cmgSetProgSort(val){
   window._cmgProgSort = val;
   renderContractMgmtView();
+}
+
+// [v140] 진척 체크리스트 엑셀 다운로드
+function cmgProgDownloadExcel(){
+  var rows = window._cmgProgDisplayRows;
+  if (!rows || !rows.length) { alert('다운로드할 데이터가 없습니다.'); return; }
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로딩 중입니다.'); return; }
+  var fmtDate = function(d){
+    if (!d) return '';
+    if (typeof d === 'string') return d;
+    if (d instanceof Date) return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    return String(d);
+  };
+  var data = rows.map(function(r, i){
+    return {
+      'No': i + 1,
+      '계약번호': r.cno || '',
+      '계약자': r.tenantName || '',
+      '연락처': r.tenantPhone || '',
+      '계약정보': r.contractInfo || '',
+      '시작일': fmtDate(r.startDate) || '',
+      '가계약일': fmtDate(r.tentativeDate) || '',
+      '부동산': r.broker || r.estateName || '',
+      '계약담당자': r.agent || r.contractManager || '',
+      '계약상태': r.contractStatus || '',
+      '홈버튼': r.checks[0] ? '✓' : '',
+      '전자계약': r.checks[1] ? '✓' : '',
+      '수수료': r.checks[2] ? '✓' : '',
+      '서명': r.checks[3] ? '✓' : '',
+      'NAS': r.checks[4] ? '✓' : '',
+      '미완 항목': ['홈버튼','전자계약','수수료','서명','NAS'].filter(function(_,j){ return !r.checks[j]; }).join(', ') || '—',
+      '진척률(%)': r.pct
+    };
+  });
+  var ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [{wch:5},{wch:10},{wch:10},{wch:14},{wch:12},{wch:12},{wch:12},{wch:14},{wch:18},{wch:10},{wch:7},{wch:8},{wch:7},{wch:6},{wch:6},{wch:24},{wch:9}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '진척체크리스트');
+  var today = (function(){ var d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
+  XLSX.writeFile(wb, '진척체크리스트_' + today + '.xlsx');
 }
 // [v89] 진척 KPI 카드 클릭 필터 (all / completed / pending / overdue)
 window._cmgProgKpiFilter = window._cmgProgKpiFilter || 'all';
@@ -9477,12 +9525,18 @@ function cmgBuildProgress(){
       pct: pct
     });
   });
-  // [v88] 미완료 항목 필터 — 선택된 항목이 false인 row만 포함
-  var unchecked = window._cmgProgUnchecked || 'all';
+  // [v88/v140] 미완료 항목 필터 — 다중선택 OR 조건 (선택된 항목 중 하나라도 false면 표시)
+  var unchecked = window._cmgProgUnchecked;
+  if (typeof unchecked === 'string') unchecked = (unchecked === 'all' || !unchecked) ? [] : [unchecked]; // 호환성
   var idxMap = { homeBtn: 0, eContract: 1, feePaid: 2, signed: 3, nas: 4 };
-  if (unchecked !== 'all' && idxMap[unchecked] !== undefined) {
-    var filterIdx = idxMap[unchecked];
-    rows = rows.filter(function(r){ return r.checks[filterIdx] === false; });
+  if (Array.isArray(unchecked) && unchecked.length > 0) {
+    var filterIdxs = unchecked.map(function(k){ return idxMap[k]; }).filter(function(i){ return i !== undefined; });
+    if (filterIdxs.length > 0) {
+      rows = rows.filter(function(r){
+        // OR: 선택된 항목 중 하나라도 false인 row만
+        return filterIdxs.some(function(i){ return r.checks[i] === false; });
+      });
+    }
   }
   // [v89] KPI 카드 필터 적용
   var kpiF = window._cmgProgKpiFilter || 'all';
@@ -9665,9 +9719,14 @@ function renderContractMgmtView(){
             + '</div>';
         }).join('')
       + '</div>';
+    // [v140] 미완료 항목 — 체크박스 다중선택
+    var ufArr = Array.isArray(window._cmgProgUnchecked) ? window._cmgProgUnchecked : (typeof window._cmgProgUnchecked === 'string' && window._cmgProgUnchecked !== 'all' ? [window._cmgProgUnchecked] : []);
+    var ufActive = ufArr.length === 0;
     var ufBtn = function(val, label){
-      return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;font-weight:' + (uf===val?'700':'500') + ';color:' + (uf===val?'#DC2626':'#374151') + '">'
-        + '<input type="radio" name="cmgProgUf" ' + (uf===val?'checked':'') + ' onchange="cmgSetProgUnchecked(\'' + val + '\')"> ' + label
+      var isAll = (val === 'all');
+      var checked = isAll ? ufActive : (ufArr.indexOf(val) >= 0);
+      return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;font-weight:' + (checked?'700':'500') + ';color:' + (checked?'#DC2626':'#374151') + '">'
+        + '<input type="' + (isAll?'radio':'checkbox') + '" ' + (isAll?'name="cmgProgUfAll" ':'') + (checked?'checked':'') + ' onchange="cmgToggleProgUnchecked(\'' + val + '\')"> ' + label
         + '</label>';
     };
     var sfBtn = function(val, label){
@@ -9683,14 +9742,17 @@ function renderContractMgmtView(){
       + ufBtn('feePaid', '수수료')
       + ufBtn('signed', '서명')
       + ufBtn('nas', 'NAS')
+      + (ufArr.length > 0 ? '<span style="font-size:10.5px;color:#6B7280;margin-left:6px">(선택 항목 중 하나라도 미완료인 계약)</span>' : '')
       + '</div>'
-      + '<div class="cmg-period-row" style="background:#F5F3FF;flex-wrap:wrap">'
+      + '<div class="cmg-period-row" style="background:#F5F3FF;flex-wrap:wrap;align-items:center">'
       + '<span style="font-size:12px;color:#6D28D9;font-weight:700;margin-right:4px">정렬 기준:</span>'
       + sfBtn('cno', '계약번호')
       + sfBtn('tentative', '가계약일')
       + sfBtn('startDate', '시작일')
       + sfBtn('pct', '진척률')
+      + '<button onclick="cmgProgDownloadExcel()" style="margin-left:auto;background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ 엑셀 다운로드</button>'
       + '</div>';
+    window._cmgProgDisplayRows = rows; // [v140] 엑셀 다운로드용
     rowsHtml = itemCardsHtml + filterHtml
       + '<div style="overflow-x:auto"><table class="cmg-tbl">'
       + '<thead><tr>'
