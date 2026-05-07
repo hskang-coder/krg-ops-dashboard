@@ -4004,9 +4004,10 @@ function renderContractRecord(c, payments, responses = []) {
   }).join('');
 
   // ── 현재 연체 현황 계산 (입금내역 기준) ──
+  // [v143] '연체납부'(이미 완납된 건) 제외 — '연체중' 또는 '분납중'만 미납으로 계산
   const isDelinqStatus = p => {
     const s = String(p['납부상태']||'').trim();
-    return s.includes('연체') || s.includes('분납');
+    return s === '연체중' || s === '분납중';
   };
   const sumDelinq = (keyword, exclude) => payments
     .filter(p => isDelinqStatus(p))
