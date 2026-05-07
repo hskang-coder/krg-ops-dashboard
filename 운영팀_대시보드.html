@@ -1198,6 +1198,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         <button class="cr-search-btn" onclick="searchContract()">🔍 검색</button>
         <button class="cr-contract-pdf-btn" id="crContractPdfBtn" onclick="openContractPdfModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능">📄 계약서 발행</button>
         <button class="cr-contract-pdf-btn" id="crSubAgreementBtn" onclick="generateSubAgreement(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:8px;">📋 부속합의서 발행</button>
+        <button class="cr-contract-pdf-btn" id="crIncomeReceiptBtn" onclick="openIncomeReceiptModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:8px;background:#059669;color:#fff;border-color:#059669">💰 입금확인발행</button>
       </div>
       <div id="crListBox" style="display:none">
         <div class="cr-list-filter">
@@ -3930,6 +3931,8 @@ function selectContractRow(no) {
   if (pdfBtn) { pdfBtn.disabled = false; pdfBtn.title = '계약서 발행 (계약번호: ' + no + ')'; }
   var subBtn = document.getElementById('crSubAgreementBtn');
   if (subBtn) { subBtn.disabled = false; subBtn.title = '부속합의서 발행 (계약번호: ' + no + ')'; }
+  var rcptBtn = document.getElementById('crIncomeReceiptBtn');
+  if (rcptBtn) { rcptBtn.disabled = false; rcptBtn.title = '입금확인발행 (계약번호: ' + no + ')'; }
   const contract = contractRawData.find(r => String(r['계약번호']).trim() === no);
   if (!contract) return;
   const payments  = paymentRawData.filter(r => String(r['계약번호']).trim() === no);
@@ -6692,6 +6695,237 @@ function generateGuaranteezPdf(contractNo) {
 // ════════════════════════════════════════════════
 // ▶ 부속합의서 발행 (계약참여자 추가용)
 // ════════════════════════════════════════════════
+// [v141] 입금확인발행 — 모달 + 발행
+function openIncomeReceiptModal(contractNo) {
+  if (!contractNo) { alert('먼저 계약을 검색해주세요.'); return; }
+  var contract = (contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim() === String(contractNo); });
+  if (!contract) { alert('계약 데이터를 찾을 수 없습니다.'); return; }
+  // 기존 모달 제거
+  var prev = document.getElementById('crIncRcptModal'); if (prev) prev.remove();
+
+  // 디폴트 기간 — 계약 시작일 ~ today (또는 종료일)
+  var fmt = function(d){ if(!d) return ''; if (typeof d==='string') return d.replace(/\./g,'-').replace(/\s/g,'').replace(/-(\d)(?!\d)/g,'-0$1'); return ''; };
+  var startD = fmt(contract['시작일']) || '';
+  var endD = fmt(contract['종료일']) || (function(){var t=new Date(); return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');})();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'crIncRcptModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = ''
+    + '<div style="background:#fff;border-radius:12px;width:100%;max-width:560px;overflow:hidden">'
+    +   '<div style="padding:14px 20px;background:linear-gradient(135deg,#059669,#10B981);color:#fff;display:flex;align-items:center;gap:10px">'
+    +     '<div style="font-size:18px;font-weight:800;flex:1">💰 입금확인서 발행</div>'
+    +     '<button onclick="closeIncomeReceiptModal()" style="background:rgba(255,255,255,.2);border:none;width:30px;height:30px;border-radius:50%;color:#fff;font-size:16px;cursor:pointer">✕</button>'
+    +   '</div>'
+    +   '<div style="padding:18px 20px">'
+    +     '<div style="margin-bottom:14px;padding:10px 12px;background:#F0FDF4;border-radius:8px;font-size:12px;color:#166534">'
+    +       '<b>' + (contract['임차인명']||contract['임차인']||'-') + '</b> · 계약 #' + contractNo + ' · ' + (contract['건물명']||'') + ' ' + (contract['호수']||'')
+    +     '</div>'
+    +     '<div style="margin-bottom:12px">'
+    +       '<label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px">📅 발행 기간 (납기일 기준)</label>'
+    +       '<div style="display:flex;align-items:center;gap:8px">'
+    +         '<input type="date" id="crIncRcptFrom" value="' + startD + '" style="flex:1;padding:8px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px">'
+    +         '<span style="color:#6B7280">~</span>'
+    +         '<input type="date" id="crIncRcptTo" value="' + endD + '" style="flex:1;padding:8px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px">'
+    +       '</div>'
+    +     '</div>'
+    +     '<div style="margin-bottom:14px">'
+    +       '<label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px">💵 납부 종류 (다중선택)</label>'
+    +       '<div style="display:flex;gap:6px">'
+    +         '<label style="flex:1;display:flex;align-items:center;gap:6px;padding:9px 12px;border:2px solid #10B981;border-radius:8px;background:#D1FAE5;cursor:pointer;font-weight:700;color:#065F46;font-size:12.5px"><input type="checkbox" id="crIncRcptT1" checked value="임대료"> 임대료</label>'
+    +         '<label style="flex:1;display:flex;align-items:center;gap:6px;padding:9px 12px;border:2px solid #3B82F6;border-radius:8px;background:#DBEAFE;cursor:pointer;font-weight:700;color:#1E40AF;font-size:12.5px"><input type="checkbox" id="crIncRcptT2" value="변동관리비"> 변동관리비</label>'
+    +       '</div>'
+    +     '</div>'
+    +     '<div style="font-size:11px;color:#6B7280;margin-bottom:8px">※ 납기일 기준 기간 내 납부 완료된 건만 발행됩니다 (납부상태: 정상납부, 연체납부)</div>'
+    +   '</div>'
+    +   '<div style="padding:12px 20px;background:#F9FAFB;border-top:1px solid #E5E7EB;display:flex;gap:8px">'
+    +     '<button onclick="closeIncomeReceiptModal()" style="background:#FFF;color:#6B7280;border:1px solid #D1D5DB;padding:9px 16px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;margin-left:auto">취소</button>'
+    +     '<button onclick="generateIncomeReceipt(\'' + contractNo + '\')" style="background:#059669;color:#fff;border:none;padding:9px 18px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">📄 입금확인서 생성</button>'
+    +   '</div>'
+    + '</div>';
+  document.body.appendChild(overlay);
+}
+function closeIncomeReceiptModal(){ var m = document.getElementById('crIncRcptModal'); if (m) m.remove(); }
+
+function generateIncomeReceipt(contractNo){
+  var fromVal = (document.getElementById('crIncRcptFrom')||{}).value;
+  var toVal = (document.getElementById('crIncRcptTo')||{}).value;
+  if (!fromVal || !toVal) { alert('발행 기간을 입력해주세요.'); return; }
+  var t1 = (document.getElementById('crIncRcptT1')||{}).checked;
+  var t2 = (document.getElementById('crIncRcptT2')||{}).checked;
+  if (!t1 && !t2) { alert('납부 종류를 한 가지 이상 선택해주세요.'); return; }
+  var types = [];
+  if (t1) types.push('임대료');
+  if (t2) types.push('변동관리비');
+
+  var contract = (contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim() === String(contractNo); });
+  if (!contract) { alert('계약 데이터 없음'); return; }
+
+  // paymentRawData 필터 — 계약번호 + 기간(납기일) + 납부종류 + 납부완료 상태
+  var fromTs = new Date(fromVal + 'T00:00:00').getTime();
+  var toTs = new Date(toVal + 'T23:59:59').getTime();
+  var parseDate = function(s){
+    if (!s) return null;
+    var m = String(s).match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+    if (!m) return null;
+    return new Date(+m[1], +m[2]-1, +m[3]).getTime();
+  };
+  var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
+
+  var rows = (paymentRawData||[]).filter(function(p){
+    if (String(p['계약번호']||'').trim() !== String(contractNo)) return false;
+    var typ = String(p['납부종류']||'').trim();
+    if (types.indexOf(typ) < 0) return false;
+    var st = String(p['납부상태']||'').trim();
+    if (st !== '정상납부' && st !== '연체납부') return false; // 납부완료만
+    var due = parseDate(p['납기일']);
+    if (!due || due < fromTs || due > toTs) return false;
+    return true;
+  });
+
+  if (!rows.length) { alert('해당 기간에 납부 완료된 내역이 없습니다.'); return; }
+
+  // 납기일 순 정렬
+  rows.sort(function(a, b){ return (parseDate(a['납기일'])||0) - (parseDate(b['납기일'])||0); });
+
+  // 합계
+  var totalPaid = rows.reduce(function(s, r){ return s + parseAmt(r['납부금액(원)']); }, 0);
+
+  // 한글 금액 (간단 변환)
+  var krWon = function(num){
+    var units = ['','만','억','조'];
+    var nums = ['영','일','이','삼','사','오','육','칠','팔','구'];
+    var n = Math.floor(num);
+    if (n === 0) return '영';
+    var result = '', i = 0;
+    while (n > 0) {
+      var part = n % 10000;
+      if (part > 0) {
+        var partStr = '';
+        var thousand = Math.floor(part / 1000); part = part % 1000;
+        var hundred = Math.floor(part / 100); part = part % 100;
+        var ten = Math.floor(part / 10); var one = part % 10;
+        if (thousand) partStr += (thousand > 1 ? nums[thousand] : '') + '천';
+        if (hundred) partStr += (hundred > 1 ? nums[hundred] : '') + '백';
+        if (ten) partStr += (ten > 1 ? nums[ten] : '') + '십';
+        if (one) partStr += nums[one];
+        result = partStr + units[i] + result;
+      }
+      n = Math.floor(n / 10000); i++;
+    }
+    return result;
+  };
+
+  var refNo = (function(){var t=new Date(); return t.getFullYear() + String(t.getMonth()+1).padStart(2,'0') + String(t.getDate()).padStart(2,'0') + '-' + String(contractNo).padStart(5,'0');})();
+  var todayStr = (function(){var t=new Date(); return t.getFullYear()+'년 '+(t.getMonth()+1)+'월 '+t.getDate()+'일';})();
+  var fmtKr = function(s){ if(!s) return '-'; var m=String(s).match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); return m ? (m[1]+'.'+String(+m[2]).padStart(2,'0')+'.'+String(+m[3]).padStart(2,'0')) : s; };
+  var fmtMon = function(n){ return '₩' + (Math.round(n)).toLocaleString(); };
+
+  var contractInfo = (contract['건물명']||'') + ' ' + (contract['호수']||'');
+  var period = (contract['시작일']||'') + ' ~ ' + (contract['종료일']||'');
+  var landlord = contract['임대인명'] || '-';
+  var tenant = contract['임차인명'] || contract['임차인'] || '-';
+
+  var rowsHtml = rows.map(function(r, i){
+    return '<tr>'
+      + '<td style="text-align:center">' + (i+1) + '</td>'
+      + '<td>' + (r['청구서명']||'-') + '</td>'
+      + '<td style="text-align:center">' + (r['납부종류']||'-') + '</td>'
+      + '<td style="text-align:center">' + fmtKr(r['납기일']) + '</td>'
+      + '<td style="text-align:center">' + fmtKr(r['납부일']) + '</td>'
+      + '<td style="text-align:right;font-weight:700;color:#065F46">' + fmtMon(parseAmt(r['납부금액(원)'])) + '</td>'
+      + '<td style="text-align:center">' + (r['납부방법']||'-') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var css = '*{box-sizing:border-box;margin:0;padding:0}'
+    + 'body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif;color:#1F2937;background:#F3F4F6;padding:24px;line-height:1.5}'
+    + '.page{max-width:780px;margin:0 auto;background:#fff;padding:36px 44px;border:1px solid #D1D5DB;box-shadow:0 2px 6px rgba(0,0,0,.06)}'
+    + '.title{text-align:center;font-size:28px;font-weight:900;letter-spacing:18px;color:#1B3976;padding-bottom:16px;border-bottom:3px double #1B3976;margin-bottom:18px}'
+    + '.refrow{display:flex;justify-content:space-between;font-size:11px;color:#6B7280;margin-bottom:18px}'
+    + '.info-box{display:grid;grid-template-columns:120px 1fr 120px 1fr;gap:0;border:1px solid #1F2937;margin-bottom:14px;font-size:12px}'
+    + '.info-box > div{padding:8px 12px;border-right:1px solid #E5E7EB;border-bottom:1px solid #E5E7EB}'
+    + '.info-box > div:nth-child(4n){border-right:none}'
+    + '.info-box > div.lbl{background:#F3F4F6;font-weight:700;color:#374151}'
+    + '.period-info{background:#FEF3C7;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:12.5px;color:#92400E;font-weight:600;border-left:4px solid #F59E0B}'
+    + 'table.detail{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:14px}'
+    + 'table.detail th{background:#1B3976;color:#fff;padding:8px 6px;font-weight:700;border:1px solid #1B3976}'
+    + 'table.detail td{padding:7px 6px;border:1px solid #D1D5DB}'
+    + 'table.detail tr:nth-child(even) td{background:#F9FAFB}'
+    + '.total-box{background:#F0FDF4;border:2px solid #059669;padding:14px 18px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}'
+    + '.total-box .lbl{font-size:13px;font-weight:700;color:#166534}'
+    + '.total-box .amt{font-size:22px;font-weight:900;color:#065F46}'
+    + '.total-box .kr{font-size:11px;color:#166534;margin-top:2px}'
+    + '.declaration{padding:14px 18px;background:#FAFBFC;border:1px solid #D1D5DB;border-radius:6px;margin-bottom:18px;font-size:12px;line-height:1.7}'
+    + '.declaration b{color:#1B3976}'
+    + '.sign-area{margin-top:24px;text-align:right}'
+    + '.sign-date{font-size:13px;font-weight:700;margin-bottom:14px}'
+    + '.sign-co{font-size:14px;font-weight:800;color:#1B3976;margin-bottom:4px}'
+    + '.sign-info{font-size:11px;color:#6B7280;line-height:1.6}'
+    + '.sign-stamp{display:inline-block;margin-left:12px;width:60px;height:60px;border:2px dashed #DC2626;border-radius:50%;color:#DC2626;font-size:11px;font-weight:700;text-align:center;line-height:56px;vertical-align:middle}'
+    + '.print-actions{text-align:center;padding:20px;background:#F3F4F6;margin-bottom:18px;border-radius:8px}'
+    + '.print-btn{padding:10px 22px;background:#1B3976;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;margin:0 6px;font-size:13px}'
+    + '@media print{body{background:#fff;padding:0}.page{border:none;box-shadow:none;max-width:none}.print-actions{display:none}}';
+
+  var html = ''
+    + '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>입금확인서_' + contractNo + '_' + refNo + '</title>'
+    + '<style>' + css + '</style></head><body>'
+    + '<div class="print-actions">'
+    +   '<button class="print-btn" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>'
+    +   '<button class="print-btn" style="background:#6B7280" onclick="window.close()">닫기</button>'
+    + '</div>'
+    + '<div class="page">'
+    +   '<div class="title">입 금 확 인 서</div>'
+    +   '<div class="refrow"><span>발행번호: ' + refNo + '</span><span>발행일: ' + todayStr + '</span></div>'
+    +   '<div class="info-box">'
+    +     '<div class="lbl">계약번호</div><div>' + contractNo + '</div>'
+    +     '<div class="lbl">계약상태</div><div>' + (contract['계약상태']||'-') + '</div>'
+    +     '<div class="lbl">임차인</div><div>' + tenant + '</div>'
+    +     '<div class="lbl">임대인</div><div>' + landlord + '</div>'
+    +     '<div class="lbl">계약물건</div><div style="grid-column:span 3">' + contractInfo + '</div>'
+    +     '<div class="lbl">계약기간</div><div style="grid-column:span 3">' + period + '</div>'
+    +   '</div>'
+    +   '<div class="period-info">📅 발행 기간: <b>' + fromVal + ' ~ ' + toVal + '</b> · 납부종류: <b>' + types.join(', ') + '</b> · 총 <b>' + rows.length + '건</b></div>'
+    +   '<table class="detail">'
+    +     '<thead><tr>'
+    +       '<th style="width:38px">No</th>'
+    +       '<th>청구서명</th>'
+    +       '<th style="width:80px">납부종류</th>'
+    +       '<th style="width:90px">납기일</th>'
+    +       '<th style="width:90px">납부일</th>'
+    +       '<th style="width:110px">납부금액</th>'
+    +       '<th style="width:80px">납부방법</th>'
+    +     '</tr></thead>'
+    +     '<tbody>' + rowsHtml + '</tbody>'
+    +   '</table>'
+    +   '<div class="total-box">'
+    +     '<div><div class="lbl">합계</div><div class="kr">일금 ' + krWon(totalPaid) + '원정</div></div>'
+    +     '<div class="amt">' + fmtMon(totalPaid) + '</div>'
+    +   '</div>'
+    +   '<div class="declaration">'
+    +     '위 명시된 ' + types.join(' 및 ') + '에 대하여 임차인 <b>' + tenant + '</b> 및 그 대리인 <b>케이알지그룹 주식회사</b>가 위 기간 (' + fromVal + ' ~ ' + toVal + ') 동안 정상 납부하였음을 확인합니다.<br>'
+    +     '본 확인서는 임대료 납부 사실의 증빙 목적으로 발행되며, 발행일 기준의 시스템 데이터를 기준으로 합니다.'
+    +   '</div>'
+    +   '<div class="sign-area">'
+    +     '<div class="sign-date">' + todayStr + '</div>'
+    +     '<div class="sign-co">케이알지그룹 주식회사</div>'
+    +     '<div class="sign-info">'
+    +       '대표이사: ○ ○ ○<br>'
+    +       '주소: 서울특별시 강남구 ○○로 ○○○<br>'
+    +       '사업자등록번호: ○○○-○○-○○○○○<br>'
+    +       '대표번호: 02-○○○-○○○○ &nbsp;·&nbsp; 이메일: contact@krggroup.co.kr'
+    +     '</div>'
+    +     '<div style="margin-top:10px"><span class="sign-stamp">(직인)</span></div>'
+    +   '</div>'
+    + '</div></body></html>';
+
+  closeIncomeReceiptModal();
+  var win = window.open('', '_blank', 'width=900,height=1000,scrollbars=yes');
+  if (!win) { alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.'); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
 function generateSubAgreement(contractNo) {
   if (!contractNo) { alert('먼저 계약을 검색해주세요.'); return; }
   var loader = document.createElement('div');
