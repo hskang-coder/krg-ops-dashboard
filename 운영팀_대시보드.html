@@ -203,7 +203,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .cr-search-bar input:focus { border-color: #2563A8; }
 .cr-search-btn { background: #1A3A5C; color: #fff; border: none; cursor: pointer; padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .cr-search-btn:hover { background: #2563A8; }
-.cr-contract-pdf-btn { background: #fff; color: #1B3976; border: 2px solid #1B3976; cursor: pointer; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; transition: all .2s; }
+.cr-contract-pdf-btn { background: #fff; color: #1B3976; border: 1.5px solid #1B3976; cursor: pointer; padding: 6px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 700; white-space: nowrap; transition: all .2s; min-width: 100px; }
 .cr-contract-pdf-btn:hover:not(:disabled) { background: #1B3976; color: #fff; }
 .cr-contract-pdf-btn:disabled { opacity: .35; cursor: not-allowed; }
 .cr-back-btn { display:none; align-items:center; gap:6px; background:#f1f5f9; color:#475569; border:1.5px solid #cbd5e1; cursor:pointer; padding:7px 14px; border-radius:8px; font-size:13px; font-weight:600; white-space:nowrap; margin-bottom:10px; }
@@ -1196,10 +1196,10 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
       <div id="crSearchBox" class="cr-search-bar">
         <input id="crInput" type="text" placeholder="계약번호를 입력하세요" onkeydown="if(event.key==='Enter')searchContract()">
         <button class="cr-search-btn" onclick="searchContract()">🔍 검색</button>
-        <button class="cr-contract-pdf-btn" id="crContractPdfBtn" onclick="openContractPdfModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능">📄 계약서 발행</button>
-        <button class="cr-contract-pdf-btn" id="crSubAgreementBtn" onclick="generateSubAgreement(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:8px;">📋 부속합의서 발행</button>
-        <button class="cr-contract-pdf-btn" id="crIncomeReceiptBtn" onclick="openIncomeReceiptModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:8px;background:#059669;color:#fff;border-color:#059669">💰 입금확인발행</button>
-        <button class="cr-contract-pdf-btn" id="crFeeCalcBtn" onclick="openFeeCalcModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:8px;background:#7C3AED;color:#fff;border-color:#7C3AED">🧮 수수료&일할계산</button>
+        <button class="cr-contract-pdf-btn" id="crContractPdfBtn" onclick="openContractPdfModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능">📄 계약서발행</button>
+        <button class="cr-contract-pdf-btn" id="crSubAgreementBtn" onclick="generateSubAgreement(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:5px;">📋 부속합의서</button>
+        <button class="cr-contract-pdf-btn" id="crIncomeReceiptBtn" onclick="openIncomeReceiptModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:5px;background:#059669;color:#fff;border-color:#059669">💰 입금내역서</button>
+        <button class="cr-contract-pdf-btn" id="crFeeCalcBtn" onclick="openFeeCalcModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:5px;background:#7C3AED;color:#fff;border-color:#7C3AED">🧮 수수료계산</button>
       </div>
       <div id="crListBox" style="display:none">
         <div class="cr-list-filter">
@@ -3938,13 +3938,13 @@ function selectContractRow(no) {
     }
   }
   var pdfBtn = document.getElementById('crContractPdfBtn');
-  if (pdfBtn) { pdfBtn.disabled = false; pdfBtn.title = '계약서 발행 (계약번호: ' + no + ')'; }
+  if (pdfBtn) { pdfBtn.disabled = false; pdfBtn.title = '계약서발행 (계약번호: ' + no + ')'; }
   var subBtn = document.getElementById('crSubAgreementBtn');
-  if (subBtn) { subBtn.disabled = false; subBtn.title = '부속합의서 발행 (계약번호: ' + no + ')'; }
+  if (subBtn) { subBtn.disabled = false; subBtn.title = '부속합의서 (계약번호: ' + no + ')'; }
   var rcptBtn = document.getElementById('crIncomeReceiptBtn');
-  if (rcptBtn) { rcptBtn.disabled = false; rcptBtn.title = '입금확인발행 (계약번호: ' + no + ')'; }
+  if (rcptBtn) { rcptBtn.disabled = false; rcptBtn.title = '입금내역서 (계약번호: ' + no + ')'; }
   var feeCalcBtn = document.getElementById('crFeeCalcBtn');
-  if (feeCalcBtn) { feeCalcBtn.disabled = false; feeCalcBtn.title = '수수료&일할계산 (계약번호: ' + no + ')'; }
+  if (feeCalcBtn) { feeCalcBtn.disabled = false; feeCalcBtn.title = '수수료계산 (계약번호: ' + no + ')'; }
   const contract = contractRawData.find(r => String(r['계약번호']).trim() === no);
   if (!contract) return;
   const payments  = paymentRawData.filter(r => String(r['계약번호']).trim() === no);
