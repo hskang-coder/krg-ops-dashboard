@@ -8933,6 +8933,30 @@ function rnwRenderCohortChart(cohorts){
 .cmg-money-sub { font-size:10.5px; color:#9CA3AF; margin-top:2px; }
 .cmg-expand-row td { background:#FAFAFA !important; padding:0 !important; border-bottom:2px solid #E5E7EB; }
 .cmg-expand-inner { padding:12px 18px 14px; }
+/* [v171] expand 패널 가독성 개선 */
+.cmg-v171-inner { padding:0 !important; background:#fff; }
+.cmg-v171-header { display:grid; grid-template-columns:1fr auto auto; gap:18px; align-items:center; padding:14px 18px; background:linear-gradient(135deg,#F9FAFB,#FFFFFF); border-bottom:1px solid #E5E7EB; }
+.cmg-v171-info { min-width:0; }
+.cmg-v171-pname { font-size:16px; font-weight:800; color:#1B3976; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.cmg-v171-sub { font-size:11px; color:#6B7280; margin-top:3px; line-height:1.5; }
+.cmg-v171-stats { display:flex; gap:16px; align-items:flex-end; }
+.cmg-v171-stat { text-align:right; }
+.cmg-v171-stat-label { font-size:10px; color:#6B7280; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+.cmg-v171-stat-val { font-size:15px; font-weight:800; color:#1F2937; margin-top:1px; }
+.cmg-v171-stat-val.brk { color:#059669; }
+.cmg-v171-stat-val .unit { font-size:11px; color:#6B7280; font-weight:600; margin-left:1px; }
+.cmg-v171-spark { background:#fff; border:1px solid #E5E7EB; border-radius:8px; padding:5px 9px; }
+.cmg-v171-spark-title { font-size:9.5px; color:#6B7280; font-weight:700; margin-bottom:1px; }
+.cmg-v171-actions { display:flex; gap:6px; align-items:center; padding:10px 18px; background:#F9FAFB; border-bottom:1px solid #E5E7EB; }
+.cmg-v171-actions-info { font-size:11px; color:#6B7280; margin-left:auto; }
+.cmg-v171-btn { padding:5px 11px; border-radius:6px; font-size:11.5px; font-weight:700; cursor:pointer; height:28px; line-height:1; white-space:nowrap; }
+.cmg-v171-btn.outline { border:1px solid #C7D2FE; background:#fff; color:#1B3976; }
+.cmg-v171-btn.outline-blue { border:1px solid #1F4ED8; background:#fff; color:#1F4ED8; }
+.cmg-v171-btn.primary { border:1px solid #DC2626; background:#DC2626; color:#fff; }
+.cmg-v171-legend { padding:8px 18px 14px; font-size:10.5px; color:#6B7280; display:flex; gap:6px; align-items:center; }
+.cmg-v171-legend-dot { width:10px; height:10px; border-radius:2px; display:inline-block; }
+.cmg-v171-legend-dot.short { background:#FEF2F2; border:1px solid #FCA5A5; }
+.cmg-v171-inner > .cmg-expand-tbl { margin:0 18px; width:calc(100% - 36px); }
 .cmg-expand-tbl { width:100%; border-collapse:collapse; font-size:11.5px; }
 .cmg-expand-tbl th { padding:5px 8px; background:#F1F5F9; color:#475569; font-weight:700; text-align:left; border-bottom:1px solid #E2E8F0; white-space:nowrap; }
 .cmg-expand-tbl td { padding:5px 8px; border-bottom:1px solid #E5E7EB; }
@@ -9655,17 +9679,38 @@ function cmgRenderPartnerStats(){
           if (isOpen) {
             var expContracts = p.contracts.slice().sort(function(a,b){ return b.startDate - a.startDate; });
             var pnEsc2 = p.partnerName.replace(/'/g, "\\'");
-            rowsExpand = '<tr class="cmg-expand-row"><td colspan="9"><div class="cmg-expand-inner">'
-              + (info ? '<div class="cmg-partner-info">'
-                  + (info.bizNo ? '<span>등록번호: <b>' + info.bizNo + '</b></span>' : '')
-                  + (info.addr ? '<span>주소: <b>' + info.addr + '</b></span>' : '')
-                  + (info.bank ? '<span>정산: <b>' + info.bank + ' ' + (info.account||'') + ' (' + (info.acctHolder||'') + ')</b></span>' : '')
-                  + '</div>' : '')
-              + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:6px 0;border-bottom:1px dashed #E5E7EB">'
-              +   '<button onclick="event.stopPropagation();var cbs=document.querySelectorAll(\'.cmg-pdf-cb[data-pn=&quot;' + p.partnerName.replace(/"/g,'&quot;').replace(/\\/g,'\\\\') + '&quot;]\');var checked=Array.from(cbs).every(function(c){return c.checked;});cbs.forEach(function(c){c.checked=!checked;});" style="padding:4px 10px;font-size:11px;border:1px solid #C7D2FE;background:#fff;border-radius:6px;cursor:pointer;font-weight:700">전체 선택/해제</button>'
-              +   '<button onclick="event.stopPropagation();cmgExportPdfFor(\'' + pnEsc2 + '\',\'selected\')" style="padding:5px 14px;font-size:12px;border:1px solid #DC2626;background:#DC2626;color:#fff;border-radius:6px;cursor:pointer;font-weight:700">📄 선택 항목 PDF</button>'
-              +   '<button onclick="event.stopPropagation();cmgExportPdfFor(\'' + pnEsc2 + '\',\'all\')" style="padding:5px 14px;font-size:12px;border:1px solid #1F4ED8;background:#fff;color:#1F4ED8;border-radius:6px;cursor:pointer;font-weight:700">📑 부동산 전체 PDF</button>'
-              +   '<span style="font-size:11px;color:#6B7280">계약담당자별 그룹화하여 PDF 생성</span>'
+            // [v171] 헤더 카드 — 파트너 정보 + 통계 KPI + sparkline
+            var sparkSvg = cmgRenderSparkline(cmgBuildSparkline(p.partnerName), {compact:true});
+            var rankBadge = cmgPartnerRank(p.partnerName);
+            var summaryHeader = '<div class="cmg-v171-header">'
+              + '<div class="cmg-v171-info">'
+              +   '<div class="cmg-v171-pname">' + p.partnerName + ' <span class="cmg-rank-badge cmg-rank-' + rankBadge + '">' + rankBadge + '</span></div>'
+              +   '<div class="cmg-v171-sub">'
+              +     (info ? [
+                      info.fullName,
+                      info.bizNo ? '등록번호: ' + info.bizNo : '',
+                      (info.person ? info.person + ' 대표' : ''),
+                      (info.mobile || info.tel || ''),
+                      info.addr ? '· ' + info.addr : '',
+                      info.bank ? '· 정산: ' + info.bank + ' ' + (info.account||'') + ' (' + (info.acctHolder||'') + ')' : ''
+                    ].filter(Boolean).join(' · ') : '')
+              +   '</div>'
+              + '</div>'
+              + '<div class="cmg-v171-stats">'
+              +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">계약</div><div class="cmg-v171-stat-val">' + p.contracts.length + '<span class="unit">건</span></div></div>'
+              +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">총 거래액</div><div class="cmg-v171-stat-val">' + cmgFmtMoneyKor(p.totalTrade) + '</div></div>'
+              +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">중개보수</div><div class="cmg-v171-stat-val brk">' + cmgFmtMoney(p.totalBrokerage) + '</div></div>'
+              + '</div>'
+              + (sparkSvg ? '<div class="cmg-v171-spark">' + sparkSvg + '</div>' : '')
+              + '</div>';
+
+            rowsExpand = '<tr class="cmg-expand-row"><td colspan="9"><div class="cmg-expand-inner cmg-v171-inner">'
+              + summaryHeader
+              + '<div class="cmg-v171-actions">'
+              +   '<button onclick="event.stopPropagation();var cbs=document.querySelectorAll(\'.cmg-pdf-cb[data-pn=&quot;' + p.partnerName.replace(/"/g,'&quot;').replace(/\\/g,'\\\\') + '&quot;]\');var checked=Array.from(cbs).every(function(c){return c.checked;});cbs.forEach(function(c){c.checked=!checked;});" class="cmg-v171-btn outline">전체 선택/해제</button>'
+              +   '<button onclick="event.stopPropagation();cmgExportPdfFor(\'' + pnEsc2 + '\',\'selected\')" class="cmg-v171-btn primary">📄 선택 항목 PDF</button>'
+              +   '<button onclick="event.stopPropagation();cmgExportPdfFor(\'' + pnEsc2 + '\',\'all\')" class="cmg-v171-btn outline-blue">📑 부동산 전체 PDF</button>'
+              +   '<span class="cmg-v171-actions-info">계약담당자별 그룹화하여 PDF 생성</span>'
               + '</div>'
               + '<table class="cmg-expand-tbl"><thead><tr>'
               + '<th style="text-align:center;width:30px"><input type="checkbox" onclick="event.stopPropagation();var cbs=document.querySelectorAll(\'.cmg-pdf-cb[data-pn=&quot;' + p.partnerName.replace(/"/g,'&quot;').replace(/\\/g,'\\\\') + '&quot;]\');cbs.forEach(function(c){c.checked=event.target.checked;});"></th>'
@@ -9716,7 +9761,8 @@ function cmgRenderPartnerStats(){
                     + '</tr>';
                 }).join('')
               + '</tbody></table>'
-              + cmgRenderSparkline(cmgBuildSparkline(p.partnerName)) // [v79] 6-6
+              // [v171] sparkline은 헤더 우측으로 이동 — 하단에서 제거
+              + '<div class="cmg-v171-legend"><span class="cmg-v171-legend-dot short"></span>12개월 미만 행 — 중개보수 산정 제외</div>'
               + '</div></td></tr>';
           }
           var rank = cmgPartnerRank(p.partnerName); // [v78]
@@ -10263,25 +10309,35 @@ function cmgBuildSparkline(partnerName){
   return months;
 }
 
-function cmgRenderSparkline(months){
+function cmgRenderSparkline(months, opt){
   if (!months || months.length === 0) return '';
+  opt = opt || {};
   var max = Math.max.apply(null, months.map(function(m){ return m.count; }));
-  if (max === 0) return '<div style="font-size:11px;color:#9CA3AF">최근 12개월 계약 없음</div>';
-  var w = 240, h = 36, n = months.length;
+  if (max === 0) return '<div style="font-size:10.5px;color:#9CA3AF">최근 12개월 계약 없음</div>';
+  // [v171] compact 모드 — 헤더 우측 배치용 (더 작게)
+  var w = opt.compact ? 200 : 240;
+  var h = opt.compact ? 30 : 36;
+  var n = months.length;
   var bw = w / n;
   var bars = months.map(function(m, i){
     var bh = max > 0 ? (m.count / max) * (h - 6) : 0;
     var x = i * bw + 1;
     var y = h - bh;
-    var color = m.count > 0 ? '#7C3AED' : '#E5E7EB';
+    var color = m.count > 0 ? (m.count >= max * 0.7 ? '#7C3AED' : '#A78BFA') : '#E5E7EB';
+    var fontSize = opt.compact ? 7 : 8;
     return '<rect x="' + x + '" y="' + y + '" width="' + (bw - 2) + '" height="' + bh + '" fill="' + color + '" rx="1"></rect>'
-      + '<text x="' + (x + bw/2) + '" y="' + (h - 1) + '" font-size="8" fill="#fff" text-anchor="middle" font-weight="700">' + (m.count > 0 ? m.count : '') + '</text>';
+      + '<text x="' + (x + bw/2) + '" y="' + (h - 1) + '" font-size="' + fontSize + '" fill="#fff" text-anchor="middle" font-weight="700">' + (m.count > 0 ? m.count : '') + '</text>';
   }).join('');
   var labels = months.map(function(m, i){
     if (i % 3 !== 0 && i !== n - 1) return '';
     var mm = m.ym.split('-')[1];
-    return '<text x="' + (i * bw + bw/2) + '" y="' + (h + 11) + '" font-size="9" fill="#6B7280" text-anchor="middle">' + mm + '월</text>';
+    var fontSize = opt.compact ? 8 : 9;
+    return '<text x="' + (i * bw + bw/2) + '" y="' + (h + 10) + '" font-size="' + fontSize + '" fill="#6B7280" text-anchor="middle">' + mm + '월</text>';
   }).join('');
+  if (opt.compact) {
+    return '<div class="cmg-v171-spark-title">📈 최근 12개월</div>'
+      + '<svg class="cmg-spark" width="' + w + '" height="' + (h+12) + '">' + bars + labels + '</svg>';
+  }
   return '<div style="margin-top:8px"><div style="font-size:11px;color:#475569;font-weight:700;margin-bottom:4px">📈 최근 12개월 계약 추이</div>'
     + '<svg class="cmg-spark" width="' + w + '" height="' + (h+14) + '">' + bars + labels + '</svg></div>';
 }
