@@ -8051,6 +8051,14 @@ function rnwSetSearchEndPeriod(which, val){
   else if (which === 'end') window._rnwSearchEndEnd = val;
   renderRenewalView();
 }
+// [v159] 전체 계약자 검색 토글 — 켜지면 심사진행기간/계약종료기간 모두 무시
+window._rnwSearchAll = !!window._rnwSearchAll;
+function rnwToggleSearchAll(checked){
+  window._rnwSearchAll = !!checked;
+  renderRenewalView();
+  var el = document.getElementById('rnwSearchInput');
+  if (el) el.focus();
+}
 function rnwSetPeriod(which, val){
   if (which === 'start') window._rnwStartMonth = val;
   else window._rnwEndMonth = val;
@@ -8472,10 +8480,15 @@ function renderRenewalView(){
   var filter = window._rnwFilter || 'all';
   var kpiFilter = window._rnwKpiFilter || 'all';
   // [v158] 검색어가 있으면 검색용 별도 모집단(검색 종료일 범위) 사용
+  // [v159] 전체 검색 토글이 켜져있으면 모든 기간 필터 무시 (광범위 범위 사용)
   var sqRaw = String(window._rnwSearch||'').trim();
   var filtered;
   if (sqRaw) {
-    filtered = rnwBuildEnriched(window._rnwSearchEndStart, window._rnwSearchEndEnd);
+    if (window._rnwSearchAll) {
+      filtered = rnwBuildEnriched('2015-01', '2099-12');
+    } else {
+      filtered = rnwBuildEnriched(window._rnwSearchEndStart, window._rnwSearchEndEnd);
+    }
   } else {
     filtered = enriched;
   }
@@ -8541,7 +8554,12 @@ function renderRenewalView(){
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
     // [v157] 계약자 검색창 — 만기퇴실 문자 좌측
     // [v158] 검색용 계약종료일 범위 셀렉트 (검색어 입력 시 모집단을 이 범위로 확장)
-    + '<div style="display:flex;align-items:center;gap:4px;border:1.5px solid #DDD6FE;background:#F5F3FF;border-radius:6px;padding:3px 6px">'
+    // [v159] 계약자 전체 검색 토글 — 켜지면 모든 기간 필터 무시
+    + '<label style="display:flex;align-items:center;gap:4px;border:1.5px solid ' + (window._rnwSearchAll?'#10B981':'#D1D5DB') + ';background:' + (window._rnwSearchAll?'#ECFDF5':'#fff') + ';border-radius:6px;padding:4px 8px;cursor:pointer;font-size:10.5px;font-weight:700;color:' + (window._rnwSearchAll?'#065F46':'#374151') + '">'
+    +   '<input type="checkbox"' + (window._rnwSearchAll?' checked':'') + ' onchange="rnwToggleSearchAll(this.checked)" style="margin:0">'
+    +   '🌐 계약자 전체'
+    + '</label>'
+    + '<div style="display:flex;align-items:center;gap:4px;border:1.5px solid #DDD6FE;background:#F5F3FF;border-radius:6px;padding:3px 6px;' + (window._rnwSearchAll?'opacity:.4;pointer-events:none':'') + '">'
     +   '<span style="font-size:10.5px;color:#5B21B6;font-weight:700">계약종료일</span>'
     +   '<select onchange="rnwSetSearchEndPeriod(\'start\', this.value)" style="font-size:10.5px;padding:2px 4px;border:1px solid #DDD6FE;border-radius:4px;background:#fff">' + rnwMonthOptions(window._rnwSearchEndStart) + '</select>'
     +   '<span style="font-size:10.5px;color:#9CA3AF">~</span>'
