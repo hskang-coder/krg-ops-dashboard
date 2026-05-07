@@ -4690,7 +4690,7 @@ function ckReset() {
 function fetchSheetJSONP(gid) {
   return new Promise((resolve, reject) => {
     const cbName = '_gsCb' + Date.now();
-    const params = new URLSearchParams({ gid, range:'A7:R', headers:'1' });
+    const params = new URLSearchParams({ gid, range:'A:ZZ', headers:'1' });  // [v161] A7:R → A:ZZ (필터 우회)
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json,responseHandler:${cbName}&${params}`;
     let timer = null;
     window[cbName] = function(resp) {
@@ -5091,8 +5091,10 @@ async function renderDelinquency() {
 
   const SHEET2 = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
   function gvizUrl(gid, range) {
-    const rPart = range ? `&range=${range}&headers=1` : '';
-    return `https://docs.google.com/spreadsheets/d/${SHEET2}/gviz/tq?tqx=out:json&gid=${gid}${rPart}`;
+    // [v161] 시트 필터 우회 — range 미지정 시에도 A:ZZ 강제 적용
+    const r = range || 'A:ZZ';
+    const headersPart = range ? '&headers=1' : '';
+    return `https://docs.google.com/spreadsheets/d/${SHEET2}/gviz/tq?tqx=out:json&gid=${gid}&range=${r}${headersPart}`;
   }
   function parseGvizLocal(txt) {
     const m = txt.match(/setResponse\((\{[\s\S]*?\})\)\s*;?\s*$/);
@@ -5131,7 +5133,7 @@ async function renderDelinquency() {
     if ((_now - _cache.ts) > DLQ_BG_REFRESH) {
       Promise.all([
         fetch(gvizUrl(1953907648)).then(r=>r.text()).then(parseGvizLocal),
-        fetch(gvizUrl(131074722,'A7:AK')).then(r=>r.text()).then(parseGvizLocal),
+        fetch(gvizUrl(131074722,'A:ZZ')).then(r=>r.text()).then(parseGvizLocal),  // [v161] A7:AK → A:ZZ (필터 우회)
         fetch(gvizUrl(554798125)).then(r=>r.text()).then(parseGvizLocal),
         fetch(gvizUrl(418937767)).then(r=>r.text()).then(parseGvizLocal),
       ]).then(([r1,r2,r3,r4]) => {
@@ -5146,7 +5148,7 @@ async function renderDelinquency() {
   try {
     const [r1, r2, r3, r4] = await Promise.all([
       fetch(gvizUrl(1953907648)).then(r=>r.text()).then(parseGvizLocal),
-      fetch(gvizUrl(131074722,'A7:AK')).then(r=>r.text()).then(parseGvizLocal),
+      fetch(gvizUrl(131074722,'A:ZZ')).then(r=>r.text()).then(parseGvizLocal),  // [v161] A7:AK → A:ZZ (필터 우회)
       fetch(gvizUrl(554798125)).then(r=>r.text()).then(parseGvizLocal),
       fetch(gvizUrl(418937767)).then(r=>r.text()).then(parseGvizLocal),
     ]);
@@ -5745,7 +5747,7 @@ async function loadData() {
   const ctrl = new AbortController();
   const fetchTimer = setTimeout(() => ctrl.abort(), 12000);
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${DAEUNG_GID}&range=A:R&headers=0`;
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${DAEUNG_GID}&range=A:ZZ&headers=0`;  // [v161] A:R → A:ZZ (필터 우회)
     const res  = await fetch(url, { signal: ctrl.signal });
     clearTimeout(fetchTimer);
     const text = await res.text();
@@ -6679,9 +6681,10 @@ function fetchContractForPdf(contractNo) {
   return new Promise(function(resolve, reject) {
     var cbName = 'cG_cb_' + Date.now();
     var tq  = encodeURIComponent('select * where A = ' + contractNo + ' limit 1');
+    // [v161] range=A:ZZ 명시로 시트 활성 필터 우회
     var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
             + '/gviz/tq?tqx=out:json,responseHandler:' + cbName
-            + '&gid=1953907648&tq=' + tq;
+            + '&gid=1953907648&range=A:ZZ&tq=' + tq;
     var script = document.createElement('script');
     var timer  = setTimeout(function() {
       delete window[cbName];
@@ -8541,36 +8544,50 @@ function renderRenewalView(){
     + '<div class="rnw-kpi k-ended" style="' + kStyle(kf==='ended') + '" onclick="rnwSetKpiFilter(\'ended\')"><div class="rnw-kpi-label">계약종료</div><div class="rnw-kpi-val">' + kpi.ended + '명</div><div class="rnw-kpi-sub">중도퇴실 + 만기퇴실</div></div>'
     + '</div>';
 
-  // [v55] 필터 행 순서: 계약상태 → 심사결과 → 문자 발송 버튼
-  var filterHtml = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">'
-    + contractFilterPills
-    + '<div class="rnw-filter-row" style="margin-bottom:0">'
-    + '<span style="font-size:11.5px;color:#6B7280;font-weight:700;align-self:center;margin-right:4px">심사결과:</span>'
-    + '<button class="rnw-filter-btn ' + (filter==='all'?'active':'') + '" onclick="rnwSetFilter(\'all\')">전체 (' + enriched.length + ')</button>'
-    + '<button class="rnw-filter-btn ' + (filter==='app'?'active':'') + '" onclick="rnwSetFilter(\'app\')">승인</button>'
-    + '<button class="rnw-filter-btn ' + (filter==='cond'?'active':'') + '" onclick="rnwSetFilter(\'cond\')">조건부승인</button>'
-    + '<button class="rnw-filter-btn ' + (filter==='deny'?'active':'') + '" onclick="rnwSetFilter(\'deny\')">거절</button>'
+  // [v160] 레이아웃 재구성 — Row 1: 계약상태 + 심사결과 + 검색그룹 / Row 2: 액션 버튼 (우측 정렬)
+  var searchAll = !!window._rnwSearchAll;
+  var togStyle = 'display:flex;align-items:center;gap:4px;border:1.5px solid ' + (searchAll?'#10B981':'#D1D5DB') + ';border-radius:5px;padding:0 8px;height:24px;font-size:10.5px;font-weight:700;cursor:pointer;background:' + (searchAll?'#ECFDF5':'#fff') + ';color:' + (searchAll?'#065F46':'#374151');
+  var periodSectionStyle = 'display:flex;align-items:center;gap:4px;padding:0 10px;' + (searchAll?'opacity:.5;pointer-events:none':'');
+  var btnAct = function(bg, label, onclick){
+    return '<button onclick="' + onclick + '" style="background:' + bg + ';color:#fff;border:none;padding:0 14px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;height:28px;line-height:1;white-space:nowrap">' + label + '</button>';
+  };
+
+  var filterHtml = ''
+    // ── Row 1: 계약상태 + 심사결과 + 검색그룹 ──
+    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;padding-bottom:10px">'
+    +   contractFilterPills
+    +   '<div class="rnw-filter-row" style="margin-bottom:0">'
+    +     '<span style="font-size:11.5px;color:#6B7280;font-weight:700;align-self:center;margin-right:4px">심사결과:</span>'
+    +     '<button class="rnw-filter-btn ' + (filter==='all'?'active':'') + '" onclick="rnwSetFilter(\'all\')">전체 (' + enriched.length + ')</button>'
+    +     '<button class="rnw-filter-btn ' + (filter==='app'?'active':'') + '" onclick="rnwSetFilter(\'app\')">승인</button>'
+    +     '<button class="rnw-filter-btn ' + (filter==='cond'?'active':'') + '" onclick="rnwSetFilter(\'cond\')">조건부승인</button>'
+    +     '<button class="rnw-filter-btn ' + (filter==='deny'?'active':'') + '" onclick="rnwSetFilter(\'deny\')">거절</button>'
+    +   '</div>'
+    // 검색 그룹 박스 (옵션 B 스타일)
+    +   '<div style="display:flex;align-items:center;gap:0;padding:5px 10px;height:36px;background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:8px">'
+    +     '<div style="display:flex;align-items:center;gap:6px;padding:0 10px">'
+    +       '<span style="font-size:11px;font-weight:700;color:#374151">🔍 검색</span>'
+    +       '<input id="rnwSearchInput" type="text" value="' + String(window._rnwSearch||'').replace(/"/g,'&quot;') + '" oninput="rnwSetSearch(this.value)" placeholder="계약자명·번호·연락처" style="padding:0 10px;border:1.5px solid #E5E7EB;border-radius:5px;font-size:11.5px;height:24px;outline:none;background:#fff;width:170px">'
+    +     '</div>'
+    +     '<div style="width:1px;height:18px;background:#E5E7EB"></div>'
+    +     '<div style="display:flex;align-items:center;gap:6px;padding:0 10px">'
+    +       '<label style="' + togStyle + '"><input type="checkbox"' + (searchAll?' checked':'') + ' onchange="rnwToggleSearchAll(this.checked)" style="margin:0">계약자 전체</label>'
+    +     '</div>'
+    +     '<div style="width:1px;height:18px;background:#E5E7EB"></div>'
+    +     '<div style="' + periodSectionStyle + '">'
+    +       '<span style="font-size:10.5px;color:#6B7280;font-weight:600">계약종료일</span>'
+    +       '<select onchange="rnwSetSearchEndPeriod(\'start\', this.value)" style="padding:0 6px;border:1px solid #D1D5DB;border-radius:4px;background:#fff;font-size:10.5px;height:22px">' + rnwMonthOptions(window._rnwSearchEndStart) + '</select>'
+    +       '<span style="color:#9CA3AF;font-size:10.5px">~</span>'
+    +       '<select onchange="rnwSetSearchEndPeriod(\'end\', this.value)" style="padding:0 6px;border:1px solid #D1D5DB;border-radius:4px;background:#fff;font-size:10.5px;height:22px">' + rnwMonthOptions(window._rnwSearchEndEnd) + '</select>'
+    +     '</div>'
+    +   '</div>'
     + '</div>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
-    // [v157] 계약자 검색창 — 만기퇴실 문자 좌측
-    // [v158] 검색용 계약종료일 범위 셀렉트 (검색어 입력 시 모집단을 이 범위로 확장)
-    // [v159] 계약자 전체 검색 토글 — 켜지면 모든 기간 필터 무시
-    + '<label style="display:flex;align-items:center;gap:4px;border:1.5px solid ' + (window._rnwSearchAll?'#10B981':'#D1D5DB') + ';background:' + (window._rnwSearchAll?'#ECFDF5':'#fff') + ';border-radius:6px;padding:4px 8px;cursor:pointer;font-size:10.5px;font-weight:700;color:' + (window._rnwSearchAll?'#065F46':'#374151') + '">'
-    +   '<input type="checkbox"' + (window._rnwSearchAll?' checked':'') + ' onchange="rnwToggleSearchAll(this.checked)" style="margin:0">'
-    +   '🌐 계약자 전체'
-    + '</label>'
-    + '<div style="display:flex;align-items:center;gap:4px;border:1.5px solid #DDD6FE;background:#F5F3FF;border-radius:6px;padding:3px 6px;' + (window._rnwSearchAll?'opacity:.4;pointer-events:none':'') + '">'
-    +   '<span style="font-size:10.5px;color:#5B21B6;font-weight:700">계약종료일</span>'
-    +   '<select onchange="rnwSetSearchEndPeriod(\'start\', this.value)" style="font-size:10.5px;padding:2px 4px;border:1px solid #DDD6FE;border-radius:4px;background:#fff">' + rnwMonthOptions(window._rnwSearchEndStart) + '</select>'
-    +   '<span style="font-size:10.5px;color:#9CA3AF">~</span>'
-    +   '<select onchange="rnwSetSearchEndPeriod(\'end\', this.value)" style="font-size:10.5px;padding:2px 4px;border:1px solid #DDD6FE;border-radius:4px;background:#fff">' + rnwMonthOptions(window._rnwSearchEndEnd) + '</select>'
-    + '</div>'
-    + '<input id="rnwSearchInput" type="text" value="' + String(window._rnwSearch||'').replace(/"/g,'&quot;') + '" oninput="rnwSetSearch(this.value)" placeholder="🔍 계약자명·번호·연락처" style="padding:6px 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:11.5px;width:200px;outline:none;margin-right:4px">'
-    + '<button onclick="rnwGenerateMsg(\'expired\')" style="background:#F59E0B;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 만기퇴실 문자</button>'
-    + '<button onclick="rnwGenerateMsg(\'conditional\')" style="background:#0EA5E9;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 조건부승인 문자</button>'
-    + '<button onclick="rnwGenerateMsg(\'denied\')" style="background:#DC2626;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">📨 갱신불가 문자</button>'
-    + '<button onclick="rnwDownloadExcel()" style="background:#1d4ed8;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">⬇️ 엑셀 다운로드</button>'
-    + '</div>'
+    // ── Row 2: 액션 버튼 (우측 정렬, dashed top border) ──
+    + '<div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;padding-top:10px;border-top:1px dashed #E5E7EB;margin-bottom:10px">'
+    +   btnAct('#F59E0B', '📨 만기퇴실', "rnwGenerateMsg('expired')")
+    +   btnAct('#0EA5E9', '📨 조건부승인', "rnwGenerateMsg('conditional')")
+    +   btnAct('#DC2626', '📨 갱신불가', "rnwGenerateMsg('denied')")
+    +   btnAct('#1d4ed8', '⬇️ 엑셀', "rnwDownloadExcel()")
     + '</div>';
 
   var rowsHtml;
