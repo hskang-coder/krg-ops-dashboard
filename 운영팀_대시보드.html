@@ -8018,15 +8018,14 @@ window._rnwFilter = window._rnwFilter || 'all';
 window._rnwIncomeRaw = window._rnwIncomeRaw || null;
 window._rnwSheetMap = window._rnwSheetMap || null; // null=미로드, {}=로드됨
 
-// 기본 기간: 현재월 ~ 다음달
+// [v164] 기본 기간: 전월 단일 (현재월 -1 ~ 현재월 -1)
 (function initRnwPeriod(){
   if (window._rnwStartMonth && window._rnwEndMonth) return;
   var t = new Date();
-  var y = t.getFullYear(), m = t.getMonth()+1;
-  var ny = (m === 12) ? y+1 : y;
-  var nm = (m === 12) ? 1 : m+1;
-  window._rnwStartMonth = y + '-' + String(m).padStart(2,'0');
-  window._rnwEndMonth   = ny + '-' + String(nm).padStart(2,'0');
+  var prev = new Date(t.getFullYear(), t.getMonth() - 1, 1);
+  var ym = prev.getFullYear() + '-' + String(prev.getMonth()+1).padStart(2,'0');
+  window._rnwStartMonth = ym;
+  window._rnwEndMonth   = ym;
 })();
 
 function rnwSetFilter(val){ window._rnwFilter = val; renderRenewalView(); }
