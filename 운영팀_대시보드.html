@@ -1853,7 +1853,7 @@ function parseVacancySheet(resp) {
   const partnerPersonIdx= 64; // BM열 = 부동산 계약담당자
   // [v81] 계약종류, 원본도착
   const contractKindIdx = 10; // K열 = 계약종류
-  // [v148] 계약물건 컬럼 (입금확인서용)
+  // [v148] 계약물건 컬럼 (입금내역서용)
   const propAddrIdx     = 19; // T열 = 건물주소
   const propBuildingIdx = 20; // U열 = 건물명
   const propRoomIdx     = 21; // V열 = 호수
@@ -1917,7 +1917,7 @@ function parseVacancySheet(resp) {
       tentativeDate: cell(tentativeDateIdx),
       // [v102] 실제 퇴실일 (Z열) — 거주기간/갱신차수 계산
       actualExitDate: cell(actualExitDateIdx),
-      // [v148] 입금확인서용 계약물건 정보
+      // [v148] 입금내역서용 계약물건 정보
       propAddr:      cell(propAddrIdx),     // T열: 건물주소
       propBuilding:  cell(propBuildingIdx), // U열: 건물명
       propRoom:      cell(propRoomIdx)      // V열: 호수
@@ -6708,7 +6708,7 @@ function generateGuaranteezPdf(contractNo) {
 // ════════════════════════════════════════════════
 // ▶ 부속합의서 발행 (계약참여자 추가용)
 // ════════════════════════════════════════════════
-// [v141] 입금확인발행 — 모달 + 발행
+// [v141] 입금내역서발행 — 모달 + 발행
 function openIncomeReceiptModal(contractNo) {
   if (!contractNo) { alert('먼저 계약을 검색해주세요.'); return; }
   var contract = (contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim() === String(contractNo); });
@@ -6727,7 +6727,7 @@ function openIncomeReceiptModal(contractNo) {
   overlay.innerHTML = ''
     + '<div style="background:#fff;border-radius:12px;width:100%;max-width:560px;overflow:hidden">'
     +   '<div style="padding:14px 20px;background:linear-gradient(135deg,#059669,#10B981);color:#fff;display:flex;align-items:center;gap:10px">'
-    +     '<div style="font-size:18px;font-weight:800;flex:1">💰 입금확인서 발행</div>'
+    +     '<div style="font-size:18px;font-weight:800;flex:1">💰 입금내역서 발행</div>'
     +     '<button onclick="closeIncomeReceiptModal()" style="background:rgba(255,255,255,.2);border:none;width:30px;height:30px;border-radius:50%;color:#fff;font-size:16px;cursor:pointer">✕</button>'
     +   '</div>'
     +   '<div style="padding:18px 20px">'
@@ -6753,7 +6753,7 @@ function openIncomeReceiptModal(contractNo) {
     +   '</div>'
     +   '<div style="padding:12px 20px;background:#F9FAFB;border-top:1px solid #E5E7EB;display:flex;gap:8px">'
     +     '<button onclick="closeIncomeReceiptModal()" style="background:#FFF;color:#6B7280;border:1px solid #D1D5DB;padding:9px 16px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;margin-left:auto">취소</button>'
-    +     '<button onclick="generateIncomeReceipt(\'' + contractNo + '\')" style="background:#059669;color:#fff;border:none;padding:9px 18px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">📄 입금확인서 생성</button>'
+    +     '<button onclick="generateIncomeReceipt(\'' + contractNo + '\')" style="background:#059669;color:#fff;border:none;padding:9px 18px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">📄 입금내역서 생성</button>'
     +   '</div>'
     + '</div>';
   document.body.appendChild(overlay);
@@ -6938,14 +6938,14 @@ function generateIncomeReceipt(contractNo){
     + '}';
 
   var html = ''
-    + '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>입금확인서_' + contractNo + '_' + refNo + '</title>'
+    + '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>입금내역서_' + contractNo + '_' + refNo + '</title>'
     + '<style>' + css + '</style></head><body>'
     + '<div class="print-actions">'
     +   '<button class="print-btn" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>'
     +   '<button class="print-btn" style="background:#6B7280" onclick="window.close()">닫기</button>'
     + '</div>'
     + '<div class="page">'
-    +   '<div class="title">입 금 확 인 서</div>'
+    +   '<div class="title">입 금 내 역 서</div>'
     +   '<div class="refrow"><span>발행번호: ' + refNo + '</span><span>발행일: ' + todayStr + '</span></div>'
     +   '<div class="info-box">'
     +     '<div class="lbl">계약번호</div><div>' + contractNo + '</div>'
