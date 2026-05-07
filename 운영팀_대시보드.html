@@ -9192,24 +9192,20 @@ function parsePartnerSheet(resp) {
   }).filter(function(p){ return p.fullName || p.shortName; });
 }
 
-// [v76] 한국 주택임대차 법정 중개보수 자동 계산
-// 거래금액 = 보증금 + (월세 × 100)
-// 주택: 구간별 요율/한도, 상가/오피스텔: 0.9% 협의
+// [v168] 중개보수 단순화 — 보증금 0 가정, 월세 임대차, 상업용도 주택 요율 적용
+// 거래금액 = 월세 × 100 (보증금 미포함)
+// 한도 미적용. 6억 이상은 표준 0.6% 적용.
+// 반환값은 "공급가액(VAT 미포함)" — 부가세는 ×0.1, VAT포함은 ×1.1로 별도 계산.
 function calcBrokerage(deposit, monthlyRent, housingType){
-  const dep = parseFloat(String(deposit||0).replace(/[^0-9.-]/g,'')) || 0;
-  const mr  = parseFloat(String(monthlyRent||0).replace(/[^0-9.-]/g,'')) || 0;
-  const tradeAmt = dep + mr * 100;
-  const ht = String(housingType||'');
-  const isCommercial = ht.indexOf('상가') >= 0 || ht.indexOf('오피스텔') >= 0 || ht.indexOf('상업') >= 0;
-  if (isCommercial) return Math.round(tradeAmt * 0.009);
-  let rate, cap;
-  if (tradeAmt < 5e7)       { rate = 0.005; cap = 200000; }
-  else if (tradeAmt < 1e8)  { rate = 0.004; cap = 300000; }
-  else if (tradeAmt < 3e8)  { rate = 0.003; cap = 700000; }
-  else if (tradeAmt < 6e8)  { rate = 0.004; cap = 2400000; }
-  else if (tradeAmt < 12e8) { rate = 0.005; cap = 7000000; }
-  else                      { rate = 0.006; cap = Infinity; }
-  return Math.round(Math.min(tradeAmt * rate, cap));
+  const mr = parseFloat(String(monthlyRent||0).replace(/[^0-9.-]/g,'')) || 0;
+  const tradeAmt = mr * 100;
+  let result;
+  if (tradeAmt < 5e7)       result = mr * 70 * 0.005;     // 5천만 미만: 월세×70×0.5%
+  else if (tradeAmt < 1e8)  result = tradeAmt * 0.004;     // 1억 미만: 0.4%
+  else if (tradeAmt < 3e8)  result = tradeAmt * 0.003;     // 3억 미만: 0.3%
+  else if (tradeAmt < 6e8)  result = tradeAmt * 0.004;     // 6억 미만: 0.4%
+  else                      result = tradeAmt * 0.006;     // 6억 이상: 0.6%
+  return Math.round(result);
 }
 
 // [v77] 파트너 매칭
@@ -10115,10 +10111,10 @@ function cmgRenderSettlementCard(){
       var partner = cmgFindPartner(r.partnerName);
       var hasBizNo = partner && partner.bizNo;
       var pnEsc = r.partnerName.replace(/'/g, "\\'");
-      // [v167] 중개보수(VAT포함) 분해 — 공급가액 = VAT포함 / 1.1, 부가세 = VAT포함 - 공급가액
-      var vatIncl = r.totalBrokerage || 0;
-      var supply  = Math.round(vatIncl / 1.1);
-      var vat     = vatIncl - supply;
+      // [v168] r.totalBrokerage 는 calcBrokerage 가 반환한 "공급가액" — 부가세 +10%, VAT포함 ×1.1
+      var supply  = r.totalBrokerage || 0;
+      var vat     = Math.round(supply * 0.1);
+      var vatIncl = supply + vat;
       return '<tr class="' + (paid ? '' : 'cmg-warn') + '">'
         + '<td><b>' + r.ym + '</b></td>'
         + '<td>' + r.partnerName + (!hasBizNo ? ' <span style="color:#9CA3AF;font-size:10px">(등록번호 없음)</span>' : '') + '</td>'
