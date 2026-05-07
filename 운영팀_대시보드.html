@@ -1852,6 +1852,10 @@ function parseVacancySheet(resp) {
   const partnerPersonIdx= 64; // BM열 = 부동산 계약담당자
   // [v81] 계약종류, 원본도착
   const contractKindIdx = 10; // K열 = 계약종류
+  // [v148] 계약물건 컬럼 (입금확인서용)
+  const propAddrIdx     = 19; // T열 = 건물주소
+  const propBuildingIdx = 20; // U열 = 건물명
+  const propRoomIdx     = 21; // V열 = 호수
   const origDeliveredIdx= 85; // CH열 = 원본도착 (TRUE/FALSE)
   // [v85] 시작일 (W열 = idx 22) — 진척 체크리스트/통계의 출력 기준
   const startDateIdx    = 22;
@@ -1911,7 +1915,11 @@ function parseVacancySheet(resp) {
       // [v86] 가계약일 (BK열)
       tentativeDate: cell(tentativeDateIdx),
       // [v102] 실제 퇴실일 (Z열) — 거주기간/갱신차수 계산
-      actualExitDate: cell(actualExitDateIdx)
+      actualExitDate: cell(actualExitDateIdx),
+      // [v148] 입금확인서용 계약물건 정보
+      propAddr:      cell(propAddrIdx),     // T열: 건물주소
+      propBuilding:  cell(propBuildingIdx), // U열: 건물명
+      propRoom:      cell(propRoomIdx)      // V열: 호수
     };
   }).filter(Boolean);
 }
@@ -6823,7 +6831,14 @@ function generateIncomeReceipt(contractNo){
   var fmtKr = function(s){ if(!s) return '-'; var m=String(s).match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); return m ? (m[1]+'.'+String(+m[2]).padStart(2,'0')+'.'+String(+m[3]).padStart(2,'0')) : s; };
   var fmtMon = function(n){ return '₩' + (Math.round(n)).toLocaleString(); };
 
-  var contractInfo = (contract['건물명']||'') + ' ' + (contract['호수']||'');
+  // [v148] 계약물건/계약상태 — vacancyRawData (gid=1953907648) 기준
+  var vac = (window.vacancyRawData||vacancyRawData||[]).find(function(v){ return String(v.no||'').trim() === String(contractNo); });
+  var contractInfo = vac
+    ? [vac.propAddr, vac.propBuilding, vac.propRoom].filter(Boolean).join(' ')
+    : ((contract['건물명']||'') + ' ' + (contract['호수']||''));
+  var contractStatusStr = vac
+    ? (vac.contractKind || vac.jValue || contract['계약상태'] || '-')
+    : (contract['계약상태'] || '-');
   var period = (contract['시작일']||'') + ' ~ ' + (contract['종료일']||'');
   var landlord = contract['임대인명'] || '-';
   var tenant = contract['임차인명'] || contract['임차인'] || '-';
@@ -6919,7 +6934,7 @@ function generateIncomeReceipt(contractNo){
     +   '<div class="refrow"><span>발행번호: ' + refNo + '</span><span>발행일: ' + todayStr + '</span></div>'
     +   '<div class="info-box">'
     +     '<div class="lbl">계약번호</div><div>' + contractNo + '</div>'
-    +     '<div class="lbl">계약상태</div><div>' + (contract['계약상태']||'-') + '</div>'
+    +     '<div class="lbl">계약상태</div><div>' + contractStatusStr + '</div>'
     +     '<div class="lbl">임차인</div><div>' + tenant + '</div>'
     +     '<div class="lbl">임대인</div><div>' + landlord + '</div>'
     +     '<div class="lbl">계약물건</div><div style="grid-column:span 3">' + contractInfo + '</div>'
