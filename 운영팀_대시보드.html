@@ -6735,27 +6735,34 @@ function cG_buildManualForm(){
           '<div>' + lbl('임대차 종료일') + inp('endDate', '', 'date') + '</div>'
         )
       )
-    + section('② 임대료',
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
+    // [v179] 임대료 섹션 — 헤더에 합계 표시, 4컬럼(보증금/월세/관리비/서비스수수료비용), payCondition 5옵션 select 복원
+    + section('② 임대료 <span id="cG_m_rentTotalLabel" style="font-size:11px;color:#059669;font-weight:600;margin-left:4px"></span>',
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
         +   '<div>' + lbl('보증금') + inp('deposit', '0', 'number') + '</div>'
-        +   '<div>' + lbl('월세') + inp('rent', '600000', 'number') + '</div>'
-        +   '<div>' + lbl('고정관리비') + inp('mgmtFee', '50000', 'number') + '</div>'
+        +   '<div>' + lbl('월세')
+        +     '<input type="number" id="cG_m_rent" placeholder="600000" oninput="cG_recalcServiceFee()" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none">'
+        +   '</div>'
+        +   '<div>' + lbl('고정관리비')
+        +     '<input type="number" id="cG_m_mgmtFee" placeholder="50000" oninput="cG_recalcServiceFee()" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none">'
+        +   '</div>'
+        +   '<div>' + lbl('서비스수수료 <span style="color:#B45309;font-weight:600">자동/수정</span>')
+        +     '<input type="number" id="cG_m_serviceFee" placeholder="자동 계산" oninput="cG_markServiceFeeEdited()" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;background:#FEFCE8;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none;font-weight:700;color:#78350F">'
+        +   '</div>'
         + '</div>'
       + grid2(
           '<div>' + lbl('월세 납입형태')
             + '<select id="cG_m_payMethod" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;background:#fff">'
             +   '<option value="선불" selected>선불</option><option value="후불">후불</option>'
             + '</select></div>',
-          // [v174/v175] 수수료 — 노란 음영 + 자유 입력(datalist 자동완성)
-          '<div>' + lbl('서비스 수수료 <span style="color:#B45309;font-weight:600">⚠ 직접 확인 / 자유 입력 가능</span>')
-            + '<input type="text" id="cG_m_payCondition" list="cG_payCondList" value="분할" placeholder="분할/일시납/수수료별도/직접 입력" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F;box-sizing:border-box;outline:none">'
-            + '<datalist id="cG_payCondList">'
-            +   '<option value="분할">분할(분납)</option>'
+          // [v179] 5옵션 select 복원 — 자동 계산 트리거
+          '<div>' + lbl('서비스 수수료 구분 <span style="color:#B45309;font-weight:600">⚠ 직접 확인</span>')
+            + '<select id="cG_m_payCondition" onchange="cG_recalcServiceFee()" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
+            +   '<option value="분할" selected>분할</option>'
             +   '<option value="일시납">일시납</option>'
-            +   '<option value="수수료별도">수수료별도</option>'
             +   '<option value="비용포함">비용포함</option>'
-            + '</datalist>'
-            + '</div>'
+            +   '<option value="수수료별도">수수료별도</option>'
+            +   '<option value="수수료포함">수수료포함</option>'
+            + '</select></div>'
         )
       )
     + section('③ 임대인 정보',
@@ -6795,6 +6802,47 @@ function cG_buildManualForm(){
     +   '<b>💡 발행 후:</b> PDF 출력 + "시트 입력용 TSV" 자동 클립보드 복사 → 운영 시트 적절한 행에 붙여넣기로 보관 가능'
     + '</div>';
   return html;
+}
+
+// ==================================================================
+// [v179] 임대료 합계 + 서비스수수료 자동 계산
+// 임대료 = 월세 + 고정관리비
+// 분할/수수료별도/수수료포함: 임대료 × 10%
+// 비용포함: 임대료 × 7% (= 0.7/10)
+// 일시납: 임대료 × 10% × 12 (1년치 일시납)
+// ==================================================================
+function cG_updateRentTotal(){
+  var rentEl = document.getElementById('cG_m_rent');
+  var mgmtEl = document.getElementById('cG_m_mgmtFee');
+  if (!rentEl || !mgmtEl) return 0;
+  var rent = parseFloat(rentEl.value) || 0;
+  var mgmt = parseFloat(mgmtEl.value) || 0;
+  var total = rent + mgmt;
+  var lbl = document.getElementById('cG_m_rentTotalLabel');
+  if (lbl) lbl.textContent = total > 0 ? '(합계: ₩' + total.toLocaleString() + ')' : '';
+  return total;
+}
+function cG_calcServiceFee(rentTotal, payCondition){
+  if (!rentTotal) return 0;
+  if (payCondition === '비용포함') return Math.round(rentTotal * 0.07);
+  if (payCondition === '일시납')   return Math.round(rentTotal * 0.1 * 12);
+  // 분할 / 수수료별도 / 수수료포함 → 10%
+  return Math.round(rentTotal * 0.1);
+}
+function cG_recalcServiceFee(){
+  var rentTotal = cG_updateRentTotal();
+  var pcEl = document.getElementById('cG_m_payCondition');
+  var sfEl = document.getElementById('cG_m_serviceFee');
+  if (!pcEl || !sfEl) return;
+  var pc = pcEl.value || '분할';
+  var fee = cG_calcServiceFee(rentTotal, pc);
+  // 사용자가 수동 수정한 경우 자동 덮어쓰기 안 함
+  if (sfEl.dataset.userEdit === 'true') return;
+  sfEl.value = fee || '';
+}
+function cG_markServiceFeeEdited(){
+  var sf = document.getElementById('cG_m_serviceFee');
+  if (sf) sf.dataset.userEdit = 'true';
 }
 
 // ==================================================================
@@ -7063,8 +7111,10 @@ function cG_parsePdfText(text){
 
   // ── 6/7. 납입형태, 수수료 ──
   data.payMethod    = pickIn(text, /월세\s*납입\s*형태\s*[:：]?\s*([^\n\d]+)/).replace(/\s/g,'');
-  var sf = pickIn(text, /서비스\s*수수료\s*[:：]?\s*([^\n\d]+)/).replace(/\s/g,'');
-  data.payCondition = sf === '분납' ? '분할' : (sf || '');
+  // [v179] 5가지 payCondition 매핑
+  var sfRaw = pickIn(text, /서비스\s*수수료\s*[:：]?\s*([^\n\d]+)/).replace(/\s/g,'');
+  var sfMap = { '분납':'분할','분할':'분할','일시납':'일시납','일시불':'일시납','비용포함':'비용포함','수수료별도':'수수료별도','수수료포함':'수수료포함' };
+  data.payCondition = sfMap[sfRaw] || sfRaw || '';
 
   // ── 8. 임대인 정보 ──
   var landlordSec = section(/임대인\s*정보/, /임대인\s*계좌\s*정보|임차인\s*정보|공동\s*임차인/);
@@ -7127,9 +7177,13 @@ function cG_applyParsedData(data){
     }
   }
   if (data.payCondition) {
-    // [v175] payCondition은 input(datalist) 기반 — value로 직접 설정
+    // [v179] payCondition은 select — option 매칭
     var pc = document.getElementById('cG_m_payCondition');
-    if (pc) pc.value = data.payCondition;
+    if (pc) {
+      for (var k = 0; k < pc.options.length; k++) {
+        if (pc.options[k].value === data.payCondition) { pc.selectedIndex = k; break; }
+      }
+    }
   }
   setVal('landlordName', data.landlordName);
   setVal('landlordPhone', data.landlordPhone);
@@ -7152,6 +7206,10 @@ function cG_applyParsedData(data){
   cG_applyAddrHighlight('cG_m_coAddr');
   cG_attachRrnMask('cG_m_tenantIdNo');
   cG_attachRrnMask('cG_m_coIdNo');
+  // [v179] 임대료 합계 + 서비스수수료 자동 계산 트리거
+  var sfEl = document.getElementById('cG_m_serviceFee');
+  if (sfEl) sfEl.dataset.userEdit = ''; // PDF 추출 시 자동값 다시 적용 가능
+  cG_recalcServiceFee();
   var fields = ['contractDate','address','startDate','endDate','rent','landlordName','tenantName','tenantPhone'];
   var filled = fields.filter(function(f){ return data[f]; }).length;
   return { total: fields.length, filled: filled };
@@ -7265,7 +7323,8 @@ function cG_collectManualData(){
     vat:          0,
     mgmtFee:      mgmtFee,
     totalRent:    rent + mgmtFee,
-    serviceFee:   0,
+    // [v179] 서비스수수료비용 — 폼 입력값(자동계산 또는 수동) 사용
+    serviceFee:   n('serviceFee'),
     payDay:       '',
     payMethod:    v('payMethod') || '선불',
     tenantPhone:  v('tenantPhone'),
