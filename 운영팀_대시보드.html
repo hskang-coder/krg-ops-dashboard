@@ -6733,8 +6733,8 @@ function cG_buildManualForm(){
     + section('① 계약 기본',
         // [v188] 계약유형 + 계약체결일 한 줄 (좌:유형 / 우:체결일)
         '<div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px">'
-      +   '<div>' + lbl('계약유형')
-      +     '<select id="cG_m_useType" onchange="cG_onUseTypeChange()" style="width:100%;padding:7px 10px;border:1.5px solid #1B3976;border-radius:5px;font-size:12px;background:#fff;font-weight:700;color:#1B3976">'
+      +   '<div>' + lbl('계약유형 <span style="color:#B45309;font-weight:600">⚠ 직접 확인</span>')
+      +     '<select id="cG_m_useType" onchange="cG_onUseTypeChange()" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
       +       '<option value="주거용" selected>주거용</option>'
       +       '<option value="상업용">상업용 (부가세 포함)</option>'
       +     '</select>'
@@ -7034,6 +7034,96 @@ function cG_attachRrnMask(id){
     }
   });
 }
+// [v189] 주민번호 형식 검증 — 평문(000000-0000000) 또는 마스킹(000000-0******)
+function cG_isValidRrn(value){
+  if (!value) return false;
+  var clean = String(value).replace(/\s/g, '');
+  // 평문: 000000-0000000 (총 13자리)
+  if (/^\d{6}-\d{7}$/.test(clean)) return true;
+  // 마스킹: 000000-0****** (앞 8자리 + 별표 6개)
+  if (/^\d{6}-\d\*{6}$/.test(clean)) return true;
+  return false;
+}
+
+// [v189] 빨간 음영 적용 / 해제
+function cG_markInvalid(el, msg){
+  if (!el) return;
+  el.style.background = '#FEE2E2';
+  el.style.borderColor = '#DC2626';
+  el.title = '⚠ ' + (msg || '입력 필요');
+  el.dataset.invalid = '1';
+}
+function cG_clearInvalid(el){
+  if (!el) return;
+  el.dataset.invalid = '';
+  // 자동 채움 상태면 초록 유지, 그 외에는 초기화
+  if (el.dataset.autoFilled === 'true') {
+    el.style.background = '#ECFDF5';
+    el.style.borderColor = '#10B981';
+  } else {
+    el.style.background = '';
+    el.style.borderColor = '';
+  }
+  el.title = '';
+}
+
+// [v189] 입력 시 빨간 음영 자동 해제 핸들러 부착
+function cG_attachInvalidClearOnInput(el){
+  if (!el || el.dataset.invalidClearAttached) return;
+  el.dataset.invalidClearAttached = '1';
+  el.addEventListener('input', function(){
+    if (this.dataset.invalid === '1' && this.value && this.value.trim()) {
+      // 주민번호는 형식 재검증
+      if (this.id === 'cG_m_tenantIdNo' || this.id === 'cG_m_coIdNo') {
+        var raw = this.dataset.raw || this.value;
+        if (cG_isValidRrn(this.value) || cG_isValidRrn(raw)) cG_clearInvalid(this);
+      } else {
+        cG_clearInvalid(this);
+      }
+    }
+  });
+}
+
+// [v189] 필수 필드 누락 검증 + 주민번호 형식 검증
+function cG_validateAllFields(){
+  var required = [
+    {id:'cG_m_contractDate', label:'계약체결일'},
+    {id:'cG_m_address',      label:'주소+호실'},
+    {id:'cG_m_startDate',    label:'임대차 시작일'},
+    {id:'cG_m_endDate',      label:'임대차 종료일'},
+    {id:'cG_m_rent',         label:'월세'},
+    {id:'cG_m_landlordName', label:'임대인명'},
+    {id:'cG_m_landlordPhone',label:'임대인 연락처'},
+    {id:'cG_m_landlordAddr', label:'임대인 주소'},
+    {id:'cG_m_bank',         label:'은행명'},
+    {id:'cG_m_account',      label:'계좌번호'},
+    {id:'cG_m_acctHolder',   label:'예금주'},
+    {id:'cG_m_tenantName',   label:'임차인명'},
+    {id:'cG_m_tenantPhone',  label:'임차인 연락처'},
+    {id:'cG_m_tenantAddr',   label:'임차인 주소'}
+  ];
+  required.forEach(function(f){
+    var el = document.getElementById(f.id);
+    if (!el) return;
+    cG_attachInvalidClearOnInput(el);
+    if (!el.value || !String(el.value).trim()) {
+      cG_markInvalid(el, f.label + ' — 입력 필요');
+    }
+  });
+  // 주민번호 형식 검증 — 임차인
+  ['cG_m_tenantIdNo','cG_m_coIdNo'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (!el) return;
+    cG_attachInvalidClearOnInput(el);
+    var val = el.value || '';
+    if (!val) return; // 빈 값은 OK (선택)
+    var raw = (el.dataset && el.dataset.raw) ? el.dataset.raw : val;
+    if (!cG_isValidRrn(val) && !cG_isValidRrn(raw)) {
+      cG_markInvalid(el, '주민번호 형식 오류 — 000000-0000000 또는 000000-0******');
+    }
+  });
+}
+
 // 주민번호 값 세팅 (PDF 추출 후 호출)
 function cG_setMaskedRrn(id, raw){
   var el = document.getElementById(id);
@@ -7377,6 +7467,8 @@ function cG_applyParsedData(data){
   var pdEl = document.getElementById('cG_m_payDay');
   if (pdEl) pdEl.dataset.userEdit = '';
   cG_recalcPayDay();
+  // [v189] 누락/형식 오류 필드 빨간 음영
+  cG_validateAllFields();
   var fields = ['contractDate','address','startDate','endDate','rent','landlordName','tenantName','tenantPhone'];
   var filled = fields.filter(function(f){ return data[f]; }).length;
   return { total: fields.length, filled: filled };
@@ -7598,6 +7690,8 @@ function cG_buildTsvFromManual(d){
 function cG_submit(contractNo){
   var mode = window._cG_mode || (contractNo ? 'search' : 'manual');
   if (mode === 'manual') {
+    // [v189] 발행 직전 검증 — 빨간 음영 표시
+    if (typeof cG_validateAllFields === 'function') cG_validateAllFields();
     var d = cG_collectManualData();
     if (!d.tenantName || !d.address) { alert('임차인 이름과 주소는 필수입니다.'); return; }
     if (!d.rent) { alert('월세를 입력해주세요.'); return; }
