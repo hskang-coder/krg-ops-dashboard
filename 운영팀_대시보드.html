@@ -6648,6 +6648,18 @@ function openContractPdfModal(contractNo) {
     + '</div></div>';
   document.body.appendChild(modal);
   setTimeout(function() {
+    // [v174] 수동 입력 폼이 노출 중이면 주민번호 마스킹 + 주소 검증 핸들러 부착
+    if (initMode === 'manual') {
+      cG_attachRrnMask('cG_m_tenantIdNo');
+      cG_attachRrnMask('cG_m_coIdNo');
+      ['cG_m_address','cG_m_landlordAddr','cG_m_tenantAddr','cG_m_coAddr'].forEach(function(id){
+        var el = document.getElementById(id);
+        if (el && !el.dataset.addrAttached) {
+          el.dataset.addrAttached = '1';
+          el.addEventListener('blur', function(){ cG_applyAddrHighlight(id); });
+        }
+      });
+    }
     var el = document.getElementById(initMode==='search' ? 'cG_special' : 'cG_m_tenantName');
     if (el) el.focus();
   }, 100);
@@ -6671,6 +6683,16 @@ function cG_switchMode(mode, contractNo){
     bm.style.background = '#fff'; bm.style.color = '#1B3976'; bm.style.boxShadow = '0 1px 3px rgba(0,0,0,.08)';
     bs.style.background = 'transparent'; bs.style.color = '#6B7280'; bs.style.boxShadow = 'none';
     if (sub) sub.textContent = '시트 등록 안 된 계약 — 수동 입력 모드';
+    // [v174] 수동 모드 전환 시 마스킹/하이라이트 핸들러 부착
+    cG_attachRrnMask('cG_m_tenantIdNo');
+    cG_attachRrnMask('cG_m_coIdNo');
+    ['cG_m_address','cG_m_landlordAddr','cG_m_tenantAddr','cG_m_coAddr'].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el && !el.dataset.addrAttached) {
+        el.dataset.addrAttached = '1';
+        el.addEventListener('blur', function(){ cG_applyAddrHighlight(id); });
+      }
+    });
   }
   window._cG_mode = mode;
 }
@@ -6717,8 +6739,9 @@ function cG_buildManualForm(){
             + '<select id="cG_m_payMethod" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;background:#fff">'
             +   '<option value="선불" selected>선불</option><option value="후불">후불</option>'
             + '</select></div>',
-          '<div>' + lbl('서비스 수수료')
-            + '<select id="cG_m_payCondition" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;background:#fff">'
+          // [v174] 수수료는 항상 노란 음영 — 검토 필수 시각화
+          '<div>' + lbl('서비스 수수료 <span style="color:#B45309;font-weight:600">⚠ 직접 확인</span>')
+            + '<select id="cG_m_payCondition" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
             +   '<option value="분할" selected>분할(분납)</option><option value="일시납">일시납</option><option value="수수료별도">수수료별도</option>'
             + '</select></div>'
         )
@@ -6759,6 +6782,71 @@ function cG_buildManualForm(){
     +   '<b>💡 발행 후:</b> PDF 출력 + "시트 입력용 TSV" 자동 클립보드 복사 → 운영 시트 적절한 행에 붙여넣기로 보관 가능'
     + '</div>';
   return html;
+}
+
+// ==================================================================
+// [v174] 주민번호 마스킹 / 주소 광역시·도 검증
+// ==================================================================
+// 마스킹: 앞 8자리(생년월일 6 + - + 1) + ****** 6자리
+function cG_maskRrn(rrn){
+  if (!rrn) return '';
+  var clean = String(rrn).replace(/\s/g, '');
+  if (clean.length < 8) return clean;
+  return clean.slice(0, 8) + '******';
+}
+// 주소가 광역시·도로 시작하는지 검증 (없으면 노란 하이라이트)
+function cG_isAddrComplete(addr){
+  if (!addr) return true; // 빈 값은 검증 안 함
+  var s = String(addr).trim();
+  var prefixes = ['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
+  for (var i = 0; i < prefixes.length; i++) {
+    if (s.indexOf(prefixes[i]) === 0) return true;
+  }
+  return false;
+}
+// 주소 input에 광역시·도 누락 시 노란 하이라이트
+function cG_applyAddrHighlight(id){
+  var el = document.getElementById(id);
+  if (!el) return;
+  if (!cG_isAddrComplete(el.value)) {
+    el.style.background = '#FEF3C7';
+    el.style.borderColor = '#F59E0B';
+    el.title = '⚠ 광역시·도가 누락되어 있을 수 있습니다 — 확인해주세요';
+  } else {
+    el.style.background = '';
+    el.style.borderColor = '';
+    el.title = '';
+  }
+}
+// 주민번호 input — focus 시 평문 / blur 시 마스킹
+function cG_attachRrnMask(id){
+  var el = document.getElementById(id);
+  if (!el || el.dataset.rrnAttached) return;
+  el.dataset.rrnAttached = '1';
+  // dataset.raw 없으면 현재 value를 raw로 저장
+  if (el.dataset.raw == null) el.dataset.raw = el.value || '';
+  el.addEventListener('focus', function(){
+    if (this.dataset.raw) this.value = this.dataset.raw;
+  });
+  el.addEventListener('blur', function(){
+    this.dataset.raw = this.value;
+    this.value = cG_maskRrn(this.value);
+    if (this.value) {
+      this.style.fontFamily = 'Menlo, monospace';
+      this.style.color = '#6B7280';
+    }
+  });
+}
+// 주민번호 값 세팅 (PDF 추출 후 호출)
+function cG_setMaskedRrn(id, raw){
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.dataset.raw = raw || '';
+  if (raw) {
+    el.value = cG_maskRrn(raw);
+    el.style.fontFamily = 'Menlo, monospace';
+    el.style.color = '#6B7280';
+  }
 }
 
 // ==================================================================
@@ -6974,12 +7062,21 @@ async function cG_handlePdfUpload(input){
     setVal('tenantName', data.tenantName);
     setVal('tenantPhone', data.tenantPhone);
     setVal('tenantAddr', data.tenantAddr);
-    setVal('tenantIdNo', data.tenantIdNo);
+    // [v174] 주민번호는 마스킹 헬퍼 사용
+    cG_setMaskedRrn('cG_m_tenantIdNo', data.tenantIdNo);
     setVal('nationality', data.nationality);
     setVal('coName', data.coName);
     setVal('coPhone', data.coPhone);
     setVal('coAddr', data.coAddr);
-    setVal('coIdNo', data.coIdNo);
+    cG_setMaskedRrn('cG_m_coIdNo', data.coIdNo);
+    // [v174] 주소 광역시·도 검증 — 노란 하이라이트
+    cG_applyAddrHighlight('cG_m_address');
+    cG_applyAddrHighlight('cG_m_landlordAddr');
+    cG_applyAddrHighlight('cG_m_tenantAddr');
+    cG_applyAddrHighlight('cG_m_coAddr');
+    // 주민번호 input에 focus/blur 핸들러 부착
+    cG_attachRrnMask('cG_m_tenantIdNo');
+    cG_attachRrnMask('cG_m_coIdNo');
     // 추출된 필드 카운트
     var fields = ['contractDate','address','startDate','endDate','rent','landlordName','tenantName','tenantPhone'];
     var filled = fields.filter(function(f){ return data[f]; }).length;
@@ -7000,6 +7097,13 @@ async function cG_handlePdfUpload(input){
 function cG_collectManualData(){
   var v = function(id){ var el = document.getElementById('cG_m_' + id); return el ? (el.value||'').trim() : ''; };
   var n = function(id){ return parseFloat(String(v(id)||'').replace(/[^0-9.\-]/g,'')) || 0; };
+  // [v174] 주민번호는 dataset.raw 우선 (마스킹 표시값이 아닌 평문)
+  var rrn = function(id){
+    var el = document.getElementById('cG_m_' + id);
+    if (!el) return '';
+    var raw = el.dataset && el.dataset.raw;
+    return (raw && raw !== el.value) ? raw : (el.value || '').trim();
+  };
   var fmtKorDate = function(iso){ if (!iso) return ''; var p = iso.split('-'); if (p.length<3) return iso; return p[0]+'.'+p[1]+'.'+p[2]; };
   var contractNo = 'M-' + Date.now().toString().slice(-8); // 수동 발행 임시 번호
   var startDate = fmtKorDate(v('startDate'));
@@ -7032,13 +7136,13 @@ function cG_collectManualData(){
     payDay:       '',
     payMethod:    v('payMethod') || '선불',
     tenantPhone:  v('tenantPhone'),
-    tenantIdNo:   v('tenantIdNo'),
+    tenantIdNo:   rrn('tenantIdNo'),
     tenantAddr:   v('tenantAddr'),
     emergPhone:   '',
     emergInfo:    '',
     coName:       v('coName'),
     coPhone:      v('coPhone'),
-    coIdNo:       v('coIdNo'),
+    coIdNo:       rrn('coIdNo'),
     coAddr:       v('coAddr'),
     coEmergPhone: '',
     coEmergInfo:  '',
