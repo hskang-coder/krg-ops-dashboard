@@ -6740,15 +6740,38 @@ function cG_switchMode(mode, contractNo){
   window._cG_mode = mode;
 }
 
-// [v172] 수동 입력 폼 빌더 — 17개 필드 (5섹션) + [v173] PDF 자동 추출
+// [v172/v197] 수동 입력 폼 빌더 — 17개 필드 (5섹션) + [v173] PDF 자동 추출
 function cG_buildManualForm(){
+  // [v197] 통일 CSS — 모든 입력/select/textarea 동일 높이, 라벨 정렬, 색상 클래스화
+  var styleBlock = '<style>'
+    + '.cG-fld-row{display:grid;gap:8px;margin-bottom:8px}'
+    + '.cG-fld-row.c2{grid-template-columns:1fr 1fr}'
+    + '.cG-fld-row.c3{grid-template-columns:1fr 1fr 1fr}'
+    + '.cG-fld-row.c4{grid-template-columns:1fr 1fr 1fr 1fr}'
+    + '.cG-fld-wrap{display:flex;flex-direction:column;gap:3px}'
+    + '.cG-fld-lbl{font-size:10.5px;font-weight:600;color:#374151;min-height:14px;line-height:1.3;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    + '.cG-fld-hint{font-size:9.5px;font-weight:500;color:#B45309}'
+    + '.cG-fld-hint.req{color:#DC2626}'
+    + '.cG-fld{width:100%;height:32px;padding:0 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:12.5px;box-sizing:border-box;outline:none;background:#fff;font-family:inherit;color:#1F2937;transition:border-color .15s}'
+    + '.cG-fld:focus{border-color:#1B3976;box-shadow:0 0 0 2px rgba(27,57,118,.1)}'
+    + 'select.cG-fld{cursor:pointer}'
+    + 'textarea.cG-fld{height:auto;min-height:54px;padding:8px 10px;line-height:1.5;resize:vertical}'
+    + '.cG-fld.cG-warn{border:1.5px solid #F59E0B;background:#FEF3C7;font-weight:700;color:#78350F}'
+    + '.cG-fld.cG-required{border:1.5px solid #DC2626;background:#FEE2E2;font-weight:700;color:#991B1B}'
+    + '.cG-fld.cG-info{border:1.5px solid #10B981;background:#F0FDF4}'
+    + '.cG-fld.cG-auto{background:#F0FDF4;border:1px solid #86EFAC}'
+    + '.cG-section{margin-bottom:14px}'
+    + '.cG-section-ttl{font-size:12px;font-weight:800;color:#1B3976;margin-bottom:8px;padding-bottom:5px;border-bottom:1.5px solid #E5E7EB;display:flex;align-items:center;gap:6px}'
+    + '</style>';
+  // 통일 헬퍼
   var inp = function(id, ph, type, w){
-    return '<input type="' + (type||'text') + '" id="cG_m_' + id + '" placeholder="' + (ph||'') + '" style="width:' + (w||'100%') + ';padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none">';
+    return '<input type="' + (type||'text') + '" id="cG_m_' + id + '" placeholder="' + (ph||'') + '" class="cG-fld">';
   };
   var lbl = function(text){ return '<label style="display:block;font-size:10.5px;font-weight:700;color:#374151;margin-bottom:3px">' + text + '</label>'; };
   var section = function(title, body){ return '<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:800;color:#1B3976;margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid #E5E7EB">' + title + '</div>' + body + '</div>'; };
   var grid2 = function(a, b){ return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + a + b + '</div>'; };
   var html = ''
+    + styleBlock
     // [v173] PDF 자동 추출 영역
     // [v182] PDF뿐 아니라 TXT/DOC/DOCX도 지원
     + '<div style="background:#F5F3FF;border:1.5px dashed #C4B5FD;border-radius:8px;padding:12px 14px;margin-bottom:14px">'
@@ -6766,7 +6789,7 @@ function cG_buildManualForm(){
     + '</div>'
     // [v176] 특약사항 — PDF 업로드 영역 바로 아래로 이동
     + section('📌 특약사항',
-        '<textarea id="cG_m_specialNotes" rows="3" placeholder="추가 특약 내용을 입력하세요 (없으면 비워두세요)" style="width:100%;border:1px solid #D1D5DB;border-radius:5px;padding:8px 10px;font-size:12px;resize:vertical;outline:none;font-family:inherit;line-height:1.5;box-sizing:border-box"></textarea>'
+        '<textarea id="cG_m_specialNotes" rows="3" placeholder="추가 특약 내용을 입력하세요 (없으면 비워두세요)" class="cG-fld"></textarea>'
       + '<div style="background:#F0F4FF;border-radius:6px;padding:8px 12px;font-size:10.5px;color:#374151;line-height:1.6;margin-top:6px">'
       + '<b>📋 자동 추가:</b> 납부조건별 고정 특약 + 공동전차인/연대보증인 위약금 조항 자동 삽입 (직접 입력한 내용은 위에 추가됨)'
       + '</div>'
@@ -6775,14 +6798,14 @@ function cG_buildManualForm(){
         // [v195/v196] 1행: 계약유형 / 계약정보구분 / 계약조건 (3컬럼) — 노란 음영 셀렉트 그룹화
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
       +   '<div>' + lbl('계약유형 <span style="color:#DC2626;font-weight:600">⚠ 필수</span>')
-      +     '<select id="cG_m_useType" onchange="cG_onUseTypeChange()" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
+      +     '<select id="cG_m_useType" onchange="cG_onUseTypeChange()" class="cG-fld cG-warn">'
       +       '<option value="" selected>— 선택하세요 —</option>'
       +       '<option value="주거용">주거용</option>'
       +       '<option value="상업용">상업용 (부가세 포함)</option>'
       +     '</select>'
       +   '</div>'
       +   '<div>' + lbl('계약정보구분 <span style="color:#B45309;font-weight:600">자동/수정</span>')
-      +     '<select id="cG_m_contractInfo" onchange="this.dataset.userEdit=\'true\'" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
+      +     '<select id="cG_m_contractInfo" onchange="this.dataset.userEdit=\'true\'" class="cG-fld cG-warn">'
       +       '<option value="단독계약" selected>단독계약</option>'
       +       '<option value="공동전차인">공동전차인</option>'
       +       '<option value="연대보증인">연대보증인</option>'
@@ -6790,7 +6813,7 @@ function cG_buildManualForm(){
       +     '</select>'
       +   '</div>'
       +   '<div>' + lbl('계약조건 <span style="color:#B45309;font-weight:600">선택</span>')
-      +     '<select id="cG_m_contractTerms" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
+      +     '<select id="cG_m_contractTerms" class="cG-fld cG-warn">'
       +       '<option value="" selected>— 선택 —</option>'
       +       '<option value="SGI보증서">SGI보증서</option>'
       +       '<option value="SGI보증서+보증금">SGI보증서+보증금</option>'
@@ -6804,7 +6827,7 @@ function cG_buildManualForm(){
       + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
       +   '<div>' + lbl('계약체결일') + inp('contractDate', '예: 2026-05-07', 'date') + '</div>'
       +   '<div>' + lbl('임대차 시작일')
-      +     '<input type="date" id="cG_m_startDate" oninput="cG_recalcPayDay()" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none">'
+      +     '<input type="date" id="cG_m_startDate" oninput="cG_recalcPayDay()" class="cG-fld">'
       +   '</div>'
       +   '<div>' + lbl('임대차 종료일') + inp('endDate', '', 'date') + '</div>'
       + '</div>'
@@ -6816,26 +6839,26 @@ function cG_buildManualForm(){
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
         +   '<div>' + lbl('보증금') + inp('deposit', '0', 'number') + '</div>'
         +   '<div>' + lbl('월세')
-        +     '<input type="number" id="cG_m_rent" placeholder="600000" oninput="cG_recalcServiceFee()" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none">'
+        +     '<input type="number" id="cG_m_rent" placeholder="600000" oninput="cG_recalcServiceFee()" class="cG-fld">'
         +   '</div>'
         +   '<div>' + lbl('고정관리비')
-        +     '<input type="number" id="cG_m_mgmtFee" placeholder="50000" oninput="cG_recalcServiceFee()" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none">'
+        +     '<input type="number" id="cG_m_mgmtFee" placeholder="50000" oninput="cG_recalcServiceFee()" class="cG-fld">'
         +   '</div>'
         +   '<div>' + lbl('서비스수수료 <span style="color:#B45309;font-weight:600">자동/수정</span>')
-        +     '<input type="number" id="cG_m_serviceFee" placeholder="자동 계산" oninput="cG_markServiceFeeEdited()" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;background:#FEFCE8;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none;font-weight:700;color:#78350F">'
+        +     '<input type="number" id="cG_m_serviceFee" placeholder="자동 계산" oninput="cG_markServiceFeeEdited()" class="cG-fld cG-warn">'
         +   '</div>'
         + '</div>'
       // [v185] grid3 — 납입형태 / 월세납입일 / 수수료구분
       + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
       +   '<div>' + lbl('월세 납입형태')
-      +     '<select id="cG_m_payMethod" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;background:#fff">'
+      +     '<select id="cG_m_payMethod" class="cG-fld">'
       +       '<option value="선불" selected>선불</option><option value="후불">후불</option>'
       +     '</select></div>'
       +   '<div>' + lbl('월세 납입일 <span style="color:#6B7280;font-weight:500;font-size:10px">자동/수정</span>')
-      +     '<input type="text" id="cG_m_payDay" placeholder="시작일 입력 시 자동" oninput="cG_markPayDayEdited()" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none;background:#F0FDF4">'
+      +     '<input type="text" id="cG_m_payDay" placeholder="시작일 입력 시 자동" oninput="cG_markPayDayEdited()" class="cG-fld cG-auto">'
       +   '</div>'
       +   '<div>' + lbl('서비스 수수료 구분 <span style="color:#B45309;font-weight:600">⚠ 직접 확인</span>')
-      +     '<select id="cG_m_payCondition" onchange="cG_recalcServiceFee()" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
+      +     '<select id="cG_m_payCondition" onchange="cG_recalcServiceFee()" class="cG-fld cG-warn">'
       +       '<option value="분할" selected>분할</option>'
       +       '<option value="일시납">일시납</option>'
       +       '<option value="비용포함">비용포함</option>'
@@ -6870,7 +6893,7 @@ function cG_buildManualForm(){
     + section('⑤ 공동임차인 (선택)',
         '<div style="font-size:10.5px;color:#6B7280;margin-bottom:6px">없으면 비워두세요</div>'
       + grid2(
-          '<div>' + lbl('이름') + '<input type="text" id="cG_m_coName" placeholder="예: 최호진" oninput="cG_autoToggleContractInfo()" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none"></div>',
+          '<div>' + lbl('이름') + '<input type="text" id="cG_m_coName" placeholder="예: 최호진" oninput="cG_autoToggleContractInfo()" class="cG-fld"></div>',
           '<div>' + lbl('연락처') + inp('coPhone', '010-0000-0000') + '</div>'
         )
       + '<div style="margin-top:8px">' + lbl('주소') + inp('coAddr', '') + '</div>'
