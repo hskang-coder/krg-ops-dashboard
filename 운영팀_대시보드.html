@@ -7355,7 +7355,7 @@ function cG_parsePdfText(text){
   if (tenantSec) {
     data.tenantName  = pickField(tenantSec, '이름').replace(/\s+/g, ' ').trim();
     data.tenantPhone = pickIn(tenantSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
-    data.tenantIdNo  = pickIn(tenantSec, /주민등록번호\s*[:：]?\s*([\d\-]+)/);
+    data.tenantIdNo  = pickIn(tenantSec, /주민(?:등록)?번호[^\n:：]*[:：]\s*(\d{6}\s*[-–]\s*\d{1,7})/).replace(/\s+/g,'').replace(/–/g,'-');
     data.nationality = pickField(tenantSec, '국적').replace(/\s+/g, ' ').trim();
     data.tenantAddr  = pickAddr(tenantSec);
   }
@@ -7365,7 +7365,7 @@ function cG_parsePdfText(text){
   if (coSec) {
     data.coName  = pickField(coSec, '이름').replace(/\s+/g, ' ').trim();
     data.coPhone = pickIn(coSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
-    data.coIdNo  = pickIn(coSec, /주민등록번호\s*[:：]?\s*([\d\-]+)/);
+    data.coIdNo  = pickIn(coSec, /주민(?:등록)?번호[^\n:：]*[:：]\s*(\d{6}\s*[-–]\s*\d{1,7})/).replace(/\s+/g,'').replace(/–/g,'-');
     data.coAddr  = pickAddr(coSec);
   }
 
