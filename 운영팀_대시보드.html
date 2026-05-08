@@ -6608,6 +6608,8 @@ function openContractPdfModal(contractNo) {
   // [v172] 모드 토글 — 검색발행 OR 수동입력
   // 진입 시 contractNo 있으면 'search', 없으면 'manual' 디폴트
   var initMode = hasSearch ? 'search' : 'manual';
+  // [v187] _cG_mode 즉시 설정 — addExtraParty/collectExtraParties가 올바른 list 선택하도록
+  window._cG_mode = initMode;
 
   modal.innerHTML = '<div style="background:#fff;border-radius:14px;padding:28px;width:600px;max-width:94vw;max-height:calc(100vh - 48px);overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
     + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">'
@@ -7587,10 +7589,16 @@ function cG_submit(contractNo){
   }
 }
 
-// [v156/v181] 추가 계약자 카드 1개 삽입 — 모드별 다른 list 컨테이너 사용
+// [v156/v181/v187] 추가 계약자 카드 1개 삽입 — 활성 모드 list 자동 감지
 var cG_extraSeq = 0;
 function cG_extraListId(){
-  return (window._cG_mode === 'manual') ? 'cG_extraList_manual' : 'cG_extraList';
+  // 1순위: 명시적 모드
+  if (window._cG_mode === 'manual') return 'cG_extraList_manual';
+  if (window._cG_mode === 'search') return 'cG_extraList';
+  // 폴백: 보이는 pane 기준
+  var manualPane = document.getElementById('cG_manualPane');
+  if (manualPane && manualPane.style.display !== 'none') return 'cG_extraList_manual';
+  return 'cG_extraList';
 }
 function addExtraParty(){
   var list = document.getElementById(cG_extraListId()); if (!list) return;
