@@ -6772,8 +6772,8 @@ function cG_buildManualForm(){
       + '</div>'
       )
     + section('① 계약 기본',
-        // [v188] 계약유형 + 계약체결일 한 줄 (좌:유형 / 우:체결일)
-        '<div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px">'
+        // [v195/v196] 1행: 계약유형 / 계약정보구분 / 계약조건 (3컬럼) — 노란 음영 셀렉트 그룹화
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
       +   '<div>' + lbl('계약유형 <span style="color:#DC2626;font-weight:600">⚠ 필수</span>')
       +     '<select id="cG_m_useType" onchange="cG_onUseTypeChange()" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
       +       '<option value="" selected>— 선택하세요 —</option>'
@@ -6781,15 +6781,35 @@ function cG_buildManualForm(){
       +       '<option value="상업용">상업용 (부가세 포함)</option>'
       +     '</select>'
       +   '</div>'
-      +   '<div>' + lbl('계약체결일') + inp('contractDate', '예: 2026-05-07', 'date') + '</div>'
+      +   '<div>' + lbl('계약정보구분 <span style="color:#B45309;font-weight:600">자동/수정</span>')
+      +     '<select id="cG_m_contractInfo" onchange="this.dataset.userEdit=\'true\'" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
+      +       '<option value="단독계약" selected>단독계약</option>'
+      +       '<option value="공동전차인">공동전차인</option>'
+      +       '<option value="연대보증인">연대보증인</option>'
+      +       '<option value="원상회복담보금">원상회복담보금</option>'
+      +     '</select>'
+      +   '</div>'
+      +   '<div>' + lbl('계약조건 <span style="color:#B45309;font-weight:600">선택</span>')
+      +     '<select id="cG_m_contractTerms" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
+      +       '<option value="" selected>— 선택 —</option>'
+      +       '<option value="SGI보증서">SGI보증서</option>'
+      +       '<option value="SGI보증서+보증금">SGI보증서+보증금</option>'
+      +       '<option value="계약승계">계약승계</option>'
+      +       '<option value="단기계약">단기계약</option>'
+      +       '<option value="보증금계약">보증금계약</option>'
+      +     '</select>'
+      +   '</div>'
       + '</div>'
-      + '<div style="margin-bottom:8px">' + lbl('주소 + 호실') + inp('address', '예: 동두천시 지행동 676 제402호') + '</div>'
-      + grid2(
-          '<div>' + lbl('임대차 시작일')
-          +   '<input type="date" id="cG_m_startDate" oninput="cG_recalcPayDay()" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none">'
-          + '</div>',
-          '<div>' + lbl('임대차 종료일') + inp('endDate', '', 'date') + '</div>'
-        )
+      // 2행: 계약체결일 / 시작일 / 종료일 (3컬럼) — 날짜 그룹
+      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
+      +   '<div>' + lbl('계약체결일') + inp('contractDate', '예: 2026-05-07', 'date') + '</div>'
+      +   '<div>' + lbl('임대차 시작일')
+      +     '<input type="date" id="cG_m_startDate" oninput="cG_recalcPayDay()" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none">'
+      +   '</div>'
+      +   '<div>' + lbl('임대차 종료일') + inp('endDate', '', 'date') + '</div>'
+      + '</div>'
+      // 3행: 주소 + 호실 (full)
+      + '<div>' + lbl('주소 + 호실') + inp('address', '예: 동두천시 지행동 676 제402호') + '</div>'
       )
     // [v179] 임대료 섹션 — 헤더에 합계 표시, 4컬럼(보증금/월세/관리비/서비스수수료비용), payCondition 5옵션 select 복원
     + section('② 임대료 <span id="cG_m_rentTotalLabel" style="font-size:11px;color:#059669;font-weight:600;margin-left:4px"></span>',
@@ -6850,7 +6870,7 @@ function cG_buildManualForm(){
     + section('⑤ 공동임차인 (선택)',
         '<div style="font-size:10.5px;color:#6B7280;margin-bottom:6px">없으면 비워두세요</div>'
       + grid2(
-          '<div>' + lbl('이름') + inp('coName', '예: 최호진') + '</div>',
+          '<div>' + lbl('이름') + '<input type="text" id="cG_m_coName" placeholder="예: 최호진" oninput="cG_autoToggleContractInfo()" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none"></div>',
           '<div>' + lbl('연락처') + inp('coPhone', '010-0000-0000') + '</div>'
         )
       + '<div style="margin-top:8px">' + lbl('주소') + inp('coAddr', '') + '</div>'
@@ -6938,6 +6958,16 @@ function cG_recalcPayDay(){
 function cG_markPayDayEdited(){
   var pdEl = document.getElementById('cG_m_payDay');
   if (pdEl) pdEl.dataset.userEdit = 'true';
+}
+
+// [v195] 공동임차인 이름 입력 → 계약정보구분 자동 '공동전차인'으로 토글
+function cG_autoToggleContractInfo(){
+  var coNameEl = document.getElementById('cG_m_coName');
+  var ciEl = document.getElementById('cG_m_contractInfo');
+  if (!coNameEl || !ciEl) return;
+  if (ciEl.dataset.userEdit === 'true') return; // 사용자 수정 시 덮어쓰지 않음
+  var hasCo = !!(coNameEl.value && coNameEl.value.trim());
+  ciEl.value = hasCo ? '공동전차인' : '단독계약';
 }
 
 // [v188] 계약유형 변경 시 월세 라벨에 (부가세 포함) 표시 추가/제거
@@ -7292,12 +7322,18 @@ function cG_parsePdfText(text){
     var m = secText.match(re);
     return m ? m[1].trim() : '';
   };
-  // [v186] 라벨 + 콜론 뒤 값 추출 — "예금주(임대인명) : 이경훈" 같은 괄호 주석 무시
+  // [v186/v195] 라벨 + 콜론 뒤 값 추출 — "예금주(임대인명) : 이경훈" 같은 괄호 주석 무시
+  // 빈 필드의 경우 다음 라벨까지 캡처되는 버그 방지
+  var LABEL_KEYWORDS = /^(?:이름|주소|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|긴급연락처|관계|월세|보증금|관리비|호실|호실정보|건물|건물공동현관비번)\s*(?:\([^)]*\))?\s*[:：]/;
   var pickField = function(secText, label){
     if (!secText) return '';
     var re = new RegExp(label + '\\s*(?:\\([^)]*\\))?\\s*[:：]\\s*([^\\n]+)');
     var m = secText.match(re);
-    return m ? m[1].trim() : '';
+    if (!m) return '';
+    var v = m[1].trim();
+    // [v195] 캡처값이 다른 라벨로 시작하면 → 빈 값 (원본 필드는 비어있었던 것)
+    if (LABEL_KEYWORDS.test(v)) return '';
+    return v;
   };
   // [v186] 주소 추출 — 원형 숫자/.선두 정리, 한 줄 inline 우선
   var pickAddr = function(secText){
@@ -7684,7 +7720,8 @@ function cG_collectManualData(){
     natType:      '',
     nationality:  v('nationality') || '대한민국',
     useType:      v('useType') || '주거용',  // [v188] 검증은 cG_submit에서 차단
-    contractInfo: v('coName') ? '공동전차인' : '단독계약',
+    contractInfo: v('contractInfo') || (v('coName') ? '공동전차인' : '단독계약'),  // [v195] 사용자 선택 우선
+    contractTerms: v('contractTerms') || '',  // [v195] 계약조건 (SGI보증서 등)
     payCondition: v('payCondition') || '분할',
     address:      v('address'),
     buildingName: '',
