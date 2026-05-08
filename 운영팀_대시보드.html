@@ -7088,6 +7088,8 @@ async function cG_extractPdfText(file){
 
 function cG_parsePdfText(text){
   var data = {};
+  // [v186] 전처리 — 원형 숫자 제거(①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮)
+  text = String(text || '').replace(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]\.?/g, ' ');
   // ── 헬퍼 ──
   // [v183] 날짜 다양 형식 지원: 2026년5월7일 / 2026.5.7 / 2026-5-7 / 2026/5/7
   var parseKDate = function(s){
@@ -7127,27 +7129,38 @@ function cG_parsePdfText(text){
     var m = secText.match(re);
     return m ? m[1].trim() : '';
   };
+  // [v186] 라벨 + 콜론 뒤 값 추출 — "예금주(임대인명) : 이경훈" 같은 괄호 주석 무시
+  var pickField = function(secText, label){
+    if (!secText) return '';
+    var re = new RegExp(label + '\\s*(?:\\([^)]*\\))?\\s*[:：]\\s*([^\\n]+)');
+    var m = secText.match(re);
+    return m ? m[1].trim() : '';
+  };
+  // [v186] 주소 추출 — 원형 숫자/.선두 정리, 한 줄 inline 우선
   var pickAddr = function(secText){
-    // "주소" 다음 줄(들) → 빈 줄/번호항목 만나기 전까지
     if (!secText) return '';
     var lines = secText.split('\n');
     var out = [];
     var collecting = false;
     for (var i = 0; i < lines.length; i++) {
-      var L = lines[i].trim();
+      var Lraw = lines[i].trim();
+      // 선두 "." 제거 (원형숫자 제거 후 잔존하는 마침표)
+      var L = Lraw.replace(/^[\.\s]+/, '').trim();
+      if (!L) { if (collecting) break; continue; }
       if (!collecting) {
-        if (/(?:^|^\d+\)|^주소)\s*(주소|주소\,호실정보|주소\s*$)/.test(L) || /^\d+\)\s*주소\s*$/.test(L) || /^주소\s*$/.test(L) || L.indexOf('주소') === 0) {
+        // "주소" 라벨 — 한 줄에 콜론과 함께 있거나 단독으로 있는 경우
+        var inline = L.match(/주소\s*(?:\([^)]*\))?\s*[:：]\s*(.+)$/);
+        if (inline && inline[1].trim()) { out.push(inline[1].trim()); break; }
+        // 라벨만 단독
+        if (/^주소\s*$/.test(L) || /^주소\s*[:：]\s*$/.test(L)) {
           collecting = true;
-          // 한 줄에 "주소: 값" 형식이면 그 자리에서 추출
-          var inline = L.match(/주소[\s:]+(.+)$/);
-          if (inline && inline[1].trim()) { out.push(inline[1].trim()); break; }
           continue;
         }
       } else {
-        // 다음 번호항목/섹션 만나면 종료
-        if (/^\d+[\.\)]/.test(L) || /^[8-9]\.|^1[0-1]\./.test(L) || L === '') break;
+        // 다음 항목 만나면 종료 (한글 라벨 / 숫자 / 빈 줄)
+        if (/^\d+[\.\)]/.test(L) || /^[가-힣]+\s*[:：]/.test(L)) break;
         out.push(L);
-        if (out.length >= 2) break; // 최대 2줄
+        if (out.length >= 2) break;
       }
     }
     return out.join(' ').trim();
@@ -7199,36 +7212,36 @@ function cG_parsePdfText(text){
   data.payCondition = sfMap[sfRaw] || sfRaw || '';
 
   // [v183] 섹션 앵커는 점·괄호·공백 변형 모두 허용 — "8.임대인정보" / "8) 임대인정보" / "8 임대인 정보" 등
-  // ── 8. 임대인 정보 ──
-  var landlordSec = section(/임대인\s*정보/, /임대인\s*계좌\s*(?:정보|계좌)|임차인\s*정보|공동\s*임차인/);
+  // [v186] 8. 임대인 정보 — pickField 사용 (괄호 주석 무시)
+  var landlordSec = section(/임대인\s*정보/, /(?:임대인\s*)?계좌\s*(?:정보|계좌)|임차인\s*정보|공동\s*임차인/);
   if (landlordSec) {
-    data.landlordName  = pickIn(landlordSec, /이름\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
+    data.landlordName  = pickField(landlordSec, '이름').replace(/\s+/g, ' ').trim();
     data.landlordPhone = pickIn(landlordSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
     data.landlordAddr  = pickAddr(landlordSec);
   }
 
-  // ── 9. 임대인 계좌 ──
-  var acctSec = section(/임대인\s*계좌\s*정보/, /임차인\s*정보|공동\s*임차인/);
+  // [v186] 9. 계좌 정보 — "예금주(임대인명) : 이경훈" 처리
+  var acctSec = section(/(?:임대인\s*)?계좌\s*정보/, /임차인\s*정보|공동\s*임차인/);
   if (acctSec) {
-    data.bank       = pickIn(acctSec, /은행명\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
+    data.bank       = pickField(acctSec, '은행명').replace(/\s+/g, ' ').trim();
     data.account    = pickIn(acctSec, /계좌번호\s*[:：]?\s*([\d\-]+)/);
-    data.acctHolder = pickIn(acctSec, /예금주\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
+    data.acctHolder = pickField(acctSec, '예금주').replace(/\s+/g, ' ').trim();
   }
 
-  // ── 10. 임차인 정보 ──
+  // [v186] 10. 임차인 정보
   var tenantSec = section(/임차인\s*정보/, /공동\s*임차인/);
   if (tenantSec) {
-    data.tenantName  = pickIn(tenantSec, /이름\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
+    data.tenantName  = pickField(tenantSec, '이름').replace(/\s+/g, ' ').trim();
     data.tenantPhone = pickIn(tenantSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
     data.tenantIdNo  = pickIn(tenantSec, /주민등록번호\s*[:：]?\s*([\d\-]+)/);
-    data.nationality = pickIn(tenantSec, /국적\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
+    data.nationality = pickField(tenantSec, '국적').replace(/\s+/g, ' ').trim();
     data.tenantAddr  = pickAddr(tenantSec);
   }
 
-  // ── 11. 공동임차인 ──
+  // [v186] 11. 공동임차인
   var coSec = section(/공동\s*임차인/, null);
   if (coSec) {
-    data.coName  = pickIn(coSec, /이름\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
+    data.coName  = pickField(coSec, '이름').replace(/\s+/g, ' ').trim();
     data.coPhone = pickIn(coSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
     data.coIdNo  = pickIn(coSec, /주민등록번호\s*[:：]?\s*([\d\-]+)/);
     data.coAddr  = pickAddr(coSec);
