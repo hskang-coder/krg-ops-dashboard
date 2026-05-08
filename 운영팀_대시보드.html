@@ -6644,7 +6644,8 @@ function openContractPdfModal(contractNo) {
   if (existing) existing.remove();
   var modal = document.createElement('div');
   modal.id = 'cG_modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:24px 0;overflow-y:auto';
+  // [v198] 초기화면 최상단 출력 — align-items:flex-start + 상단 패딩 축소
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:12px 0 24px;overflow-y:auto';
 
   // [v172] 모드 토글 — 검색발행 OR 수동입력
   // 진입 시 contractNo 있으면 'search', 없으면 'manual' 디폴트
@@ -6690,7 +6691,19 @@ function openContractPdfModal(contractNo) {
     + '<button id="cG_submitBtn" onclick="cG_submit(\'' + (contractNo||'') + '\')" style="padding:9px 22px;background:#1B3976;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">📄 계약서 생성</button>'
     + '</div></div>';
   document.body.appendChild(modal);
+  // [v198] 모달 + 내부 스크롤 위치를 최상단으로 강제 (이전 모달이 스크롤 상태를 남겼을 가능성 차단)
+  try {
+    modal.scrollTop = 0;
+    var inner = modal.firstElementChild;
+    if (inner) inner.scrollTop = 0;
+  } catch(_) {}
   setTimeout(function() {
+    // [v198] setTimeout 내에서도 한 번 더 스크롤 위치 보정
+    try {
+      modal.scrollTop = 0;
+      var inner2 = modal.firstElementChild;
+      if (inner2) inner2.scrollTop = 0;
+    } catch(_) {}
     // [v174] 수동 입력 폼이 노출 중이면 주민번호 마스킹 + 주소 검증 핸들러 부착
     if (initMode === 'manual') {
       cG_attachRrnMask('cG_m_tenantIdNo');
@@ -6704,7 +6717,10 @@ function openContractPdfModal(contractNo) {
       });
     }
     var el = document.getElementById(initMode==='search' ? 'cG_special' : 'cG_m_tenantName');
-    if (el) el.focus();
+    if (el) {
+      // [v198] focus는 하되 — focus가 모달을 스크롤시키는 것을 막기 위해 preventScroll 적용
+      try { el.focus({ preventScroll: true }); } catch(_) { el.focus(); }
+    }
   }, 100);
 }
 
@@ -6740,165 +6756,198 @@ function cG_switchMode(mode, contractNo){
   window._cG_mode = mode;
 }
 
-// [v172/v197] 수동 입력 폼 빌더 — 17개 필드 (5섹션) + [v173] PDF 자동 추출
+// [v172/v197/v198] 수동 입력 폼 빌더 — 17개 필드 (5섹션) + [v173] PDF 자동 추출
 function cG_buildManualForm(){
-  // [v197] 통일 CSS — 모든 입력/select/textarea 동일 높이, 라벨 정렬, 색상 클래스화
+  // [v198] 통일 CSS — 모든 행/입력/라벨/힌트 일관 클래스 적용 (인라인 그리드 제거)
   var styleBlock = '<style>'
-    + '.cG-fld-row{display:grid;gap:8px;margin-bottom:8px}'
-    + '.cG-fld-row.c2{grid-template-columns:1fr 1fr}'
-    + '.cG-fld-row.c3{grid-template-columns:1fr 1fr 1fr}'
-    + '.cG-fld-row.c4{grid-template-columns:1fr 1fr 1fr 1fr}'
-    + '.cG-fld-wrap{display:flex;flex-direction:column;gap:3px}'
-    + '.cG-fld-lbl{font-size:10.5px;font-weight:600;color:#374151;min-height:14px;line-height:1.3;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
-    + '.cG-fld-hint{font-size:9.5px;font-weight:500;color:#B45309}'
-    + '.cG-fld-hint.req{color:#DC2626}'
-    + '.cG-fld{width:100%;height:32px;padding:0 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:12.5px;box-sizing:border-box;outline:none;background:#fff;font-family:inherit;color:#1F2937;transition:border-color .15s}'
-    + '.cG-fld:focus{border-color:#1B3976;box-shadow:0 0 0 2px rgba(27,57,118,.1)}'
-    + 'select.cG-fld{cursor:pointer}'
-    + 'textarea.cG-fld{height:auto;min-height:54px;padding:8px 10px;line-height:1.5;resize:vertical}'
+    + '.cG-form{display:flex;flex-direction:column;gap:14px}'
+    + '.cG-row{display:grid;gap:10px;align-items:end}'
+    + '.cG-row.c1{grid-template-columns:1fr}'
+    + '.cG-row.c2{grid-template-columns:1fr 1fr}'
+    + '.cG-row.c3{grid-template-columns:1fr 1fr 1fr}'
+    + '.cG-row.c4{grid-template-columns:1fr 1fr 1fr 1fr}'
+    + '.cG-row.bank{grid-template-columns:1fr 1.3fr 1fr}'
+    + '.cG-row.id-nat{grid-template-columns:1.3fr 1fr}'
+    + '.cG-cell{display:flex;flex-direction:column;gap:4px;min-width:0}'
+    + '.cG-lbl{font-size:10.5px;font-weight:700;color:#374151;line-height:1.25;display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:15px}'
+    + '.cG-hint{font-size:9.5px;font-weight:500;padding:1px 6px;border-radius:3px;line-height:1.2;flex-shrink:0}'
+    + '.cG-hint.req{color:#fff;background:#DC2626}'
+    + '.cG-hint.warn{color:#fff;background:#F59E0B}'
+    + '.cG-hint.auto{color:#065F46;background:#D1FAE5;font-weight:600}'
+    + '.cG-hint.opt{color:#6B7280;background:#F3F4F6}'
+    + '.cG-fld{width:100%;height:34px;padding:0 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:12.5px;box-sizing:border-box;outline:none;background:#fff;font-family:inherit;color:#1F2937;transition:border-color .15s,box-shadow .15s}'
+    + '.cG-fld:focus{border-color:#1B3976;box-shadow:0 0 0 2px rgba(27,57,118,.12)}'
+    + 'select.cG-fld{cursor:pointer;padding-right:26px}'
+    + 'textarea.cG-fld{height:auto;min-height:60px;padding:9px 11px;line-height:1.5;resize:vertical}'
     + '.cG-fld.cG-warn{border:1.5px solid #F59E0B;background:#FEF3C7;font-weight:700;color:#78350F}'
     + '.cG-fld.cG-required{border:1.5px solid #DC2626;background:#FEE2E2;font-weight:700;color:#991B1B}'
     + '.cG-fld.cG-info{border:1.5px solid #10B981;background:#F0FDF4}'
     + '.cG-fld.cG-auto{background:#F0FDF4;border:1px solid #86EFAC}'
-    + '.cG-section{margin-bottom:14px}'
-    + '.cG-section-ttl{font-size:12px;font-weight:800;color:#1B3976;margin-bottom:8px;padding-bottom:5px;border-bottom:1.5px solid #E5E7EB;display:flex;align-items:center;gap:6px}'
+    + '.cG-sec{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:14px 16px}'
+    + '.cG-sec-ttl{font-size:12.5px;font-weight:800;color:#1B3976;margin:0 0 10px;padding-bottom:7px;border-bottom:1.5px solid #E5E7EB;display:flex;align-items:center;gap:6px}'
+    + '.cG-sec-sub{font-size:10.5px;color:#6B7280;margin:-4px 0 8px}'
+    + '.cG-pdf-box{background:#F5F3FF;border:1.5px dashed #C4B5FD;border-radius:8px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px}'
+    + '.cG-pdf-ttl{font-size:12px;font-weight:800;color:#5B21B6}'
+    + '.cG-pdf-desc{font-size:10.5px;color:#6B7280;margin-top:3px}'
+    + '.cG-pdf-btn{padding:9px 18px;background:#7C3AED;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700;white-space:nowrap}'
+    + '.cG-info-box{background:#F0F4FF;border-radius:6px;padding:8px 12px;font-size:10.5px;color:#374151;line-height:1.6;margin-top:8px}'
+    + '.cG-tip{background:#FEF3C7;border-left:4px solid #F59E0B;border-radius:6px;padding:10px 14px;font-size:11.5px;color:#78350F;line-height:1.6;margin-top:6px}'
+    + '.cG-extra{border-top:1px dashed #d1d5db;padding-top:14px;margin-top:6px}'
+    + '.cG-extra-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}'
+    + '.cG-extra-ttl{font-size:12px;font-weight:700;color:#1B3976}'
+    + '.cG-extra-btn{padding:7px 13px;background:#7C3AED;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700}'
     + '</style>';
-  // 통일 헬퍼
-  var inp = function(id, ph, type, w){
-    return '<input type="' + (type||'text') + '" id="cG_m_' + id + '" placeholder="' + (ph||'') + '" class="cG-fld">';
+  // [v198] 통일 헬퍼
+  var H = {
+    req:  '<span class="cG-hint req">필수</span>',
+    warn: '<span class="cG-hint warn">확인</span>',
+    auto: '<span class="cG-hint auto">자동</span>',
+    opt:  '<span class="cG-hint opt">선택</span>'
   };
-  var lbl = function(text){ return '<label style="display:block;font-size:10.5px;font-weight:700;color:#374151;margin-bottom:3px">' + text + '</label>'; };
-  var section = function(title, body){ return '<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:800;color:#1B3976;margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid #E5E7EB">' + title + '</div>' + body + '</div>'; };
-  var grid2 = function(a, b){ return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + a + b + '</div>'; };
+  // 입력 필드 (기본값/타입 지정 가능)
+  var inp = function(id, ph, type, extraCls){
+    return '<input type="' + (type||'text') + '" id="cG_m_' + id + '" placeholder="' + (ph||'') + '" class="cG-fld' + (extraCls?' '+extraCls:'') + '">';
+  };
+  // [label] + [input] 셀
+  var cell = function(label, fieldHtml){
+    return '<div class="cG-cell"><label class="cG-lbl">' + label + '</label>' + fieldHtml + '</div>';
+  };
+  // 행 헬퍼
+  var row = function(cls /*, ...cells */){
+    var args = Array.prototype.slice.call(arguments, 1);
+    return '<div class="cG-row ' + cls + '">' + args.join('') + '</div>';
+  };
+  // 섹션 헬퍼
+  var section = function(title, body){
+    return '<div class="cG-sec"><div class="cG-sec-ttl">' + title + '</div>' + body + '</div>';
+  };
   var html = ''
     + styleBlock
-    // [v173] PDF 자동 추출 영역
-    // [v182] PDF뿐 아니라 TXT/DOC/DOCX도 지원
-    + '<div style="background:#F5F3FF;border:1.5px dashed #C4B5FD;border-radius:8px;padding:12px 14px;margin-bottom:14px">'
-    +   '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
-    +     '<div>'
-    +       '<div style="font-size:12px;font-weight:800;color:#5B21B6">📎 파일로 자동 채우기 (PDF · TXT · DOCX)</div>'
-    +       '<div style="font-size:10.5px;color:#6B7280;margin-top:3px">「계약 필수 정보」 파일을 업로드하면 17개 필드가 자동 추출됩니다.</div>'
-    +     '</div>'
-    +     '<div>'
-    +       '<input type="file" id="cG_m_pdfFile" accept=".pdf,.txt,.doc,.docx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="cG_handlePdfUpload(this)">'
-    +       '<button type="button" onclick="document.getElementById(\'cG_m_pdfFile\').click()" style="padding:8px 16px;background:#7C3AED;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700;white-space:nowrap">파일 선택</button>'
-    +     '</div>'
+    + '<div class="cG-form">'
+    // [v173/v182] PDF/TXT/DOCX 자동 추출 영역
+    + '<div class="cG-pdf-box">'
+    +   '<div>'
+    +     '<div class="cG-pdf-ttl">📎 파일로 자동 채우기 (PDF · TXT · DOCX)</div>'
+    +     '<div class="cG-pdf-desc">「계약 필수 정보」 파일을 업로드하면 17개 필드가 자동 추출됩니다.</div>'
     +   '</div>'
-    +   '<div id="cG_m_pdfStatus" style="font-size:10.5px;margin-top:6px;display:none"></div>'
+    +   '<div>'
+    +     '<input type="file" id="cG_m_pdfFile" accept=".pdf,.txt,.doc,.docx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="cG_handlePdfUpload(this)">'
+    +     '<button type="button" onclick="document.getElementById(\'cG_m_pdfFile\').click()" class="cG-pdf-btn">파일 선택</button>'
+    +   '</div>'
     + '</div>'
-    // [v176] 특약사항 — PDF 업로드 영역 바로 아래로 이동
+    + '<div id="cG_m_pdfStatus" style="font-size:10.5px;display:none"></div>'
+    // [v176] 특약사항
     + section('📌 특약사항',
         '<textarea id="cG_m_specialNotes" rows="3" placeholder="추가 특약 내용을 입력하세요 (없으면 비워두세요)" class="cG-fld"></textarea>'
-      + '<div style="background:#F0F4FF;border-radius:6px;padding:8px 12px;font-size:10.5px;color:#374151;line-height:1.6;margin-top:6px">'
-      + '<b>📋 자동 추가:</b> 납부조건별 고정 특약 + 공동전차인/연대보증인 위약금 조항 자동 삽입 (직접 입력한 내용은 위에 추가됨)'
-      + '</div>'
+      + '<div class="cG-info-box"><b>📋 자동 추가:</b> 납부조건별 고정 특약 + 공동전차인/연대보증인 위약금 조항 자동 삽입 (직접 입력한 내용은 위에 추가됨)</div>'
       )
+    // ① 계약 기본
     + section('① 계약 기본',
-        // [v195/v196] 1행: 계약유형 / 계약정보구분 / 계약조건 (3컬럼) — 노란 음영 셀렉트 그룹화
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
-      +   '<div>' + lbl('계약유형 <span style="color:#DC2626;font-weight:600">⚠ 필수</span>')
-      +     '<select id="cG_m_useType" onchange="cG_onUseTypeChange()" class="cG-fld cG-warn">'
-      +       '<option value="" selected>— 선택하세요 —</option>'
-      +       '<option value="주거용">주거용</option>'
-      +       '<option value="상업용">상업용 (부가세 포함)</option>'
-      +     '</select>'
-      +   '</div>'
-      +   '<div>' + lbl('계약정보구분 <span style="color:#B45309;font-weight:600">자동/수정</span>')
-      +     '<select id="cG_m_contractInfo" onchange="this.dataset.userEdit=\'true\'" class="cG-fld cG-warn">'
-      +       '<option value="단독계약" selected>단독계약</option>'
-      +       '<option value="공동전차인">공동전차인</option>'
-      +       '<option value="연대보증인">연대보증인</option>'
-      +       '<option value="원상회복담보금">원상회복담보금</option>'
-      +     '</select>'
-      +   '</div>'
-      +   '<div>' + lbl('계약조건 <span style="color:#B45309;font-weight:600">선택</span>')
-      +     '<select id="cG_m_contractTerms" class="cG-fld cG-warn">'
-      +       '<option value="" selected>— 선택 —</option>'
-      +       '<option value="SGI보증서">SGI보증서</option>'
-      +       '<option value="SGI보증서+보증금">SGI보증서+보증금</option>'
-      +       '<option value="계약승계">계약승계</option>'
-      +       '<option value="단기계약">단기계약</option>'
-      +       '<option value="보증금계약">보증금계약</option>'
-      +     '</select>'
-      +   '</div>'
-      + '</div>'
-      // 2행: 계약체결일 / 시작일 / 종료일 (3컬럼) — 날짜 그룹
-      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
-      +   '<div>' + lbl('계약체결일') + inp('contractDate', '예: 2026-05-07', 'date') + '</div>'
-      +   '<div>' + lbl('임대차 시작일')
-      +     '<input type="date" id="cG_m_startDate" oninput="cG_recalcPayDay()" class="cG-fld">'
-      +   '</div>'
-      +   '<div>' + lbl('임대차 종료일') + inp('endDate', '', 'date') + '</div>'
-      + '</div>'
-      // 3행: 주소 + 호실 (full)
-      + '<div>' + lbl('주소 + 호실') + inp('address', '예: 동두천시 지행동 676 제402호') + '</div>'
+        // [v195/v196] 1행: 계약유형 / 계약정보구분 / 계약조건
+        row('c3',
+          cell('계약유형 ' + H.req,
+            '<select id="cG_m_useType" onchange="cG_onUseTypeChange()" class="cG-fld cG-warn">'
+            + '<option value="" selected>— 선택하세요 —</option>'
+            + '<option value="주거용">주거용</option>'
+            + '<option value="상업용">상업용 (부가세 포함)</option>'
+            + '</select>'),
+          cell('계약정보구분 ' + H.auto,
+            '<select id="cG_m_contractInfo" onchange="this.dataset.userEdit=\'true\'" class="cG-fld cG-warn">'
+            + '<option value="단독계약" selected>단독계약</option>'
+            + '<option value="공동전차인">공동전차인</option>'
+            + '<option value="연대보증인">연대보증인</option>'
+            + '<option value="원상회복담보금">원상회복담보금</option>'
+            + '</select>'),
+          cell('계약조건 ' + H.opt,
+            '<select id="cG_m_contractTerms" class="cG-fld cG-warn">'
+            + '<option value="" selected>— 선택 —</option>'
+            + '<option value="SGI보증서">SGI보증서</option>'
+            + '<option value="SGI보증서+보증금">SGI보증서+보증금</option>'
+            + '<option value="계약승계">계약승계</option>'
+            + '<option value="단기계약">단기계약</option>'
+            + '<option value="보증금계약">보증금계약</option>'
+            + '</select>')
+        )
+      // 2행: 날짜 3개
+      + row('c3',
+          cell('계약체결일', inp('contractDate', '', 'date')),
+          cell('임대차 시작일 ' + H.req,
+            '<input type="date" id="cG_m_startDate" oninput="cG_recalcPayDay()" class="cG-fld">'),
+          cell('임대차 종료일 ' + H.req, inp('endDate', '', 'date'))
+        )
+      // 3행: 주소
+      + row('c1',
+          cell('주소 + 호실 ' + H.req, inp('address', '예: 동두천시 지행동 676 제402호'))
+        )
       )
-    // [v179] 임대료 섹션 — 헤더에 합계 표시, 4컬럼(보증금/월세/관리비/서비스수수료비용), payCondition 5옵션 select 복원
+    // ② 임대료
     + section('② 임대료 <span id="cG_m_rentTotalLabel" style="font-size:11px;color:#059669;font-weight:600;margin-left:4px"></span>',
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
-        +   '<div>' + lbl('보증금') + inp('deposit', '0', 'number') + '</div>'
-        +   '<div>' + lbl('월세')
-        +     '<input type="number" id="cG_m_rent" placeholder="600000" oninput="cG_recalcServiceFee()" class="cG-fld">'
-        +   '</div>'
-        +   '<div>' + lbl('고정관리비')
-        +     '<input type="number" id="cG_m_mgmtFee" placeholder="50000" oninput="cG_recalcServiceFee()" class="cG-fld">'
-        +   '</div>'
-        +   '<div>' + lbl('서비스수수료 <span style="color:#B45309;font-weight:600">자동/수정</span>')
-        +     '<input type="number" id="cG_m_serviceFee" placeholder="자동 계산" oninput="cG_markServiceFeeEdited()" class="cG-fld cG-warn">'
-        +   '</div>'
-        + '</div>'
-      // [v185] grid3 — 납입형태 / 월세납입일 / 수수료구분
-      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
-      +   '<div>' + lbl('월세 납입형태')
-      +     '<select id="cG_m_payMethod" class="cG-fld">'
-      +       '<option value="선불" selected>선불</option><option value="후불">후불</option>'
-      +     '</select></div>'
-      +   '<div>' + lbl('월세 납입일 <span style="color:#6B7280;font-weight:500;font-size:10px">자동/수정</span>')
-      +     '<input type="text" id="cG_m_payDay" placeholder="시작일 입력 시 자동" oninput="cG_markPayDayEdited()" class="cG-fld cG-auto">'
-      +   '</div>'
-      +   '<div>' + lbl('서비스 수수료 구분 <span style="color:#B45309;font-weight:600">⚠ 직접 확인</span>')
-      +     '<select id="cG_m_payCondition" onchange="cG_recalcServiceFee()" class="cG-fld cG-warn">'
-      +       '<option value="분할" selected>분할</option>'
-      +       '<option value="일시납">일시납</option>'
-      +       '<option value="비용포함">비용포함</option>'
-      +       '<option value="수수료별도">수수료별도</option>'
-      +       '<option value="수수료포함">수수료포함</option>'
-      +     '</select></div>'
-      + '</div>'
+        row('c4',
+          cell('보증금', inp('deposit', '0', 'number')),
+          cell('월세 ' + H.req,
+            '<input type="number" id="cG_m_rent" placeholder="600000" oninput="cG_recalcServiceFee()" class="cG-fld">'),
+          cell('고정관리비',
+            '<input type="number" id="cG_m_mgmtFee" placeholder="50000" oninput="cG_recalcServiceFee()" class="cG-fld">'),
+          cell('서비스수수료 ' + H.auto,
+            '<input type="number" id="cG_m_serviceFee" placeholder="자동 계산" oninput="cG_markServiceFeeEdited()" class="cG-fld cG-warn">')
+        )
+      + row('c3',
+          cell('월세 납입형태',
+            '<select id="cG_m_payMethod" class="cG-fld">'
+            + '<option value="선불" selected>선불</option><option value="후불">후불</option>'
+            + '</select>'),
+          cell('월세 납입일 ' + H.auto,
+            '<input type="text" id="cG_m_payDay" placeholder="시작일 입력 시 자동" oninput="cG_markPayDayEdited()" class="cG-fld cG-auto">'),
+          cell('서비스 수수료 구분 ' + H.warn,
+            '<select id="cG_m_payCondition" onchange="cG_recalcServiceFee()" class="cG-fld cG-warn">'
+            + '<option value="분할" selected>분할</option>'
+            + '<option value="일시납">일시납</option>'
+            + '<option value="비용포함">비용포함</option>'
+            + '<option value="수수료별도">수수료별도</option>'
+            + '<option value="수수료포함">수수료포함</option>'
+            + '</select>')
+        )
       )
+    // ③ 임대인 정보
     + section('③ 임대인 정보',
-        grid2(
-          '<div>' + lbl('이름') + inp('landlordName', '예: 조영준') + '</div>',
-          '<div>' + lbl('연락처') + inp('landlordPhone', '010-0000-0000') + '</div>'
+        row('c2',
+          cell('이름', inp('landlordName', '예: 조영준')),
+          cell('연락처', inp('landlordPhone', '010-0000-0000'))
         )
-      + '<div style="margin-top:8px">' + lbl('주소') + inp('landlordAddr', '예: 의정부시 호국로 1303 104동 302호') + '</div>'
-      + '<div style="display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:8px;margin-top:8px">'
-      +   '<div>' + lbl('은행명') + inp('bank', '예: 우리은행') + '</div>'
-      +   '<div>' + lbl('계좌번호') + inp('account', '예: 1002-337-026032') + '</div>'
-      +   '<div>' + lbl('예금주') + inp('acctHolder', '예: 조영준') + '</div>'
-      + '</div>'
+      + row('c1',
+          cell('주소', inp('landlordAddr', '예: 의정부시 호국로 1303 104동 302호'))
+        )
+      + row('bank',
+          cell('은행명', inp('bank', '예: 우리은행')),
+          cell('계좌번호', inp('account', '예: 1002-337-026032')),
+          cell('예금주', inp('acctHolder', '예: 조영준'))
+        )
       )
+    // ④ 임차인 정보
     + section('④ 임차인 정보',
-        grid2(
-          '<div>' + lbl('이름') + inp('tenantName', '예: 석지연') + '</div>',
-          '<div>' + lbl('연락처') + inp('tenantPhone', '010-0000-0000') + '</div>'
+        row('c2',
+          cell('이름 ' + H.req, inp('tenantName', '예: 석지연')),
+          cell('연락처 ' + H.req, inp('tenantPhone', '010-0000-0000'))
         )
-      + '<div style="margin-top:8px">' + lbl('주소') + inp('tenantAddr', '주소 전체') + '</div>'
-      + '<div style="display:grid;grid-template-columns:1.3fr 1fr;gap:8px;margin-top:8px">'
-      +   '<div>' + lbl('주민등록번호') + inp('tenantIdNo', '000000-0000000') + '</div>'
-      +   '<div>' + lbl('국적') + inp('nationality', '대한민국') + '</div>'
-      + '</div>'
+      + row('c1',
+          cell('주소 ' + H.req, inp('tenantAddr', '주소 전체'))
+        )
+      + row('id-nat',
+          cell('주민등록번호 ' + H.req, inp('tenantIdNo', '000000-0000000')),
+          cell('국적', inp('nationality', '대한민국'))
+        )
       )
+    // ⑤ 공동임차인 (선택)
     + section('⑤ 공동임차인 (선택)',
-        '<div style="font-size:10.5px;color:#6B7280;margin-bottom:6px">없으면 비워두세요</div>'
-      + grid2(
-          '<div>' + lbl('이름') + '<input type="text" id="cG_m_coName" placeholder="예: 최호진" oninput="cG_autoToggleContractInfo()" class="cG-fld"></div>',
-          '<div>' + lbl('연락처') + inp('coPhone', '010-0000-0000') + '</div>'
+        '<div class="cG-sec-sub">없으면 비워두세요</div>'
+      + row('c2',
+          cell('이름', '<input type="text" id="cG_m_coName" placeholder="예: 최호진" oninput="cG_autoToggleContractInfo()" class="cG-fld">'),
+          cell('연락처', inp('coPhone', '010-0000-0000'))
         )
-      + '<div style="margin-top:8px">' + lbl('주소') + inp('coAddr', '') + '</div>'
-      + '<div style="margin-top:8px">' + lbl('주민등록번호') + inp('coIdNo', '000000-0000000') + '</div>'
+      + row('c1', cell('주소', inp('coAddr', '')))
+      + row('c1', cell('주민등록번호', inp('coIdNo', '000000-0000000')))
       )
+    + '</div>'
     // [v181] 추가 계약자 (공동명의계약인/연대보증인) — 검색 모드와 동일
     + '<div style="border-top:1px dashed #d1d5db;padding-top:12px;margin:12px 0">'
     +   '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
