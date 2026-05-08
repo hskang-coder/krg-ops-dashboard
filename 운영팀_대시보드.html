@@ -7045,11 +7045,21 @@ async function cG_extractPdfText(file){
 function cG_parsePdfText(text){
   var data = {};
   // ── 헬퍼 ──
+  // [v183] 날짜 다양 형식 지원: 2026년5월7일 / 2026.5.7 / 2026-5-7 / 2026/5/7
   var parseKDate = function(s){
     if (!s) return '';
+    // 1) 한글
     var x = s.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
-    if (!x) return '';
-    return x[1] + '-' + String(+x[2]).padStart(2,'0') + '-' + String(+x[3]).padStart(2,'0');
+    if (x) return x[1] + '-' + String(+x[2]).padStart(2,'0') + '-' + String(+x[3]).padStart(2,'0');
+    // 2) 점/하이픈/슬래시 구분
+    var y = s.match(/(\d{4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/);
+    if (y) return y[1] + '-' + String(+y[2]).padStart(2,'0') + '-' + String(+y[3]).padStart(2,'0');
+    return '';
+  };
+  // [v183] 한 줄에서 날짜만 추출 (포맷 무관)
+  var matchAnyDate = function(re){
+    var m = text.match(re);
+    return m ? parseKDate(m[1]) : '';
   };
   var parseAmt = function(s){
     if (!s) return 0;
@@ -7099,16 +7109,16 @@ function cG_parsePdfText(text){
     return out.join(' ').trim();
   };
 
-  // ── 1. 계약체결일 ──
-  var dt = text.match(/계약\s*체결\s*일\s*[:：]?\s*(\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일)/);
-  data.contractDate = dt ? parseKDate(dt[1]) : '';
+  // [v183] 1. 계약체결일 — 한글/점/하이픈/슬래시 모두 지원
+  data.contractDate = matchAnyDate(/계약\s*체결\s*일\s*[:：]?\s*(\d{4}[\s년.\-\/]+\d{1,2}[\s월.\-\/]+\d{1,2}\s*일?)/);
 
-  // ── 3. 주소, 호실정보 ──
-  var addrSec = text.match(/주소[,，]?\s*호실정보\s*\n([^\n]+)/);
+  // [v183] 3. 주소, 호실정보 — 콜론 형식도 허용
+  var addrSec = text.match(/주소[,，·]?\s*호실(?:정보)?\s*[:：]?\s*\n?\s*([^\n]+)/);
+  if (!addrSec) addrSec = text.match(/주소\s*[:：]\s*([^\n]+)/);
   data.address = addrSec ? addrSec[1].trim() : '';
 
-  // ── 4. 임대차계약기간 ──
-  var rng = text.match(/임대차\s*계약\s*기간\s*[:：]?\s*(\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일)\s*~\s*(\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일)/);
+  // [v183] 4. 임대차계약기간 — 다양 날짜 포맷
+  var rng = text.match(/임대차\s*계약\s*기간\s*[:：]?\s*([\d년월일.\-\/\s]+?)\s*~\s*([\d년월일.\-\/\s]+?)(?:[\n,]|$)/);
   if (rng) {
     data.startDate = parseKDate(rng[1]);
     data.endDate = parseKDate(rng[2]);
@@ -7126,8 +7136,9 @@ function cG_parsePdfText(text){
   var sfMap = { '분납':'분할','분할':'분할','일시납':'일시납','일시불':'일시납','비용포함':'비용포함','수수료별도':'수수료별도','수수료포함':'수수료포함' };
   data.payCondition = sfMap[sfRaw] || sfRaw || '';
 
+  // [v183] 섹션 앵커는 점·괄호·공백 변형 모두 허용 — "8.임대인정보" / "8) 임대인정보" / "8 임대인 정보" 등
   // ── 8. 임대인 정보 ──
-  var landlordSec = section(/임대인\s*정보/, /임대인\s*계좌\s*정보|임차인\s*정보|공동\s*임차인/);
+  var landlordSec = section(/임대인\s*정보/, /임대인\s*계좌\s*(?:정보|계좌)|임차인\s*정보|공동\s*임차인/);
   if (landlordSec) {
     data.landlordName  = pickIn(landlordSec, /이름\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
     data.landlordPhone = pickIn(landlordSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
@@ -7280,10 +7291,15 @@ async function cG_handlePdfUpload(input){
   try {
     var text = await cG_extractTextFromFile(file);
     if (!text || !text.trim()) throw new Error('파일에서 텍스트를 추출할 수 없습니다');
+    // [v183] 추출된 원문 — 디버그용 전역 보관
+    window._cG_lastExtractedText = text;
     var data = cG_parsePdfText(text);
     var stat = cG_applyParsedData(data);
     if (status) {
-      status.innerHTML = '✅ ' + fileLabel + ' 자동 채우기 완료 — 핵심 ' + stat.filled + '/' + stat.total + '개 필드 추출됨. 비어있는 필드는 직접 입력해주세요.';
+      var hint = stat.filled < stat.total
+        ? ' <button type="button" onclick="cG_showExtractedText()" style="margin-left:6px;padding:3px 9px;background:#fff;border:1px solid #C4B5FD;color:#5B21B6;border-radius:4px;cursor:pointer;font-size:10.5px;font-weight:700">🔍 원문 보기</button>'
+        : '';
+      status.innerHTML = '✅ ' + fileLabel + ' 자동 채우기 완료 — 핵심 ' + stat.filled + '/' + stat.total + '개 필드 추출됨. 비어있는 필드는 직접 입력해주세요.' + hint;
       status.style.color = '#065F46';
     }
   } catch(e) {
@@ -7317,11 +7333,34 @@ function cG_openTextPasteFallback(){
   setTimeout(function(){ var t = document.getElementById('cG_pasteText'); if (t) t.focus(); }, 100);
 }
 
+// [v183] 추출된 원문 텍스트 미리보기 — 파서 디버그
+function cG_showExtractedText(){
+  var t = window._cG_lastExtractedText || '';
+  if (!t) { alert('추출된 텍스트가 없습니다'); return; }
+  var existing = document.getElementById('cG_debugModal');
+  if (existing) existing.remove();
+  var d = document.createElement('div');
+  d.id = 'cG_debugModal';
+  d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10002;display:flex;align-items:center;justify-content:center;padding:20px';
+  d.innerHTML = '<div style="background:#fff;border-radius:12px;padding:22px 24px;width:680px;max-width:94vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    +   '<div style="font-size:14px;font-weight:800;color:#1B3976">🔍 추출된 원문 (디버그)</div>'
+    +   '<button onclick="document.getElementById(\'cG_debugModal\').remove()" style="background:#fff;border:1px solid #D1D5DB;border-radius:5px;width:28px;height:28px;cursor:pointer">✕</button>'
+    + '</div>'
+    + '<div style="font-size:11px;color:#6B7280;margin-bottom:8px">파서가 받은 텍스트입니다. 빈 필드의 라벨이 여기 보이는지 확인하면 어디가 어긋났는지 알 수 있습니다.</div>'
+    + '<textarea readonly style="flex:1;min-height:380px;border:1px solid #E5E7EB;border-radius:6px;padding:10px;font-size:11.5px;font-family:Menlo,monospace;line-height:1.6;background:#FAFBFC;outline:none">' + String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">'
+    +   '<button onclick="navigator.clipboard.writeText(window._cG_lastExtractedText||\'\').then(function(){alert(\'클립보드 복사 완료\')})" style="padding:7px 14px;border:1px solid #C4B5FD;background:#fff;color:#5B21B6;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">📋 복사</button>'
+    + '</div></div>';
+  document.body.appendChild(d);
+}
+
 function cG_processPastedText(){
   var ta = document.getElementById('cG_pasteText');
   if (!ta || !ta.value.trim()) { alert('텍스트를 붙여넣어주세요.'); return; }
   var status = document.getElementById('cG_m_pdfStatus');
   try {
+    window._cG_lastExtractedText = ta.value; // [v183] 디버그용
     var data = cG_parsePdfText(ta.value);
     var stat = cG_applyParsedData(data);
     var pm = document.getElementById('cG_pasteModal');
