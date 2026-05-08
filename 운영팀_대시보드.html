@@ -6707,14 +6707,15 @@ function cG_buildManualForm(){
   var grid2 = function(a, b){ return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + a + b + '</div>'; };
   var html = ''
     // [v173] PDF 자동 추출 영역
+    // [v182] PDF뿐 아니라 TXT/DOC/DOCX도 지원
     + '<div style="background:#F5F3FF;border:1.5px dashed #C4B5FD;border-radius:8px;padding:12px 14px;margin-bottom:14px">'
     +   '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
     +     '<div>'
-    +       '<div style="font-size:12px;font-weight:800;color:#5B21B6">📎 PDF로 자동 채우기</div>'
-    +       '<div style="font-size:10.5px;color:#6B7280;margin-top:3px">「계약 필수 정보」 PDF 파일을 업로드하면 17개 필드가 자동 추출됩니다.</div>'
+    +       '<div style="font-size:12px;font-weight:800;color:#5B21B6">📎 파일로 자동 채우기 (PDF · TXT · DOCX)</div>'
+    +       '<div style="font-size:10.5px;color:#6B7280;margin-top:3px">「계약 필수 정보」 파일을 업로드하면 17개 필드가 자동 추출됩니다.</div>'
     +     '</div>'
     +     '<div>'
-    +       '<input type="file" id="cG_m_pdfFile" accept="application/pdf" style="display:none" onchange="cG_handlePdfUpload(this)">'
+    +       '<input type="file" id="cG_m_pdfFile" accept=".pdf,.txt,.doc,.docx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="cG_handlePdfUpload(this)">'
     +       '<button type="button" onclick="document.getElementById(\'cG_m_pdfFile\').click()" style="padding:8px 16px;background:#7C3AED;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700;white-space:nowrap">파일 선택</button>'
     +     '</div>'
     +   '</div>'
@@ -6797,6 +6798,15 @@ function cG_buildManualForm(){
       + '<div style="margin-top:8px">' + lbl('주소') + inp('coAddr', '') + '</div>'
       + '<div style="margin-top:8px">' + lbl('주민등록번호') + inp('coIdNo', '000000-0000000') + '</div>'
       )
+    // [v181] 추가 계약자 (공동명의계약인/연대보증인) — 검색 모드와 동일
+    + '<div style="border-top:1px dashed #d1d5db;padding-top:12px;margin:12px 0">'
+    +   '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    +     '<label style="font-size:12px;font-weight:700;color:#1B3976">👥 계약자 추가 (선택사항)</label>'
+    +     '<button type="button" onclick="addExtraParty()" style="padding:6px 12px;background:#7C3AED;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700">+ 계약자추가</button>'
+    +   '</div>'
+    +   '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">공동명의계약인 또는 연대보증인을 추가하면 계약서의 "기타 공동계약자" 영역에 자동 입력됩니다.</div>'
+    +   '<div id="cG_extraList_manual"></div>'
+    + '</div>'
     // [v176] 특약사항은 PDF 업로드 영역 아래로 이동됨 (위 참조)
     + '<div style="background:#FEF3C7;border-left:4px solid #F59E0B;border-radius:6px;padding:10px 14px;font-size:11.5px;color:#78350F;line-height:1.7;margin-top:6px">'
     +   '<b>💡 발행 후:</b> PDF 출력 + "시트 입력용 TSV" 자동 클립보드 복사 → 운영 시트 적절한 행에 붙여넣기로 보관 가능'
@@ -7215,31 +7225,74 @@ function cG_applyParsedData(data){
   return { total: fields.length, filled: filled };
 }
 
-// [v173] PDF 파일 업로드 핸들러 — 추출 + 폼 자동 채우기
+// [v182] mammoth.js 동적 로드 (DOCX 텍스트 추출용)
+async function cG_loadMammoth(){
+  if (window.mammoth) return;
+  return new Promise(function(resolve, reject){
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+    s.onload = function(){ resolve(); };
+    s.onerror = function(){ reject(new Error('mammoth.js 로드 실패')); };
+    document.head.appendChild(s);
+  });
+}
+
+// [v182] 파일 → 텍스트 추출 (PDF / TXT / DOCX 자동 분기)
+async function cG_extractTextFromFile(file){
+  var name = (file.name || '').toLowerCase();
+  // TXT
+  if (name.endsWith('.txt') || file.type === 'text/plain') {
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){ resolve(String(reader.result||'')); };
+      reader.onerror = function(){ reject(new Error('텍스트 파일 읽기 실패')); };
+      reader.readAsText(file, 'UTF-8');
+    });
+  }
+  // DOCX
+  if (name.endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    await cG_loadMammoth();
+    var buf = await file.arrayBuffer();
+    var result = await window.mammoth.extractRawText({ arrayBuffer: buf });
+    return String((result && result.value) || '');
+  }
+  // DOC (구 워드) — 미지원 안내
+  if (name.endsWith('.doc')) {
+    throw new Error('구 .doc 형식은 지원하지 않습니다. .docx 또는 .pdf 로 변환 후 다시 시도해주세요');
+  }
+  // 기본: PDF
+  return await cG_extractPdfText(file);
+}
+
+// [v173/v182] 파일 업로드 핸들러 — 추출 + 폼 자동 채우기 (PDF/TXT/DOCX)
 async function cG_handlePdfUpload(input){
   var file = input.files && input.files[0];
   if (!file) return;
   var status = document.getElementById('cG_m_pdfStatus');
+  var name = file.name || '';
+  var ext = name.split('.').pop().toLowerCase();
+  var fileLabel = ext === 'pdf' ? 'PDF' : (ext === 'txt' ? 'TXT' : (ext === 'docx' ? 'DOCX' : ext.toUpperCase()));
   if (status) {
     status.style.display = 'block';
-    status.innerHTML = '⏳ PDF 분석 중...';
+    status.innerHTML = '⏳ ' + fileLabel + ' 분석 중...';
     status.style.color = '#7C3AED';
   }
   try {
-    var text = await cG_extractPdfText(file);
+    var text = await cG_extractTextFromFile(file);
+    if (!text || !text.trim()) throw new Error('파일에서 텍스트를 추출할 수 없습니다');
     var data = cG_parsePdfText(text);
     var stat = cG_applyParsedData(data);
     if (status) {
-      status.innerHTML = '✅ 자동 채우기 완료 — 핵심 ' + stat.filled + '/' + stat.total + '개 필드 추출됨. 비어있는 필드는 직접 입력해주세요.';
+      status.innerHTML = '✅ ' + fileLabel + ' 자동 채우기 완료 — 핵심 ' + stat.filled + '/' + stat.total + '개 필드 추출됨. 비어있는 필드는 직접 입력해주세요.';
       status.style.color = '#065F46';
     }
   } catch(e) {
-    console.error('[v178] PDF parse error:', e, e && e.stack);
+    console.error('[v182] file parse error:', e, e && e.stack);
     if (status) {
       var detail = (e && (e.message || e.name)) || '알 수 없는 오류';
-      status.innerHTML = '⚠ PDF 분석 실패: ' + detail + '<br>'
+      status.innerHTML = '⚠ ' + fileLabel + ' 분석 실패: ' + detail + '<br>'
         + '<button type="button" onclick="cG_openTextPasteFallback()" style="margin-top:6px;padding:6px 12px;background:#7C3AED;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">📋 텍스트 붙여넣기로 시도</button>'
-        + '<span style="color:#9CA3AF;margin-left:8px">PDF 파일을 열어 Cmd+A → Cmd+C 후 붙여넣기</span>';
+        + '<span style="color:#9CA3AF;margin-left:8px">파일을 열어 Cmd+A → Cmd+C 후 붙여넣기</span>';
       status.style.color = '#DC2626';
     }
   }
@@ -7374,8 +7427,10 @@ function cG_submit(contractNo){
     // [v175] 사용자 입력 특약사항 수집 — buildGuaranteezContractHtml 내부에서 자동 조항과 결합
     var snEl = document.getElementById('cG_m_specialNotes');
     var specialNotes = snEl ? (snEl.value || '') : '';
-    // PDF 생성 — 기존 빌더 재사용 (특약: 자동조항 + 사용자 입력)
-    var html = buildGuaranteezContractHtml(d, specialNotes, []);
+    // [v181] 추가 계약자 수집 — 검색 모드와 동일
+    var extras = (typeof collectExtraParties === 'function') ? collectExtraParties() : [];
+    // PDF 생성 — 기존 빌더 재사용 (특약: 자동조항 + 사용자 입력 / extras: 기타 공동계약자)
+    var html = buildGuaranteezContractHtml(d, specialNotes, extras);
     var win = window.open('', '_blank', 'width=960,height=900,scrollbars=yes');
     if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
     win.document.write(html);
@@ -7389,10 +7444,13 @@ function cG_submit(contractNo){
   }
 }
 
-// [v156] 추가 계약자 카드 1개 삽입
+// [v156/v181] 추가 계약자 카드 1개 삽입 — 모드별 다른 list 컨테이너 사용
 var cG_extraSeq = 0;
+function cG_extraListId(){
+  return (window._cG_mode === 'manual') ? 'cG_extraList_manual' : 'cG_extraList';
+}
 function addExtraParty(){
-  var list = document.getElementById('cG_extraList'); if (!list) return;
+  var list = document.getElementById(cG_extraListId()); if (!list) return;
   var idx = ++cG_extraSeq;
   var card = document.createElement('div');
   card.id = 'cG_extra_' + idx;
@@ -7415,9 +7473,9 @@ function addExtraParty(){
   list.appendChild(card);
 }
 
-// [v156] 모달에서 추가된 계약자 정보 수집
+// [v156/v181] 모달에서 추가된 계약자 정보 수집 — 활성 모드의 list만 읽음
 function collectExtraParties(){
-  var list = document.getElementById('cG_extraList'); if (!list) return [];
+  var list = document.getElementById(cG_extraListId()); if (!list) return [];
   var cards = list.querySelectorAll('[data-extra-idx]');
   var arr = [];
   cards.forEach(function(card){
