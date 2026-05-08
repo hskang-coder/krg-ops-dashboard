@@ -1957,10 +1957,11 @@ async function fetchSheetByGidFresh(gid){
   }
 }
 
-// [v199] 미러 시트 동기화 상태 진단 — 양쪽 gid 행수 + 마지막 행 비교
+// [v199/v200] 미러 시트 동기화 상태 진단 — 양쪽 gid 행수 + 마지막 행 비교
+// [v200] 미러 gid: 1931755549 → 2078071528 (신규 생성된 "계약관리_미러" 시트)
 async function checkMirrorSync(){
   try {
-    var SRC = '1953907648', DST = '1931755549';
+    var SRC = '1953907648', DST = '2078071528';
     var [src, dst] = await Promise.all([
       fetchSheetByGidFresh(SRC).catch(function(){ return null; }),
       fetchSheetByGidFresh(DST).catch(function(){ return null; })
@@ -1968,7 +1969,7 @@ async function checkMirrorSync(){
     var srcRows = (src && src.table && src.table.rows) ? src.table.rows.length : 0;
     var dstRows = (dst && dst.table && dst.table.rows) ? dst.table.rows.length : 0;
     if (!srcRows && !dstRows) return { ok:false, reason:'양쪽 시트 모두 비어있음 또는 접근 불가', srcRows:0, dstRows:0 };
-    if (!dstRows) return { ok:false, reason:'미러(1931755549) 비어있음 — Apps Script 트리거 미설정?', srcRows:srcRows, dstRows:0 };
+    if (!dstRows) return { ok:false, reason:'미러(계약관리_미러) 비어있음 — Apps Script 트리거 미설정?', srcRows:srcRows, dstRows:0 };
     var diff = Math.abs(srcRows - dstRows);
     // 행수 차이가 5행 이내면 OK (실시간 입력 + 15분 트리거 지연 허용)
     var ok = diff <= 5;
