@@ -6731,7 +6731,16 @@ function cG_buildManualForm(){
       + '</div>'
       )
     + section('① 계약 기본',
-        '<div style="margin-bottom:8px">' + lbl('계약체결일') + inp('contractDate', '예: 2026-05-07', 'date') + '</div>'
+        // [v188] 계약유형 + 계약체결일 한 줄 (좌:유형 / 우:체결일)
+        '<div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px">'
+      +   '<div>' + lbl('계약유형')
+      +     '<select id="cG_m_useType" onchange="cG_onUseTypeChange()" style="width:100%;padding:7px 10px;border:1.5px solid #1B3976;border-radius:5px;font-size:12px;background:#fff;font-weight:700;color:#1B3976">'
+      +       '<option value="주거용" selected>주거용</option>'
+      +       '<option value="상업용">상업용 (부가세 포함)</option>'
+      +     '</select>'
+      +   '</div>'
+      +   '<div>' + lbl('계약체결일') + inp('contractDate', '예: 2026-05-07', 'date') + '</div>'
+      + '</div>'
       + '<div style="margin-bottom:8px">' + lbl('주소 + 호실') + inp('address', '예: 동두천시 지행동 676 제402호') + '</div>'
       + grid2(
           '<div>' + lbl('임대차 시작일')
@@ -6887,6 +6896,23 @@ function cG_recalcPayDay(){
 function cG_markPayDayEdited(){
   var pdEl = document.getElementById('cG_m_payDay');
   if (pdEl) pdEl.dataset.userEdit = 'true';
+}
+
+// [v188] 계약유형 변경 시 월세 라벨에 (부가세 포함) 표시 추가/제거
+function cG_onUseTypeChange(){
+  var ut = document.getElementById('cG_m_useType');
+  var rentInput = document.getElementById('cG_m_rent');
+  if (!ut || !rentInput) return;
+  var isCommercial = (ut.value === '상업용');
+  // 라벨 업데이트
+  var rentLabel = rentInput.parentNode && rentInput.parentNode.querySelector('label');
+  if (rentLabel) {
+    rentLabel.innerHTML = isCommercial
+      ? '월세 <span style="color:#DC2626;font-weight:700">⚠ 부가세 포함 금액</span>'
+      : '월세';
+  }
+  // placeholder 변경
+  rentInput.placeholder = isCommercial ? '예: 11,000,000 (VAT 포함)' : '600000';
 }
 
 // ==================================================================
@@ -7209,9 +7235,13 @@ function cG_parsePdfText(text){
   // ── 6/7. 납입형태, 수수료 ──
   data.payMethod    = pickIn(text, /월세\s*납입\s*형태\s*[:：]?\s*([^\n\d]+)/).replace(/\s/g,'');
   // [v179] 5가지 payCondition 매핑
-  var sfRaw = pickIn(text, /서비스\s*수수료\s*[:：]?\s*([^\n\d]+)/).replace(/\s/g,'');
+  var sfRaw = pickIn(text, /서비스\s*수수료\s*(?:납부방법)?\s*[:：]?\s*([^\n\d]+)/).replace(/\s/g,'');
   var sfMap = { '분납':'분할','분할':'분할','일시납':'일시납','일시불':'일시납','비용포함':'비용포함','수수료별도':'수수료별도','수수료포함':'수수료포함' };
   data.payCondition = sfMap[sfRaw] || sfRaw || '';
+
+  // [v188] 계약유형 자동 추출 — '상업용' 키워드 우선, 없으면 '주거용'(디폴트)
+  if (/상업\s*용/.test(text)) data.useType = '상업용';
+  else if (/주거\s*용/.test(text)) data.useType = '주거용';
 
   // [v183] 섹션 앵커는 점·괄호·공백 변형 모두 허용 — "8.임대인정보" / "8) 임대인정보" / "8 임대인 정보" 등
   // [v186] 8. 임대인 정보 — pickField 사용 (괄호 주석 무시)
@@ -7291,6 +7321,16 @@ function cG_applyParsedData(data){
   setVal('deposit', data.deposit);
   setVal('rent', data.rent);
   setVal('mgmtFee', data.mgmtFee);
+  // [v188] 계약유형 자동 선택
+  if (data.useType) {
+    var ut = document.getElementById('cG_m_useType');
+    if (ut) {
+      for (var ui = 0; ui < ut.options.length; ui++) {
+        if (ut.options[ui].value === data.useType) { ut.selectedIndex = ui; highlightAuto(ut); break; }
+      }
+      cG_onUseTypeChange(); // 라벨/visual 업데이트
+    }
+  }
   if (data.payMethod) {
     var pm = document.getElementById('cG_m_payMethod');
     if (pm) {
@@ -7506,7 +7546,7 @@ function cG_collectManualData(){
     landlordName: v('landlordName'),
     natType:      '',
     nationality:  v('nationality') || '대한민국',
-    useType:      '주거용',
+    useType:      v('useType') || '주거용',  // [v188]
     contractInfo: v('coName') ? '공동전차인' : '단독계약',
     payCondition: v('payCondition') || '분할',
     address:      v('address'),
@@ -7517,8 +7557,9 @@ function cG_collectManualData(){
     duration:     '',
     depositRecov: 0,
     deposit:      n('deposit'),
-    rent:         rent,
-    vat:          0,
+    // [v188] 상업용일 때 월세 입력값 = VAT 포함. base/vat 분리해서 PDF에 표시
+    rent:         (v('useType') === '상업용') ? Math.round(rent / 1.1) : rent,
+    vat:          (v('useType') === '상업용') ? Math.round(rent - rent / 1.1) : 0,
     mgmtFee:      mgmtFee,
     totalRent:    rent + mgmtFee,
     // [v179] 서비스수수료비용 — 폼 입력값(자동계산 또는 수동) 사용
