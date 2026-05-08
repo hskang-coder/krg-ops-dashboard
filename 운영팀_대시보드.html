@@ -6675,7 +6675,7 @@ function cG_switchMode(mode, contractNo){
   window._cG_mode = mode;
 }
 
-// [v172] 수동 입력 폼 빌더 — 17개 필드 (5섹션)
+// [v172] 수동 입력 폼 빌더 — 17개 필드 (5섹션) + [v173] PDF 자동 추출
 function cG_buildManualForm(){
   var inp = function(id, ph, type, w){
     return '<input type="' + (type||'text') + '" id="cG_m_' + id + '" placeholder="' + (ph||'') + '" style="width:' + (w||'100%') + ';padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none">';
@@ -6684,6 +6684,20 @@ function cG_buildManualForm(){
   var section = function(title, body){ return '<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:800;color:#1B3976;margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid #E5E7EB">' + title + '</div>' + body + '</div>'; };
   var grid2 = function(a, b){ return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + a + b + '</div>'; };
   var html = ''
+    // [v173] PDF 자동 추출 영역
+    + '<div style="background:#F5F3FF;border:1.5px dashed #C4B5FD;border-radius:8px;padding:12px 14px;margin-bottom:14px">'
+    +   '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+    +     '<div>'
+    +       '<div style="font-size:12px;font-weight:800;color:#5B21B6">📎 PDF로 자동 채우기</div>'
+    +       '<div style="font-size:10.5px;color:#6B7280;margin-top:3px">「계약 필수 정보」 PDF 파일을 업로드하면 17개 필드가 자동 추출됩니다.</div>'
+    +     '</div>'
+    +     '<div>'
+    +       '<input type="file" id="cG_m_pdfFile" accept="application/pdf" style="display:none" onchange="cG_handlePdfUpload(this)">'
+    +       '<button type="button" onclick="document.getElementById(\'cG_m_pdfFile\').click()" style="padding:8px 16px;background:#7C3AED;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700;white-space:nowrap">파일 선택</button>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div id="cG_m_pdfStatus" style="font-size:10.5px;margin-top:6px;display:none"></div>'
+    + '</div>'
     + section('① 계약 기본',
         '<div style="margin-bottom:8px">' + lbl('계약체결일') + inp('contractDate', '예: 2026-05-07', 'date') + '</div>'
       + '<div style="margin-bottom:8px">' + lbl('주소 + 호실') + inp('address', '예: 동두천시 지행동 676 제402호') + '</div>'
@@ -6745,6 +6759,241 @@ function cG_buildManualForm(){
     +   '<b>💡 발행 후:</b> PDF 출력 + "시트 입력용 TSV" 자동 클립보드 복사 → 운영 시트 적절한 행에 붙여넣기로 보관 가능'
     + '</div>';
   return html;
+}
+
+// ==================================================================
+// [v173] PDF 자동 추출 — PDF.js CDN + 정규식 파서
+// ==================================================================
+async function cG_loadPdfJs(){
+  if (window.pdfjsLib) return;
+  return new Promise(function(resolve, reject){
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = function(){
+      try {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        resolve();
+      } catch(e) { reject(e); }
+    };
+    s.onerror = function(){ reject(new Error('PDF.js 로드 실패')); };
+    document.head.appendChild(s);
+  });
+}
+
+async function cG_extractPdfText(file){
+  await cG_loadPdfJs();
+  var buf = await file.arrayBuffer();
+  var pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  var lines = [];
+  for (var i = 1; i <= pdf.numPages; i++) {
+    var page = await pdf.getPage(i);
+    var content = await page.getTextContent();
+    // Y 좌표로 라인 그룹화 (PDF는 위→아래로 갈수록 y 감소)
+    var lineMap = {};
+    content.items.forEach(function(it){
+      var y = Math.round(it.transform[5]);
+      if (!lineMap[y]) lineMap[y] = [];
+      lineMap[y].push({ x: it.transform[4], str: it.str });
+    });
+    var ys = Object.keys(lineMap).map(Number).sort(function(a,b){ return b - a; });
+    ys.forEach(function(y){
+      var line = lineMap[y].sort(function(a,b){ return a.x - b.x; }).map(function(it){ return it.str; }).join('').trim();
+      if (line) lines.push(line);
+    });
+  }
+  return lines.join('\n');
+}
+
+function cG_parsePdfText(text){
+  var data = {};
+  // ── 헬퍼 ──
+  var parseKDate = function(s){
+    if (!s) return '';
+    var x = s.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    if (!x) return '';
+    return x[1] + '-' + String(+x[2]).padStart(2,'0') + '-' + String(+x[3]).padStart(2,'0');
+  };
+  var parseAmt = function(s){
+    if (!s) return 0;
+    if (/없음|미정/.test(s)) return 0;
+    var clean = s.replace(/[\s,원]/g, '');
+    var x = clean.match(/(\d+(?:\.\d+)?)\s*(만)?/);
+    if (!x) return 0;
+    var num = parseFloat(x[1]);
+    if (clean.indexOf('만') >= 0) return Math.round(num * 10000);
+    return Math.round(num);
+  };
+  var section = function(startRe, endRe){
+    var s = text.search(startRe);
+    if (s < 0) return '';
+    var rest = text.slice(s);
+    var e = endRe ? rest.slice(1).search(endRe) : -1;
+    return e >= 0 ? rest.slice(0, e+1) : rest;
+  };
+  var pickIn = function(secText, re){
+    if (!secText) return '';
+    var m = secText.match(re);
+    return m ? m[1].trim() : '';
+  };
+  var pickAddr = function(secText){
+    // "주소" 다음 줄(들) → 빈 줄/번호항목 만나기 전까지
+    if (!secText) return '';
+    var lines = secText.split('\n');
+    var out = [];
+    var collecting = false;
+    for (var i = 0; i < lines.length; i++) {
+      var L = lines[i].trim();
+      if (!collecting) {
+        if (/(?:^|^\d+\)|^주소)\s*(주소|주소\,호실정보|주소\s*$)/.test(L) || /^\d+\)\s*주소\s*$/.test(L) || /^주소\s*$/.test(L) || L.indexOf('주소') === 0) {
+          collecting = true;
+          // 한 줄에 "주소: 값" 형식이면 그 자리에서 추출
+          var inline = L.match(/주소[\s:]+(.+)$/);
+          if (inline && inline[1].trim()) { out.push(inline[1].trim()); break; }
+          continue;
+        }
+      } else {
+        // 다음 번호항목/섹션 만나면 종료
+        if (/^\d+[\.\)]/.test(L) || /^[8-9]\.|^1[0-1]\./.test(L) || L === '') break;
+        out.push(L);
+        if (out.length >= 2) break; // 최대 2줄
+      }
+    }
+    return out.join(' ').trim();
+  };
+
+  // ── 1. 계약체결일 ──
+  var dt = text.match(/계약\s*체결\s*일\s*[:：]?\s*(\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일)/);
+  data.contractDate = dt ? parseKDate(dt[1]) : '';
+
+  // ── 3. 주소, 호실정보 ──
+  var addrSec = text.match(/주소[,，]?\s*호실정보\s*\n([^\n]+)/);
+  data.address = addrSec ? addrSec[1].trim() : '';
+
+  // ── 4. 임대차계약기간 ──
+  var rng = text.match(/임대차\s*계약\s*기간\s*[:：]?\s*(\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일)\s*~\s*(\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일)/);
+  if (rng) {
+    data.startDate = parseKDate(rng[1]);
+    data.endDate = parseKDate(rng[2]);
+  }
+
+  // ── 5. 임대료 — 보증금/월세/관리비 ──
+  data.deposit = parseAmt(pickIn(text, /보증금\s*[:：]?\s*([^\n]+)/));
+  data.rent    = parseAmt(pickIn(text, /월세\s*[:：]?\s*([^\n]+)/));
+  data.mgmtFee = parseAmt(pickIn(text, /고정\s*관리비\s*[:：]?\s*([^\n]+)/));
+
+  // ── 6/7. 납입형태, 수수료 ──
+  data.payMethod    = pickIn(text, /월세\s*납입\s*형태\s*[:：]?\s*([^\n\d]+)/).replace(/\s/g,'');
+  var sf = pickIn(text, /서비스\s*수수료\s*[:：]?\s*([^\n\d]+)/).replace(/\s/g,'');
+  data.payCondition = sf === '분납' ? '분할' : (sf || '');
+
+  // ── 8. 임대인 정보 ──
+  var landlordSec = section(/임대인\s*정보/, /임대인\s*계좌\s*정보|임차인\s*정보|공동\s*임차인/);
+  if (landlordSec) {
+    data.landlordName  = pickIn(landlordSec, /이름\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
+    data.landlordPhone = pickIn(landlordSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
+    data.landlordAddr  = pickAddr(landlordSec);
+  }
+
+  // ── 9. 임대인 계좌 ──
+  var acctSec = section(/임대인\s*계좌\s*정보/, /임차인\s*정보|공동\s*임차인/);
+  if (acctSec) {
+    data.bank       = pickIn(acctSec, /은행명\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
+    data.account    = pickIn(acctSec, /계좌번호\s*[:：]?\s*([\d\-]+)/);
+    data.acctHolder = pickIn(acctSec, /예금주\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
+  }
+
+  // ── 10. 임차인 정보 ──
+  var tenantSec = section(/임차인\s*정보/, /공동\s*임차인/);
+  if (tenantSec) {
+    data.tenantName  = pickIn(tenantSec, /이름\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
+    data.tenantPhone = pickIn(tenantSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
+    data.tenantIdNo  = pickIn(tenantSec, /주민등록번호\s*[:：]?\s*([\d\-]+)/);
+    data.nationality = pickIn(tenantSec, /국적\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
+    data.tenantAddr  = pickAddr(tenantSec);
+  }
+
+  // ── 11. 공동임차인 ──
+  var coSec = section(/공동\s*임차인/, null);
+  if (coSec) {
+    data.coName  = pickIn(coSec, /이름\s*[:：]?\s*([^\n0-9)]+)/).replace(/[\s)]/g,'');
+    data.coPhone = pickIn(coSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
+    data.coIdNo  = pickIn(coSec, /주민등록번호\s*[:：]?\s*([\d\-]+)/);
+    data.coAddr  = pickAddr(coSec);
+  }
+
+  return data;
+}
+
+// [v173] PDF 파일 업로드 핸들러 — 추출 + 폼 자동 채우기
+async function cG_handlePdfUpload(input){
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var status = document.getElementById('cG_m_pdfStatus');
+  if (status) {
+    status.style.display = 'block';
+    status.innerHTML = '⏳ PDF 분석 중...';
+    status.style.color = '#7C3AED';
+  }
+  try {
+    var text = await cG_extractPdfText(file);
+    var data = cG_parsePdfText(text);
+    var setVal = function(id, v){
+      var el = document.getElementById('cG_m_' + id);
+      if (el && v != null && v !== '' && v !== 0) el.value = v;
+      else if (el && id === 'deposit' && data.deposit === 0) el.value = 0;
+    };
+    setVal('contractDate', data.contractDate);
+    setVal('address', data.address);
+    setVal('startDate', data.startDate);
+    setVal('endDate', data.endDate);
+    setVal('deposit', data.deposit);
+    setVal('rent', data.rent);
+    setVal('mgmtFee', data.mgmtFee);
+    if (data.payMethod) {
+      var pm = document.getElementById('cG_m_payMethod');
+      if (pm) {
+        for (var i = 0; i < pm.options.length; i++) {
+          if (pm.options[i].value === data.payMethod) { pm.selectedIndex = i; break; }
+        }
+      }
+    }
+    if (data.payCondition) {
+      var pc = document.getElementById('cG_m_payCondition');
+      if (pc) {
+        for (var j = 0; j < pc.options.length; j++) {
+          if (pc.options[j].value === data.payCondition) { pc.selectedIndex = j; break; }
+        }
+      }
+    }
+    setVal('landlordName', data.landlordName);
+    setVal('landlordPhone', data.landlordPhone);
+    setVal('landlordAddr', data.landlordAddr);
+    setVal('bank', data.bank);
+    setVal('account', data.account);
+    setVal('acctHolder', data.acctHolder);
+    setVal('tenantName', data.tenantName);
+    setVal('tenantPhone', data.tenantPhone);
+    setVal('tenantAddr', data.tenantAddr);
+    setVal('tenantIdNo', data.tenantIdNo);
+    setVal('nationality', data.nationality);
+    setVal('coName', data.coName);
+    setVal('coPhone', data.coPhone);
+    setVal('coAddr', data.coAddr);
+    setVal('coIdNo', data.coIdNo);
+    // 추출된 필드 카운트
+    var fields = ['contractDate','address','startDate','endDate','rent','landlordName','tenantName','tenantPhone'];
+    var filled = fields.filter(function(f){ return data[f]; }).length;
+    if (status) {
+      status.innerHTML = '✅ 자동 채우기 완료 — 핵심 ' + filled + '/' + fields.length + '개 필드 추출됨. 비어있는 필드는 직접 입력해주세요.';
+      status.style.color = '#065F46';
+    }
+  } catch(e) {
+    console.warn('[v173] PDF parse error:', e);
+    if (status) {
+      status.innerHTML = '⚠ PDF 분석 실패: ' + (e.message || '알 수 없는 오류') + ' — 폼에 직접 입력해주세요.';
+      status.style.color = '#DC2626';
+    }
+  }
 }
 
 // [v172] 수동 폼 데이터 수집 → buildGuaranteezContractHtml 호환 객체 반환
