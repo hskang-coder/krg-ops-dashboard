@@ -1001,6 +1001,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
           <span id="statusText">로딩 중</span>
         </span>
         <button class="refresh-btn" id="refreshBtn" onclick="loadData()">🔄 새로고침</button>
+        <!-- [v193] 계약정보 새로고침 — 기존 loadData() 보존, 계약/공실 강제 재로드 -->
+        <button class="refresh-btn" id="refreshContractsBtn" onclick="refreshContractsOnly()" style="margin-left:6px;background:#7C3AED" title="계약·공실 데이터만 다시 받습니다">📑 계약정보 새로고침</button>
       </div>
     </div>
   </div>
@@ -1930,6 +1932,45 @@ function parseVacancySheet(resp) {
       propRoom:      cell(propRoomIdx)      // V열: 호수
     };
   }).filter(Boolean);
+}
+
+// [v193] 계약/공실 데이터만 강제 재로드 — 헤더 우측 "📑 계약정보 새로고침" 버튼 핸들러
+// 기존 loadData / loadContractData 동작에 영향 없음 (재호출만 수행)
+async function refreshContractsOnly(){
+  var btn = document.getElementById('refreshContractsBtn');
+  var orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 로딩 중...'; }
+  try {
+    // 1) 공실현황 (vacancy) — gid=1953907648
+    if (typeof fetchSheetByGid === 'function' && typeof parseVacancySheet === 'function') {
+      try {
+        var vResp = await fetchSheetByGid('1953907648');
+        var newVac = parseVacancySheet(vResp);
+        if (Array.isArray(newVac) && newVac.length) vacancyRawData = newVac;
+      } catch(e) { console.warn('[v193] vacancy refresh failed:', e); }
+    }
+    // 2) 계약 raw data
+    if (typeof loadContractData === 'function') {
+      try { await loadContractData(); } catch(e) { console.warn('[v193] loadContractData failed:', e); }
+    }
+    // 3) 임대인 정산계좌 + 중도퇴실 매핑 (gid=418937767)
+    if (typeof loadLandlordAccounts === 'function') {
+      try { await loadLandlordAccounts(); } catch(e) { console.warn('[v193] loadLandlordAccounts failed:', e); }
+    }
+    // 4) 현재 보이는 뷰 갱신 (있을 때만)
+    if (typeof renderContractMgmtView === 'function') {
+      var view = document.getElementById('contractMgmtView');
+      if (view && view.style.display !== 'none') { try { renderContractMgmtView(); } catch(e){} }
+    }
+    if (typeof renderRenewalView === 'function') {
+      var rView = document.getElementById('renewalView');
+      if (rView && rView.style.display !== 'none') { try { renderRenewalView(); } catch(e){} }
+    }
+    if (btn) { btn.textContent = '✅ 갱신 완료'; setTimeout(function(){ btn.textContent = orig; btn.disabled = false; }, 1500); }
+  } catch(e) {
+    console.error('[v193] refreshContractsOnly error:', e);
+    if (btn) { btn.textContent = '⚠ 실패'; setTimeout(function(){ btn.textContent = orig; btn.disabled = false; }, 1500); }
+  }
 }
 
 async function loadContractData() {
