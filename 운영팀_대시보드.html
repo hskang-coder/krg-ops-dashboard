@@ -1002,7 +1002,9 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         </span>
         <button class="refresh-btn" id="refreshBtn" onclick="loadData()">🔄 새로고침</button>
         <!-- [v193] 계약정보 새로고침 — 기존 loadData() 보존, 계약/공실 강제 재로드 -->
-        <button class="refresh-btn" id="refreshContractsBtn" onclick="refreshContractsOnly()" style="margin-left:6px;background:#7C3AED" title="계약·공실 데이터만 다시 받습니다">📑 계약정보 새로고침</button>
+        <button class="refresh-btn" id="refreshContractsBtn" onclick="refreshContractsOnly()" style="margin-left:6px;background:#7C3AED" title="계약·공실 데이터만 다시 받습니다 (캐시 무력화 + 미러 시트 동기화 진단)">📑 계약정보 새로고침</button>
+        <!-- [v199] 마지막 새로고침 시각 + 미러 시트 동기화 상태 -->
+        <span id="refreshContractsStatus" style="margin-left:8px;font-size:11px;color:#6B7280;font-weight:500;display:none"></span>
       </div>
     </div>
   </div>
@@ -1934,28 +1936,77 @@ function parseVacancySheet(resp) {
   }).filter(Boolean);
 }
 
-// [v193] 계약/공실 데이터만 강제 재로드 — 헤더 우측 "📑 계약정보 새로고침" 버튼 핸들러
+// [v193/v199] 계약/공실 데이터만 강제 재로드 — 헤더 우측 "📑 계약정보 새로고침" 버튼 핸들러
+// [v199] 캐시 버스트(_t) + 미러 시트(gid=1931755549) 동기화 진단 추가
 // 기존 loadData / loadContractData 동작에 영향 없음 (재호출만 수행)
+
+// [v199] 캐시-버스트 fetch — 기존 fetchSheetByGid는 보존, 새 헬퍼만 추가
+async function fetchSheetByGidFresh(gid){
+  try {
+    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+            + '/gviz/tq?tqx=out:json&gid=' + gid
+            + '&range=A:ZZ&_t=' + Date.now();
+    var res = await fetch(url, { cache: 'no-store' });
+    var text = await res.text();
+    var m = text.match(/setResponse\((\{[\s\S]+\})\)/);
+    if (!m) throw new Error('parse error');
+    return JSON.parse(m[1]);
+  } catch(e){
+    console.warn('[v199] fetchSheetByGidFresh(' + gid + ') failed:', e);
+    throw e;
+  }
+}
+
+// [v199] 미러 시트 동기화 상태 진단 — 양쪽 gid 행수 + 마지막 행 비교
+async function checkMirrorSync(){
+  try {
+    var SRC = '1953907648', DST = '1931755549';
+    var [src, dst] = await Promise.all([
+      fetchSheetByGidFresh(SRC).catch(function(){ return null; }),
+      fetchSheetByGidFresh(DST).catch(function(){ return null; })
+    ]);
+    var srcRows = (src && src.table && src.table.rows) ? src.table.rows.length : 0;
+    var dstRows = (dst && dst.table && dst.table.rows) ? dst.table.rows.length : 0;
+    if (!srcRows && !dstRows) return { ok:false, reason:'양쪽 시트 모두 비어있음 또는 접근 불가', srcRows:0, dstRows:0 };
+    if (!dstRows) return { ok:false, reason:'미러(1931755549) 비어있음 — Apps Script 트리거 미설정?', srcRows:srcRows, dstRows:0 };
+    var diff = Math.abs(srcRows - dstRows);
+    // 행수 차이가 5행 이내면 OK (실시간 입력 + 15분 트리거 지연 허용)
+    var ok = diff <= 5;
+    return {
+      ok: ok,
+      srcRows: srcRows,
+      dstRows: dstRows,
+      diff: diff,
+      reason: ok ? '동기화 OK' : ('미러 지연 — ' + diff + '행 차이 (15분 내 자동 보정)')
+    };
+  } catch(e){
+    console.warn('[v199] checkMirrorSync error:', e);
+    return { ok:false, reason:'진단 실패: ' + (e.message||e) };
+  }
+}
+
 async function refreshContractsOnly(){
   var btn = document.getElementById('refreshContractsBtn');
+  var statusEl = document.getElementById('refreshContractsStatus');
   var orig = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 로딩 중...'; }
+  if (statusEl) { statusEl.style.display = 'none'; }
   try {
-    // 1) 공실현황 (vacancy) — gid=1953907648
-    if (typeof fetchSheetByGid === 'function' && typeof parseVacancySheet === 'function') {
+    // 1) 공실현황 (vacancy) — gid=1953907648 (캐시 버스트 적용)
+    if (typeof parseVacancySheet === 'function') {
       try {
-        var vResp = await fetchSheetByGid('1953907648');
+        var vResp = await fetchSheetByGidFresh('1953907648');
         var newVac = parseVacancySheet(vResp);
         if (Array.isArray(newVac) && newVac.length) vacancyRawData = newVac;
-      } catch(e) { console.warn('[v193] vacancy refresh failed:', e); }
+      } catch(e) { console.warn('[v199] vacancy refresh failed:', e); }
     }
     // 2) 계약 raw data
     if (typeof loadContractData === 'function') {
-      try { await loadContractData(); } catch(e) { console.warn('[v193] loadContractData failed:', e); }
+      try { await loadContractData(); } catch(e) { console.warn('[v199] loadContractData failed:', e); }
     }
     // 3) 임대인 정산계좌 + 중도퇴실 매핑 (gid=418937767)
     if (typeof loadLandlordAccounts === 'function') {
-      try { await loadLandlordAccounts(); } catch(e) { console.warn('[v193] loadLandlordAccounts failed:', e); }
+      try { await loadLandlordAccounts(); } catch(e) { console.warn('[v199] loadLandlordAccounts failed:', e); }
     }
     // 4) 현재 보이는 뷰 갱신 (있을 때만)
     if (typeof renderContractMgmtView === 'function') {
@@ -1966,9 +2017,29 @@ async function refreshContractsOnly(){
       var rView = document.getElementById('renewalView');
       if (rView && rView.style.display !== 'none') { try { renderRenewalView(); } catch(e){} }
     }
+    // 5) [v199] 미러 동기화 상태 진단 (백그라운드)
+    if (statusEl) {
+      var ts = new Date();
+      var pad = function(n){ return n<10 ? '0'+n : ''+n; };
+      var hms = pad(ts.getHours()) + ':' + pad(ts.getMinutes()) + ':' + pad(ts.getSeconds());
+      statusEl.textContent = '⏱ ' + hms + ' · 미러 진단 중...';
+      statusEl.style.color = '#6B7280';
+      statusEl.style.display = 'inline';
+      checkMirrorSync().then(function(s){
+        var icon = s.ok ? '🟢' : '🟡';
+        var color = s.ok ? '#059669' : '#D97706';
+        var detail = s.srcRows ? (' · 소스 ' + s.srcRows + '행 / 미러 ' + s.dstRows + '행') : '';
+        statusEl.textContent = '⏱ ' + hms + ' ' + icon + ' ' + (s.reason||'') + detail;
+        statusEl.style.color = color;
+        console.log('[v199] sync status:', s);
+      }).catch(function(e){
+        statusEl.textContent = '⏱ ' + hms + ' · 미러 진단 실패';
+        statusEl.style.color = '#DC2626';
+      });
+    }
     if (btn) { btn.textContent = '✅ 갱신 완료'; setTimeout(function(){ btn.textContent = orig; btn.disabled = false; }, 1500); }
   } catch(e) {
-    console.error('[v193] refreshContractsOnly error:', e);
+    console.error('[v199] refreshContractsOnly error:', e);
     if (btn) { btn.textContent = '⚠ 실패'; setTimeout(function(){ btn.textContent = orig; btn.disabled = false; }, 1500); }
   }
 }
