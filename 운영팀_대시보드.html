@@ -6732,7 +6732,9 @@ function cG_buildManualForm(){
         '<div style="margin-bottom:8px">' + lbl('계약체결일') + inp('contractDate', '예: 2026-05-07', 'date') + '</div>'
       + '<div style="margin-bottom:8px">' + lbl('주소 + 호실') + inp('address', '예: 동두천시 지행동 676 제402호') + '</div>'
       + grid2(
-          '<div>' + lbl('임대차 시작일') + inp('startDate', '', 'date') + '</div>',
+          '<div>' + lbl('임대차 시작일')
+          +   '<input type="date" id="cG_m_startDate" oninput="cG_recalcPayDay()" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none">'
+          + '</div>',
           '<div>' + lbl('임대차 종료일') + inp('endDate', '', 'date') + '</div>'
         )
       )
@@ -6750,21 +6752,24 @@ function cG_buildManualForm(){
         +     '<input type="number" id="cG_m_serviceFee" placeholder="자동 계산" oninput="cG_markServiceFeeEdited()" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;background:#FEFCE8;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none;font-weight:700;color:#78350F">'
         +   '</div>'
         + '</div>'
-      + grid2(
-          '<div>' + lbl('월세 납입형태')
-            + '<select id="cG_m_payMethod" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;background:#fff">'
-            +   '<option value="선불" selected>선불</option><option value="후불">후불</option>'
-            + '</select></div>',
-          // [v179] 5옵션 select 복원 — 자동 계산 트리거
-          '<div>' + lbl('서비스 수수료 구분 <span style="color:#B45309;font-weight:600">⚠ 직접 확인</span>')
-            + '<select id="cG_m_payCondition" onchange="cG_recalcServiceFee()" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
-            +   '<option value="분할" selected>분할</option>'
-            +   '<option value="일시납">일시납</option>'
-            +   '<option value="비용포함">비용포함</option>'
-            +   '<option value="수수료별도">수수료별도</option>'
-            +   '<option value="수수료포함">수수료포함</option>'
-            + '</select></div>'
-        )
+      // [v185] grid3 — 납입형태 / 월세납입일 / 수수료구분
+      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+      +   '<div>' + lbl('월세 납입형태')
+      +     '<select id="cG_m_payMethod" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;background:#fff">'
+      +       '<option value="선불" selected>선불</option><option value="후불">후불</option>'
+      +     '</select></div>'
+      +   '<div>' + lbl('월세 납입일 <span style="color:#6B7280;font-weight:500;font-size:10px">자동/수정</span>')
+      +     '<input type="text" id="cG_m_payDay" placeholder="시작일 입력 시 자동" oninput="cG_markPayDayEdited()" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none;background:#F0FDF4">'
+      +   '</div>'
+      +   '<div>' + lbl('서비스 수수료 구분 <span style="color:#B45309;font-weight:600">⚠ 직접 확인</span>')
+      +     '<select id="cG_m_payCondition" onchange="cG_recalcServiceFee()" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
+      +       '<option value="분할" selected>분할</option>'
+      +       '<option value="일시납">일시납</option>'
+      +       '<option value="비용포함">비용포함</option>'
+      +       '<option value="수수료별도">수수료별도</option>'
+      +       '<option value="수수료포함">수수료포함</option>'
+      +     '</select></div>'
+      + '</div>'
       )
     + section('③ 임대인 정보',
         grid2(
@@ -6853,6 +6858,33 @@ function cG_recalcServiceFee(){
 function cG_markServiceFeeEdited(){
   var sf = document.getElementById('cG_m_serviceFee');
   if (sf) sf.dataset.userEdit = 'true';
+}
+
+// [v185] 월세 납입일 — 시작일 기반 자동 계산
+// • 입주일 1~3일       → 입주일 그대로 (예: 2일 → 2)
+// • 입주일 = 말일      → '말일'
+// • 그 외 (4일~말일 직전) → 입주일 - 3 (예: 17일 → 14)
+function cG_calcPayDay(){
+  var startEl = document.getElementById('cG_m_startDate');
+  if (!startEl || !startEl.value) return '';
+  var d = new Date(startEl.value + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  var day = d.getDate();
+  var lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  if (day === lastDay) return '말일';
+  if (day <= 3) return String(day);
+  return String(day - 3);
+}
+function cG_recalcPayDay(){
+  var pdEl = document.getElementById('cG_m_payDay');
+  if (!pdEl) return;
+  if (pdEl.dataset.userEdit === 'true') return; // 사용자가 수정한 경우 보호
+  var v = cG_calcPayDay();
+  if (v) pdEl.value = v;
+}
+function cG_markPayDayEdited(){
+  var pdEl = document.getElementById('cG_m_payDay');
+  if (pdEl) pdEl.dataset.userEdit = 'true';
 }
 
 // ==================================================================
@@ -7286,6 +7318,10 @@ function cG_applyParsedData(data){
   var sfEl = document.getElementById('cG_m_serviceFee');
   if (sfEl) sfEl.dataset.userEdit = ''; // PDF 추출 시 자동값 다시 적용 가능
   cG_recalcServiceFee();
+  // [v185] 월세 납입일 자동 계산 (시작일이 채워진 경우)
+  var pdEl = document.getElementById('cG_m_payDay');
+  if (pdEl) pdEl.dataset.userEdit = '';
+  cG_recalcPayDay();
   var fields = ['contractDate','address','startDate','endDate','rent','landlordName','tenantName','tenantPhone'];
   var filled = fields.filter(function(f){ return data[f]; }).length;
   return { total: fields.length, filled: filled };
@@ -7472,7 +7508,7 @@ function cG_collectManualData(){
     totalRent:    rent + mgmtFee,
     // [v179] 서비스수수료비용 — 폼 입력값(자동계산 또는 수동) 사용
     serviceFee:   n('serviceFee'),
-    payDay:       '',
+    payDay:       v('payDay'),  // [v185] 월세 납입일 (1~31 또는 '말일')
     payMethod:    v('payMethod') || '선불',
     tenantPhone:  v('tenantPhone'),
     tenantIdNo:   rrn('tenantIdNo'),
@@ -8655,7 +8691,7 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
     + '</tr>'
     + '<tr>'
     +   '<th style="background:#f0f4ff;color:#374151;font-weight:600;padding:5px 7px;border:1px solid #d1d5db">월세납입일</th>'
-    +   '<td style="padding:5px 7px;border:1px solid #d1d5db">매월 ' + (d.payDay||'') + ' 일 ' + (d.payMethod||'') + '</td>'
+    +   '<td style="padding:5px 7px;border:1px solid #d1d5db">매월 ' + (function(){ var pd = d.payDay||''; var s = String(pd); if (!s) return ''; if (/^\d+$/.test(s)) return s + '일'; return s; })() + ' ' + (d.payMethod||'') + '</td>'
     +   '<th style="background:#f0f4ff;color:#374151;font-weight:600;padding:5px 7px;border:1px solid #d1d5db">수수료납입방법</th>'
     +   '<td style="padding:5px 7px;border:1px solid #d1d5db">' + (d.payCondition||'') + '</td>'
     + '</tr>'
