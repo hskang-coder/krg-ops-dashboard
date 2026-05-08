@@ -6928,14 +6928,16 @@ async function cG_loadPdfJs(){
   if (window.pdfjsLib) return;
   return new Promise(function(resolve, reject){
     var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    // [v178] v3.x 내부 length 에러 회피 — v2.16.105 (장기 안정 버전)
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
     s.onload = function(){
       try {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        if (!window.pdfjsLib) { reject(new Error('PDF.js 객체 생성 안 됨 (CSP 차단 가능)')); return; }
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
         resolve();
       } catch(e) { reject(e); }
     };
-    s.onerror = function(){ reject(new Error('PDF.js 로드 실패')); };
+    s.onerror = function(){ reject(new Error('PDF.js CDN 로드 실패 — 네트워크 확인')); };
     document.head.appendChild(s);
   });
 }
@@ -7102,6 +7104,59 @@ function cG_parsePdfText(text){
   return data;
 }
 
+// [v178] 추출된 데이터를 폼에 적용 (PDF 업로드 / 텍스트 붙여넣기 공통)
+function cG_applyParsedData(data){
+  var setVal = function(id, v){
+    var el = document.getElementById('cG_m_' + id);
+    if (el && v != null && v !== '' && v !== 0) el.value = v;
+    else if (el && id === 'deposit' && data.deposit === 0) el.value = 0;
+  };
+  setVal('contractDate', data.contractDate);
+  setVal('address', data.address);
+  setVal('startDate', data.startDate);
+  setVal('endDate', data.endDate);
+  setVal('deposit', data.deposit);
+  setVal('rent', data.rent);
+  setVal('mgmtFee', data.mgmtFee);
+  if (data.payMethod) {
+    var pm = document.getElementById('cG_m_payMethod');
+    if (pm) {
+      for (var i = 0; i < pm.options.length; i++) {
+        if (pm.options[i].value === data.payMethod) { pm.selectedIndex = i; break; }
+      }
+    }
+  }
+  if (data.payCondition) {
+    // [v175] payCondition은 input(datalist) 기반 — value로 직접 설정
+    var pc = document.getElementById('cG_m_payCondition');
+    if (pc) pc.value = data.payCondition;
+  }
+  setVal('landlordName', data.landlordName);
+  setVal('landlordPhone', data.landlordPhone);
+  setVal('landlordAddr', data.landlordAddr);
+  setVal('bank', data.bank);
+  setVal('account', data.account);
+  setVal('acctHolder', data.acctHolder);
+  setVal('tenantName', data.tenantName);
+  setVal('tenantPhone', data.tenantPhone);
+  setVal('tenantAddr', data.tenantAddr);
+  cG_setMaskedRrn('cG_m_tenantIdNo', data.tenantIdNo);
+  setVal('nationality', data.nationality);
+  setVal('coName', data.coName);
+  setVal('coPhone', data.coPhone);
+  setVal('coAddr', data.coAddr);
+  cG_setMaskedRrn('cG_m_coIdNo', data.coIdNo);
+  cG_applyAddrHighlight('cG_m_address');
+  cG_applyAddrHighlight('cG_m_landlordAddr');
+  cG_applyAddrHighlight('cG_m_tenantAddr');
+  cG_applyAddrHighlight('cG_m_coAddr');
+  cG_attachRrnMask('cG_m_tenantIdNo');
+  cG_attachRrnMask('cG_m_coIdNo');
+  var fields = ['contractDate','address','startDate','endDate','rent','landlordName','tenantName','tenantPhone'];
+  var filled = fields.filter(function(f){ return data[f]; }).length;
+  return { total: fields.length, filled: filled };
+}
+
 // [v173] PDF 파일 업로드 핸들러 — 추출 + 폼 자동 채우기
 async function cG_handlePdfUpload(input){
   var file = input.files && input.files[0];
@@ -7115,71 +7170,59 @@ async function cG_handlePdfUpload(input){
   try {
     var text = await cG_extractPdfText(file);
     var data = cG_parsePdfText(text);
-    var setVal = function(id, v){
-      var el = document.getElementById('cG_m_' + id);
-      if (el && v != null && v !== '' && v !== 0) el.value = v;
-      else if (el && id === 'deposit' && data.deposit === 0) el.value = 0;
-    };
-    setVal('contractDate', data.contractDate);
-    setVal('address', data.address);
-    setVal('startDate', data.startDate);
-    setVal('endDate', data.endDate);
-    setVal('deposit', data.deposit);
-    setVal('rent', data.rent);
-    setVal('mgmtFee', data.mgmtFee);
-    if (data.payMethod) {
-      var pm = document.getElementById('cG_m_payMethod');
-      if (pm) {
-        for (var i = 0; i < pm.options.length; i++) {
-          if (pm.options[i].value === data.payMethod) { pm.selectedIndex = i; break; }
-        }
-      }
-    }
-    if (data.payCondition) {
-      var pc = document.getElementById('cG_m_payCondition');
-      if (pc) {
-        for (var j = 0; j < pc.options.length; j++) {
-          if (pc.options[j].value === data.payCondition) { pc.selectedIndex = j; break; }
-        }
-      }
-    }
-    setVal('landlordName', data.landlordName);
-    setVal('landlordPhone', data.landlordPhone);
-    setVal('landlordAddr', data.landlordAddr);
-    setVal('bank', data.bank);
-    setVal('account', data.account);
-    setVal('acctHolder', data.acctHolder);
-    setVal('tenantName', data.tenantName);
-    setVal('tenantPhone', data.tenantPhone);
-    setVal('tenantAddr', data.tenantAddr);
-    // [v174] 주민번호는 마스킹 헬퍼 사용
-    cG_setMaskedRrn('cG_m_tenantIdNo', data.tenantIdNo);
-    setVal('nationality', data.nationality);
-    setVal('coName', data.coName);
-    setVal('coPhone', data.coPhone);
-    setVal('coAddr', data.coAddr);
-    cG_setMaskedRrn('cG_m_coIdNo', data.coIdNo);
-    // [v174] 주소 광역시·도 검증 — 노란 하이라이트
-    cG_applyAddrHighlight('cG_m_address');
-    cG_applyAddrHighlight('cG_m_landlordAddr');
-    cG_applyAddrHighlight('cG_m_tenantAddr');
-    cG_applyAddrHighlight('cG_m_coAddr');
-    // 주민번호 input에 focus/blur 핸들러 부착
-    cG_attachRrnMask('cG_m_tenantIdNo');
-    cG_attachRrnMask('cG_m_coIdNo');
-    // 추출된 필드 카운트
-    var fields = ['contractDate','address','startDate','endDate','rent','landlordName','tenantName','tenantPhone'];
-    var filled = fields.filter(function(f){ return data[f]; }).length;
+    var stat = cG_applyParsedData(data);
     if (status) {
-      status.innerHTML = '✅ 자동 채우기 완료 — 핵심 ' + filled + '/' + fields.length + '개 필드 추출됨. 비어있는 필드는 직접 입력해주세요.';
+      status.innerHTML = '✅ 자동 채우기 완료 — 핵심 ' + stat.filled + '/' + stat.total + '개 필드 추출됨. 비어있는 필드는 직접 입력해주세요.';
       status.style.color = '#065F46';
     }
   } catch(e) {
-    console.warn('[v173/v177] PDF parse error:', e);
+    console.error('[v178] PDF parse error:', e, e && e.stack);
     if (status) {
-      status.innerHTML = '⚠ PDF 분석 실패: ' + (e.message || e.name || '알 수 없는 오류') + ' — 폼에 직접 입력해주세요. (콘솔 F12에서 상세 로그 확인 가능)';
+      var detail = (e && (e.message || e.name)) || '알 수 없는 오류';
+      status.innerHTML = '⚠ PDF 분석 실패: ' + detail + '<br>'
+        + '<button type="button" onclick="cG_openTextPasteFallback()" style="margin-top:6px;padding:6px 12px;background:#7C3AED;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700">📋 텍스트 붙여넣기로 시도</button>'
+        + '<span style="color:#9CA3AF;margin-left:8px">PDF 파일을 열어 Cmd+A → Cmd+C 후 붙여넣기</span>';
       status.style.color = '#DC2626';
     }
+  }
+}
+
+// [v178] 텍스트 직접 붙여넣기 폴백 모달
+function cG_openTextPasteFallback(){
+  var existing = document.getElementById('cG_pasteModal');
+  if (existing) existing.remove();
+  var pm = document.createElement('div');
+  pm.id = 'cG_pasteModal';
+  pm.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px';
+  pm.innerHTML = '<div style="background:#fff;border-radius:12px;padding:22px 24px;width:640px;max-width:94vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
+    + '<div style="font-size:14px;font-weight:800;color:#1B3976;margin-bottom:6px">📋 PDF 텍스트 붙여넣기</div>'
+    + '<div style="font-size:11.5px;color:#6B7280;margin-bottom:10px;line-height:1.6">PDF를 미리보기/Adobe Reader 등으로 열어 <b>Cmd+A → Cmd+C</b>로 전체 텍스트 복사 → 아래 영역에 붙여넣으세요. 17개 필드를 자동 추출합니다.</div>'
+    + '<textarea id="cG_pasteText" rows="14" placeholder="여기에 PDF 텍스트 붙여넣기..." style="width:100%;border:1.5px solid #C4B5FD;border-radius:6px;padding:10px;font-size:11.5px;font-family:Menlo,monospace;resize:vertical;outline:none;box-sizing:border-box;line-height:1.5"></textarea>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    +   '<button onclick="document.getElementById(\'cG_pasteModal\').remove()" style="padding:8px 16px;border:1px solid #D1D5DB;background:#fff;border-radius:6px;cursor:pointer;font-size:12px">취소</button>'
+    +   '<button onclick="cG_processPastedText()" style="padding:8px 18px;background:#7C3AED;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">📥 추출 + 폼 채우기</button>'
+    + '</div></div>';
+  document.body.appendChild(pm);
+  setTimeout(function(){ var t = document.getElementById('cG_pasteText'); if (t) t.focus(); }, 100);
+}
+
+function cG_processPastedText(){
+  var ta = document.getElementById('cG_pasteText');
+  if (!ta || !ta.value.trim()) { alert('텍스트를 붙여넣어주세요.'); return; }
+  var status = document.getElementById('cG_m_pdfStatus');
+  try {
+    var data = cG_parsePdfText(ta.value);
+    var stat = cG_applyParsedData(data);
+    var pm = document.getElementById('cG_pasteModal');
+    if (pm) pm.remove();
+    if (status) {
+      status.style.display = 'block';
+      status.innerHTML = '✅ 텍스트에서 자동 채우기 완료 — 핵심 ' + stat.filled + '/' + stat.total + '개 필드 추출됨.';
+      status.style.color = '#065F46';
+    }
+  } catch(e) {
+    console.error('[v178] paste parse error:', e);
+    alert('텍스트 추출 실패: ' + (e.message || e.name));
   }
 }
 
