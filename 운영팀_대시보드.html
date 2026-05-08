@@ -6739,11 +6739,16 @@ function cG_buildManualForm(){
             + '<select id="cG_m_payMethod" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;background:#fff">'
             +   '<option value="선불" selected>선불</option><option value="후불">후불</option>'
             + '</select></div>',
-          // [v174] 수수료는 항상 노란 음영 — 검토 필수 시각화
-          '<div>' + lbl('서비스 수수료 <span style="color:#B45309;font-weight:600">⚠ 직접 확인</span>')
-            + '<select id="cG_m_payCondition" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F">'
-            +   '<option value="분할" selected>분할(분납)</option><option value="일시납">일시납</option><option value="수수료별도">수수료별도</option>'
-            + '</select></div>'
+          // [v174/v175] 수수료 — 노란 음영 + 자유 입력(datalist 자동완성)
+          '<div>' + lbl('서비스 수수료 <span style="color:#B45309;font-weight:600">⚠ 직접 확인 / 자유 입력 가능</span>')
+            + '<input type="text" id="cG_m_payCondition" list="cG_payCondList" value="분할" placeholder="분할/일시납/수수료별도/직접 입력" style="width:100%;padding:7px 10px;border:1.5px solid #F59E0B;border-radius:5px;font-size:12px;background:#FEF3C7;font-weight:700;color:#78350F;box-sizing:border-box;outline:none">'
+            + '<datalist id="cG_payCondList">'
+            +   '<option value="분할">분할(분납)</option>'
+            +   '<option value="일시납">일시납</option>'
+            +   '<option value="수수료별도">수수료별도</option>'
+            +   '<option value="비용포함">비용포함</option>'
+            + '</datalist>'
+            + '</div>'
         )
       )
     + section('③ 임대인 정보',
@@ -6778,10 +6783,64 @@ function cG_buildManualForm(){
       + '<div style="margin-top:8px">' + lbl('주소') + inp('coAddr', '') + '</div>'
       + '<div style="margin-top:8px">' + lbl('주민등록번호') + inp('coIdNo', '000000-0000000') + '</div>'
       )
+    // [v175] 특약사항 — 검색 모드와 동일하게 자동 추가 + 직접 입력
+    + section('⑥ 특약사항',
+        '<textarea id="cG_m_specialNotes" rows="3" placeholder="추가 특약 내용을 입력하세요 (없으면 비워두세요)" style="width:100%;border:1px solid #D1D5DB;border-radius:5px;padding:8px 10px;font-size:12px;resize:vertical;outline:none;font-family:inherit;line-height:1.5;box-sizing:border-box"></textarea>'
+      + '<div style="background:#F0F4FF;border-radius:6px;padding:8px 12px;font-size:10.5px;color:#374151;line-height:1.6;margin-top:6px">'
+      + '<b>📋 자동 추가:</b> 납부조건별 고정 특약 + 공동전차인/연대보증인 위약금 조항 자동 삽입 (직접 입력한 내용은 위에 추가됨)'
+      + '</div>'
+      )
     + '<div style="background:#FEF3C7;border-left:4px solid #F59E0B;border-radius:6px;padding:10px 14px;font-size:11.5px;color:#78350F;line-height:1.7;margin-top:6px">'
     +   '<b>💡 발행 후:</b> PDF 출력 + "시트 입력용 TSV" 자동 클립보드 복사 → 운영 시트 적절한 행에 붙여넣기로 보관 가능'
     + '</div>';
   return html;
+}
+
+// ==================================================================
+// [v175] 시 단위 → 광역시·도 자동 매핑 (보증금=0, 월세 임대차 한정 사용)
+// ==================================================================
+var CG_SI_TO_DO = {
+  // 경기도
+  '수원시':'경기도','성남시':'경기도','의정부시':'경기도','안양시':'경기도','부천시':'경기도',
+  '광명시':'경기도','평택시':'경기도','동두천시':'경기도','안산시':'경기도','고양시':'경기도',
+  '과천시':'경기도','구리시':'경기도','남양주시':'경기도','오산시':'경기도','시흥시':'경기도',
+  '군포시':'경기도','의왕시':'경기도','하남시':'경기도','용인시':'경기도','파주시':'경기도',
+  '이천시':'경기도','안성시':'경기도','김포시':'경기도','화성시':'경기도','광주시':'경기도',
+  '양주시':'경기도','포천시':'경기도','여주시':'경기도',
+  // 강원도
+  '춘천시':'강원도','원주시':'강원도','강릉시':'강원도','동해시':'강원도','태백시':'강원도',
+  '속초시':'강원도','삼척시':'강원도',
+  // 충청북도
+  '청주시':'충청북도','충주시':'충청북도','제천시':'충청북도',
+  // 충청남도
+  '천안시':'충청남도','공주시':'충청남도','보령시':'충청남도','아산시':'충청남도','서산시':'충청남도',
+  '논산시':'충청남도','계룡시':'충청남도','당진시':'충청남도',
+  // 전라북도
+  '전주시':'전라북도','군산시':'전라북도','익산시':'전라북도','정읍시':'전라북도','남원시':'전라북도',
+  '김제시':'전라북도',
+  // 전라남도
+  '목포시':'전라남도','여수시':'전라남도','순천시':'전라남도','나주시':'전라남도','광양시':'전라남도',
+  // 경상북도
+  '포항시':'경상북도','경주시':'경상북도','김천시':'경상북도','안동시':'경상북도','구미시':'경상북도',
+  '영주시':'경상북도','영천시':'경상북도','상주시':'경상북도','문경시':'경상북도','경산시':'경상북도',
+  // 경상남도
+  '창원시':'경상남도','진주시':'경상남도','통영시':'경상남도','사천시':'경상남도','김해시':'경상남도',
+  '밀양시':'경상남도','거제시':'경상남도','양산시':'경상남도',
+  // 제주
+  '제주시':'제주특별자치도','서귀포시':'제주특별자치도'
+};
+// 시 단위 주소만 있을 때 자동으로 광역시/도 prefix 추가
+function cG_autoCompleteAddr(addr){
+  if (!addr) return addr;
+  var s = String(addr).trim();
+  // 이미 광역시/도가 있으면 그대로
+  if (cG_isAddrComplete(s)) return s;
+  // 첫 단어가 'XX시'인 경우 매핑
+  var m = s.match(/^([가-힣]+시)(\s|$)/);
+  if (m && CG_SI_TO_DO[m[1]]) {
+    return CG_SI_TO_DO[m[1]] + ' ' + s;
+  }
+  return s;
 }
 
 // ==================================================================
@@ -6804,10 +6863,22 @@ function cG_isAddrComplete(addr){
   }
   return false;
 }
-// 주소 input에 광역시·도 누락 시 노란 하이라이트
+// 주소 input에 광역시·도 누락 시: 시→도 자동 보정 시도, 실패 시 노란 하이라이트
 function cG_applyAddrHighlight(id){
   var el = document.getElementById(id);
   if (!el) return;
+  var orig = el.value || '';
+  if (orig && !cG_isAddrComplete(orig)) {
+    var fixed = cG_autoCompleteAddr(orig);
+    if (fixed !== orig) {
+      // 자동 보정 성공 — 값 갱신 + 연한 녹색으로 잠깐 깜박여 알림
+      el.value = fixed;
+      el.style.background = '#ECFDF5';
+      el.style.borderColor = '#10B981';
+      el.title = '✓ 광역시/도(' + fixed.split(' ')[0] + ')가 자동으로 추가되었습니다';
+      return;
+    }
+  }
   if (!cG_isAddrComplete(el.value)) {
     el.style.background = '#FEF3C7';
     el.style.borderColor = '#F59E0B';
@@ -7179,8 +7250,11 @@ function cG_submit(contractNo){
         console.log('[v172] TSV copied to clipboard');
       }).catch(function(){});
     } catch(e){}
-    // PDF 생성 — 기존 빌더 재사용
-    var html = buildGuaranteezContractHtml(d, '', []);
+    // [v175] 사용자 입력 특약사항 수집 — buildGuaranteezContractHtml 내부에서 자동 조항과 결합
+    var snEl = document.getElementById('cG_m_specialNotes');
+    var specialNotes = snEl ? (snEl.value || '') : '';
+    // PDF 생성 — 기존 빌더 재사용 (특약: 자동조항 + 사용자 입력)
+    var html = buildGuaranteezContractHtml(d, specialNotes, []);
     var win = window.open('', '_blank', 'width=960,height=900,scrollbars=yes');
     if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
     win.document.write(html);
