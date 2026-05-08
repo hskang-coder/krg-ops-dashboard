@@ -8415,8 +8415,8 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
     + '.it .hl{color:#1B3976;font-weight:600}'
     + '.s-ttl{font-size:9pt;font-weight:700;background:#1B3976;color:#fff;padding:5px 12px;margin-top:10px}'
     + '.s-body{border:1.5px solid #1B3976;border-top:none;padding:10px 12px;font-size:8.5pt;min-height:60px;white-space:pre-line;line-height:1.8}'
-    + '.fee-box{border:2px solid #1B3976;border-radius:8px;padding:11px 15px;margin-top:10px}'
-    + '.fee-ttl{font-size:9.5pt;font-weight:700;background:#1B3976;color:#fff;padding:4px 13px;border-radius:4px;display:inline-block;margin-bottom:9px}'
+    + '.fee-box{border:2px solid #1B3976;border-radius:8px;padding:7px 12px;margin-top:6px}'  /* [v180] 압축 */
+    + '.fee-ttl{font-size:9pt;font-weight:700;background:#1B3976;color:#fff;padding:3px 11px;border-radius:4px;display:inline-block;margin-bottom:5px}'  /* [v180] 압축 */
     + '.fee-amt{font-size:11pt;font-weight:700;color:#1B3976}'
     + '.fee-note{font-size:7.5pt;color:#6b7280;margin-top:4px}'
     + '.sig-box{border-radius:7px;padding:9px 13px;margin-top:7px}'
@@ -8508,23 +8508,24 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
     +   '<td style="padding:5px 7px;border:1px solid #d1d5db">' + (d.payCondition||'') + '</td>'
     + '</tr>'
     + '</table></div>'
-    + '<div style="border:2px solid #1B3976;border-radius:7px;overflow:hidden;margin-bottom:9px">'
-    + '<div style="background:#1B3976;color:#fff;font-weight:700;padding:5px 12px;font-size:9pt">특약사항</div>'
-    + '<div style="padding:9px 12px;font-size:8.5pt;min-height:48px;white-space:pre-line;line-height:1.8">' + specialClause.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>'
+    // [v180] 특약사항 박스 — 1페이지 갑+을 들어갈 공간 확보 위해 압축
+    + '<div style="border:2px solid #1B3976;border-radius:7px;overflow:hidden;margin-bottom:6px;break-inside:avoid;page-break-inside:avoid">'
+    + '<div style="background:#1B3976;color:#fff;font-weight:700;padding:4px 11px;font-size:9pt">특약사항</div>'
+    + '<div style="padding:6px 11px;font-size:8pt;min-height:24px;white-space:pre-line;line-height:1.5">' + specialClause.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>'
     + '</div>'
-    + '<div class="fee-box"><div class="fee-ttl">서비스 수수료</div>'
+    // [v180] 서비스 수수료 박스 — 압축
+    + '<div class="fee-box" style="break-inside:avoid;page-break-inside:avoid"><div class="fee-ttl">서비스 수수료</div>'
     + '<table style="width:100%;border-collapse:collapse;font-size:8.5pt"><tr>'
-    + '<td style="width:28%">서비스 수수료</td>'
-    + '<td><span class="fee-amt">' + cG_fmtKRW(d.serviceFee) + '</span> / 월</td>'
-    + '<td style="width:28%">수수료 확인</td>'
-    + '<td>서비스수수료확인 (인)</td></tr></table>'
+    + '<td style="width:28%;padding:2px 4px">서비스 수수료</td>'
+    + '<td style="padding:2px 4px"><span class="fee-amt">' + cG_fmtKRW(d.serviceFee) + '</span> / 월</td>'
+    + '<td style="width:28%;padding:2px 4px">수수료 확인</td>'
+    + '<td style="padding:2px 4px">서비스수수료확인 (인)</td></tr></table>'
     + '<div class="fee-note">*첫 서비스 수수료 납입기한은 임대차계약 시작일의 3영업일 전까지</div>'
     + '<div class="fee-note">*퇴실할 때 남은 계약기간의 수수료를 일괄 지급한다.</div></div>'
-    // 갑→을→병 세로 배치 (1페이지 압축)
-    // ── 갑 + 을 1페이지에 고정 표시 (break-inside:avoid) ──
-    + '<div style="margin-top:8px;break-inside:avoid;page-break-inside:avoid">'
+    // [v180] 갑+을 1페이지 고정 — 강력 keep-together
+    + '<div style="margin-top:6px;break-inside:avoid;page-break-inside:avoid;break-before:avoid;page-break-before:avoid">'
     // 갑
-    + '<div style="border:2px solid #1e3a8a;border-radius:6px;padding:7px 10px;margin-bottom:6px;break-inside:avoid;page-break-inside:avoid">'
+    + '<div style="border:2px solid #1e3a8a;border-radius:6px;padding:6px 9px;margin-bottom:5px;break-inside:avoid;page-break-inside:avoid">'
     + '<div class="sig-ttl" style="background:#1e3a8a">케이알지그룹(주)(갑)</div>'
     + '<div style="display:grid;grid-template-columns:1fr 60px;margin-top:4px">'
     + '<table class="sg-tbl" style="font-size:8pt">'
