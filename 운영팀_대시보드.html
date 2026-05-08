@@ -6943,9 +6943,16 @@ function cG_applyAddrHighlight(id){
     el.style.borderColor = '#F59E0B';
     el.title = '⚠ 광역시·도가 누락되어 있을 수 있습니다 — 확인해주세요';
   } else {
-    el.style.background = '';
-    el.style.borderColor = '';
-    el.title = '';
+    // [v184] 자동 채움 표시 유지 (autoFilled=true이면 초록색 그대로)
+    if (el.dataset.autoFilled === 'true') {
+      el.style.background = '#ECFDF5';
+      el.style.borderColor = '#10B981';
+      el.title = '✓ 파일에서 자동 추출됨';
+    } else {
+      el.style.background = '';
+      el.style.borderColor = '';
+      el.title = '';
+    }
   }
 }
 // 주민번호 input — focus 시 평문 / blur 시 마스킹
@@ -6976,6 +6983,11 @@ function cG_setMaskedRrn(id, raw){
     el.value = cG_maskRrn(raw);
     el.style.fontFamily = 'Menlo, monospace';
     el.style.color = '#6B7280';
+    // [v184] 자동 추출 표시
+    el.style.background = '#ECFDF5';
+    el.style.borderColor = '#10B981';
+    el.dataset.autoFilled = 'true';
+    el.title = '✓ 파일에서 자동 추출됨';
   }
 }
 
@@ -7117,11 +7129,29 @@ function cG_parsePdfText(text){
   if (!addrSec) addrSec = text.match(/주소\s*[:：]\s*([^\n]+)/);
   data.address = addrSec ? addrSec[1].trim() : '';
 
-  // [v183] 4. 임대차계약기간 — 다양 날짜 포맷
-  var rng = text.match(/임대차\s*계약\s*기간\s*[:：]?\s*([\d년월일.\-\/\s]+?)\s*~\s*([\d년월일.\-\/\s]+?)(?:[\n,]|$)/);
-  if (rng) {
-    data.startDate = parseKDate(rng[1]);
-    data.endDate = parseKDate(rng[2]);
+  // [v184] 4. 임대차계약기간 — 라벨/구분자/줄바꿈 변형 다중 패턴
+  // 시도 순서: (a) 임대차계약기간 라벨 + 같은 줄 / (b) 계약기간 라벨 + 같은 줄 /
+  //         (c) 라벨 다음 줄에 날짜 / (d) 라벨 무관, 두 날짜가 ~로 연결된 패턴
+  var datePatterns = [
+    /임대차\s*계약\s*기간\s*[:：]?\s*([^\n~～]*?\d[\d년월일.\-\/\s]*?)\s*[~～]\s*([^\n]*?\d[\d년월일.\-\/\s]*?)(?:[\n,]|$)/,
+    /계약\s*기간\s*[:：]?\s*([^\n~～]*?\d[\d년월일.\-\/\s]*?)\s*[~～]\s*([^\n]*?\d[\d년월일.\-\/\s]*?)(?:[\n,]|$)/,
+    /임대\s*기간\s*[:：]?\s*([^\n~～]*?\d[\d년월일.\-\/\s]*?)\s*[~～]\s*([^\n]*?\d[\d년월일.\-\/\s]*?)(?:[\n,]|$)/,
+    // 라벨이 줄 끝에 있고 날짜가 다음 줄
+    /(?:임대차\s*)?계약\s*기간\s*[:：]?\s*\n\s*([^\n~～]+?)\s*[~～]\s*([^\n]+)/,
+    // 라벨 무관 — 가까운 날짜 두 개 with ~ (보강용)
+    /(\d{4}[\s년.\-\/]+\d{1,2}[\s월.\-\/]+\d{1,2}\s*일?)\s*[~～]\s*(\d{4}[\s년.\-\/]+\d{1,2}[\s월.\-\/]+\d{1,2}\s*일?)/
+  ];
+  for (var di = 0; di < datePatterns.length; di++) {
+    var rng = text.match(datePatterns[di]);
+    if (rng) {
+      var s = parseKDate(rng[1]);
+      var e = parseKDate(rng[2]);
+      if (s && e) {
+        data.startDate = s;
+        data.endDate = e;
+        break;
+      }
+    }
   }
 
   // ── 5. 임대료 — 보증금/월세/관리비 ──
@@ -7175,12 +7205,37 @@ function cG_parsePdfText(text){
   return data;
 }
 
-// [v178] 추출된 데이터를 폼에 적용 (PDF 업로드 / 텍스트 붙여넣기 공통)
+// [v178/v184] 추출된 데이터를 폼에 적용 + 자동 채움 시 초록 하이라이트
 function cG_applyParsedData(data){
+  // [v184] 추출 성공한 필드에 초록 배경 + 사용자 편집 시 해제 핸들러
+  var highlightAuto = function(el){
+    if (!el) return;
+    el.style.background = '#ECFDF5';
+    el.style.borderColor = '#10B981';
+    el.dataset.autoFilled = 'true';
+    el.title = '✓ 파일에서 자동 추출됨';
+    if (!el.dataset.autoEditAttached) {
+      el.dataset.autoEditAttached = '1';
+      el.addEventListener('input', function(){
+        if (this.dataset.autoFilled === 'true') {
+          this.style.background = '';
+          this.style.borderColor = '';
+          this.dataset.autoFilled = 'false';
+          this.title = '';
+        }
+      });
+    }
+  };
   var setVal = function(id, v){
     var el = document.getElementById('cG_m_' + id);
-    if (el && v != null && v !== '' && v !== 0) el.value = v;
-    else if (el && id === 'deposit' && data.deposit === 0) el.value = 0;
+    if (!el) return;
+    if (v != null && v !== '' && v !== 0) {
+      el.value = v;
+      highlightAuto(el);
+    } else if (id === 'deposit' && data.deposit === 0) {
+      el.value = 0;
+      highlightAuto(el);
+    }
   };
   setVal('contractDate', data.contractDate);
   setVal('address', data.address);
@@ -7193,7 +7248,7 @@ function cG_applyParsedData(data){
     var pm = document.getElementById('cG_m_payMethod');
     if (pm) {
       for (var i = 0; i < pm.options.length; i++) {
-        if (pm.options[i].value === data.payMethod) { pm.selectedIndex = i; break; }
+        if (pm.options[i].value === data.payMethod) { pm.selectedIndex = i; highlightAuto(pm); break; }
       }
     }
   }
@@ -7202,7 +7257,7 @@ function cG_applyParsedData(data){
     var pc = document.getElementById('cG_m_payCondition');
     if (pc) {
       for (var k = 0; k < pc.options.length; k++) {
-        if (pc.options[k].value === data.payCondition) { pc.selectedIndex = k; break; }
+        if (pc.options[k].value === data.payCondition) { pc.selectedIndex = k; /* payCondition은 노란 음영 유지 */ break; }
       }
     }
   }
