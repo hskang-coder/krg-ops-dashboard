@@ -1196,7 +1196,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
       <div id="crSearchBox" class="cr-search-bar">
         <input id="crInput" type="text" placeholder="계약번호를 입력하세요" onkeydown="if(event.key==='Enter')searchContract()">
         <button class="cr-search-btn" onclick="searchContract()">🔍 검색</button>
-        <button class="cr-contract-pdf-btn" id="crContractPdfBtn" onclick="openContractPdfModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능">📄 계약서발행</button>
+        <button class="cr-contract-pdf-btn" id="crContractPdfBtn" onclick="openContractPdfModal(window._crCurrentNo)" title="검색된 계약은 자동 발행 / 검색 안 한 경우 수동 입력 모드로 진입">📄 계약서발행</button>
         <button class="cr-contract-pdf-btn" id="crSubAgreementBtn" onclick="generateSubAgreement(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:5px;">📋 부속합의서</button>
         <button class="cr-contract-pdf-btn" id="crIncomeReceiptBtn" onclick="openIncomeReceiptModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:5px;background:#059669;color:#fff;border-color:#059669">💰 입금내역서</button>
         <button class="cr-contract-pdf-btn" id="crFeeCalcBtn" onclick="openFeeCalcModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:5px;background:#7C3AED;color:#fff;border-color:#7C3AED">🧮 수수료계산</button>
@@ -6597,40 +6597,248 @@ function cG_specialClause(payCondition, contractInfo, specialNotes) {
 
 // ── 모달 열기 ─────────────────────────────────────────────
 function openContractPdfModal(contractNo) {
-  if (!contractNo) { alert('먼저 계약을 검색해주세요.'); return; }
+  // [v172] contractNo 없어도 진입 가능 — 수동 입력 모드 사용 가능
+  var hasSearch = !!contractNo;
   var existing = document.getElementById('cG_modal');
   if (existing) existing.remove();
   var modal = document.createElement('div');
   modal.id = 'cG_modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:24px 0;overflow-y:auto';
-  modal.innerHTML = '<div style="background:#fff;border-radius:14px;padding:28px;width:560px;max-width:94vw;max-height:calc(100vh - 48px);overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
-    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">'
+
+  // [v172] 모드 토글 — 검색발행 OR 수동입력
+  // 진입 시 contractNo 있으면 'search', 없으면 'manual' 디폴트
+  var initMode = hasSearch ? 'search' : 'manual';
+
+  modal.innerHTML = '<div style="background:#fff;border-radius:14px;padding:28px;width:600px;max-width:94vw;max-height:calc(100vh - 48px);overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">'
     + '<div style="background:#1B3976;color:#fff;width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:19px;font-style:italic">K</div>'
     + '<div><div style="font-size:15px;font-weight:700;color:#1B3976">개런티즈 계약서 발행</div>'
-    + '<div style="font-size:12px;color:#9ca3af;margin-top:2px">계약번호 ' + contractNo + '</div></div></div>'
+    + '<div id="cG_modeSubtitle" style="font-size:12px;color:#9ca3af;margin-top:2px">' + (hasSearch ? '계약번호 ' + contractNo : '시트 등록 안 된 계약 — 수동 입력 모드') + '</div></div></div>'
 
-    // ── 1. 특약사항 (기존) ──
-    + '<label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">특약사항 · 1단계 (자유 입력, 없으면 비워두세요)</label>'
-    + '<textarea id="cG_special" rows="3" placeholder="추가 특약 내용을 입력하세요..." style="width:100%;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px 12px;font-size:13px;resize:vertical;outline:none;font-family:inherit;line-height:1.6;box-sizing:border-box"></textarea>'
-    + '<div style="background:#f0f4ff;border-radius:8px;padding:10px 14px;font-size:11.5px;color:#374151;line-height:1.7;margin:10px 0 14px">'
-    + '<b>📋 자동 추가:</b> 납부조건별 고정 특약 + 공동전차인/연대보증인 위약금 조항 자동 삽입</div>'
+    // [v172] 모드 토글
+    + '<div style="display:flex;gap:0;background:#F3F4F6;border-radius:8px;padding:3px;margin-bottom:14px">'
+    +   '<button id="cG_modeBtn_search" type="button" onclick="cG_switchMode(\'search\', \'' + (contractNo||'') + '\')" style="flex:1;padding:8px 12px;border:none;background:' + (initMode==='search'?'#fff':'transparent') + ';color:' + (initMode==='search'?'#1B3976':'#6B7280') + ';border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;' + (initMode==='search'?'box-shadow:0 1px 3px rgba(0,0,0,.08)':'') + '"' + (!hasSearch?' disabled title="먼저 계약을 검색해주세요"':'') + '>🔍 검색 발행' + (hasSearch?' (계약번호: '+contractNo+')':'') + '</button>'
+    +   '<button id="cG_modeBtn_manual" type="button" onclick="cG_switchMode(\'manual\')" style="flex:1;padding:8px 12px;border:none;background:' + (initMode==='manual'?'#fff':'transparent') + ';color:' + (initMode==='manual'?'#1B3976':'#6B7280') + ';border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;' + (initMode==='manual'?'box-shadow:0 1px 3px rgba(0,0,0,.08)':'') + '">📝 수동 입력</button>'
+    + '</div>'
 
-    // ── 2. [v156] 계약자추가 섹션 ──
-    + '<div style="border-top:1px dashed #d1d5db;padding-top:14px;margin-top:6px">'
-    +   '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
-    +     '<label style="font-size:12px;font-weight:700;color:#1B3976">👥 계약자 추가 (선택사항)</label>'
-    +     '<button type="button" onclick="addExtraParty()" style="padding:6px 12px;background:#7C3AED;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700">+ 계약자추가</button>'
+    // ── 검색 모드 영역 ──
+    + '<div id="cG_searchPane" style="display:' + (initMode==='search'?'block':'none') + '">'
+    +   '<label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">특약사항 · 1단계 (자유 입력, 없으면 비워두세요)</label>'
+    +   '<textarea id="cG_special" rows="3" placeholder="추가 특약 내용을 입력하세요..." style="width:100%;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px 12px;font-size:13px;resize:vertical;outline:none;font-family:inherit;line-height:1.6;box-sizing:border-box"></textarea>'
+    +   '<div style="background:#f0f4ff;border-radius:8px;padding:10px 14px;font-size:11.5px;color:#374151;line-height:1.7;margin:10px 0 14px">'
+    +   '<b>📋 자동 추가:</b> 납부조건별 고정 특약 + 공동전차인/연대보증인 위약금 조항 자동 삽입</div>'
+    +   '<div style="border-top:1px dashed #d1d5db;padding-top:14px;margin-top:6px">'
+    +     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    +       '<label style="font-size:12px;font-weight:700;color:#1B3976">👥 계약자 추가 (선택사항)</label>'
+    +       '<button type="button" onclick="addExtraParty()" style="padding:6px 12px;background:#7C3AED;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700">+ 계약자추가</button>'
+    +     '</div>'
+    +     '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">공동명의계약인 또는 연대보증인을 추가하면 계약서의 빈 양식 영역에 자동 입력됩니다.</div>'
+    +     '<div id="cG_extraList"></div>'
     +   '</div>'
-    +   '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">공동명의계약인 또는 연대보증인을 추가하면 계약서의 빈 양식 영역에 자동 입력됩니다.</div>'
-    +   '<div id="cG_extraList"></div>'
+    + '</div>'
+
+    // ── [v172] 수동 입력 모드 영역 ──
+    + '<div id="cG_manualPane" style="display:' + (initMode==='manual'?'block':'none') + '">'
+    +   cG_buildManualForm()
     + '</div>'
 
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:14px">'
     + '<button onclick="document.getElementById(\'cG_modal\').remove()" style="padding:9px 18px;border:1.5px solid #d1d5db;background:#fff;border-radius:8px;cursor:pointer;font-size:13px">취소</button>'
-    + '<button onclick="generateGuaranteezPdf(\'' + contractNo + '\')" style="padding:9px 22px;background:#1B3976;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">📄 계약서 생성</button>'
+    + '<button id="cG_submitBtn" onclick="cG_submit(\'' + (contractNo||'') + '\')" style="padding:9px 22px;background:#1B3976;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">📄 계약서 생성</button>'
     + '</div></div>';
   document.body.appendChild(modal);
-  setTimeout(function() { var el = document.getElementById('cG_special'); if (el) el.focus(); }, 100);
+  setTimeout(function() {
+    var el = document.getElementById(initMode==='search' ? 'cG_special' : 'cG_m_tenantName');
+    if (el) el.focus();
+  }, 100);
+}
+
+// [v172] 모드 토글
+function cG_switchMode(mode, contractNo){
+  var sp = document.getElementById('cG_searchPane');
+  var mp = document.getElementById('cG_manualPane');
+  var bs = document.getElementById('cG_modeBtn_search');
+  var bm = document.getElementById('cG_modeBtn_manual');
+  var sub = document.getElementById('cG_modeSubtitle');
+  if (!sp || !mp) return;
+  if (mode === 'search') {
+    sp.style.display = 'block'; mp.style.display = 'none';
+    bs.style.background = '#fff'; bs.style.color = '#1B3976'; bs.style.boxShadow = '0 1px 3px rgba(0,0,0,.08)';
+    bm.style.background = 'transparent'; bm.style.color = '#6B7280'; bm.style.boxShadow = 'none';
+    if (sub) sub.textContent = contractNo ? '계약번호 ' + contractNo : '';
+  } else {
+    sp.style.display = 'none'; mp.style.display = 'block';
+    bm.style.background = '#fff'; bm.style.color = '#1B3976'; bm.style.boxShadow = '0 1px 3px rgba(0,0,0,.08)';
+    bs.style.background = 'transparent'; bs.style.color = '#6B7280'; bs.style.boxShadow = 'none';
+    if (sub) sub.textContent = '시트 등록 안 된 계약 — 수동 입력 모드';
+  }
+  window._cG_mode = mode;
+}
+
+// [v172] 수동 입력 폼 빌더 — 17개 필드 (5섹션)
+function cG_buildManualForm(){
+  var inp = function(id, ph, type, w){
+    return '<input type="' + (type||'text') + '" id="cG_m_' + id + '" placeholder="' + (ph||'') + '" style="width:' + (w||'100%') + ';padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box;outline:none">';
+  };
+  var lbl = function(text){ return '<label style="display:block;font-size:10.5px;font-weight:700;color:#374151;margin-bottom:3px">' + text + '</label>'; };
+  var section = function(title, body){ return '<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:800;color:#1B3976;margin-bottom:7px;padding-bottom:4px;border-bottom:1.5px solid #E5E7EB">' + title + '</div>' + body + '</div>'; };
+  var grid2 = function(a, b){ return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + a + b + '</div>'; };
+  var html = ''
+    + section('① 계약 기본',
+        '<div style="margin-bottom:8px">' + lbl('계약체결일') + inp('contractDate', '예: 2026-05-07', 'date') + '</div>'
+      + '<div style="margin-bottom:8px">' + lbl('주소 + 호실') + inp('address', '예: 동두천시 지행동 676 제402호') + '</div>'
+      + grid2(
+          '<div>' + lbl('임대차 시작일') + inp('startDate', '', 'date') + '</div>',
+          '<div>' + lbl('임대차 종료일') + inp('endDate', '', 'date') + '</div>'
+        )
+      )
+    + section('② 임대료',
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
+        +   '<div>' + lbl('보증금') + inp('deposit', '0', 'number') + '</div>'
+        +   '<div>' + lbl('월세') + inp('rent', '600000', 'number') + '</div>'
+        +   '<div>' + lbl('고정관리비') + inp('mgmtFee', '50000', 'number') + '</div>'
+        + '</div>'
+      + grid2(
+          '<div>' + lbl('월세 납입형태')
+            + '<select id="cG_m_payMethod" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;background:#fff">'
+            +   '<option value="선불" selected>선불</option><option value="후불">후불</option>'
+            + '</select></div>',
+          '<div>' + lbl('서비스 수수료')
+            + '<select id="cG_m_payCondition" style="width:100%;padding:7px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;background:#fff">'
+            +   '<option value="분할" selected>분할(분납)</option><option value="일시납">일시납</option><option value="수수료별도">수수료별도</option>'
+            + '</select></div>'
+        )
+      )
+    + section('③ 임대인 정보',
+        grid2(
+          '<div>' + lbl('이름') + inp('landlordName', '예: 조영준') + '</div>',
+          '<div>' + lbl('연락처') + inp('landlordPhone', '010-0000-0000') + '</div>'
+        )
+      + '<div style="margin-top:8px">' + lbl('주소') + inp('landlordAddr', '예: 의정부시 호국로 1303 104동 302호') + '</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:8px;margin-top:8px">'
+      +   '<div>' + lbl('은행명') + inp('bank', '예: 우리은행') + '</div>'
+      +   '<div>' + lbl('계좌번호') + inp('account', '예: 1002-337-026032') + '</div>'
+      +   '<div>' + lbl('예금주') + inp('acctHolder', '예: 조영준') + '</div>'
+      + '</div>'
+      )
+    + section('④ 임차인 정보',
+        grid2(
+          '<div>' + lbl('이름') + inp('tenantName', '예: 석지연') + '</div>',
+          '<div>' + lbl('연락처') + inp('tenantPhone', '010-0000-0000') + '</div>'
+        )
+      + '<div style="margin-top:8px">' + lbl('주소') + inp('tenantAddr', '주소 전체') + '</div>'
+      + '<div style="display:grid;grid-template-columns:1.3fr 1fr;gap:8px;margin-top:8px">'
+      +   '<div>' + lbl('주민등록번호') + inp('tenantIdNo', '000000-0000000') + '</div>'
+      +   '<div>' + lbl('국적') + inp('nationality', '대한민국') + '</div>'
+      + '</div>'
+      )
+    + section('⑤ 공동임차인 (선택)',
+        '<div style="font-size:10.5px;color:#6B7280;margin-bottom:6px">없으면 비워두세요</div>'
+      + grid2(
+          '<div>' + lbl('이름') + inp('coName', '예: 최호진') + '</div>',
+          '<div>' + lbl('연락처') + inp('coPhone', '010-0000-0000') + '</div>'
+        )
+      + '<div style="margin-top:8px">' + lbl('주소') + inp('coAddr', '') + '</div>'
+      + '<div style="margin-top:8px">' + lbl('주민등록번호') + inp('coIdNo', '000000-0000000') + '</div>'
+      )
+    + '<div style="background:#FEF3C7;border-left:4px solid #F59E0B;border-radius:6px;padding:10px 14px;font-size:11.5px;color:#78350F;line-height:1.7;margin-top:6px">'
+    +   '<b>💡 발행 후:</b> PDF 출력 + "시트 입력용 TSV" 자동 클립보드 복사 → 운영 시트 적절한 행에 붙여넣기로 보관 가능'
+    + '</div>';
+  return html;
+}
+
+// [v172] 수동 폼 데이터 수집 → buildGuaranteezContractHtml 호환 객체 반환
+function cG_collectManualData(){
+  var v = function(id){ var el = document.getElementById('cG_m_' + id); return el ? (el.value||'').trim() : ''; };
+  var n = function(id){ return parseFloat(String(v(id)||'').replace(/[^0-9.\-]/g,'')) || 0; };
+  var fmtKorDate = function(iso){ if (!iso) return ''; var p = iso.split('-'); if (p.length<3) return iso; return p[0]+'.'+p[1]+'.'+p[2]; };
+  var contractNo = 'M-' + Date.now().toString().slice(-8); // 수동 발행 임시 번호
+  var startDate = fmtKorDate(v('startDate'));
+  var endDate = fmtKorDate(v('endDate'));
+  var contractDate = fmtKorDate(v('contractDate'));
+  var rent = n('rent');
+  var mgmtFee = n('mgmtFee');
+  return {
+    contractNo:   contractNo,
+    tenantName:   v('tenantName'),
+    landlordName: v('landlordName'),
+    natType:      '',
+    nationality:  v('nationality') || '대한민국',
+    useType:      '주거용',
+    contractInfo: v('coName') ? '공동전차인' : '단독계약',
+    payCondition: v('payCondition') || '분할',
+    address:      v('address'),
+    buildingName: '',
+    roomNo:       '',
+    startDate:    startDate,
+    endDate:      endDate,
+    duration:     '',
+    depositRecov: 0,
+    deposit:      n('deposit'),
+    rent:         rent,
+    vat:          0,
+    mgmtFee:      mgmtFee,
+    totalRent:    rent + mgmtFee,
+    serviceFee:   0,
+    payDay:       '',
+    payMethod:    v('payMethod') || '선불',
+    tenantPhone:  v('tenantPhone'),
+    tenantIdNo:   v('tenantIdNo'),
+    tenantAddr:   v('tenantAddr'),
+    emergPhone:   '',
+    emergInfo:    '',
+    coName:       v('coName'),
+    coPhone:      v('coPhone'),
+    coIdNo:       v('coIdNo'),
+    coAddr:       v('coAddr'),
+    coEmergPhone: '',
+    coEmergInfo:  '',
+    contractDate: contractDate,
+    // 임대인 추가 (TSV용)
+    landlordPhone: v('landlordPhone'),
+    landlordAddr:  v('landlordAddr'),
+    bank:         v('bank'),
+    account:      v('account'),
+    acctHolder:   v('acctHolder')
+  };
+}
+
+// [v172] 수동 입력 데이터를 시트 입력용 TSV 한 줄로 변환
+function cG_buildTsvFromManual(d){
+  // 시트 컬럼 순서 추정: 계약번호 | 임차인 | 시작일 | 종료일 | 주소 | 보증금 | 월세 | 관리비 | 임대인 | 임대인연락처 | 은행 | 계좌
+  var cols = [d.contractNo, d.tenantName, d.startDate, d.endDate, d.address, d.deposit, d.rent, d.mgmtFee, d.landlordName, d.landlordPhone||'', d.bank||'', d.account||'', d.tenantPhone, d.tenantIdNo, d.coName||'', d.coPhone||'', d.coIdNo||''];
+  return cols.join('\t');
+}
+
+// [v172] 발행 버튼 — 모드별 분기
+function cG_submit(contractNo){
+  var mode = window._cG_mode || (contractNo ? 'search' : 'manual');
+  if (mode === 'manual') {
+    var d = cG_collectManualData();
+    if (!d.tenantName || !d.address) { alert('임차인 이름과 주소는 필수입니다.'); return; }
+    if (!d.rent) { alert('월세를 입력해주세요.'); return; }
+    var modal = document.getElementById('cG_modal');
+    if (modal) modal.remove();
+    // TSV 클립보드 복사 (best-effort)
+    try {
+      var tsv = cG_buildTsvFromManual(d);
+      navigator.clipboard.writeText(tsv).then(function(){
+        console.log('[v172] TSV copied to clipboard');
+      }).catch(function(){});
+    } catch(e){}
+    // PDF 생성 — 기존 빌더 재사용
+    var html = buildGuaranteezContractHtml(d, '', []);
+    var win = window.open('', '_blank', 'width=960,height=900,scrollbars=yes');
+    if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
+    win.document.write(html);
+    win.document.close();
+    setTimeout(function(){
+      alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 시트 입력용 TSV가 클립보드에 복사되었습니다.\n운영 시트의 적절한 행에 Cmd+V로 붙여넣을 수 있습니다.');
+    }, 500);
+  } else {
+    // 검색 모드 — 기존 함수
+    generateGuaranteezPdf(contractNo);
+  }
 }
 
 // [v156] 추가 계약자 카드 1개 삽입
