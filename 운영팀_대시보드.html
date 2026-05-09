@@ -12318,10 +12318,10 @@ function sumCalcKpi(){
   });
   kpi.avgResidence = residenceCount > 0 ? Math.round((totalMonths / residenceCount) * 10) / 10 : 0;
 
-  // 활성 계약 (계약상태가 종료/만기 아닌 것)
+  // [v207] 활성 계약 = 공실상태(BN열)가 '계약중' 인 행만 (이전: 부정 매칭으로 가계약/보류 등 포함되던 버그 수정)
   kpi.activeContracts = vacancyRawData.filter(function(v){
     var s = String(v.status||'').trim();
-    return s && s.indexOf('종료') < 0 && s.indexOf('만기') < 0 && s.indexOf('퇴실') < 0;
+    return s.indexOf('계약중') >= 0;
   }).length;
 
   // 신규 가계약 (이번달 — BI열 tentativeDate가 이번달)
@@ -12376,11 +12376,24 @@ function sumCalcKpi(){
   });
   kpi.earlyDelqRate = earlyTotal > 0 ? Math.round((earlyDelq / earlyTotal) * 1000) / 10 : 0;
 
-  // 분할 약정 활성 건수 (S열 payCondition !== 일시납)
+  // [v207] 분할 약정 활성 = 계약중 AND payCondition !== 일시납 (이전: 종료된 계약도 카운트되던 버그 수정)
   kpi.installmentDue = vacancyRawData.filter(function(v){
+    var s = String(v.status||'').trim();
+    if (s.indexOf('계약중') < 0) return false;
     var pc = String(v.payCondition||'').trim();
     return pc && pc.indexOf('일시납') < 0;
   }).length;
+
+  // [v207] 디버그: status 고유값 1회 출력 — 검증용
+  if (!window.__sumStatusValuesLogged) {
+    var statusSet = {};
+    vacancyRawData.forEach(function(v){
+      var s = String(v.status||'').trim() || '(빈값)';
+      statusSet[s] = (statusSet[s]||0) + 1;
+    });
+    console.log('[v207] 공실상태(BN) 분포:', statusSet);
+    window.__sumStatusValuesLogged = true;
+  }
 
   return kpi;
 }
