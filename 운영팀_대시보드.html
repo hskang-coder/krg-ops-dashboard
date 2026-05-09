@@ -1013,6 +1013,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   <div class="view-tabs">
     <button class="view-tab active" onclick="switchView('summary')">📈 DashBoard</button>
     <button class="view-tab"        onclick="switchView('dashboard')">📊 운영관리</button>
+    <button class="view-tab"        onclick="switchView('opskpi')">📊 운영관리 (KPI)</button>
     <button class="view-tab"        onclick="switchView('checklist')">✅ 업무루틴관리</button>
     <button class="view-tab"        onclick="switchView('contractMgmt')">📑 계약관리</button>
     <button class="view-tab"        onclick="switchView('contract')">📋 입주관리</button>
@@ -1281,6 +1282,10 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   </div>
   <div id="summaryView" class="view-content active">
     <div class="sum-inner"></div>
+  </div>
+  <!-- [Phase 2a] 운영관리 (KPI) — 격리된 신규 탭 -->
+  <div id="opskpiView" class="view-content">
+    <div class="okpi-inner"></div>
   </div>
 </div>
 
@@ -1560,20 +1565,23 @@ function switchView(view) {
   document.getElementById('renewalView').classList.toggle('active', view === 'renewal');  // [v43]
   document.getElementById('contractMgmtView').classList.toggle('active', view === 'contractMgmt');  // [v74]
   document.getElementById('summaryView').classList.toggle('active', view === 'summary'); // [v102]
+  // [Phase 2a] 운영관리 (KPI) 탭 — 격리 모듈
+  try { document.getElementById('opskpiView').classList.toggle('active', view === 'opskpi'); } catch(e){}
+  if (view === 'opskpi') { try { okpi_render(); } catch(e) { console.error('[okpi] render error:', e); } }
   if (view === 'delinquency') renderDelinquency();
   if (view === 'renewal') renderRenewalView();  // [v43]
   if (view === 'contractMgmt') renderContractMgmtView();  // [v74]
   if (view === 'summary') renderSummaryDashboard(); // [v102]
   document.getElementById('personTabsRow').style.display = view === 'checklist' ? 'flex' : 'none';
   // [v74] contractMgmt 추가
-  const titles = { dashboard:'운영관리', checklist:'업무 체크리스트', contract:'입주관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리', contractMgmt:'계약관리', summary:'K.R.G. Enterprize' };
+  const titles = { dashboard:'운영관리', opskpi:'운영관리 (KPI)', checklist:'업무 체크리스트', contract:'입주관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리', contractMgmt:'계약관리', summary:'K.R.G. Enterprize' };
   document.getElementById('pageTitle').textContent = titles[view] || '';
   document.getElementById('refreshBtn').style.display = view === 'dashboard' ? '' : 'none';
 
   // [v74] 7개 탭 (dashboard/checklist/contract/contractMgmt/payment/delinquency/renewal)
   document.querySelectorAll('.view-tab').forEach((btn,i) => {
     // [v101] DOM 순서와 일치 (v94: dashboard/checklist/contractMgmt/contract/renewal/payment/delinquency)
-    btn.classList.toggle('active', ['summary','dashboard','checklist','contractMgmt','contract','renewal','payment','delinquency'][i] === view);
+    btn.classList.toggle('active', ['summary','dashboard','opskpi','checklist','contractMgmt','contract','renewal','payment','delinquency'][i] === view);
   });
 
   if (view === 'checklist') {
@@ -13560,6 +13568,393 @@ function sumPlaceholderSections(){
     + '</div>'
     + '<div class="sum-sticky">' + sumRenderSidebar() + '</div>'
     + '</div>';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// [Phase 2a] 운영관리 (KPI) — 격리 모듈 (okpi_* 네임스페이스)
+// 데이터 소스: 기존 vacancyRawData (gid=1953907648) + daeungRawData (gid=554798125)
+// 절대 기존 함수/변수/CSS 수정 없음. 모든 코드 try/catch 래핑.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// CSS 1회 주입 (격리 클래스명)
+function okpi_injectCss(){
+  if (document.getElementById('okpi-style')) return;
+  var s = document.createElement('style');
+  s.id = 'okpi-style';
+  s.textContent = ''
+    + '.okpi-wrap{padding:16px 20px;max-width:1400px;margin:0 auto;font-family:"Noto Sans KR","Malgun Gothic",sans-serif;color:#1F2937}'
+    + '.okpi-controls{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}'
+    + '.okpi-btn{padding:6px 14px;border:1.5px solid #D1D5DB;background:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;color:#374151}'
+    + '.okpi-btn.active{background:#1B3976;color:#fff;border-color:#1B3976}'
+    + '.okpi-input{padding:6px 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:12px}'
+    + '.okpi-period-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}'
+    + '.okpi-period-card{background:#fff;border:1.5px solid #E5E7EB;border-radius:8px;padding:12px 14px}'
+    + '.okpi-period-card.active{border:2px solid #7C3AED;background:#F5F3FF}'
+    + '.okpi-period-label{font-size:11px;color:#6B7280;font-weight:600;margin-bottom:4px}'
+    + '.okpi-period-val{font-size:24px;font-weight:900;color:#1B3976;line-height:1}'
+    + '.okpi-period-val .unit{font-size:12px;color:#6B7280;font-weight:600;margin-left:2px}'
+    + '.okpi-period-cmp{font-size:10.5px;color:#6B7280;margin-top:4px}'
+    + '.okpi-period-cmp.up{color:#059669}'
+    + '.okpi-period-cmp.down{color:#DC2626}'
+    + '.okpi-person-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:16px}'
+    + '.okpi-person-card{background:#fff;border:1.5px solid #E5E7EB;border-radius:10px;padding:16px 18px}'
+    + '.okpi-person-card.c1{border-left:5px solid #1B3976}'
+    + '.okpi-person-card.c2{border-left:5px solid #7C3AED}'
+    + '.okpi-person-card.col{border-left:5px solid #059669}'
+    + '.okpi-person-card.del{border-left:5px solid #DC2626}'
+    + '.okpi-person-hd{display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #F3F4F6}'
+    + '.okpi-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff}'
+    + '.okpi-avatar.c1{background:#1B3976}.okpi-avatar.c2{background:#7C3AED}'
+    + '.okpi-avatar.col{background:#059669}.okpi-avatar.del{background:#DC2626}'
+    + '.okpi-person-name{font-size:16px;font-weight:800;color:#1F2937}'
+    + '.okpi-person-role{font-size:11.5px;color:#6B7280;margin-top:1px}'
+    + '.okpi-list{display:flex;flex-direction:column;gap:10px}'
+    + '.okpi-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:6px;background:#F9FAFB}'
+    + '.okpi-row.warn{background:#FEF3C7}.okpi-row.danger{background:#FEE2E2}.okpi-row.good{background:#F0FDF4}'
+    + '.okpi-name{font-size:12.5px;font-weight:700;color:#1F2937;margin-bottom:3px}'
+    + '.okpi-name .src{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9.5px;font-weight:600;margin-left:5px}'
+    + '.okpi-name .src.auto{background:#D1FAE5;color:#065F46}'
+    + '.okpi-name .src.kw{background:#FEF3C7;color:#78350F}'
+    + '.okpi-name .src.field{background:#DBEAFE;color:#1E40AF}'
+    + '.okpi-name .src.combo{background:#EDE9FE;color:#5B21B6}'
+    + '.okpi-formula{font-size:10.5px;color:#6B7280;line-height:1.4}'
+    + '.okpi-value{display:flex;flex-direction:column;align-items:flex-end;gap:2px}'
+    + '.okpi-num{font-size:22px;font-weight:900;color:#1B3976;line-height:1;font-variant-numeric:tabular-nums}'
+    + '.okpi-num.warn{color:#B45309}.okpi-num.danger{color:#991B1B}.okpi-num.good{color:#047857}'
+    + '.okpi-target{font-size:10.5px;color:#6B7280}'
+    + '.okpi-status{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px}'
+    + '.okpi-status.good{background:#D1FAE5;color:#065F46}'
+    + '.okpi-status.warn{background:#FED7AA;color:#9A3412}'
+    + '.okpi-status.danger{background:#FECACA;color:#991B1B}'
+    + '.okpi-empty{padding:30px;text-align:center;color:#9CA3AF;font-size:13px;background:#fff;border-radius:8px;border:1px dashed #D1D5DB}'
+    + '.okpi-section-title{font-size:13px;font-weight:800;color:#1B3976;margin:14px 0 8px;padding-bottom:6px;border-bottom:2px solid #E5E7EB;display:flex;align-items:center;gap:8px}'
+    + '.okpi-section-title .pill{background:#EFF6FF;color:#1B3976;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}';
+  document.head.appendChild(s);
+}
+
+// 상태 (격리)
+window._okpi = window._okpi || { period: 'day', date: null };
+
+// 헬퍼 — 날짜 파싱
+function okpi_parseDate(raw){
+  if (raw == null || raw === '') return null;
+  var s = String(raw).trim();
+  if (!s || s === '-') return null;
+  var m1 = s.match(/Date\((\d+),\s*(\d+),\s*(\d+)/);
+  if (m1) return new Date(+m1[1], +m1[2], +m1[3]);
+  var m2 = s.match(/(\d{4})[\s.\-\/]+(\d{1,2})[\s.\-\/]+(\d{1,2})/);
+  if (m2) return new Date(+m2[1], +m2[2]-1, +m2[3]);
+  var d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+function okpi_ymd(d){
+  if (!(d instanceof Date) || isNaN(d)) return '';
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function okpi_diffDays(a, b){
+  if (!a || !b) return null;
+  return Math.floor((a.getTime() - b.getTime()) / 86400000);
+}
+
+// 기간 범위 계산 (일/주/월)
+function okpi_getRange(period, anchorDate){
+  var a = anchorDate ? new Date(anchorDate) : new Date();
+  a.setHours(0,0,0,0);
+  if (period === 'day') return { start: new Date(a), end: new Date(a) };
+  if (period === 'week') {
+    var dow = a.getDay(); // 0=Sun
+    var diff = dow === 0 ? -6 : 1 - dow; // 월요일 시작
+    var s = new Date(a); s.setDate(a.getDate() + diff);
+    var e = new Date(s); e.setDate(s.getDate() + 6);
+    return { start: s, end: e };
+  }
+  // month
+  var ms = new Date(a.getFullYear(), a.getMonth(), 1);
+  var me = new Date(a.getFullYear(), a.getMonth()+1, 0);
+  return { start: ms, end: me };
+}
+
+// 행이 기간 안에 있는지 검사 (대응일 기준)
+function okpi_inRange(row, range){
+  var d = okpi_parseDate(row.date);
+  if (!d) return false;
+  d.setHours(0,0,0,0);
+  return d >= range.start && d <= range.end;
+}
+
+// 4명 KPI 계산
+function okpi_calcAll(){
+  var period = window._okpi.period || 'day';
+  var anchor = window._okpi.date || new Date();
+  var range = okpi_getRange(period, anchor);
+  var prevRange = (function(){
+    var s = new Date(range.start), e = new Date(range.end);
+    var span = (e - s) / 86400000 + 1;
+    var ps = new Date(s); ps.setDate(s.getDate() - span);
+    var pe = new Date(s); pe.setDate(s.getDate() - 1);
+    return { start: ps, end: pe };
+  })();
+
+  var vacRaw = (typeof vacancyRawData !== 'undefined' && Array.isArray(vacancyRawData)) ? vacancyRawData : [];
+  var daeRaw = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
+
+  // 일/주/월 비교 — 전체 처리 건수
+  var curTotal = daeRaw.filter(function(r){ return okpi_inRange(r, range); }).length;
+  var prevTotal = daeRaw.filter(function(r){ return okpi_inRange(r, prevRange); }).length;
+
+  // 헬퍼: 담당자별 행 카운트
+  var countBy = function(person, predicate){
+    return daeRaw.filter(function(r){
+      if (!okpi_inRange(r, range)) return false;
+      if (String(r.person||'').trim() !== person) return false;
+      return predicate ? predicate(r) : true;
+    }).length;
+  };
+  var hasKw = function(text, keywords){
+    var t = String(text||'').toLowerCase();
+    return keywords.some(function(k){ return t.indexOf(String(k).toLowerCase()) >= 0; });
+  };
+
+  // 고송미 KPI
+  var goSongmi = (function(){
+    // 입주 임박(시작일이 today~D+7) + 전자계약+수수료 모두 TRUE 비율
+    var today = new Date(); today.setHours(0,0,0,0);
+    var d7 = new Date(today); d7.setDate(today.getDate() + 7);
+    var imminent = vacRaw.filter(function(v){
+      var sd = okpi_parseDate(v.startDate);
+      return sd && sd >= today && sd <= d7;
+    });
+    var done1 = imminent.filter(function(v){ return v.eContract && v.feePaid; }).length;
+    var total1 = imminent.length;
+
+    // 입주 후 NAS 등록 (시작일이 today-7 ~ today, NAS=TRUE)
+    var dn7 = new Date(today); dn7.setDate(today.getDate() - 7);
+    var recent = vacRaw.filter(function(v){
+      var sd = okpi_parseDate(v.startDate);
+      return sd && sd >= dn7 && sd <= today;
+    });
+    var nasDone = recent.filter(function(v){ return v.nas; }).length;
+
+    // 신규 계약 처리 (가계약일이 기간 내)
+    var newC = vacRaw.filter(function(v){
+      var td = okpi_parseDate(v.tentativeDate);
+      return td && td >= range.start && td <= range.end;
+    }).length;
+    return { done1:done1, total1:total1, nasDone:nasDone, nasTotal:recent.length, newC:newC };
+  })();
+
+  // 이지희 KPI
+  var leeJihee = (function(){
+    var phone = countBy('이지희', function(r){ return hasKw(r.content, ['진행','위임','종료']); });
+    // D-30 갱신 홈버튼: 만기-today ≤ 30 + CC=TRUE
+    var today = new Date(); today.setHours(0,0,0,0);
+    var d30 = new Date(today); d30.setDate(today.getDate() + 30);
+    var renewTargets = vacRaw.filter(function(v){
+      var ed = okpi_parseDate(v.endDate);
+      return ed && ed >= today && ed <= d30;
+    });
+    var renewDone = renewTargets.filter(function(v){ return v.homeBtn; }).length;
+    // 갱신 거절/조건부 (메모 키워드)
+    var rejection = countBy('이지희', function(r){
+      var jt = String(r.jobType||'').trim();
+      return jt.indexOf('갱신') >= 0 && hasKw(r.content, ['거절','조건부']);
+    });
+    return { phone:phone, renewDone:renewDone, renewTotal:renewTargets.length, rejection:rejection };
+  })();
+
+  // 김영철 KPI
+  var kimYC = (function(){
+    var dueSet = countBy('김영철', function(r){
+      var jt = String(r.jobType||'').trim();
+      return jt.indexOf('수납') >= 0 && r.payDate && String(r.payDate).trim() !== '';
+    });
+    var paid = countBy('김영철', function(r){ return hasKw(r.content, ['완납']); });
+    var partial = countBy('김영철', function(r){ return hasKw(r.content, ['분납']); });
+    return { dueSet:dueSet, paid:paid, partial:partial };
+  })();
+
+  // 오진선 KPI
+  var ohJS = (function(){
+    var legal = countBy('오진선', function(r){ return hasKw(r.content, ['내용증명','지급명령','법조치']); });
+    var endDue = countBy('오진선', function(r){
+      return r.payDate && String(r.payDate).trim() !== '' && hasKw(r.content, ['종료','퇴실']);
+    });
+    var endPaid = countBy('오진선', function(r){
+      return hasKw(r.content, ['완납','분납']);
+    });
+    return { legal:legal, endDue:endDue, endPaid:endPaid };
+  })();
+
+  return {
+    period: period, range: range, prevRange: prevRange,
+    curTotal: curTotal, prevTotal: prevTotal,
+    goSongmi: goSongmi, leeJihee: leeJihee, kimYC: kimYC, ohJS: ohJS
+  };
+}
+
+// 상태 결정 (good/warn/danger)
+function okpi_status(num, den, thrGood, thrWarn){
+  if (!den) return { cls:'', txt:'—' };
+  var pct = num / den * 100;
+  if (pct >= thrGood) return { cls:'good',   txt:'✓ 정상' };
+  if (pct >= thrWarn) return { cls:'warn',   txt:'⚠ 주의' };
+  return { cls:'danger', txt:'🔴 위험' };
+}
+
+// 비율 KPI 행
+function okpi_rowRatio(label, src, formula, num, den, thrGood, thrWarn){
+  var st = okpi_status(num, den, thrGood, thrWarn);
+  var pct = den > 0 ? Math.round(num/den*100) : 0;
+  return ''
+    + '<div class="okpi-row ' + st.cls + '">'
+    + '<div class="okpi-info"><div class="okpi-name">' + label + ' <span class="src ' + (src.cls||'auto') + '">' + (src.txt||'자동') + '</span></div><div class="okpi-formula">' + formula + '</div></div>'
+    + '<div class="okpi-value"><div class="okpi-num ' + st.cls + '">' + num + '/' + den + '</div><div class="okpi-target">' + pct + '%</div><span class="okpi-status ' + st.cls + '">' + st.txt + '</span></div>'
+    + '</div>';
+}
+// 카운트 KPI 행
+function okpi_rowCount(label, src, formula, val){
+  return ''
+    + '<div class="okpi-row">'
+    + '<div class="okpi-info"><div class="okpi-name">' + label + ' <span class="src ' + (src.cls||'auto') + '">' + (src.txt||'자동') + '</span></div><div class="okpi-formula">' + formula + '</div></div>'
+    + '<div class="okpi-value"><div class="okpi-num">' + val + '</div><div class="okpi-target">건</div></div>'
+    + '</div>';
+}
+
+// 컨트롤 + 일/주/월 카드
+function okpi_renderTopBar(k){
+  var pf = function(p){ return window._okpi.period === p ? 'active' : ''; };
+  var diff = k.curTotal - k.prevTotal;
+  var diffPct = k.prevTotal > 0 ? Math.round(diff/k.prevTotal*100) : 0;
+  var dirCls = diff > 0 ? 'up' : (diff < 0 ? 'down' : '');
+  var dirArrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '·');
+  var periodLabel = window._okpi.period === 'day' ? '오늘' : (window._okpi.period === 'week' ? '이번주' : '이번달');
+  var prevLabel = window._okpi.period === 'day' ? '어제' : (window._okpi.period === 'week' ? '지난주' : '지난달');
+  var dateInput = okpi_ymd(window._okpi.date || new Date());
+  return ''
+    + '<div class="okpi-controls">'
+    +   '<span style="font-size:11px;color:#6B7280;margin-right:4px">기간:</span>'
+    +   '<button class="okpi-btn ' + pf('day') + '" onclick="okpi_setPeriod(\'day\')">일</button>'
+    +   '<button class="okpi-btn ' + pf('week') + '" onclick="okpi_setPeriod(\'week\')">주</button>'
+    +   '<button class="okpi-btn ' + pf('month') + '" onclick="okpi_setPeriod(\'month\')">월</button>'
+    +   '<span style="margin-left:12px;font-size:11px;color:#6B7280">기준일:</span>'
+    +   '<input type="date" class="okpi-input" value="' + dateInput + '" onchange="okpi_setDate(this.value)">'
+    +   '<button class="okpi-btn" style="margin-left:8px" onclick="okpi_setDate(null)">오늘</button>'
+    + '</div>'
+    + '<div class="okpi-period-bar">'
+    +   '<div class="okpi-period-card active"><div class="okpi-period-label">' + periodLabel + ' 처리 건수</div>'
+    +     '<div class="okpi-period-val">' + k.curTotal + '<span class="unit">건</span></div>'
+    +     '<div class="okpi-period-cmp ' + dirCls + '">' + dirArrow + ' ' + Math.abs(diff) + '건 (' + (diffPct>=0?'+':'') + diffPct + '%)</div>'
+    +   '</div>'
+    +   '<div class="okpi-period-card"><div class="okpi-period-label">' + prevLabel + ' 처리 건수</div>'
+    +     '<div class="okpi-period-val" style="color:#6B7280">' + k.prevTotal + '<span class="unit">건</span></div>'
+    +     '<div class="okpi-period-cmp">비교 기준</div>'
+    +   '</div>'
+    +   '<div class="okpi-period-card"><div class="okpi-period-label">기간</div>'
+    +     '<div class="okpi-period-val" style="font-size:14px;font-weight:700">' + okpi_ymd(k.range.start) + '<br>~ ' + okpi_ymd(k.range.end) + '</div>'
+    +   '</div>'
+    + '</div>';
+}
+
+// 4명 카드 렌더
+function okpi_renderPersonCards(k){
+  var src = {
+    auto:   { cls:'auto',   txt:'자동' },
+    kw:     { cls:'kw',     txt:'메모키워드' },
+    field:  { cls:'field',  txt:'D열' },
+    combo:  { cls:'combo',  txt:'조합' }
+  };
+  var go = k.goSongmi, lj = k.leeJihee, ky = k.kimYC, oh = k.ohJS;
+
+  return '<div class="okpi-person-grid">'
+    // 고송미
+    + '<div class="okpi-person-card c1">'
+    +   '<div class="okpi-person-hd"><div class="okpi-avatar c1">고</div><div><div class="okpi-person-name">고송미</div><div class="okpi-person-role">계약관리 · 스텝1 (입주 전 처리)</div></div></div>'
+    +   '<div class="okpi-list">'
+    +     okpi_rowRatio('입주 전 전자계약+수수료 완료', src.combo, '시작일 D-7~D0 / 둘 다 TRUE 비율', go.done1, go.total1, 90, 80)
+    +     okpi_rowRatio('입주 후 NAS 등록 (D+7)',     src.auto,  '시작일 D-7~D0 / NAS=TRUE 비율',    go.nasDone, go.nasTotal, 90, 80)
+    +     okpi_rowCount('신규 계약 처리',              src.auto,  '가계약일이 기간 내 행수',           go.newC)
+    +   '</div>'
+    + '</div>'
+    // 이지희
+    + '<div class="okpi-person-card c2">'
+    +   '<div class="okpi-person-hd"><div class="okpi-avatar c2">이</div><div><div class="okpi-person-name">이지희</div><div class="okpi-person-role">계약관리 · 스텝2 (계약·갱신·종료)</div></div></div>'
+    +   '<div class="okpi-list">'
+    +     okpi_rowCount('전화 종료 처리',              src.kw, '담당=이지희 + 메모 "진행/위임/종료"', lj.phone)
+    +     okpi_rowRatio('D-30 갱신 홈버튼 등록',       src.combo, '만기 D-30 대상 / CC=TRUE 비율',     lj.renewDone, lj.renewTotal, 90, 70)
+    +     okpi_rowCount('갱신 거절/조건부 대응',       src.kw, '담당=이지희 + 1차=갱신 + "거절/조건부"', lj.rejection)
+    +   '</div>'
+    + '</div>'
+    // 김영철
+    + '<div class="okpi-person-card col">'
+    +   '<div class="okpi-person-hd"><div class="okpi-avatar col">김</div><div><div class="okpi-person-name">김영철</div><div class="okpi-person-role">수납관리 (일단위 연체대응)</div></div></div>'
+    +   '<div class="okpi-list">'
+    +     okpi_rowCount('입금예정일 확정',             src.field, '담당=김영철 + 1차=수납 + D열 채워짐', ky.dueSet)
+    +     okpi_rowCount('완납 처리',                   src.kw, '담당=김영철 + 메모 "완납"',           ky.paid)
+    +     okpi_rowCount('분납 처리',                   src.kw, '담당=김영철 + 메모 "분납"',           ky.partial)
+    +   '</div>'
+    + '</div>'
+    // 오진선
+    + '<div class="okpi-person-card del">'
+    +   '<div class="okpi-person-hd"><div class="okpi-avatar del">오</div><div><div class="okpi-person-name">오진선</div><div class="okpi-person-role">연체관리 (법진행·종료대응)</div></div></div>'
+    +   '<div class="okpi-list">'
+    +     okpi_rowCount('법조치 대응',                 src.kw, '담당=오진선 + 메모 "내용증명/지급명령/법조치"', oh.legal)
+    +     okpi_rowCount('종료자 입금예정 확정',         src.combo, '담당=오진선 + D열 + 메모 "종료/퇴실"', oh.endDue)
+    +     okpi_rowCount('종료자 완납/분납',            src.kw, '담당=오진선 + 메모 "완납/분납"',      oh.endPaid)
+    +   '</div>'
+    + '</div>'
+    + '</div>';
+}
+
+// 컨트롤 핸들러
+function okpi_setPeriod(p){ window._okpi.period = p; okpi_render(); }
+function okpi_setDate(v){
+  if (!v) { window._okpi.date = null; }
+  else {
+    var parts = v.split('-');
+    window._okpi.date = new Date(+parts[0], +parts[1]-1, +parts[2]);
+  }
+  okpi_render();
+}
+
+// 데이터 보장 (필요 시 fetch)
+async function okpi_ensureData(){
+  try {
+    if (typeof vacancyRawData === 'undefined' || !Array.isArray(vacancyRawData) || !vacancyRawData.length) {
+      if (typeof fetchSheetByGid === 'function' && typeof parseVacancySheet === 'function') {
+        var v = await fetchSheetByGid('1953907648');
+        var newVac = parseVacancySheet(v);
+        if (Array.isArray(newVac) && newVac.length) window.vacancyRawData = newVac;
+      }
+    }
+    if (typeof daeungRawData === 'undefined' || !Array.isArray(daeungRawData) || !daeungRawData.length) {
+      if (typeof fetchSheetByGid === 'function' && typeof parseDailyReport === 'function') {
+        var d = await fetchSheetByGid('554798125');
+        var newDae = parseDailyReport(d);
+        if (Array.isArray(newDae) && newDae.length) window.daeungRawData = newDae;
+      }
+    }
+  } catch(e) { console.warn('[okpi] data fetch warn:', e); }
+}
+
+// 메인 렌더
+async function okpi_render(){
+  try {
+    okpi_injectCss();
+    var host = document.querySelector('#opskpiView .okpi-inner');
+    if (!host) return;
+    host.innerHTML = '<div class="okpi-empty">📡 KPI 데이터 로딩 중...</div>';
+    await okpi_ensureData();
+    var k = okpi_calcAll();
+    host.innerHTML = '<div class="okpi-wrap">'
+      + okpi_renderTopBar(k)
+      + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
+      + okpi_renderPersonCards(k)
+      + '</div>';
+  } catch(e) {
+    console.error('[okpi] render fatal:', e);
+    var host = document.querySelector('#opskpiView .okpi-inner');
+    if (host) host.innerHTML = '<div class="okpi-empty">❌ 렌더링 실패: ' + (e.message||e) + '</div>';
+  }
 }
 
 </script>
