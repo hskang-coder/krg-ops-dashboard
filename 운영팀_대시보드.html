@@ -14011,24 +14011,54 @@ function okpi_setDate(v){
   okpi_render();
 }
 
-// 데이터 보장 (필요 시 fetch)
+// 데이터 보장 (필요 시 fetch + 재시도 1회)
 async function okpi_ensureData(){
+  // vacancy
   try {
     if (typeof vacancyRawData === 'undefined' || !Array.isArray(vacancyRawData) || !vacancyRawData.length) {
-      if (typeof fetchSheetByGid === 'function' && typeof parseVacancySheet === 'function') {
-        var v = await fetchSheetByGid('1953907648');
-        var newVac = parseVacancySheet(v);
-        if (Array.isArray(newVac) && newVac.length) window.vacancyRawData = newVac;
+      for (var attempt = 1; attempt <= 2; attempt++) {
+        try {
+          if (typeof fetchSheetByGid === 'function' && typeof parseVacancySheet === 'function') {
+            var v = await fetchSheetByGid('1953907648');
+            var newVac = parseVacancySheet(v);
+            if (Array.isArray(newVac) && newVac.length) {
+              window.vacancyRawData = newVac;
+              console.log('[okpi] vacancy 로드:', newVac.length, '건 (시도' + attempt + ')');
+              break;
+            } else if (attempt === 2) {
+              console.warn('[okpi] vacancy fetch 2회 시도 모두 빈 응답');
+            }
+          }
+        } catch(e1) {
+          console.warn('[okpi] vacancy fetch 시도' + attempt + ' 실패:', e1);
+          if (attempt === 1) await new Promise(function(r){ setTimeout(r, 500); });
+        }
       }
     }
+  } catch(e) { console.warn('[okpi] vacancy ensure warn:', e); }
+  // daeung (운영기록)
+  try {
     if (typeof daeungRawData === 'undefined' || !Array.isArray(daeungRawData) || !daeungRawData.length) {
-      if (typeof fetchSheetByGid === 'function' && typeof parseDailyReport === 'function') {
-        var d = await fetchSheetByGid('554798125');
-        var newDae = parseDailyReport(d);
-        if (Array.isArray(newDae) && newDae.length) window.daeungRawData = newDae;
+      for (var attempt2 = 1; attempt2 <= 2; attempt2++) {
+        try {
+          if (typeof fetchSheetByGid === 'function' && typeof parseDailyReport === 'function') {
+            var d = await fetchSheetByGid('554798125');
+            var newDae = parseDailyReport(d);
+            if (Array.isArray(newDae) && newDae.length) {
+              window.daeungRawData = newDae;
+              console.log('[okpi] daeung 로드:', newDae.length, '건 (시도' + attempt2 + ')');
+              break;
+            } else if (attempt2 === 2) {
+              console.warn('[okpi] daeung fetch 2회 시도 모두 빈 응답 — KPI 0건 표시될 수 있음');
+            }
+          }
+        } catch(e2) {
+          console.warn('[okpi] daeung fetch 시도' + attempt2 + ' 실패:', e2);
+          if (attempt2 === 1) await new Promise(function(r){ setTimeout(r, 500); });
+        }
       }
     }
-  } catch(e) { console.warn('[okpi] data fetch warn:', e); }
+  } catch(e) { console.warn('[okpi] daeung ensure warn:', e); }
 }
 
 // [옵션 A] 업무 진척 미니 섹션 — 기존 PEOPLE/TASKS/ckLoad 재사용 (수정 X)
