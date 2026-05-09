@@ -13658,6 +13658,16 @@ function okpi_injectCss(){
     + '.okpi-vbar-val{font-size:11px;font-weight:800;color:#1F2937;white-space:nowrap}'
     + '.okpi-vbar-val small{font-weight:600;color:#6B7280;font-size:9px;margin-left:2px}'
     + '.okpi-vbar-lbl{font-size:9.5px;color:#6B7280;font-weight:600;white-space:nowrap}'
+    + '.okpi-vstack-wrap{display:flex;align-items:flex-end;gap:10px;height:120px;width:100%;justify-content:center;margin:6px 0 4px}'
+    + '.okpi-vstack-bar{width:36px;height:100%;display:flex;flex-direction:column;border-radius:4px;overflow:hidden;background:#F3F4F6;border:1px solid #E5E7EB}'
+    + '.okpi-stack-seg{transition:flex .4s;min-height:0}'
+    + '.okpi-vstack-info{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:2px;padding-bottom:6px}'
+    + '.okpi-vstack-total{font-size:20px;font-weight:900;color:#1F2937;line-height:1}'
+    + '.okpi-vstack-total-lbl{font-size:10px;color:#6B7280;font-weight:600}'
+    + '.okpi-vstack-legend{display:flex;flex-direction:column;gap:3px;font-size:9.5px;color:#4B5563;font-weight:600;align-items:flex-start;margin-top:6px;width:100%;padding:0 8px}'
+    + '.okpi-vstack-legend span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}'
+    + '.okpi-vstack-legend i{width:9px;height:9px;border-radius:2px;display:inline-block;flex-shrink:0}'
+    + '.okpi-vstack-legend small{color:#9CA3AF;font-size:9px;margin-left:auto;font-weight:500}'
     + '.okpi-status.good{background:#D1FAE5;color:#065F46}'
     + '.okpi-status.warn{background:#FED7AA;color:#9A3412}'
     + '.okpi-status.danger{background:#FECACA;color:#991B1B}'
@@ -13891,8 +13901,12 @@ function okpi_calcAll(){
     return { contacts:contacts, dueSet:dueSet, dueTotal:dueTotal, paid:paid, partial:partial };
   })();
 
-  // 오진선 KPI
+  // 오진선 KPI — 김영철과 동일 3개 항목 추가 (입금예정일확정/완납/분납)
   var ohJS = (function(){
+    var isCollectCat = function(r){
+      var jt = String(r.jobType||'').trim();
+      return jt.indexOf('수납') >= 0 || jt.indexOf('연체') >= 0;
+    };
     var legal = countBy('오진선', function(r){ return hasKw(r.content, ['내용증명','지급명령','법조치']); });
     var endDue = countBy('오진선', function(r){
       return r.payDate && String(r.payDate).trim() !== '' && hasKw(r.content, ['종료','퇴실']);
@@ -13900,14 +13914,26 @@ function okpi_calcAll(){
     var endPaid = countBy('오진선', function(r){
       return hasKw(r.content, ['완납','분납']);
     });
-    // [차트용] 오진선 unique 계약번호 + 메모 시작 "완납"/"분납"
+    // [차트용] 오진선 unique 계약번호
     var allOh = daeRaw.filter(function(r){ return okpi_inRange(r, range) && String(r.person||'').trim() === '오진선'; });
     var ohSet = {};
     allOh.forEach(function(r){ var no = String(r.no||'').trim(); if (no) ohSet[no] = true; });
     var contacts = Object.keys(ohSet).length;
+    // [차트용] 입금예정일 확정 (수납/연체 unique 계약 중 D열 입력)
+    var ohCollectMap = {};
+    allOh.forEach(function(r){
+      if (!isCollectCat(r)) return;
+      var no = String(r.no||'').trim();
+      if (!no) return;
+      if (!ohCollectMap[no]) ohCollectMap[no] = false;
+      if (r.payDate && String(r.payDate).trim() !== '') ohCollectMap[no] = true;
+    });
+    var ohDueSet = 0;
+    for (var k in ohCollectMap) { if (ohCollectMap[k]) ohDueSet++; }
+    // [차트용] 메모 시작 "완납"/"분납"
     var ohPaid = allOh.filter(function(r){ return String(r.content||'').trim().indexOf('완납') === 0; }).length;
     var ohPartial = allOh.filter(function(r){ return String(r.content||'').trim().indexOf('분납') === 0; }).length;
-    return { legal:legal, endDue:endDue, endPaid:endPaid, contacts:contacts, ohPaid:ohPaid, ohPartial:ohPartial };
+    return { legal:legal, endDue:endDue, endPaid:endPaid, contacts:contacts, ohDueSet:ohDueSet, ohPaid:ohPaid, ohPartial:ohPartial };
   })();
 
   return {
@@ -13988,51 +14014,73 @@ function okpi_renderTopBar(k){
     + '</div>';
 }
 
-// 4명 KPI 시각화 — 세로 클러스터 막대 (각자의 분모/분자 비교)
+// 4명 KPI 시각화 — 고송미 도넛, 나머지 단일 누적 막대 (분모=대응 100%)
 function okpi_renderChart(k){
   try {
     var go = k.goSongmi, lj = k.leeJihee, ky = k.kimYC, oh = k.ohJS;
     var periodLabel = window._okpi.period === 'day' ? '오늘' : (window._okpi.period === 'week' ? '이번주' : '이번달');
 
-    // 세로 막대 (절대값) — 각 사람의 모수 + 분자들을 옆으로 나란히
-    var renderVert = function(name, nameCls, total, totalLabel, segs){
-      // segs = [{label, value, color}, ...]
-      var maxVal = Math.max.apply(null, [total].concat(segs.map(function(s){ return s.value; })).concat([1]));
-      var totalH = total > 0 ? Math.round(total/maxVal*100) : 0;
-      var bars = '<div class="okpi-vbar"><div class="okpi-vbar-fill" style="height:' + totalH + '%;background:#9CA3AF"></div><div class="okpi-vbar-val">' + total + '</div><div class="okpi-vbar-lbl">' + totalLabel + '</div></div>'
-        + segs.map(function(s){
-          var pct = total > 0 ? Math.round(s.value/total*100) : 0;
-          var h = maxVal > 0 ? Math.round(s.value/maxVal*100) : 0;
-          return '<div class="okpi-vbar"><div class="okpi-vbar-fill" style="height:' + h + '%;background:' + s.color + '"></div><div class="okpi-vbar-val">' + s.value + '<small>(' + pct + '%)</small></div><div class="okpi-vbar-lbl">' + s.label + '</div></div>';
-        }).join('');
+    // ── 1. 고송미 — 도넛
+    var goPct = go.total1 > 0 ? Math.round(go.done1/go.total1*100) : 0;
+    var goCirc = 2 * Math.PI * 35;
+    var goDash = (goPct/100) * goCirc;
+    var goColor = goPct >= 90 ? '#10B981' : goPct >= 80 ? '#F59E0B' : '#EF4444';
+    var goChart = ''
+      + '<div class="okpi-vis-card">'
+      +   '<div class="okpi-vis-name c1">고송미</div>'
+      +   '<svg viewBox="0 0 100 100" class="okpi-donut">'
+      +     '<circle cx="50" cy="50" r="35" fill="none" stroke="#E5E7EB" stroke-width="14"/>'
+      +     '<circle cx="50" cy="50" r="35" fill="none" stroke="' + goColor + '" stroke-width="14" stroke-linecap="round" stroke-dasharray="' + goDash + ' ' + goCirc + '" transform="rotate(-90 50 50)"/>'
+      +     '<text x="50" y="48" text-anchor="middle" font-size="20" font-weight="900" fill="#1F2937">' + goPct + '%</text>'
+      +     '<text x="50" y="63" text-anchor="middle" font-size="9" fill="#6B7280">' + go.done1 + '/' + go.total1 + '</text>'
+      +   '</svg>'
+      +   '<div class="okpi-vis-label">입주 전 처리율</div>'
+      + '</div>';
+
+    // 단일 누적 막대 헬퍼 — 분모(total)=100%, segments stacked
+    var renderStack = function(name, nameCls, total, segs){
+      var sumVal = segs.reduce(function(a,s){ return a + s.value; }, 0);
+      var unhandled = Math.max(0, total - sumVal);
+      var pct = function(v){ return total > 0 ? (v/total*100).toFixed(2) : 0; };
+      // 위에서 아래로: 미처리(회색) → segs 역순(아래쪽이 첫 segment)
+      var segsHtml = '<div class="okpi-stack-seg" style="flex:0 0 ' + pct(unhandled) + '%;background:#E5E7EB" title="미처리 ' + unhandled + '"></div>';
+      for (var i = segs.length - 1; i >= 0; i--) {
+        var s = segs[i];
+        segsHtml += '<div class="okpi-stack-seg" style="flex:0 0 ' + pct(s.value) + '%;background:' + s.color + '" title="' + s.label + ' ' + s.value + '"></div>';
+      }
+      var legendHtml = segs.map(function(s){
+        var p = total > 0 ? Math.round(s.value/total*100) : 0;
+        return '<span><i style="background:' + s.color + '"></i>' + s.label + ' ' + s.value + '<small>(' + p + '%)</small></span>';
+      }).join('');
       return '<div class="okpi-vis-card">'
         + '<div class="okpi-vis-name ' + nameCls + '">' + name + '</div>'
-        + '<div class="okpi-vert-chart">' + bars + '</div>'
+        + '<div class="okpi-vstack-wrap">'
+        +   '<div class="okpi-vstack-bar">' + segsHtml + '</div>'
+        +   '<div class="okpi-vstack-info"><div class="okpi-vstack-total">' + total + '</div><div class="okpi-vstack-total-lbl">대응</div></div>'
+        + '</div>'
+        + '<div class="okpi-vstack-legend">' + legendHtml + '</div>'
         + '</div>';
     };
 
-    // 고송미 — 입주 전 전자계약+수수료 (모수: 입주 예정)
-    var goChart = renderVert('고송미', 'c1', go.total1, '입주', [
-      { label:'완료', value: go.done1, color:'#1B3976' }
-    ]);
-    // 이지희 — 종료 / 대응건수
-    var ljChart = renderVert('이지희', 'c2', lj.contacts, '대응', [
+    // ── 2. 이지희 — 단일 누적 막대 (종료 / 대응)
+    var ljChart = renderStack('이지희', 'c2', lj.contacts, [
       { label:'종료', value: lj.closed, color:'#7C3AED' }
     ]);
-    // 김영철 — 입금 + 완납분납 / 대응
-    var kyChart = renderVert('김영철', 'col', ky.contacts, '대응', [
-      { label:'입금', value: ky.dueSet, color:'#10B981' },
-      { label:'완분', value: ky.paid + ky.partial, color:'#F59E0B' }
+    // ── 3. 김영철 — 단일 누적 막대 (입금예정일확정 + 완납 + 분납 / 대응)
+    var kyChart = renderStack('김영철', 'col', ky.contacts, [
+      { label:'입금예정일확정', value: ky.dueSet, color:'#3B82F6' },
+      { label:'완납', value: ky.paid, color:'#10B981' },
+      { label:'분납', value: ky.partial, color:'#F59E0B' }
     ]);
-    // 오진선 — 입금 + 완납 + 분납 / 대응
-    var ohChart = renderVert('오진선', 'del', oh.contacts, '대응', [
-      { label:'입금', value: oh.endDue, color:'#3B82F6' },
+    // ── 4. 오진선 — 단일 누적 막대 (김영철과 동일 3개 항목)
+    var ohChart = renderStack('오진선', 'del', oh.contacts, [
+      { label:'입금예정일확정', value: oh.ohDueSet, color:'#3B82F6' },
       { label:'완납', value: oh.ohPaid, color:'#10B981' },
       { label:'분납', value: oh.ohPartial, color:'#F59E0B' }
     ]);
 
     return '<div class="okpi-chart-card">'
-      + '<div class="okpi-chart-title">📊 담당자별 ' + periodLabel + ' KPI 시각화 <span style="color:#9CA3AF;font-size:10.5px;font-weight:500">· 회색=대응(모수) / 컬러=처리</span></div>'
+      + '<div class="okpi-chart-title">📊 담당자별 ' + periodLabel + ' KPI 시각화</div>'
       + '<div class="okpi-vis-grid4">' + goChart + ljChart + kyChart + ohChart + '</div>'
       + '</div>';
   } catch(e){ console.warn('[okpi] chart:', e); return ''; }
