@@ -13627,7 +13627,28 @@ function okpi_injectCss(){
     + '.okpi-status.danger{background:#FECACA;color:#991B1B}'
     + '.okpi-empty{padding:30px;text-align:center;color:#9CA3AF;font-size:13px;background:#fff;border-radius:8px;border:1px dashed #D1D5DB}'
     + '.okpi-section-title{font-size:13px;font-weight:800;color:#1B3976;margin:14px 0 8px;padding-bottom:6px;border-bottom:2px solid #E5E7EB;display:flex;align-items:center;gap:8px}'
-    + '.okpi-section-title .pill{background:#EFF6FF;color:#1B3976;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}';
+    + '.okpi-section-title .pill{background:#EFF6FF;color:#1B3976;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}'
+    + '.okpi-ck-table{width:100%;border-collapse:separate;border-spacing:6px;margin-bottom:8px}'
+    + '.okpi-ck-table thead th{background:#F3F4F6;color:#6B7280;font-size:11px;font-weight:700;padding:8px;border-radius:6px}'
+    + '.okpi-ck-table thead th:first-child{background:transparent;text-align:left}'
+    + '.okpi-ck-name{padding:10px 14px;background:#F9FAFB;border-radius:6px;font-weight:700;color:#1F2937;display:flex;align-items:center;gap:8px;font-size:13px;min-width:120px}'
+    + '.okpi-ck-avatar{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;background:#6B7280}'
+    + '.okpi-ck-avatar.av-blue{background:#2563A8}.okpi-ck-avatar.av-purple{background:#7C3AED}.okpi-ck-avatar.av-green{background:#059669}'
+    + '.okpi-ck-cell{padding:10px 12px;border-radius:6px;background:#fff;border:1px solid #E5E7EB;cursor:pointer;text-align:center;transition:transform .1s,box-shadow .15s}'
+    + '.okpi-ck-cell:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.08)}'
+    + '.okpi-ck-cell.good{background:#F0FDF4;border-color:#86EFAC}'
+    + '.okpi-ck-cell.mid{background:#FEF3C7;border-color:#FCD34D}'
+    + '.okpi-ck-cell.low{background:#FEE2E2;border-color:#FCA5A5}'
+    + '.okpi-ck-cell.na{background:#F9FAFB;color:#9CA3AF;cursor:default}'
+    + '.okpi-ck-pct{font-size:18px;font-weight:900;color:#1B3976;line-height:1.1}'
+    + '.okpi-ck-cell.good .okpi-ck-pct{color:#047857}'
+    + '.okpi-ck-cell.mid .okpi-ck-pct{color:#B45309}'
+    + '.okpi-ck-cell.low .okpi-ck-pct{color:#991B1B}'
+    + '.okpi-ck-pct.na{font-size:13px;color:#9CA3AF;font-weight:700}'
+    + '.okpi-ck-meta{font-size:10.5px;color:#6B7280;font-weight:600;margin-top:2px}'
+    + '.okpi-ck-bar{width:100%;height:4px;background:#E5E7EB;border-radius:2px;margin-top:5px;overflow:hidden}'
+    + '.okpi-ck-bar-fill{height:100%;background:#1B3976;transition:width .3s}'
+    + '.okpi-ck-bar-fill.good{background:#10B981}.okpi-ck-bar-fill.mid{background:#F59E0B}.okpi-ck-bar-fill.low{background:#EF4444}';
   document.head.appendChild(s);
 }
 
@@ -13935,6 +13956,71 @@ async function okpi_ensureData(){
   } catch(e) { console.warn('[okpi] data fetch warn:', e); }
 }
 
+// [옵션 A] 업무 진척 미니 섹션 — 기존 PEOPLE/TASKS/ckLoad 재사용 (수정 X)
+function okpi_renderChecklistMini(){
+  try {
+    if (typeof PEOPLE === 'undefined' || typeof TASKS === 'undefined' || typeof ckLoad !== 'function') {
+      return ''; // 체크리스트 모듈 미로드 시 섹션 숨김
+    }
+    var periods = ['daily','weekly','monthly'];
+    var pLabels = { daily:'일', weekly:'주', monthly:'월' };
+    var rows = PEOPLE.map(function(p){
+      var cells = periods.map(function(period){
+        try {
+          var tasks = (TASKS[p.key] && TASKS[p.key][period]) || [];
+          var total = tasks.length;
+          if (total === 0) {
+            return '<td class="okpi-ck-cell na" onclick="okpi_jumpToCk(\'' + p.key + '\',\'' + period + '\')">'
+              + '<div class="okpi-ck-pct na">N/A</div>'
+              + '<div class="okpi-ck-meta">없음</div>'
+              + '</td>';
+          }
+          var state = ckLoad(p.key, period) || {};
+          var done = tasks.filter(function(t){ return state[t.id]; }).length;
+          var pct = Math.round(done/total*100);
+          var cls = pct === 100 ? 'good' : (pct >= 50 ? 'mid' : 'low');
+          return '<td class="okpi-ck-cell ' + cls + '" onclick="okpi_jumpToCk(\'' + p.key + '\',\'' + period + '\')">'
+            + '<div class="okpi-ck-pct">' + pct + '%</div>'
+            + '<div class="okpi-ck-meta">' + done + '/' + total + '</div>'
+            + '<div class="okpi-ck-bar"><div class="okpi-ck-bar-fill ' + cls + '" style="width:' + pct + '%"></div></div>'
+            + '</td>';
+        } catch(e) {
+          return '<td class="okpi-ck-cell na">—</td>';
+        }
+      }).join('');
+      return '<tr>'
+        + '<td class="okpi-ck-name"><span class="okpi-ck-avatar ' + (p.avClass||'') + '">' + (p.name||'?').charAt(0) + '</span>' + (p.name||'') + '</td>'
+        + cells
+        + '</tr>';
+    }).join('');
+    return ''
+      + '<div class="okpi-section-title" style="margin-top:18px">📅 업무 진척 (체크리스트) <span class="pill">클릭 시 업무루틴관리 이동</span>'
+      +   '<button class="okpi-btn" style="margin-left:auto;background:#7C3AED;color:#fff;border-color:#7C3AED" onclick="okpi_jumpToCk()">전체 보기 →</button>'
+      + '</div>'
+      + '<table class="okpi-ck-table">'
+      +   '<thead><tr><th></th><th>일</th><th>주</th><th>월</th></tr></thead>'
+      +   '<tbody>' + rows + '</tbody>'
+      + '</table>';
+  } catch(e) {
+    console.warn('[okpi] checklist mini render warn:', e);
+    return '';
+  }
+}
+
+// 진척 셀 클릭 시 업무루틴관리 탭으로 이동 + 사람/기간 자동 선택
+function okpi_jumpToCk(person, period){
+  try {
+    if (typeof switchView !== 'function') return;
+    switchView('checklist');
+    setTimeout(function(){
+      try {
+        if (person && typeof selectPerson === 'function') selectPerson(person);
+        if (period && typeof switchPeriod === 'function') switchPeriod(period);
+      } catch(e){ console.warn('[okpi] jumpToCk inner warn:', e); }
+    }, 80);
+  } catch(e){ console.warn('[okpi] jumpToCk warn:', e); }
+}
+
 // 메인 렌더
 async function okpi_render(){
   try {
@@ -13948,6 +14034,7 @@ async function okpi_render(){
       + okpi_renderTopBar(k)
       + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
       + okpi_renderPersonCards(k)
+      + okpi_renderChecklistMini()
       + '</div>';
   } catch(e) {
     console.error('[okpi] render fatal:', e);
