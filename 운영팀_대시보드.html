@@ -1604,6 +1604,30 @@ function switchView(view) {
       }).catch(() => { daeungRawData = []; });
     }
   }
+  // [v202] 수납관리 디폴트 — 오늘 ~ 오늘+1 자동 입력 후 즉시 조회
+  if (view === 'payment') {
+    try {
+      var fEl = document.getElementById('ptDateFrom');
+      var tEl = document.getElementById('ptDateTo');
+      if (fEl && tEl) {
+        var fmtYMD = function(d){
+          var y = d.getFullYear();
+          var m = String(d.getMonth()+1).padStart(2,'0');
+          var dd = String(d.getDate()).padStart(2,'0');
+          return y + '-' + m + '-' + dd;
+        };
+        // 사용자가 이미 입력한 값이 없을 때만 디폴트 세팅 (재진입 시 사용자 선택 보존)
+        if (!fEl.value && !tEl.value) {
+          var today = new Date(); today.setHours(0,0,0,0);
+          var tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+          fEl.value = fmtYMD(today);
+          tEl.value = fmtYMD(tomorrow);
+          // 자동 조회 — 데이터 로드 후 렌더
+          if (typeof loadPaymentTargets === 'function') loadPaymentTargets();
+        }
+      }
+    } catch(e) { console.warn('[v202] payment default date set failed:', e); }
+  }
 }
 
 // ═══════════════════════════════════════════
