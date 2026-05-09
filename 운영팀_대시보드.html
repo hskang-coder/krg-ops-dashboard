@@ -14012,6 +14012,7 @@ function okpi_setDate(v){
 }
 
 // 데이터 보장 (필요 시 fetch + 재시도 1회)
+// [중요] vacancyRawData / daeungRawData는 let 변수라 window.* 할당이 아니라 직접 할당해야 함
 async function okpi_ensureData(){
   // vacancy
   try {
@@ -14022,7 +14023,7 @@ async function okpi_ensureData(){
             var v = await fetchSheetByGid('1953907648');
             var newVac = parseVacancySheet(v);
             if (Array.isArray(newVac) && newVac.length) {
-              window.vacancyRawData = newVac;
+              vacancyRawData = newVac; // [fix] let 변수 직접 할당
               console.log('[okpi] vacancy 로드:', newVac.length, '건 (시도' + attempt + ')');
               break;
             } else if (attempt === 2) {
@@ -14045,7 +14046,7 @@ async function okpi_ensureData(){
             var d = await fetchSheetByGid('554798125');
             var newDae = parseDailyReport(d);
             if (Array.isArray(newDae) && newDae.length) {
-              window.daeungRawData = newDae;
+              daeungRawData = newDae; // [fix] let 변수 직접 할당
               console.log('[okpi] daeung 로드:', newDae.length, '건 (시도' + attempt2 + ')');
               break;
             } else if (attempt2 === 2) {
@@ -14438,7 +14439,7 @@ async function okpi_ensureRefresh(){
     if (typeof fetchSheetByGid === 'function' && typeof parseDailyReport === 'function') {
       var d = await fetchSheetByGid('554798125');
       var newDae = parseDailyReport(d);
-      if (Array.isArray(newDae)) window.daeungRawData = newDae;
+      if (Array.isArray(newDae) && newDae.length) daeungRawData = newDae; // [fix] let 직접 할당
     }
     okpi_render();
   } catch(e){ console.warn('[okpi] refresh:', e); }
