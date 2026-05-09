@@ -1887,7 +1887,7 @@ function parseVacancySheet(resp) {
   const partnerNameIdx  = 63; // BL열 = 부동산명
   const partnerPersonIdx= 64; // BM열 = 부동산 계약담당자
   // [v81] 계약종류, 원본도착
-  const contractKindIdx = 10; // K열 = 계약종류
+  const contractKindIdx = 10; // K열 = 계약종류 / [v210] 계약상태로도 사용 (계약중/정상/예정)
   // [v148] 계약물건 컬럼 (입금내역서용)
   const propAddrIdx     = 19; // T열 = 건물주소
   const propBuildingIdx = 20; // U열 = 건물명
@@ -1945,6 +1945,7 @@ function parseVacancySheet(resp) {
       partnerPerson: cell(partnerPersonIdx), // BM열: 부동산 계약담당자
       // [v81]
       contractKind:  cell(contractKindIdx),  // K열: 계약종류
+      kStatus:       cell(contractKindIdx),  // [v210] K열 alias for KPI 활성계약 카운트 (계약중/정상/예정)
       origDelivered: (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[origDeliveredIdx] && (c[origDeliveredIdx].v != null ? c[origDeliveredIdx].v : c[origDeliveredIdx].f)),
       // [v85] 시작일 (W열) — 진척/통계의 출력 기준
       startDate:     cell(startDateIdx),
@@ -12318,27 +12319,15 @@ function sumCalcKpi(){
   });
   kpi.avgResidence = residenceCount > 0 ? Math.round((totalMonths / residenceCount) * 10) / 10 : 0;
 
-  // [v207/v208/v209] 활성 계약 — 적응형 매칭
-  // 1순위: 긍정 매칭 (계약중|정상)
-  // 2순위 (1순위 0건일 때 폴백): 부정 매칭 (NOT 종료/만기/퇴실/해지)
-  // 빈 status는 항상 제외
-  var isActiveStatusPositive = function(s){
-    s = String(s||'').trim();
-    if (!s) return false;
-    return s.indexOf('계약중') >= 0 || s.indexOf('정상') >= 0;
+  // [v210] 활성 계약 — gid=1953907648 K열 (kStatus) 기준
+  // 활성 = 계약중 / 정상 / 예정 (3개 모두 활성으로 카운트)
+  var isActiveStatus = function(v){
+    var k = String(v && v.kStatus || '').trim();
+    if (!k) return false;
+    return k === '계약중' || k === '정상' || k === '예정'
+        || k.indexOf('계약중') >= 0 || k.indexOf('정상') >= 0 || k.indexOf('예정') >= 0;
   };
-  var isActiveStatusNegative = function(s){
-    s = String(s||'').trim();
-    if (!s) return false;
-    return s.indexOf('종료') < 0 && s.indexOf('만기') < 0 && s.indexOf('퇴실') < 0 && s.indexOf('해지') < 0 && s.indexOf('삭제') < 0 && s.indexOf('철회') < 0;
-  };
-  var positiveCount = vacancyRawData.filter(function(v){ return isActiveStatusPositive(v.status); }).length;
-  var isActiveStatus = positiveCount > 0 ? isActiveStatusPositive : isActiveStatusNegative;
-  kpi.activeContracts = positiveCount > 0 ? positiveCount : vacancyRawData.filter(function(v){ return isActiveStatusNegative(v.status); }).length;
-  if (positiveCount === 0 && !window.__sumActiveFallbackLogged) {
-    console.warn('[v209] 활성계약 긍정매칭 0건 → 부정매칭 폴백 적용. 콘솔의 [v207] 공실상태 분포 확인 필요.');
-    window.__sumActiveFallbackLogged = true;
-  }
+  kpi.activeContracts = vacancyRawData.filter(isActiveStatus).length;
 
   // 신규 가계약 (이번달 — BI열 tentativeDate가 이번달)
   var today = new Date();
@@ -12392,21 +12381,24 @@ function sumCalcKpi(){
   });
   kpi.earlyDelqRate = earlyTotal > 0 ? Math.round((earlyDelq / earlyTotal) * 1000) / 10 : 0;
 
-  // [v207/v208] 분할 약정 활성 = (계약중|정상) AND payCondition !== 일시납
+  // [v210] 분할 약정 활성 = K열 활성(계약중|정상|예정) AND payCondition !== 일시납
   kpi.installmentDue = vacancyRawData.filter(function(v){
-    if (!isActiveStatus(v.status)) return false;
+    if (!isActiveStatus(v)) return false;
     var pc = String(v.payCondition||'').trim();
     return pc && pc.indexOf('일시납') < 0;
   }).length;
 
-  // [v207] 디버그: status 고유값 1회 출력 — 검증용
+  // [v210] 디버그: K열(kStatus) 고유값 1회 출력 — 검증용
   if (!window.__sumStatusValuesLogged) {
-    var statusSet = {};
+    var kSet = {}, bnSet = {};
     vacancyRawData.forEach(function(v){
-      var s = String(v.status||'').trim() || '(빈값)';
-      statusSet[s] = (statusSet[s]||0) + 1;
+      var k = String(v.kStatus||'').trim() || '(빈값)';
+      var s = String(v.status||'').trim()  || '(빈값)';
+      kSet[k]  = (kSet[k]||0)  + 1;
+      bnSet[s] = (bnSet[s]||0) + 1;
     });
-    console.log('[v207] 공실상태(BN) 분포:', statusSet);
+    console.log('[v210] K열(계약상태) 분포:', kSet);
+    console.log('[v210] BN열(공실상태) 분포:', bnSet);
     window.__sumStatusValuesLogged = true;
   }
 
