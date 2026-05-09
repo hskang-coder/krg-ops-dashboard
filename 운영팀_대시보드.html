@@ -12318,13 +12318,27 @@ function sumCalcKpi(){
   });
   kpi.avgResidence = residenceCount > 0 ? Math.round((totalMonths / residenceCount) * 10) / 10 : 0;
 
-  // [v207/v208] 활성 계약 = 공실상태(BN열)가 '계약중' 또는 '정상' 인 행 (v46에서 표시만 통일, raw는 '정상' 가능성)
-  var isActiveStatus = function(s){
+  // [v207/v208/v209] 활성 계약 — 적응형 매칭
+  // 1순위: 긍정 매칭 (계약중|정상)
+  // 2순위 (1순위 0건일 때 폴백): 부정 매칭 (NOT 종료/만기/퇴실/해지)
+  // 빈 status는 항상 제외
+  var isActiveStatusPositive = function(s){
     s = String(s||'').trim();
     if (!s) return false;
     return s.indexOf('계약중') >= 0 || s.indexOf('정상') >= 0;
   };
-  kpi.activeContracts = vacancyRawData.filter(function(v){ return isActiveStatus(v.status); }).length;
+  var isActiveStatusNegative = function(s){
+    s = String(s||'').trim();
+    if (!s) return false;
+    return s.indexOf('종료') < 0 && s.indexOf('만기') < 0 && s.indexOf('퇴실') < 0 && s.indexOf('해지') < 0 && s.indexOf('삭제') < 0 && s.indexOf('철회') < 0;
+  };
+  var positiveCount = vacancyRawData.filter(function(v){ return isActiveStatusPositive(v.status); }).length;
+  var isActiveStatus = positiveCount > 0 ? isActiveStatusPositive : isActiveStatusNegative;
+  kpi.activeContracts = positiveCount > 0 ? positiveCount : vacancyRawData.filter(function(v){ return isActiveStatusNegative(v.status); }).length;
+  if (positiveCount === 0 && !window.__sumActiveFallbackLogged) {
+    console.warn('[v209] 활성계약 긍정매칭 0건 → 부정매칭 폴백 적용. 콘솔의 [v207] 공실상태 분포 확인 필요.');
+    window.__sumActiveFallbackLogged = true;
+  }
 
   // 신규 가계약 (이번달 — BI열 tentativeDate가 이번달)
   var today = new Date();
