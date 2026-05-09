@@ -13824,14 +13824,21 @@ function okpi_calcAll(){
   })();
 
   // 김영철 KPI
-  // [수정] 입금예정일 확정 = 대응일 기준 D열(납부예정일) 입력 카운트 (1차 카테고리 필터 제거)
+  // [수정] 입금예정일 확정 = 비율 KPI
+  //   분모: 담당=김영철 + 1차∈{수납관리|연체관리}
+  //   분자: 그 중 D열(납부예정일) 입력된 행
   var kimYC = (function(){
+    var isCollectCat = function(r){
+      var jt = String(r.jobType||'').trim();
+      return jt.indexOf('수납') >= 0 || jt.indexOf('연체') >= 0;
+    };
+    var dueTotal = countBy('김영철', isCollectCat);
     var dueSet = countBy('김영철', function(r){
-      return r.payDate && String(r.payDate).trim() !== '';
+      return isCollectCat(r) && r.payDate && String(r.payDate).trim() !== '';
     });
     var paid = countBy('김영철', function(r){ return hasKw(r.content, ['완납']); });
     var partial = countBy('김영철', function(r){ return hasKw(r.content, ['분납']); });
-    return { dueSet:dueSet, paid:paid, partial:partial };
+    return { dueSet:dueSet, dueTotal:dueTotal, paid:paid, partial:partial };
   })();
 
   // 오진선 KPI
@@ -13980,7 +13987,7 @@ function okpi_renderPersonCards(k){
   // 카드별 카운트 KPI max — progress bar 스케일 기준
   var goCntMax = Math.max(go.newC, 1);
   var ljCntMax = Math.max(lj.phone, lj.rejection, 1);
-  var kyCntMax = Math.max(ky.dueSet, ky.paid, ky.partial, 1);
+  var kyCntMax = Math.max(ky.paid, ky.partial, 1);
   var ohCntMax = Math.max(oh.legal, oh.endDue, oh.endPaid, 1);
 
   return '<div class="okpi-person-grid">'
@@ -14006,7 +14013,7 @@ function okpi_renderPersonCards(k){
     + '<div class="okpi-person-card col">'
     +   '<div class="okpi-person-hd"><div class="okpi-avatar col">김</div><div><div class="okpi-person-name">김영철 <span class="okpi-person-total">' + tKy + '건</span></div><div class="okpi-person-role">수납관리 (일단위 연체대응)</div></div></div>'
     +   '<div class="okpi-list">'
-    +     okpi_rowCount('입금예정일 확정',             src.field, '담당=김영철 + D열 채워짐', ky.dueSet, kyCntMax, 'col')
+    +     okpi_rowRatio('입금예정일 확정',             src.combo, '수납/연체 카테고리 / D열 입력 비율', ky.dueSet, ky.dueTotal, 90, 70)
     +     okpi_rowCount('완납 처리',                   src.kw, '담당=김영철 + 메모 "완납"',           ky.paid, kyCntMax, 'col')
     +     okpi_rowCount('분납 처리',                   src.kw, '담당=김영철 + 메모 "분납"',           ky.partial, kyCntMax, 'col')
     +   '</div>'
