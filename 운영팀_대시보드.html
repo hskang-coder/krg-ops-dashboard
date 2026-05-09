@@ -1566,7 +1566,7 @@ function switchView(view) {
   document.getElementById('summaryView').classList.toggle('active', view === 'summary'); // [v102]
   // [Phase 2a] 운영관리 (KPI) 탭 — 격리 모듈
   try { document.getElementById('opskpiView').classList.toggle('active', view === 'opskpi'); } catch(e){}
-  if (view === 'opskpi') { try { okpi_render(); } catch(e) { console.error('[okpi] render error:', e); } }
+  if (view === 'opskpi') { try { if (typeof okpi_syncFromGlobal === 'function') okpi_syncFromGlobal(); okpi_render(); } catch(e) { console.error('[okpi] render error:', e); } }
   if (view === 'delinquency') renderDelinquency();
   if (view === 'renewal') renderRenewalView();  // [v43]
   if (view === 'contractMgmt') renderContractMgmtView();  // [v74]
@@ -13659,7 +13659,7 @@ function okpi_injectCss(){
     + '.okpi-ck-bar-fill{height:100%;background:#1B3976;transition:width .3s}'
     + '.okpi-ck-bar-fill.good{background:#10B981}.okpi-ck-bar-fill.mid{background:#F59E0B}.okpi-ck-bar-fill.low{background:#EF4444}'
     + '.okpi-form-wrap{background:#fff;border:1.5px solid #E5E7EB;border-radius:8px;padding:10px 12px;margin-bottom:12px;position:relative}'
-    + '.okpi-form-row{display:grid;grid-template-columns:0.7fr 0.7fr 0.85fr 1fr 0.65fr 1.2fr 0.85fr 1.5fr 0.5fr;gap:6px;align-items:end}'
+    + '.okpi-form-row{display:grid;grid-template-columns:0.7fr 0.7fr 0.9fr 1.1fr 1.3fr 0.95fr 1.7fr 0.5fr;gap:6px;align-items:end}'
     + '.okpi-fld{min-width:0;position:relative}'
     + '.okpi-fld label{display:block;font-size:9.5px;color:#6B7280;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + '.okpi-fld-input{width:100%;height:30px;padding:0 8px;border:1.5px solid #D1D5DB;border-radius:5px;font-size:11.5px;box-sizing:border-box;outline:none;background:#fff;font-family:inherit;color:#1F2937}'
@@ -14221,12 +14221,10 @@ function okpi_form_pickResult(rawJson){
     var info = document.getElementById('okpiF_info');
     var hContractNo = document.getElementById('okpiF_h_contractNo');
     var hTenant = document.getElementById('okpiF_h_tenant');
-    var sTarget = document.getElementById('okpiF_target');
     if (inp) inp.value = r.name || '';
     if (box) { box.style.display = 'none'; box.innerHTML = ''; }
     if (hContractNo) hContractNo.value = r.no || '';
     if (hTenant) hTenant.value = r.name || '';
-    if (sTarget) sTarget.value = r.kind === '임대인' ? '임대인' : '계약자';
     if (info) {
       var bits = [];
       bits.push('<b>' + r.kind + '</b>: ' + (r.name||''));
@@ -14244,9 +14242,8 @@ function okpi_form_pickResult(rawJson){
 function okpi_form_reset(keepContext){
   try {
     if (!keepContext) {
-      document.getElementById('okpiF_cat1').value = '계약관리';
+      document.getElementById('okpiF_cat1').value = '계약(입주)관리';
       okpi_form_onCat1Change();
-      document.getElementById('okpiF_target').value = '계약자';
     }
     document.getElementById('okpiF_search').value = '';
     document.getElementById('okpiF_h_contractNo').value = '';
@@ -14266,7 +14263,6 @@ function okpi_form_submit(){
     var person = document.getElementById('okpiF_person').value;
     var cat1 = document.getElementById('okpiF_cat1').value;
     var cat2 = document.getElementById('okpiF_cat2').value;
-    var target = document.getElementById('okpiF_target').value;
     var contractNo = document.getElementById('okpiF_h_contractNo').value;
     var tenant = document.getElementById('okpiF_h_tenant').value;
     var dueDate = document.getElementById('okpiF_dueDate').value;
@@ -14324,7 +14320,7 @@ function okpi_form_submit(){
       action: 'kpi_log',
       callback: cb,
       date: dateInput || '',
-      person: person, cat1: cat1, cat2: cat2, target: target,
+      person: person, cat1: cat1, cat2: cat2,
       contractNo: contractNo, tenant: tenant,
       dueDate: dueDate, memo: memo
     });
@@ -14379,7 +14375,12 @@ function okpi_syncFromGlobal(){
       var origSP = window.switchPeriod;
       window.switchPeriod = function(){
         var ret = origSP.apply(this, arguments);
-        try { if (typeof currentView !== 'undefined' && currentView === 'opskpi') okpi_render(); } catch(e){}
+        try {
+          if (typeof currentView !== 'undefined' && currentView === 'opskpi') {
+            okpi_syncFromGlobal();
+            okpi_render();
+          }
+        } catch(e){}
         return ret;
       };
       window._okpi_hooked_sp = true;
@@ -14388,7 +14389,12 @@ function okpi_syncFromGlobal(){
       var origSF = window.shiftPeriod;
       window.shiftPeriod = function(){
         var ret = origSF.apply(this, arguments);
-        try { if (typeof currentView !== 'undefined' && currentView === 'opskpi') okpi_render(); } catch(e){}
+        try {
+          if (typeof currentView !== 'undefined' && currentView === 'opskpi') {
+            okpi_syncFromGlobal();
+            okpi_render();
+          }
+        } catch(e){}
         return ret;
       };
       window._okpi_hooked_sf = true;
@@ -14441,10 +14447,6 @@ function okpi_renderForm(){
     +       '</select></div>'
     +     '<div class="okpi-fld"><label>2차<span class="okpi-tag-new">F</span></label>'
     +       '<select id="okpiF_cat2" class="okpi-fld-input">' + c2Opts + '</select></div>'
-    +     '<div class="okpi-fld"><label>대상<span class="okpi-tag-new">J</span></label>'
-    +       '<select id="okpiF_target" class="okpi-fld-input">'
-    +         '<option>계약자</option><option>임대인</option><option>부동산</option><option>기타</option>'
-    +       '</select></div>'
     +     '<div class="okpi-fld okpi-fld-search"><label>검색</label>'
     +       '<input type="text" id="okpiF_search" class="okpi-fld-input okpi-fld-search-input" placeholder="이름2자/계약번호4자리" oninput="okpi_form_onSearchInput()" autocomplete="off">'
     +       '<div id="okpiF_acBox" class="okpi-ac-box" style="display:none"></div>'
@@ -14466,7 +14468,7 @@ function okpi_renderForm(){
 async function okpi_render(){
   try {
     okpi_injectCss();
-    okpi_syncFromGlobal(); // [Phase 2c] 글로벌 날짜 탭 → okpi 상태 동기화
+    // [Phase 2c-fix] syncFromGlobal은 매 렌더가 아니라 탭 진입 시·글로벌 후크에서만 호출
     var host = document.querySelector('#opskpiView .okpi-inner');
     if (!host) return;
     host.innerHTML = '<div class="okpi-empty">📡 KPI 데이터 로딩 중...</div>';
