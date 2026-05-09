@@ -13415,6 +13415,39 @@ function sumBuildSidebar(){
     });
   }
   var partnerTop3 = Object.values(byPartner).sort(function(a,b){ return b.fee - a.fee; }).slice(0, 3);
+
+  // [v203/v204/v205] 발생 통계 — today 기준 전전월/전월/금월 × 계약수/매출액/중개보수
+  // [v205] 기준일: 시작일 (W열, startDate) — 입주월 = 매출 발생 시점 (가계약일 BI에서 변경)
+  // 매출액 = 계약기간(개월) × 서비스수수료(AL열)
+  // 중개보수: 12개월 미만 계약은 0원 처리 (기존 정산표 로직과 동일)
+  var todayStat = new Date();
+  var statMonths = [-2, -1, 0].map(function(off){
+    var d = new Date(todayStat.getFullYear(), todayStat.getMonth() + off, 1);
+    var ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    var label = (off === -2 ? '전전월' : (off === -1 ? '전월' : '금월'));
+    return { ym: ym, label: label, count: 0, revenue: 0, brokerage: 0 };
+  });
+  if (Array.isArray(vacancyRawData)) {
+    vacancyRawData.forEach(function(v){
+      // [v205] 시작일(W열) 기준 — 입주월
+      var sd = (typeof cmgParseStartDate === 'function') ? cmgParseStartDate(v.startDate) : null;
+      if (!sd) return;
+      var ym = sd.getFullYear() + '-' + String(sd.getMonth()+1).padStart(2,'0');
+      var slot = statMonths.find(function(s){ return s.ym === ym; });
+      if (!slot) return;
+      var ed = (typeof cmgParseStartDate === 'function') ? cmgParseStartDate(v.endDate) : null;
+      var monthsForCalc = (sd && ed && typeof cmgMonthsBetween === 'function') ? cmgMonthsBetween(sd, ed) : 0;
+      var dep  = parseAmt(v.deposit);
+      var rent = parseAmt(v.monthRent || v.rent);
+      var fee  = parseAmt(v.fee);
+      var isShort = monthsForCalc > 0 && monthsForCalc < 12;
+      var brk = isShort ? 0 : ((typeof calcBrokerage === 'function') ? calcBrokerage(dep, rent, v.housingType) : 0);
+      slot.count++;
+      slot.revenue += monthsForCalc * fee;
+      slot.brokerage += brk;
+    });
+  }
+
   // Risk Alerts
   var alerts = {
     newDelq: s3 ? s3.newDelqCnt : 0,
@@ -13422,7 +13455,10 @@ function sumBuildSidebar(){
     over90: s3 ? s3.over90Cnt : 0,
     delay: s4 ? s4.delayCnt : 0
   };
-  return { mrr: mrr, aum: aum, partnerTop3: partnerTop3, alerts: alerts };
+  return {
+    mrr: mrr, aum: aum, partnerTop3: partnerTop3, alerts: alerts,
+    statMonths: statMonths
+  };
 }
 
 function sumRenderSidebar(){
@@ -13451,6 +13487,41 @@ function sumRenderSidebar(){
     +   '<div class="sum-fin-row"><span style="color:#6B7280">MRR (월 임대료)</span><b style="color:#2563EB">' + fmtMoney(s.mrr) + '</b></div>'
     +   '<div class="sum-fin-row"><span style="color:#6B7280">AUM (보증금 총액)</span><b style="color:#F59E0B">' + fmtMoney(s.aum) + '</b></div>'
     + '</div>'
+    + (function(){
+        // [v204] 발생 통계 표 — 전전월/전월/금월 × 계약수/매출액/중개보수
+        var ms = s.statMonths || [];
+        var headRow = '<div class="sum-stat-row sum-stat-head">'
+          + '<div></div>'
+          + '<div>계약수</div>'
+          + '<div>매출액</div>'
+          + '<div>중개보수</div>'
+          + '</div>';
+        var body = ms.map(function(m){
+          var isCur = m.label === '금월';
+          var rowCls = isCur ? 'sum-stat-row sum-stat-cur' : 'sum-stat-row';
+          return '<div class="' + rowCls + '">'
+            + '<div class="sum-stat-lbl">' + m.label + '<small> · ' + m.ym.slice(5) + '월</small></div>'
+            + '<div>' + m.count + '<small>건</small></div>'
+            + '<div>' + fmtMoney(m.revenue) + '</div>'
+            + '<div>' + fmtMoney(m.brokerage) + '</div>'
+            + '</div>';
+        }).join('');
+        return '<div class="sum-card">'
+          + '<div class="sum-card-title"><span class="dot" style="background:#7C3AED"></span>💼 발생 통계 <small style="color:#9CA3AF;font-weight:500;font-size:10px">월 기준 (입주월 W열)</small></div>'
+          + '<style>'
+          +   '.sum-stat-row{display:grid;grid-template-columns:1.05fr .7fr 1fr 1fr;gap:6px;padding:5px 4px;font-size:11px;align-items:center;border-bottom:1px solid #F3F4F6}'
+          +   '.sum-stat-row:last-child{border-bottom:none}'
+          +   '.sum-stat-row>div:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}'
+          +   '.sum-stat-row.sum-stat-head{background:#F9FAFB;color:#9CA3AF;font-size:10px;font-weight:600;padding:4px}'
+          +   '.sum-stat-row.sum-stat-head>div:first-child{text-align:left}'
+          +   '.sum-stat-row.sum-stat-cur{background:#F5F3FF;border-radius:5px;font-weight:700;color:#1F2937}'
+          +   '.sum-stat-row.sum-stat-cur>div:last-child{color:#7C3AED}'
+          +   '.sum-stat-lbl small{color:#9CA3AF;font-weight:500;font-size:10px}'
+          +   '.sum-stat-row small{color:#9CA3AF;font-weight:500;margin-left:1px}'
+          + '</style>'
+          + headRow + body
+          + '</div>';
+      })()
     + '<div class="sum-card">'
     +   '<div class="sum-card-title"><span class="dot" style="background:#8B5CF6"></span>🏆 파트너 TOP 3</div>'
     +   partnerHtml
