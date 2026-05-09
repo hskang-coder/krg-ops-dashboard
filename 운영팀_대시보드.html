@@ -13824,35 +13824,47 @@ function okpi_calcAll(){
   })();
 
   // 김영철 KPI
-  // [수정] 입금예정일 확정 = 비율 KPI (계약번호 중복 제거)
-  //   분모: 담당=김영철 + 1차∈{수납관리|연체관리} + 기간내 + 계약번호 unique 카운트
-  //   분자: 그 unique 계약번호 중 D열(납부예정일) 입력된 적이 있는 계약번호 수
+  // 1) 대응인원 = 기간 내 김영철 담당 + 계약번호 unique
+  // 2) 입금예정일 확정 = 비율 (수납/연체 카테고리 unique 계약 / D열 입력 적 있음)
+  // 3) 완납/분납 = 메모 가장 앞자리(시작) 키워드 매칭
   var kimYC = (function(){
     var isCollectCat = function(r){
       var jt = String(r.jobType||'').trim();
       return jt.indexOf('수납') >= 0 || jt.indexOf('연체') >= 0;
     };
-    // 기간 내 + 김영철 + 수납/연체 카테고리 행 수집
-    var collectRows = daeRaw.filter(function(r){
-      if (!okpi_inRange(r, range)) return false;
-      if (String(r.person||'').trim() !== '김영철') return false;
-      return isCollectCat(r);
+    var startsWith = function(text, kw){
+      return String(text||'').trim().indexOf(kw) === 0;
+    };
+    // 기간 내 + 김영철 행
+    var allRows = daeRaw.filter(function(r){
+      return okpi_inRange(r, range) && String(r.person||'').trim() === '김영철';
     });
-    // 계약번호별 묶기 (중복 제거)
-    var uniqMap = {};
-    collectRows.forEach(function(r){
+    // (1) 대응인원 — unique 계약번호
+    var contactSet = {};
+    allRows.forEach(function(r){
+      var no = String(r.no||'').trim();
+      if (no) contactSet[no] = true;
+    });
+    var contacts = Object.keys(contactSet).length;
+
+    // (2) 입금예정일 확정 (수납/연체 + unique 계약)
+    var collectMap = {};
+    allRows.forEach(function(r){
+      if (!isCollectCat(r)) return;
       var no = String(r.no||'').trim();
       if (!no) return;
-      if (!uniqMap[no]) uniqMap[no] = false;
-      if (r.payDate && String(r.payDate).trim() !== '') uniqMap[no] = true;
+      if (!collectMap[no]) collectMap[no] = false;
+      if (r.payDate && String(r.payDate).trim() !== '') collectMap[no] = true;
     });
-    var dueTotal = Object.keys(uniqMap).length;
+    var dueTotal = Object.keys(collectMap).length;
     var dueSet = 0;
-    for (var k in uniqMap) { if (uniqMap[k]) dueSet++; }
+    for (var k in collectMap) { if (collectMap[k]) dueSet++; }
 
-    var paid = countBy('김영철', function(r){ return hasKw(r.content, ['완납']); });
-    var partial = countBy('김영철', function(r){ return hasKw(r.content, ['분납']); });
-    return { dueSet:dueSet, dueTotal:dueTotal, paid:paid, partial:partial };
+    // (3) 완납/분납 — 메모 시작 키워드
+    var paid = allRows.filter(function(r){ return startsWith(r.content, '완납'); }).length;
+    var partial = allRows.filter(function(r){ return startsWith(r.content, '분납'); }).length;
+
+    return { contacts:contacts, dueSet:dueSet, dueTotal:dueTotal, paid:paid, partial:partial };
   })();
 
   // 오진선 KPI
@@ -14001,7 +14013,7 @@ function okpi_renderPersonCards(k){
   // 카드별 카운트 KPI max — progress bar 스케일 기준
   var goCntMax = Math.max(go.newC, 1);
   var ljCntMax = Math.max(lj.phone, lj.rejection, 1);
-  var kyCntMax = Math.max(ky.paid, ky.partial, 1);
+  var kyCntMax = Math.max(ky.contacts, ky.paid, ky.partial, 1);
   var ohCntMax = Math.max(oh.legal, oh.endDue, oh.endPaid, 1);
 
   return '<div class="okpi-person-grid">'
@@ -14027,9 +14039,10 @@ function okpi_renderPersonCards(k){
     + '<div class="okpi-person-card col">'
     +   '<div class="okpi-person-hd"><div class="okpi-avatar col">김</div><div><div class="okpi-person-name">김영철 <span class="okpi-person-total">' + tKy + '건</span></div><div class="okpi-person-role">수납관리 (일단위 연체대응)</div></div></div>'
     +   '<div class="okpi-list">'
+    +     okpi_rowCount('대응인원',                    src.field, '계약번호 unique 카운트', ky.contacts, kyCntMax, 'col')
     +     okpi_rowRatio('입금예정일 확정',             src.combo, '수납/연체 unique 계약 / D열 입력 비율', ky.dueSet, ky.dueTotal, 90, 70)
-    +     okpi_rowCount('완납 처리',                   src.kw, '담당=김영철 + 메모 "완납"',           ky.paid, kyCntMax, 'col')
-    +     okpi_rowCount('분납 처리',                   src.kw, '담당=김영철 + 메모 "분납"',           ky.partial, kyCntMax, 'col')
+    +     okpi_rowCount('완납 처리',                   src.kw, '메모 시작 "완납"',           ky.paid, kyCntMax, 'col')
+    +     okpi_rowCount('분납 처리',                   src.kw, '메모 시작 "분납"',           ky.partial, kyCntMax, 'col')
     +   '</div>'
     + '</div>'
     // 오진선
