@@ -13648,7 +13648,36 @@ function okpi_injectCss(){
     + '.okpi-ck-meta{font-size:10.5px;color:#6B7280;font-weight:600;margin-top:2px}'
     + '.okpi-ck-bar{width:100%;height:4px;background:#E5E7EB;border-radius:2px;margin-top:5px;overflow:hidden}'
     + '.okpi-ck-bar-fill{height:100%;background:#1B3976;transition:width .3s}'
-    + '.okpi-ck-bar-fill.good{background:#10B981}.okpi-ck-bar-fill.mid{background:#F59E0B}.okpi-ck-bar-fill.low{background:#EF4444}';
+    + '.okpi-ck-bar-fill.good{background:#10B981}.okpi-ck-bar-fill.mid{background:#F59E0B}.okpi-ck-bar-fill.low{background:#EF4444}'
+    + '.okpi-form-wrap{background:#fff;border:1.5px solid #E5E7EB;border-radius:10px;padding:14px 16px;margin-bottom:14px;position:relative}'
+    + '.okpi-form-row{display:grid;grid-template-columns:0.8fr 0.9fr 1fr 1.2fr 0.9fr;gap:8px;margin-bottom:8px}'
+    + '.okpi-form-row:nth-child(2){grid-template-columns:1.7fr 1fr 1.8fr 0.7fr}'
+    + '.okpi-fld{min-width:0;position:relative}'
+    + '.okpi-fld label{display:block;font-size:10.5px;color:#6B7280;font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    + '.okpi-fld-input{width:100%;height:34px;padding:0 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:12.5px;box-sizing:border-box;outline:none;background:#fff;font-family:inherit;color:#1F2937}'
+    + '.okpi-fld-input:focus{border-color:#7C3AED;box-shadow:0 0 0 2px rgba(124,58,237,.1)}'
+    + '.okpi-fld-input.okpi-fld-auto{background:#F0FDF4;border-color:#86EFAC}'
+    + '.okpi-fld-search-input{border-color:#7C3AED}'
+    + '.okpi-tag-auto{color:#10B981;font-size:9px;margin-left:3px;font-weight:600}'
+    + '.okpi-tag-new{color:#7C3AED;font-size:9px;padding:1px 4px;background:#F5F3FF;border-radius:2px;margin-left:3px}'
+    + '.okpi-form-submit{height:34px;padding:0 16px;background:#7C3AED;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;align-self:end}'
+    + '.okpi-form-submit:hover:not(:disabled){background:#6D28D9}'
+    + '.okpi-form-submit:disabled{background:#9CA3AF;cursor:not-allowed}'
+    + '.okpi-ac-box{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #7C3AED;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:100;max-height:280px;overflow-y:auto;margin-top:2px;min-width:360px}'
+    + '.okpi-ac-section{padding:5px 12px;font-size:10px;font-weight:700;color:#6B7280;background:#F9FAFB;border-bottom:1px solid #E5E7EB}'
+    + '.okpi-ac-item{padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid #F3F4F6;display:flex;align-items:center;gap:6px}'
+    + '.okpi-ac-item:hover{background:#F5F3FF}'
+    + '.okpi-ac-item:last-child{border-bottom:none}'
+    + '.okpi-ac-tag{padding:1px 6px;border-radius:3px;font-size:9.5px;font-weight:700}'
+    + '.okpi-ac-tag.c{background:#DBEAFE;color:#1E40AF}'
+    + '.okpi-ac-tag.l{background:#FEF3C7;color:#78350F}'
+    + '.okpi-ac-name{font-weight:700;color:#1B3976}'
+    + '.okpi-ac-meta{font-size:10.5px;color:#6B7280;margin-left:4px}'
+    + '.okpi-form-info{padding:8px 12px;background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:6px;font-size:11.5px;color:#065F46;margin-top:6px}'
+    + '.okpi-toast{padding:8px 12px;border-radius:6px;font-size:12px;font-weight:600;margin-top:6px}'
+    + '.okpi-toast.info{background:#EFF6FF;color:#1B3976;border:1px solid #BFDBFE}'
+    + '.okpi-toast.success{background:#F0FDF4;color:#065F46;border:1px solid #86EFAC}'
+    + '.okpi-toast.error{background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5}';
   document.head.appendChild(s);
 }
 
@@ -14021,6 +14050,314 @@ function okpi_jumpToCk(person, period){
   } catch(e){ console.warn('[okpi] jumpToCk warn:', e); }
 }
 
+// ─────────────────────────────────────────────────────────────────
+// [Phase 2b] 빠른 입력 폼 — gid=554798125 신규 행 추가
+// ─────────────────────────────────────────────────────────────────
+
+// 1차 → 2차 카테고리 트리
+window._okpiCat = {
+  '계약관리':    ['전화응대(임차인)','전화응대(부동산)','전화응대(임대인)','계약정보 입수','전자서명 발행','수수료 입금','중요사항 설명','날인 계약서 입수','임대차신고 보관','부동산 계약전 검토','퇴실청소비 청구','발행','종료','기타'],
+  '수납관리':    ['임대료 수납 처리','연체자 전화 대응','납부일 확정 받음','연락불가자 방문','납부 완료','분납 완료','분납 진행중','전화응대(임차인)','기타'],
+  '갱신관리':    ['갱신 희망 확인','갱신 협의','갱신심사 거절 안내','갱신대상 홈버튼 등록','만기 퇴실 확정','전화응대','기타'],
+  '연체관리':    ['내용증명 발송','지급명령 진행','중도퇴실 처리','계약 종료자 대응','법적 조치 검토','전화응대','기타'],
+  '중도퇴실관리':['중도퇴실 신청 접수','정산서 발행','후임 세입자 모색','정산 협의','퇴실 확정','보증금 반환','전화응대','기타']
+};
+
+function okpi_form_cat2Options(cat1){
+  var arr = window._okpiCat[cat1] || [];
+  return arr.map(function(o){ return '<option value="' + o + '">' + o + '</option>'; }).join('');
+}
+
+// D열 라벨 동적 변경
+function okpi_form_dueLabel(cat1){
+  if (cat1 === '수납관리' || cat1 === '연체관리') return '입금예정일';
+  return '재연락일정';
+}
+
+function okpi_form_onCat1Change(){
+  try {
+    var c1 = document.getElementById('okpiF_cat1').value;
+    var sel2 = document.getElementById('okpiF_cat2');
+    if (sel2) sel2.innerHTML = okpi_form_cat2Options(c1);
+    var lblD = document.getElementById('okpiF_dueLabel');
+    if (lblD) lblD.textContent = okpi_form_dueLabel(c1);
+  } catch(e){ console.warn('[okpi] cat1 change:', e); }
+}
+
+// 검색 자동완성 — 계약자/계약번호/임대인
+function okpi_form_search(q){
+  q = String(q||'').trim();
+  if (q.length < 2 && !/^\d{4,}$/.test(q)) return [];
+  var qLower = q.toLowerCase();
+  var vac = (typeof vacancyRawData !== 'undefined' && Array.isArray(vacancyRawData)) ? vacancyRawData : [];
+  var seen = {};
+  var results = [];
+  // 계약번호 매칭 (정확 시작)
+  vac.forEach(function(v){
+    if (results.length >= 30) return;
+    var no = String(v.no||'');
+    if (no.indexOf(q) === 0) {
+      var key = 'c|' + no;
+      if (!seen[key]) {
+        seen[key] = true;
+        results.push({ kind:'계약자', name: v.tenant1Name || v.tenantName || '', no: no, phone: v.tenantPhone||'', partner: v.partnerName||'', landlord: v.landlordName||'' });
+      }
+    }
+  });
+  // 계약자 이름 매칭
+  vac.forEach(function(v){
+    if (results.length >= 30) return;
+    var n = String(v.tenant1Name || v.tenantName || '').toLowerCase();
+    if (n && n.indexOf(qLower) >= 0) {
+      var key = 'c|' + v.no;
+      if (!seen[key]) {
+        seen[key] = true;
+        results.push({ kind:'계약자', name: v.tenant1Name || v.tenantName || '', no: v.no, phone: v.tenantPhone||'', partner: v.partnerName||'', landlord: v.landlordName||'' });
+      }
+    }
+  });
+  // 임대인 이름 매칭
+  var landlordSeen = {};
+  vac.forEach(function(v){
+    if (results.length >= 30) return;
+    var ln = String(v.landlordName||'').trim();
+    if (!ln) return;
+    if (ln.toLowerCase().indexOf(qLower) >= 0 && !landlordSeen[ln]) {
+      landlordSeen[ln] = true;
+      var cnt = vac.filter(function(x){ return x.landlordName === ln; }).length;
+      results.push({ kind:'임대인', name: ln, no: '', phone: v.landlordPhone||'', partner: '', landlord: ln, cnt: cnt });
+    }
+  });
+  return results;
+}
+
+function okpi_form_onSearchInput(){
+  try {
+    var inp = document.getElementById('okpiF_search');
+    var box = document.getElementById('okpiF_acBox');
+    if (!inp || !box) return;
+    var q = inp.value;
+    var res = okpi_form_search(q);
+    if (!res.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    var grouped = { '계약자':[], '임대인':[] };
+    res.forEach(function(r){ if (grouped[r.kind]) grouped[r.kind].push(r); });
+    var html = '';
+    if (grouped['계약자'].length) {
+      html += '<div class="okpi-ac-section">📘 계약자 (' + grouped['계약자'].length + ')</div>';
+      grouped['계약자'].forEach(function(r){
+        html += '<div class="okpi-ac-item" onclick="okpi_form_pickResult(' + JSON.stringify(JSON.stringify(r)).replace(/"/g,'&quot;') + ')">'
+          + '<span class="okpi-ac-tag c">계약</span>'
+          + '<span class="okpi-ac-name">' + (r.name||'(이름없음)') + '</span>'
+          + '<span class="okpi-ac-meta">' + (r.no||'') + (r.phone?' · '+r.phone:'') + (r.partner?' · '+r.partner:'') + '</span>'
+          + '</div>';
+      });
+    }
+    if (grouped['임대인'].length) {
+      html += '<div class="okpi-ac-section">📙 임대인 (' + grouped['임대인'].length + ')</div>';
+      grouped['임대인'].forEach(function(r){
+        html += '<div class="okpi-ac-item" onclick="okpi_form_pickResult(' + JSON.stringify(JSON.stringify(r)).replace(/"/g,'&quot;') + ')">'
+          + '<span class="okpi-ac-tag l">임대</span>'
+          + '<span class="okpi-ac-name">' + (r.name||'') + '</span>'
+          + '<span class="okpi-ac-meta">활성 ' + (r.cnt||0) + '건' + (r.phone?' · '+r.phone:'') + '</span>'
+          + '</div>';
+      });
+    }
+    box.innerHTML = html;
+    box.style.display = 'block';
+  } catch(e){ console.warn('[okpi] search input:', e); }
+}
+
+function okpi_form_pickResult(rawJson){
+  try {
+    var r = JSON.parse(rawJson);
+    var inp = document.getElementById('okpiF_search');
+    var box = document.getElementById('okpiF_acBox');
+    var info = document.getElementById('okpiF_info');
+    var hContractNo = document.getElementById('okpiF_h_contractNo');
+    var hTenant = document.getElementById('okpiF_h_tenant');
+    var sTarget = document.getElementById('okpiF_target');
+    if (inp) inp.value = r.name || '';
+    if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+    if (hContractNo) hContractNo.value = r.no || '';
+    if (hTenant) hTenant.value = r.name || '';
+    if (sTarget) sTarget.value = r.kind === '임대인' ? '임대인' : '계약자';
+    if (info) {
+      var bits = [];
+      bits.push('<b>' + r.kind + '</b>: ' + (r.name||''));
+      if (r.no) bits.push('계약번호: ' + r.no);
+      if (r.phone) bits.push('연락처: ' + r.phone);
+      if (r.partner) bits.push('부동산: ' + r.partner);
+      if (r.landlord && r.kind !== '임대인') bits.push('임대인: ' + r.landlord);
+      info.innerHTML = '✓ ' + bits.join(' · ');
+      info.style.display = 'block';
+    }
+  } catch(e){ console.warn('[okpi] pick:', e); }
+}
+
+// 폼 초기화
+function okpi_form_reset(keepContext){
+  try {
+    if (!keepContext) {
+      document.getElementById('okpiF_cat1').value = '계약관리';
+      okpi_form_onCat1Change();
+      document.getElementById('okpiF_target').value = '계약자';
+    }
+    document.getElementById('okpiF_search').value = '';
+    document.getElementById('okpiF_h_contractNo').value = '';
+    document.getElementById('okpiF_h_tenant').value = '';
+    document.getElementById('okpiF_dueDate').value = '';
+    document.getElementById('okpiF_memo').value = '';
+    var info = document.getElementById('okpiF_info');
+    if (info) { info.style.display = 'none'; info.innerHTML = ''; }
+    var box = document.getElementById('okpiF_acBox');
+    if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+  } catch(e){}
+}
+
+// 제출 — JSONP 호출
+function okpi_form_submit(){
+  try {
+    var person = document.getElementById('okpiF_person').value;
+    var cat1 = document.getElementById('okpiF_cat1').value;
+    var cat2 = document.getElementById('okpiF_cat2').value;
+    var target = document.getElementById('okpiF_target').value;
+    var contractNo = document.getElementById('okpiF_h_contractNo').value;
+    var tenant = document.getElementById('okpiF_h_tenant').value;
+    var dueDate = document.getElementById('okpiF_dueDate').value;
+    var memo = document.getElementById('okpiF_memo').value;
+    var dateInput = document.getElementById('okpiF_date').value;
+
+    if (!person || !cat1 || !cat2) {
+      okpi_form_toast('담당자/업무구분/업무하위는 필수입니다', 'error');
+      return;
+    }
+    if (typeof CK_API_URL === 'undefined' || !CK_API_URL) {
+      okpi_form_toast('Apps Script API URL 미설정', 'error');
+      return;
+    }
+
+    okpi_form_toast('⏳ 기록 중...', 'info');
+    var btn = document.getElementById('okpiF_submitBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
+
+    var cb = 'okpi_cb_' + Date.now();
+    window[cb] = function(resp){
+      try {
+        if (btn) { btn.disabled = false; btn.textContent = '+ 기록'; }
+        if (resp && resp.status === 'ok') {
+          okpi_form_toast('✓ 시트 입력 완료 (1행 추가)', 'success');
+          okpi_form_reset(true); // 컨텍스트(담당자/1차/2차/대상) 유지, 검색/메모만 비움
+          // KPI 자동 갱신 (백그라운드 fetch + 재렌더)
+          setTimeout(function(){
+            okpi_ensureRefresh();
+          }, 500);
+        } else {
+          okpi_form_toast('⚠ 저장 실패: ' + (resp && resp.message ? resp.message : '응답 오류'), 'error');
+        }
+      } finally {
+        try { delete window[cb]; } catch(_){}
+        var s = document.getElementById('okpi-jsonp-' + cb);
+        if (s && s.parentNode) s.parentNode.removeChild(s);
+      }
+    };
+
+    var params = new URLSearchParams({
+      action: 'kpi_log',
+      callback: cb,
+      date: dateInput || '',
+      person: person, cat1: cat1, cat2: cat2, target: target,
+      contractNo: contractNo, tenant: tenant,
+      dueDate: dueDate, memo: memo
+    });
+    var script = document.createElement('script');
+    script.id = 'okpi-jsonp-' + cb;
+    script.src = CK_API_URL + '?' + params.toString();
+    script.onerror = function(){
+      if (btn) { btn.disabled = false; btn.textContent = '+ 기록'; }
+      okpi_form_toast('⚠ 네트워크 오류', 'error');
+    };
+    document.head.appendChild(script);
+    setTimeout(function(){
+      if (window[cb]) {
+        if (btn) { btn.disabled = false; btn.textContent = '+ 기록'; }
+        okpi_form_toast('⚠ 응답 시간 초과', 'error');
+        try { delete window[cb]; } catch(_){}
+      }
+    }, 15000);
+  } catch(e) {
+    console.error('[okpi] submit:', e);
+    okpi_form_toast('⚠ 오류: ' + (e.message||e), 'error');
+  }
+}
+
+// 데이터 강제 재로드 후 재렌더
+async function okpi_ensureRefresh(){
+  try {
+    if (typeof fetchSheetByGid === 'function' && typeof parseDailyReport === 'function') {
+      var d = await fetchSheetByGid('554798125');
+      var newDae = parseDailyReport(d);
+      if (Array.isArray(newDae)) window.daeungRawData = newDae;
+    }
+    okpi_render();
+  } catch(e){ console.warn('[okpi] refresh:', e); }
+}
+
+// 토스트
+function okpi_form_toast(msg, kind){
+  try {
+    var t = document.getElementById('okpiF_toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.className = 'okpi-toast ' + (kind || 'info');
+    t.style.display = 'block';
+    setTimeout(function(){ if (t) t.style.display = 'none'; }, 3000);
+  } catch(_){}
+}
+
+// 폼 HTML
+function okpi_renderForm(){
+  var todayStr = okpi_ymd(new Date());
+  var c1Default = '계약관리';
+  var c2Opts = okpi_form_cat2Options(c1Default);
+  return ''
+    + '<div class="okpi-section-title">⚡ 빠른 입력 — 1행 = 1건 <span class="pill">gid=554798125 신규 행 추가</span></div>'
+    + '<div class="okpi-form-wrap">'
+    +   '<div class="okpi-form-row">'
+    +     '<div class="okpi-fld"><label>일자<span class="okpi-tag-auto">자동</span></label>'
+    +       '<input type="date" id="okpiF_date" value="' + todayStr + '" class="okpi-fld-input okpi-fld-auto"></div>'
+    +     '<div class="okpi-fld"><label>담당자</label>'
+    +       '<select id="okpiF_person" class="okpi-fld-input">'
+    +         '<option>고송미</option><option>이지희</option><option>김영철</option><option>오진선</option>'
+    +       '</select></div>'
+    +     '<div class="okpi-fld"><label>업무구분(1차)</label>'
+    +       '<select id="okpiF_cat1" class="okpi-fld-input" onchange="okpi_form_onCat1Change()">'
+    +         Object.keys(window._okpiCat).map(function(k){ return '<option' + (k===c1Default?' selected':'') + '>' + k + '</option>'; }).join('')
+    +       '</select></div>'
+    +     '<div class="okpi-fld"><label>업무하위(2차)<span class="okpi-tag-new">F열</span></label>'
+    +       '<select id="okpiF_cat2" class="okpi-fld-input">' + c2Opts + '</select></div>'
+    +     '<div class="okpi-fld"><label>대상<span class="okpi-tag-new">J열</span></label>'
+    +       '<select id="okpiF_target" class="okpi-fld-input">'
+    +         '<option>계약자</option><option>임대인</option><option>부동산</option><option>기타</option>'
+    +       '</select></div>'
+    +   '</div>'
+    +   '<div class="okpi-form-row">'
+    +     '<div class="okpi-fld okpi-fld-search"><label>검색 (계약자/계약번호/임대인)</label>'
+    +       '<input type="text" id="okpiF_search" class="okpi-fld-input okpi-fld-search-input" placeholder="이름 2자 또는 계약번호 4자리" oninput="okpi_form_onSearchInput()" autocomplete="off">'
+    +       '<div id="okpiF_acBox" class="okpi-ac-box" style="display:none"></div>'
+    +     '</div>'
+    +     '<div class="okpi-fld"><label id="okpiF_dueLabel">' + okpi_form_dueLabel(c1Default) + '</label>'
+    +       '<input type="date" id="okpiF_dueDate" class="okpi-fld-input"></div>'
+    +     '<div class="okpi-fld okpi-fld-memo"><label>메모 (대응 상세)</label>'
+    +       '<input type="text" id="okpiF_memo" class="okpi-fld-input" placeholder="대응 상세내용"></div>'
+    +     '<button type="button" id="okpiF_submitBtn" class="okpi-form-submit" onclick="okpi_form_submit()">+ 기록</button>'
+    +   '</div>'
+    +   '<input type="hidden" id="okpiF_h_contractNo">'
+    +   '<input type="hidden" id="okpiF_h_tenant">'
+    +   '<div id="okpiF_info" class="okpi-form-info" style="display:none"></div>'
+    +   '<div id="okpiF_toast" class="okpi-toast" style="display:none"></div>'
+    + '</div>';
+}
+
 // 메인 렌더
 async function okpi_render(){
   try {
@@ -14032,6 +14369,7 @@ async function okpi_render(){
     var k = okpi_calcAll();
     host.innerHTML = '<div class="okpi-wrap">'
       + okpi_renderTopBar(k)
+      + okpi_renderForm()
       + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
       + okpi_renderPersonCards(k)
       + okpi_renderChecklistMini()
