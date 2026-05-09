@@ -13775,32 +13775,26 @@ function okpi_calcAll(){
     return keywords.some(function(k){ return t.indexOf(String(k).toLowerCase()) >= 0; });
   };
 
-  // 고송미 KPI
+  // 고송미 KPI — 선택한 기간(range) 기준
   var goSongmi = (function(){
-    // 입주 임박(시작일이 today~D+7) + 전자계약+수수료 모두 TRUE 비율
-    var today = new Date(); today.setHours(0,0,0,0);
-    var d7 = new Date(today); d7.setDate(today.getDate() + 7);
+    // [수정] 선택한 기간 내 입주 예정 계약 + 전자계약+수수료 모두 TRUE 비율
+    // 일 모드: 그 날 입주 / 주 모드: 그 주 입주 / 월 모드: 그 달 입주
     var imminent = vacRaw.filter(function(v){
       var sd = okpi_parseDate(v.startDate);
-      return sd && sd >= today && sd <= d7;
+      return sd && sd >= range.start && sd <= range.end;
     });
     var done1 = imminent.filter(function(v){ return v.eContract && v.feePaid; }).length;
     var total1 = imminent.length;
 
-    // 입주 후 NAS 등록 (시작일이 today-7 ~ today, NAS=TRUE)
-    var dn7 = new Date(today); dn7.setDate(today.getDate() - 7);
-    var recent = vacRaw.filter(function(v){
-      var sd = okpi_parseDate(v.startDate);
-      return sd && sd >= dn7 && sd <= today;
-    });
-    var nasDone = recent.filter(function(v){ return v.nas; }).length;
+    // [수정] 입주 후 NAS 등록 — 같은 기간(입주 완료자) 중 NAS=TRUE 비율
+    var nasDone = imminent.filter(function(v){ return v.nas; }).length;
 
     // 신규 계약 처리 (가계약일이 기간 내)
     var newC = vacRaw.filter(function(v){
       var td = okpi_parseDate(v.tentativeDate);
       return td && td >= range.start && td <= range.end;
     }).length;
-    return { done1:done1, total1:total1, nasDone:nasDone, nasTotal:recent.length, newC:newC };
+    return { done1:done1, total1:total1, nasDone:nasDone, nasTotal:imminent.length, newC:newC };
   })();
 
   // 이지희 KPI
@@ -13965,8 +13959,8 @@ function okpi_renderPersonCards(k){
     + '<div class="okpi-person-card c1">'
     +   '<div class="okpi-person-hd"><div class="okpi-avatar c1">고</div><div><div class="okpi-person-name">고송미</div><div class="okpi-person-role">계약관리 · 스텝1 (입주 전 처리)</div></div></div>'
     +   '<div class="okpi-list">'
-    +     okpi_rowRatio('입주 전 전자계약+수수료 완료', src.combo, '시작일 D-7~D0 / 둘 다 TRUE 비율', go.done1, go.total1, 90, 80)
-    +     okpi_rowRatio('입주 후 NAS 등록 (D+7)',     src.auto,  '시작일 D-7~D0 / NAS=TRUE 비율',    go.nasDone, go.nasTotal, 90, 80)
+    +     okpi_rowRatio('입주 전 전자계약+수수료 완료', src.combo, '기간 내 입주 예정 / 둘 다 TRUE 비율', go.done1, go.total1, 90, 80)
+    +     okpi_rowRatio('입주 후 NAS 등록',           src.auto,  '기간 내 입주 / NAS=TRUE 비율',     go.nasDone, go.nasTotal, 90, 80)
     +     okpi_rowCount('신규 계약 처리',              src.auto,  '가계약일이 기간 내 행수',           go.newC)
     +   '</div>'
     + '</div>'
