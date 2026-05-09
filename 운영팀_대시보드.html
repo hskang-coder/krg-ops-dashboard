@@ -12318,11 +12318,13 @@ function sumCalcKpi(){
   });
   kpi.avgResidence = residenceCount > 0 ? Math.round((totalMonths / residenceCount) * 10) / 10 : 0;
 
-  // [v207] 활성 계약 = 공실상태(BN열)가 '계약중' 인 행만 (이전: 부정 매칭으로 가계약/보류 등 포함되던 버그 수정)
-  kpi.activeContracts = vacancyRawData.filter(function(v){
-    var s = String(v.status||'').trim();
-    return s.indexOf('계약중') >= 0;
-  }).length;
+  // [v207/v208] 활성 계약 = 공실상태(BN열)가 '계약중' 또는 '정상' 인 행 (v46에서 표시만 통일, raw는 '정상' 가능성)
+  var isActiveStatus = function(s){
+    s = String(s||'').trim();
+    if (!s) return false;
+    return s.indexOf('계약중') >= 0 || s.indexOf('정상') >= 0;
+  };
+  kpi.activeContracts = vacancyRawData.filter(function(v){ return isActiveStatus(v.status); }).length;
 
   // 신규 가계약 (이번달 — BI열 tentativeDate가 이번달)
   var today = new Date();
@@ -12376,10 +12378,9 @@ function sumCalcKpi(){
   });
   kpi.earlyDelqRate = earlyTotal > 0 ? Math.round((earlyDelq / earlyTotal) * 1000) / 10 : 0;
 
-  // [v207] 분할 약정 활성 = 계약중 AND payCondition !== 일시납 (이전: 종료된 계약도 카운트되던 버그 수정)
+  // [v207/v208] 분할 약정 활성 = (계약중|정상) AND payCondition !== 일시납
   kpi.installmentDue = vacancyRawData.filter(function(v){
-    var s = String(v.status||'').trim();
-    if (s.indexOf('계약중') < 0) return false;
+    if (!isActiveStatus(v.status)) return false;
     var pc = String(v.payCondition||'').trim();
     return pc && pc.indexOf('일시납') < 0;
   }).length;
