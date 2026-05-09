@@ -13605,7 +13605,8 @@ function okpi_injectCss(){
     + '.okpi-avatar{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;color:#fff;flex-shrink:0}'
     + '.okpi-avatar.c1{background:#1B3976}.okpi-avatar.c2{background:#7C3AED}'
     + '.okpi-avatar.col{background:#059669}.okpi-avatar.del{background:#DC2626}'
-    + '.okpi-person-name{font-size:12px;font-weight:800;color:#1F2937;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    + '.okpi-person-name{font-size:12px;font-weight:800;color:#1F2937;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px}'
+    + '.okpi-person-total{font-size:10.5px;font-weight:700;color:#7C3AED;background:#F5F3FF;padding:1px 6px;border-radius:3px;font-variant-numeric:tabular-nums}'
     + '.okpi-person-role{display:none}'
     + '.okpi-list{display:flex;flex-direction:column;gap:4px}'
     + '.okpi-row{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;padding:5px 8px;border-radius:4px;background:#F9FAFB}'
@@ -13953,11 +13954,20 @@ function okpi_renderPersonCards(k){
     combo:  { cls:'combo',  txt:'조합' }
   };
   var go = k.goSongmi, lj = k.leeJihee, ky = k.kimYC, oh = k.ohJS;
+  // 담당자별 총 대응 건수 (range 내 person 매칭)
+  var daeRawT = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
+  var totalBy = function(name){
+    return daeRawT.filter(function(r){
+      if (!okpi_inRange(r, k.range)) return false;
+      return String(r.person||'').trim() === name;
+    }).length;
+  };
+  var tGo = totalBy('고송미'), tLj = totalBy('이지희'), tKy = totalBy('김영철'), tOh = totalBy('오진선');
 
   return '<div class="okpi-person-grid">'
     // 고송미
     + '<div class="okpi-person-card c1">'
-    +   '<div class="okpi-person-hd"><div class="okpi-avatar c1">고</div><div><div class="okpi-person-name">고송미</div><div class="okpi-person-role">계약관리 · 스텝1 (입주 전 처리)</div></div></div>'
+    +   '<div class="okpi-person-hd"><div class="okpi-avatar c1">고</div><div><div class="okpi-person-name">고송미 <span class="okpi-person-total">' + tGo + '건</span></div><div class="okpi-person-role">계약관리 · 스텝1 (입주 전 처리)</div></div></div>'
     +   '<div class="okpi-list">'
     +     okpi_rowRatio('입주 전 전자계약+수수료 완료', src.combo, '기간 내 입주 예정 / 둘 다 TRUE 비율', go.done1, go.total1, 90, 80)
     +     okpi_rowRatio('입주 후 NAS 등록',           src.auto,  '기간 내 입주 / NAS=TRUE 비율',     go.nasDone, go.nasTotal, 90, 80)
@@ -13966,7 +13976,7 @@ function okpi_renderPersonCards(k){
     + '</div>'
     // 이지희
     + '<div class="okpi-person-card c2">'
-    +   '<div class="okpi-person-hd"><div class="okpi-avatar c2">이</div><div><div class="okpi-person-name">이지희</div><div class="okpi-person-role">계약관리 · 스텝2 (계약·갱신·종료)</div></div></div>'
+    +   '<div class="okpi-person-hd"><div class="okpi-avatar c2">이</div><div><div class="okpi-person-name">이지희 <span class="okpi-person-total">' + tLj + '건</span></div><div class="okpi-person-role">계약관리 · 스텝2 (계약·갱신·종료)</div></div></div>'
     +   '<div class="okpi-list">'
     +     okpi_rowCount('전화 종료 처리',              src.kw, '담당=이지희 + 메모 "진행/위임/종료"', lj.phone)
     +     okpi_rowRatio('D-30 갱신 홈버튼 등록',       src.combo, '만기 D-30 대상 / CC=TRUE 비율',     lj.renewDone, lj.renewTotal, 90, 70)
@@ -13975,7 +13985,7 @@ function okpi_renderPersonCards(k){
     + '</div>'
     // 김영철
     + '<div class="okpi-person-card col">'
-    +   '<div class="okpi-person-hd"><div class="okpi-avatar col">김</div><div><div class="okpi-person-name">김영철</div><div class="okpi-person-role">수납관리 (일단위 연체대응)</div></div></div>'
+    +   '<div class="okpi-person-hd"><div class="okpi-avatar col">김</div><div><div class="okpi-person-name">김영철 <span class="okpi-person-total">' + tKy + '건</span></div><div class="okpi-person-role">수납관리 (일단위 연체대응)</div></div></div>'
     +   '<div class="okpi-list">'
     +     okpi_rowCount('입금예정일 확정',             src.field, '담당=김영철 + D열 채워짐', ky.dueSet)
     +     okpi_rowCount('완납 처리',                   src.kw, '담당=김영철 + 메모 "완납"',           ky.paid)
@@ -13984,7 +13994,7 @@ function okpi_renderPersonCards(k){
     + '</div>'
     // 오진선
     + '<div class="okpi-person-card del">'
-    +   '<div class="okpi-person-hd"><div class="okpi-avatar del">오</div><div><div class="okpi-person-name">오진선</div><div class="okpi-person-role">연체관리 (법진행·종료대응)</div></div></div>'
+    +   '<div class="okpi-person-hd"><div class="okpi-avatar del">오</div><div><div class="okpi-person-name">오진선 <span class="okpi-person-total">' + tOh + '건</span></div><div class="okpi-person-role">연체관리 (법진행·종료대응)</div></div></div>'
     +   '<div class="okpi-list">'
     +     okpi_rowCount('법조치 대응',                 src.kw, '담당=오진선 + 메모 "내용증명/지급명령/법조치"', oh.legal)
     +     okpi_rowCount('종료자 입금예정 확정',         src.combo, '담당=오진선 + D열 + 메모 "종료/퇴실"', oh.endDue)
