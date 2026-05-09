@@ -13638,6 +13638,20 @@ function okpi_injectCss(){
     + '.okpi-chart-bar-name{font-size:11px;font-weight:700;color:#1F2937;margin-top:4px}'
     + '.okpi-chart-bar.c1{color:#1B3976}.okpi-chart-bar.c2{color:#7C3AED}'
     + '.okpi-chart-bar.col{color:#059669}.okpi-chart-bar.del{color:#DC2626}'
+    + '.okpi-vis-grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}'
+    + '.okpi-vis-card{background:#F9FAFB;border-radius:8px;padding:10px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}'
+    + '.okpi-vis-name{font-size:12px;font-weight:800;padding:2px 10px;border-radius:4px;color:#fff}'
+    + '.okpi-vis-name.c1{background:#1B3976}.okpi-vis-name.c2{background:#7C3AED}'
+    + '.okpi-vis-name.col{background:#059669}.okpi-vis-name.del{background:#DC2626}'
+    + '.okpi-vis-label{font-size:10.5px;color:#6B7280;font-weight:600;margin-top:auto}'
+    + '.okpi-donut{width:90px;height:90px}'
+    + '.okpi-stack-wrap{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;width:100%;margin:8px 0 4px}'
+    + '.okpi-stack-bar{flex:1;height:14px;background:#E5E7EB;border-radius:7px;overflow:hidden;display:flex}'
+    + '.okpi-stack-seg{height:100%;transition:width .4s}'
+    + '.okpi-stack-pct{font-size:13px;font-weight:900;color:#1F2937;min-width:36px;text-align:right}'
+    + '.okpi-vis-legend{display:flex;gap:8px;font-size:9.5px;color:#4B5563;font-weight:600;flex-wrap:wrap;justify-content:center}'
+    + '.okpi-vis-legend span{display:inline-flex;align-items:center;gap:3px;white-space:nowrap}'
+    + '.okpi-vis-legend i{width:8px;height:8px;border-radius:2px;display:inline-block}'
     + '.okpi-status.good{background:#D1FAE5;color:#065F46}'
     + '.okpi-status.warn{background:#FED7AA;color:#9A3412}'
     + '.okpi-status.danger{background:#FECACA;color:#991B1B}'
@@ -13820,7 +13834,13 @@ function okpi_calcAll(){
       var jt = String(r.jobType||'').trim();
       return jt.indexOf('갱신') >= 0 && hasKw(r.content, ['거절','조건부']);
     });
-    return { phone:phone, renewDone:renewDone, renewTotal:renewTargets.length, rejection:rejection };
+    // [차트용] 이지희 unique 계약번호 + 메모 시작 "종료"
+    var allLj = daeRaw.filter(function(r){ return okpi_inRange(r, range) && String(r.person||'').trim() === '이지희'; });
+    var ljSet = {};
+    allLj.forEach(function(r){ var no = String(r.no||'').trim(); if (no) ljSet[no] = true; });
+    var contacts = Object.keys(ljSet).length;
+    var closed = allLj.filter(function(r){ return String(r.content||'').trim().indexOf('종료') === 0; }).length;
+    return { phone:phone, renewDone:renewDone, renewTotal:renewTargets.length, rejection:rejection, contacts:contacts, closed:closed };
   })();
 
   // 김영철 KPI
@@ -13876,7 +13896,14 @@ function okpi_calcAll(){
     var endPaid = countBy('오진선', function(r){
       return hasKw(r.content, ['완납','분납']);
     });
-    return { legal:legal, endDue:endDue, endPaid:endPaid };
+    // [차트용] 오진선 unique 계약번호 + 메모 시작 "완납"/"분납"
+    var allOh = daeRaw.filter(function(r){ return okpi_inRange(r, range) && String(r.person||'').trim() === '오진선'; });
+    var ohSet = {};
+    allOh.forEach(function(r){ var no = String(r.no||'').trim(); if (no) ohSet[no] = true; });
+    var contacts = Object.keys(ohSet).length;
+    var ohPaid = allOh.filter(function(r){ return String(r.content||'').trim().indexOf('완납') === 0; }).length;
+    var ohPartial = allOh.filter(function(r){ return String(r.content||'').trim().indexOf('분납') === 0; }).length;
+    return { legal:legal, endDue:endDue, endPaid:endPaid, contacts:contacts, ohPaid:ohPaid, ohPartial:ohPartial };
   })();
 
   return {
@@ -13957,37 +13984,95 @@ function okpi_renderTopBar(k){
     + '</div>';
 }
 
-// [개선] 4명 처리 건수 비교 차트 (심플 막대)
+// 4명 KPI 시각화 — 사람별 다른 차트 형태
 function okpi_renderChart(k){
   try {
-    var daeRaw = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
-    var range = k.range;
-    var people = [
-      { name:'고송미', cls:'c1' },
-      { name:'이지희', cls:'c2' },
-      { name:'김영철', cls:'col' },
-      { name:'오진선', cls:'del' }
-    ];
-    var counts = people.map(function(p){
-      return daeRaw.filter(function(r){
-        if (!okpi_inRange(r, range)) return false;
-        return String(r.person||'').trim() === p.name;
-      }).length;
-    });
-    var max = Math.max.apply(null, counts.concat([1]));
-    var bars = people.map(function(p, i){
-      var v = counts[i];
-      var h = max > 0 ? Math.round(v / max * 100) : 0;
-      return '<div class="okpi-chart-bar ' + p.cls + '">'
-        + '<div class="okpi-chart-bar-val">' + v + '</div>'
-        + '<div class="okpi-chart-bar-rect" style="height:' + h + '%"></div>'
-        + '<div class="okpi-chart-bar-name">' + p.name + '</div>'
-        + '</div>';
-    }).join('');
+    var go = k.goSongmi, lj = k.leeJihee, ky = k.kimYC, oh = k.ohJS;
     var periodLabel = window._okpi.period === 'day' ? '오늘' : (window._okpi.period === 'week' ? '이번주' : '이번달');
+
+    // ── 1. 고송미 — 도넛 (입주 전 전자계약+수수료 완료율)
+    var goPct = go.total1 > 0 ? Math.round(go.done1/go.total1*100) : 0;
+    var goCirc = 2 * Math.PI * 35; // r=35
+    var goDash = (goPct/100) * goCirc;
+    var goColor = goPct >= 90 ? '#10B981' : goPct >= 80 ? '#F59E0B' : '#EF4444';
+    var goChart = ''
+      + '<div class="okpi-vis-card">'
+      +   '<div class="okpi-vis-name c1">고송미</div>'
+      +   '<svg viewBox="0 0 100 100" class="okpi-donut">'
+      +     '<circle cx="50" cy="50" r="35" fill="none" stroke="#E5E7EB" stroke-width="14"/>'
+      +     '<circle cx="50" cy="50" r="35" fill="none" stroke="' + goColor + '" stroke-width="14" stroke-linecap="round" stroke-dasharray="' + goDash + ' ' + goCirc + '" transform="rotate(-90 50 50)"/>'
+      +     '<text x="50" y="48" text-anchor="middle" font-size="20" font-weight="900" fill="#1F2937">' + goPct + '%</text>'
+      +     '<text x="50" y="63" text-anchor="middle" font-size="9" fill="#6B7280">' + go.done1 + '/' + go.total1 + '</text>'
+      +   '</svg>'
+      +   '<div class="okpi-vis-label">입주 전 처리율</div>'
+      + '</div>';
+
+    // ── 2. 이지희 — 누적 막대 (종료 / 대응건수)
+    var ljPct = lj.contacts > 0 ? Math.round(lj.closed/lj.contacts*100) : 0;
+    var ljChart = ''
+      + '<div class="okpi-vis-card">'
+      +   '<div class="okpi-vis-name c2">이지희</div>'
+      +   '<div class="okpi-stack-wrap">'
+      +     '<div class="okpi-stack-bar">'
+      +       '<div class="okpi-stack-seg" style="width:' + ljPct + '%;background:#7C3AED" title="종료 ' + lj.closed + '건"></div>'
+      +     '</div>'
+      +     '<div class="okpi-stack-pct">' + ljPct + '%</div>'
+      +   '</div>'
+      +   '<div class="okpi-vis-legend">'
+      +     '<span><i style="background:#7C3AED"></i>종료 ' + lj.closed + '</span>'
+      +     '<span><i style="background:#E5E7EB"></i>나머지 ' + (lj.contacts - lj.closed) + '</span>'
+      +   '</div>'
+      +   '<div class="okpi-vis-label">대응 ' + lj.contacts + '건</div>'
+      + '</div>';
+
+    // ── 3. 김영철 — 누적 막대 (완납+분납 / 대응건수)
+    var kyPaidPct = ky.contacts > 0 ? (ky.paid/ky.contacts*100) : 0;
+    var kyPartPct = ky.contacts > 0 ? (ky.partial/ky.contacts*100) : 0;
+    var kyTotalPct = Math.round(kyPaidPct + kyPartPct);
+    var kyChart = ''
+      + '<div class="okpi-vis-card">'
+      +   '<div class="okpi-vis-name col">김영철</div>'
+      +   '<div class="okpi-stack-wrap">'
+      +     '<div class="okpi-stack-bar">'
+      +       '<div class="okpi-stack-seg" style="width:' + kyPaidPct + '%;background:#10B981" title="완납 ' + ky.paid + '건"></div>'
+      +       '<div class="okpi-stack-seg" style="width:' + kyPartPct + '%;background:#F59E0B" title="분납 ' + ky.partial + '건"></div>'
+      +     '</div>'
+      +     '<div class="okpi-stack-pct">' + kyTotalPct + '%</div>'
+      +   '</div>'
+      +   '<div class="okpi-vis-legend">'
+      +     '<span><i style="background:#10B981"></i>완납 ' + ky.paid + '</span>'
+      +     '<span><i style="background:#F59E0B"></i>분납 ' + ky.partial + '</span>'
+      +   '</div>'
+      +   '<div class="okpi-vis-label">대응 ' + ky.contacts + '건</div>'
+      + '</div>';
+
+    // ── 4. 오진선 — 누적 막대 (종료자 입금 + 완납 + 분납 / 대응건수)
+    var ohEndPct  = oh.contacts > 0 ? (oh.endDue/oh.contacts*100) : 0;
+    var ohPaidPct = oh.contacts > 0 ? (oh.ohPaid/oh.contacts*100) : 0;
+    var ohPartPct = oh.contacts > 0 ? (oh.ohPartial/oh.contacts*100) : 0;
+    var ohTotalPct = Math.round(ohEndPct + ohPaidPct + ohPartPct);
+    var ohChart = ''
+      + '<div class="okpi-vis-card">'
+      +   '<div class="okpi-vis-name del">오진선</div>'
+      +   '<div class="okpi-stack-wrap">'
+      +     '<div class="okpi-stack-bar">'
+      +       '<div class="okpi-stack-seg" style="width:' + ohEndPct  + '%;background:#3B82F6" title="입금예정 ' + oh.endDue + '건"></div>'
+      +       '<div class="okpi-stack-seg" style="width:' + ohPaidPct + '%;background:#10B981" title="완납 ' + oh.ohPaid + '건"></div>'
+      +       '<div class="okpi-stack-seg" style="width:' + ohPartPct + '%;background:#F59E0B" title="분납 ' + oh.ohPartial + '건"></div>'
+      +     '</div>'
+      +     '<div class="okpi-stack-pct">' + ohTotalPct + '%</div>'
+      +   '</div>'
+      +   '<div class="okpi-vis-legend">'
+      +     '<span><i style="background:#3B82F6"></i>입금 ' + oh.endDue + '</span>'
+      +     '<span><i style="background:#10B981"></i>완납 ' + oh.ohPaid + '</span>'
+      +     '<span><i style="background:#F59E0B"></i>분납 ' + oh.ohPartial + '</span>'
+      +   '</div>'
+      +   '<div class="okpi-vis-label">대응 ' + oh.contacts + '건</div>'
+      + '</div>';
+
     return '<div class="okpi-chart-card">'
-      + '<div class="okpi-chart-title">📊 담당자별 ' + periodLabel + ' 처리 건수 <span style="color:#9CA3AF;font-size:10.5px;font-weight:500">· 합계 ' + counts.reduce(function(a,b){return a+b;},0) + '건</span></div>'
-      + '<div class="okpi-chart-bars">' + bars + '</div>'
+      + '<div class="okpi-chart-title">📊 담당자별 ' + periodLabel + ' KPI 시각화</div>'
+      + '<div class="okpi-vis-grid4">' + goChart + ljChart + kyChart + ohChart + '</div>'
       + '</div>';
   } catch(e){ console.warn('[okpi] chart:', e); return ''; }
 }
