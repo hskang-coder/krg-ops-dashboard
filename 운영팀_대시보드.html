@@ -14161,52 +14161,64 @@ function okpi_setDate(v){
   okpi_render();
 }
 
-// 데이터 보장 (필요 시 fetch + 재시도 1회)
-// [중요] vacancyRawData / daeungRawData는 let 변수라 window.* 할당이 아니라 직접 할당해야 함
+// [근본 조치] 시트 active filter 영향 영구 차단 + 캐시 무력화
+// SQL 쿼리(tq=SELECT *) + range=A:ZZ + 캐시버스트(_t) + cache:'no-store' 4중 안전장치
+async function okpi_fetchRaw(gid){
+  var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
+          + '/gviz/tq?tqx=out:json'
+          + '&gid=' + gid
+          + '&range=A:ZZ'
+          + '&tq=' + encodeURIComponent('SELECT *')
+          + '&headers=1'
+          + '&_t=' + Date.now();
+  var res = await fetch(url, { cache: 'no-store' });
+  var text = await res.text();
+  var m = text.match(/setResponse\((\{[\s\S]+\})\)/);
+  if (!m) throw new Error('parse error');
+  return JSON.parse(m[1]);
+}
+
+// 데이터 보장 (항상 fresh fetch + 재시도 + raw 보장)
 async function okpi_ensureData(){
-  // vacancy
+  // vacancy — 항상 새로 fetch (필터/캐시 우회)
   try {
-    if (typeof vacancyRawData === 'undefined' || !Array.isArray(vacancyRawData) || !vacancyRawData.length) {
-      for (var attempt = 1; attempt <= 2; attempt++) {
-        try {
-          if (typeof fetchSheetByGid === 'function' && typeof parseVacancySheet === 'function') {
-            var v = await fetchSheetByGid('1953907648');
-            var newVac = parseVacancySheet(v);
-            if (Array.isArray(newVac) && newVac.length) {
-              vacancyRawData = newVac; // [fix] let 변수 직접 할당
-              console.log('[okpi] vacancy 로드:', newVac.length, '건 (시도' + attempt + ')');
-              break;
-            } else if (attempt === 2) {
-              console.warn('[okpi] vacancy fetch 2회 시도 모두 빈 응답');
-            }
+    for (var a1 = 1; a1 <= 2; a1++) {
+      try {
+        if (typeof parseVacancySheet === 'function') {
+          var v = await okpi_fetchRaw('1953907648');
+          var newVac = parseVacancySheet(v);
+          if (Array.isArray(newVac) && newVac.length) {
+            vacancyRawData = newVac;
+            console.log('[okpi] vacancy 로드:', newVac.length, '건 (시도' + a1 + ', raw fetch)');
+            break;
+          } else if (a1 === 2) {
+            console.warn('[okpi] vacancy fetch 2회 시도 모두 빈 응답');
           }
-        } catch(e1) {
-          console.warn('[okpi] vacancy fetch 시도' + attempt + ' 실패:', e1);
-          if (attempt === 1) await new Promise(function(r){ setTimeout(r, 500); });
         }
+      } catch(e1) {
+        console.warn('[okpi] vacancy raw fetch 시도' + a1 + ' 실패:', e1);
+        if (a1 === 1) await new Promise(function(r){ setTimeout(r, 500); });
       }
     }
   } catch(e) { console.warn('[okpi] vacancy ensure warn:', e); }
-  // daeung (운영기록)
+  // daeung (운영기록) — 항상 새로 fetch
   try {
-    if (typeof daeungRawData === 'undefined' || !Array.isArray(daeungRawData) || !daeungRawData.length) {
-      for (var attempt2 = 1; attempt2 <= 2; attempt2++) {
-        try {
-          if (typeof fetchSheetByGid === 'function' && typeof parseDailyReport === 'function') {
-            var d = await fetchSheetByGid('554798125');
-            var newDae = parseDailyReport(d);
-            if (Array.isArray(newDae) && newDae.length) {
-              daeungRawData = newDae; // [fix] let 변수 직접 할당
-              console.log('[okpi] daeung 로드:', newDae.length, '건 (시도' + attempt2 + ')');
-              break;
-            } else if (attempt2 === 2) {
-              console.warn('[okpi] daeung fetch 2회 시도 모두 빈 응답 — KPI 0건 표시될 수 있음');
-            }
+    for (var a2 = 1; a2 <= 2; a2++) {
+      try {
+        if (typeof parseDailyReport === 'function') {
+          var d = await okpi_fetchRaw('554798125');
+          var newDae = parseDailyReport(d);
+          if (Array.isArray(newDae) && newDae.length) {
+            daeungRawData = newDae;
+            console.log('[okpi] daeung 로드:', newDae.length, '건 (시도' + a2 + ', raw fetch)');
+            break;
+          } else if (a2 === 2) {
+            console.warn('[okpi] daeung fetch 2회 시도 모두 빈 응답 — 시트 필터 또는 권한 점검 필요');
           }
-        } catch(e2) {
-          console.warn('[okpi] daeung fetch 시도' + attempt2 + ' 실패:', e2);
-          if (attempt2 === 1) await new Promise(function(r){ setTimeout(r, 500); });
         }
+      } catch(e2) {
+        console.warn('[okpi] daeung raw fetch 시도' + a2 + ' 실패:', e2);
+        if (a2 === 1) await new Promise(function(r){ setTimeout(r, 500); });
       }
     }
   } catch(e) { console.warn('[okpi] daeung ensure warn:', e); }
@@ -14583,13 +14595,13 @@ function okpi_syncFromGlobal(){
   } catch(e){ console.warn('[okpi] hook:', e); }
 })();
 
-// 데이터 강제 재로드 후 재렌더
+// 데이터 강제 재로드 후 재렌더 — raw fetch 사용 (필터 우회)
 async function okpi_ensureRefresh(){
   try {
-    if (typeof fetchSheetByGid === 'function' && typeof parseDailyReport === 'function') {
-      var d = await fetchSheetByGid('554798125');
+    if (typeof parseDailyReport === 'function') {
+      var d = await okpi_fetchRaw('554798125');
       var newDae = parseDailyReport(d);
-      if (Array.isArray(newDae) && newDae.length) daeungRawData = newDae; // [fix] let 직접 할당
+      if (Array.isArray(newDae) && newDae.length) daeungRawData = newDae;
     }
     okpi_render();
   } catch(e){ console.warn('[okpi] refresh:', e); }
