@@ -13608,8 +13608,14 @@ function okpi_injectCss(){
     + '.okpi-person-name{font-size:12px;font-weight:800;color:#1F2937;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px}'
     + '.okpi-person-total{font-size:10.5px;font-weight:700;color:#7C3AED;background:#F5F3FF;padding:1px 6px;border-radius:3px;font-variant-numeric:tabular-nums}'
     + '.okpi-person-role{display:none}'
-    + '.okpi-list{display:flex;flex-direction:column;gap:4px}'
-    + '.okpi-row{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;padding:5px 8px;border-radius:4px;background:#F9FAFB}'
+    + '.okpi-list{display:flex;flex-direction:column;gap:5px}'
+    + '.okpi-row{display:flex;flex-direction:column;gap:4px;padding:6px 8px;border-radius:4px;background:#F9FAFB}'
+    + '.okpi-row-main{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}'
+    + '.okpi-progress-bar{width:100%;height:5px;background:#E5E7EB;border-radius:3px;overflow:hidden}'
+    + '.okpi-progress-fill{height:100%;border-radius:3px;transition:width .4s}'
+    + '.okpi-progress-fill.c1{background:#1B3976}.okpi-progress-fill.c2{background:#7C3AED}'
+    + '.okpi-progress-fill.col{background:#059669}.okpi-progress-fill.del{background:#DC2626}'
+    + '.okpi-progress-fill.good{background:#10B981}.okpi-progress-fill.warn{background:#F59E0B}.okpi-progress-fill.danger{background:#EF4444}'
     + '.okpi-row.warn{background:#FEF3C7}.okpi-row.danger{background:#FEE2E2}.okpi-row.good{background:#F0FDF4}'
     + '.okpi-name{font-size:10.5px;font-weight:700;color:#1F2937;line-height:1.25;display:flex;align-items:center;gap:3px;flex-wrap:wrap}'
     + '.okpi-name .src{display:inline-block;padding:0 4px;border-radius:2px;font-size:8.5px;font-weight:600}'
@@ -13856,22 +13862,30 @@ function okpi_status(num, den, thrGood, thrWarn){
   return { cls:'danger', txt:'🔴 위험' };
 }
 
-// 비율 KPI 행
+// 비율 KPI 행 (가로 진행바 + 상태 색상)
 function okpi_rowRatio(label, src, formula, num, den, thrGood, thrWarn){
   var st = okpi_status(num, den, thrGood, thrWarn);
   var pct = den > 0 ? Math.round(num/den*100) : 0;
+  var fillCls = st.cls || 'good';
   return ''
     + '<div class="okpi-row ' + st.cls + '">'
-    + '<div class="okpi-info"><div class="okpi-name">' + label + ' <span class="src ' + (src.cls||'auto') + '">' + (src.txt||'자동') + '</span></div><div class="okpi-formula">' + formula + '</div></div>'
-    + '<div class="okpi-value"><div class="okpi-num ' + st.cls + '">' + num + '/' + den + '</div><div class="okpi-target">' + pct + '%</div><span class="okpi-status ' + st.cls + '">' + st.txt + '</span></div>'
+    +   '<div class="okpi-row-main">'
+    +     '<div class="okpi-info"><div class="okpi-name">' + label + ' <span class="src ' + (src.cls||'auto') + '">' + (src.txt||'자동') + '</span></div><div class="okpi-formula">' + formula + '</div></div>'
+    +     '<div class="okpi-value"><div class="okpi-num ' + st.cls + '">' + num + '/' + den + '</div><div class="okpi-target">' + pct + '%</div><span class="okpi-status ' + st.cls + '">' + st.txt + '</span></div>'
+    +   '</div>'
+    +   '<div class="okpi-progress-bar"><div class="okpi-progress-fill ' + fillCls + '" style="width:' + pct + '%"></div></div>'
     + '</div>';
 }
-// 카운트 KPI 행
-function okpi_rowCount(label, src, formula, val){
+// 카운트 KPI 행 (카드 내 max 대비 막대)
+function okpi_rowCount(label, src, formula, val, maxVal, colorCls){
+  var pct = (maxVal && maxVal > 0) ? Math.min(100, Math.round(val/maxVal*100)) : (val > 0 ? 100 : 0);
   return ''
     + '<div class="okpi-row">'
-    + '<div class="okpi-info"><div class="okpi-name">' + label + ' <span class="src ' + (src.cls||'auto') + '">' + (src.txt||'자동') + '</span></div><div class="okpi-formula">' + formula + '</div></div>'
-    + '<div class="okpi-value"><div class="okpi-num">' + val + '</div><div class="okpi-target">건</div></div>'
+    +   '<div class="okpi-row-main">'
+    +     '<div class="okpi-info"><div class="okpi-name">' + label + ' <span class="src ' + (src.cls||'auto') + '">' + (src.txt||'자동') + '</span></div><div class="okpi-formula">' + formula + '</div></div>'
+    +     '<div class="okpi-value"><div class="okpi-num">' + val + '</div><div class="okpi-target">건</div></div>'
+    +   '</div>'
+    +   '<div class="okpi-progress-bar"><div class="okpi-progress-fill ' + (colorCls||'c1') + '" style="width:' + pct + '%"></div></div>'
     + '</div>';
 }
 
@@ -13963,6 +13977,11 @@ function okpi_renderPersonCards(k){
     }).length;
   };
   var tGo = totalBy('고송미'), tLj = totalBy('이지희'), tKy = totalBy('김영철'), tOh = totalBy('오진선');
+  // 카드별 카운트 KPI max — progress bar 스케일 기준
+  var goCntMax = Math.max(go.newC, 1);
+  var ljCntMax = Math.max(lj.phone, lj.rejection, 1);
+  var kyCntMax = Math.max(ky.dueSet, ky.paid, ky.partial, 1);
+  var ohCntMax = Math.max(oh.legal, oh.endDue, oh.endPaid, 1);
 
   return '<div class="okpi-person-grid">'
     // 고송미
@@ -13971,34 +13990,34 @@ function okpi_renderPersonCards(k){
     +   '<div class="okpi-list">'
     +     okpi_rowRatio('입주 전 전자계약+수수료 완료', src.combo, '기간 내 입주 예정 / 둘 다 TRUE 비율', go.done1, go.total1, 90, 80)
     +     okpi_rowRatio('입주 후 NAS 등록',           src.auto,  '기간 내 입주 / NAS=TRUE 비율',     go.nasDone, go.nasTotal, 90, 80)
-    +     okpi_rowCount('신규 계약 처리',              src.auto,  '가계약일이 기간 내 행수',           go.newC)
+    +     okpi_rowCount('신규 계약 처리',              src.auto,  '가계약일이 기간 내 행수',           go.newC, goCntMax, 'c1')
     +   '</div>'
     + '</div>'
     // 이지희
     + '<div class="okpi-person-card c2">'
     +   '<div class="okpi-person-hd"><div class="okpi-avatar c2">이</div><div><div class="okpi-person-name">이지희 <span class="okpi-person-total">' + tLj + '건</span></div><div class="okpi-person-role">계약관리 · 스텝2 (계약·갱신·종료)</div></div></div>'
     +   '<div class="okpi-list">'
-    +     okpi_rowCount('전화 종료 처리',              src.kw, '담당=이지희 + 메모 "진행/위임/종료"', lj.phone)
+    +     okpi_rowCount('전화 종료 처리',              src.kw, '담당=이지희 + 메모 "진행/위임/종료"', lj.phone, ljCntMax, 'c2')
     +     okpi_rowRatio('D-30 갱신 홈버튼 등록',       src.combo, '만기 D-30 대상 / CC=TRUE 비율',     lj.renewDone, lj.renewTotal, 90, 70)
-    +     okpi_rowCount('갱신 거절/조건부 대응',       src.kw, '담당=이지희 + 1차=갱신 + "거절/조건부"', lj.rejection)
+    +     okpi_rowCount('갱신 거절/조건부 대응',       src.kw, '담당=이지희 + 1차=갱신 + "거절/조건부"', lj.rejection, ljCntMax, 'c2')
     +   '</div>'
     + '</div>'
     // 김영철
     + '<div class="okpi-person-card col">'
     +   '<div class="okpi-person-hd"><div class="okpi-avatar col">김</div><div><div class="okpi-person-name">김영철 <span class="okpi-person-total">' + tKy + '건</span></div><div class="okpi-person-role">수납관리 (일단위 연체대응)</div></div></div>'
     +   '<div class="okpi-list">'
-    +     okpi_rowCount('입금예정일 확정',             src.field, '담당=김영철 + D열 채워짐', ky.dueSet)
-    +     okpi_rowCount('완납 처리',                   src.kw, '담당=김영철 + 메모 "완납"',           ky.paid)
-    +     okpi_rowCount('분납 처리',                   src.kw, '담당=김영철 + 메모 "분납"',           ky.partial)
+    +     okpi_rowCount('입금예정일 확정',             src.field, '담당=김영철 + D열 채워짐', ky.dueSet, kyCntMax, 'col')
+    +     okpi_rowCount('완납 처리',                   src.kw, '담당=김영철 + 메모 "완납"',           ky.paid, kyCntMax, 'col')
+    +     okpi_rowCount('분납 처리',                   src.kw, '담당=김영철 + 메모 "분납"',           ky.partial, kyCntMax, 'col')
     +   '</div>'
     + '</div>'
     // 오진선
     + '<div class="okpi-person-card del">'
     +   '<div class="okpi-person-hd"><div class="okpi-avatar del">오</div><div><div class="okpi-person-name">오진선 <span class="okpi-person-total">' + tOh + '건</span></div><div class="okpi-person-role">연체관리 (법진행·종료대응)</div></div></div>'
     +   '<div class="okpi-list">'
-    +     okpi_rowCount('법조치 대응',                 src.kw, '담당=오진선 + 메모 "내용증명/지급명령/법조치"', oh.legal)
-    +     okpi_rowCount('종료자 입금예정 확정',         src.combo, '담당=오진선 + D열 + 메모 "종료/퇴실"', oh.endDue)
-    +     okpi_rowCount('종료자 완납/분납',            src.kw, '담당=오진선 + 메모 "완납/분납"',      oh.endPaid)
+    +     okpi_rowCount('법조치 대응',                 src.kw, '담당=오진선 + 메모 "내용증명/지급명령/법조치"', oh.legal, ohCntMax, 'del')
+    +     okpi_rowCount('종료자 입금예정 확정',         src.combo, '담당=오진선 + D열 + 메모 "종료/퇴실"', oh.endDue, ohCntMax, 'del')
+    +     okpi_rowCount('종료자 완납/분납',            src.kw, '담당=오진선 + 메모 "완납/분납"',      oh.endPaid, ohCntMax, 'del')
     +   '</div>'
     + '</div>'
     + '</div>';
