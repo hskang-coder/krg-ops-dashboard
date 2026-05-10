@@ -1190,7 +1190,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   <div class="cr-wrap">
     <div class="cr-search-panel">
       <div class="cr-mode-tabs">
-        <button class="cr-mode-tab active" onclick="switchCrMode('no')">🔢 계약번호</button>
+        <button class="cr-mode-tab active" onclick="switchCrMode('no')">🔢 계약번호 / 임차인명</button>
         <button class="cr-mode-tab"        onclick="switchCrMode('tenant')">👤 임차인 이름</button>
         <button class="cr-mode-tab"        onclick="switchCrMode('landlord')">🏢 임대인 이름</button>
         <button class="cr-mode-tab"        onclick="switchCrMode('phone')">📞 전화번호</button>
@@ -1198,7 +1198,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         <button class="cr-mode-tab"        onclick="switchCrMode('list')">📋 목록 선택</button>
       </div>
       <div id="crSearchBox" class="cr-search-bar">
-        <input id="crInput" type="text" placeholder="계약번호를 입력하세요" onkeydown="if(event.key==='Enter')searchContract()">
+        <input id="crInput" type="text" placeholder="계약번호(숫자) 또는 임차인명(2자 이상) 입력" onkeydown="if(event.key==='Enter')searchContract()">
         <button class="cr-search-btn" onclick="searchContract()">🔍 검색</button>
         <button class="cr-contract-pdf-btn" id="crContractPdfBtn" onclick="openContractPdfModal(window._crCurrentNo)" title="검색된 계약은 자동 발행 / 검색 안 한 경우 수동 입력 모드로 진입">📄 계약서발행</button>
         <button class="cr-contract-pdf-btn" id="crSubAgreementBtn" onclick="generateSubAgreement(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능" style="margin-left:5px;">📋 부속합의서</button>
@@ -1720,7 +1720,7 @@ function switchCrMode(mode) {
   } else {
     searchBox.style.display = '';
     listBox.style.display   = 'none';
-    const ph = { no:'계약번호를 입력하세요', tenant:'임차인 이름 2글자 이상 입력하세요', landlord:'임대인 이름 2글자 이상 입력하세요', phone:'전화번호를 입력하세요 (일부 가능)', addr:'주소를 입력하세요 (일부 입력 가능)' };
+    const ph = { no:'계약번호(숫자) 또는 임차인명(2자 이상) 입력', tenant:'임차인 이름 2글자 이상 입력하세요', landlord:'임대인 이름 2글자 이상 입력하세요', phone:'전화번호를 입력하세요 (일부 가능)', addr:'주소를 입력하세요 (일부 입력 가능)' };
     input.placeholder = ph[mode]; input.value = '';
     input.type = 'text';
   }
@@ -2227,7 +2227,13 @@ function searchContract() {
   }
   if (!q) return;
 
-  // 이름 검색: 2글자 이상 필요
+  // [v213] 계약번호 탭은 자동 감지: 숫자면 계약번호, 한글이면 임차인명으로 검색
+  // 한글 검색은 2글자 이상 필요
+  var isNumericQ = /^\d+$/.test(q);
+  if (crMode === 'no' && !isNumericQ && q.length < 2) {
+    el.innerHTML = '<div class="cr-empty">⚠️ 임차인명은 2글자 이상 입력하세요.</div>';
+    return;
+  }
   if ((crMode === 'tenant' || crMode === 'landlord') && q.length < 2) {
     el.innerHTML = '<div class="cr-empty">⚠️ 이름은 2글자 이상 입력하세요.</div>';
     return;
@@ -2235,11 +2241,36 @@ function searchContract() {
 
   let matches = [];
   if (crMode === 'no') {
-    // 계약번호: 완전일치 또는 포함 검색
-    matches = contractRawData.filter(r =>
-      String(r['계약번호']||'').trim() === q ||
-      String(r['계약번호']||'').trim().includes(q)
-    );
+    if (isNumericQ) {
+      // 1) 계약번호 검색 (완전일치 또는 포함)
+      matches = contractRawData.filter(r =>
+        String(r['계약번호']||'').trim() === q ||
+        String(r['계약번호']||'').trim().includes(q)
+      );
+      // 2) 0건이면 임차인명으로도 폴백 (숫자 임차인명은 거의 없으나 안전망)
+      if (matches.length === 0) {
+        const kw = q.toLowerCase();
+        const matchedNos = new Set(
+          vacancyRawData.filter(v => String(v.tenantName||'').toLowerCase().includes(kw)).map(v => v.no)
+        );
+        matches = contractRawData.filter(r =>
+          matchedNos.has(String(r['계약번호']||'').trim()) ||
+          String(r['임차인명']||'').toLowerCase().includes(kw) ||
+          String(r['임차인']||'').toLowerCase().includes(kw)
+        );
+      }
+    } else {
+      // 한글/영문 입력 → 임차인명 검색
+      const kw = q.toLowerCase();
+      const matchedNos = new Set(
+        vacancyRawData.filter(v => String(v.tenantName||'').toLowerCase().includes(kw)).map(v => v.no)
+      );
+      matches = contractRawData.filter(r =>
+        matchedNos.has(String(r['계약번호']||'').trim()) ||
+        String(r['임차인명']||'').toLowerCase().includes(kw) ||
+        String(r['임차인']||'').toLowerCase().includes(kw)
+      );
+    }
   } else if (crMode === 'tenant') {
     const kw = q.toLowerCase();
     // vacancyRawData(GID=1953907648 AT열)에서 임차인 이름으로 계약번호 추출
