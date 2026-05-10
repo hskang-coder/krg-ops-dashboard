@@ -14822,6 +14822,20 @@ function crQF_render(no, tenantName){
       +     '<div id="okpiF_toast" class="okpi-toast" style="display:none"></div>'
       +   '</div>'
       + '</div>';
+
+    // [스크롤] 검색 후 최상단으로 자동 이동 (검색창 + 빠른 메모 + 첫 카드가 한 화면에 보이도록)
+    try {
+      var headerOffset = 0;
+      var fixedHd = document.querySelector('.app-header, .header, header');
+      if (fixedHd) headerOffset = fixedHd.offsetHeight || 0;
+      var crWrap = document.querySelector('#contractView .cr-wrap');
+      if (crWrap) {
+        var top = crWrap.getBoundingClientRect().top + window.pageYOffset - headerOffset - 8;
+        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch(_e){ try { window.scrollTo(0, 0); } catch(_){} }
   } catch(e){ console.warn('[crQF] render warn:', e); }
 }
 
