@@ -14317,6 +14317,15 @@ function okpi_form_dueLabel(cat1){
   return '재연락일정';
 }
 
+// 메모 placeholder 동적 변경 (1차 카테고리에 따른 샘플 가이드)
+function okpi_form_memoPlaceholder(cat1){
+  if (cat1 === '수납관리' || cat1 === '연체관리' || cat1 === '중도퇴실관리') {
+    return '예: 분납 / 완납 / 미수신, 다음 액션 내용';
+  }
+  // 계약(입주)관리, 갱신관리
+  return '예: 종료 / 대응중 / 위임, 이슈사항';
+}
+
 function okpi_form_onCat1Change(){
   try {
     var c1 = document.getElementById('okpiF_cat1').value;
@@ -14324,6 +14333,8 @@ function okpi_form_onCat1Change(){
     if (sel2) sel2.innerHTML = okpi_form_cat2Options(c1);
     var lblD = document.getElementById('okpiF_dueLabel');
     if (lblD) lblD.textContent = okpi_form_dueLabel(c1);
+    var memoEl = document.getElementById('okpiF_memo');
+    if (memoEl) memoEl.placeholder = okpi_form_memoPlaceholder(c1);
   } catch(e){ console.warn('[okpi] cat1 change:', e); }
 }
 
@@ -14651,7 +14662,7 @@ function okpi_renderForm(){
     +     '<div class="okpi-fld"><label id="okpiF_dueLabel">' + okpi_form_dueLabel(c1Default) + '</label>'
     +       '<input type="date" id="okpiF_dueDate" class="okpi-fld-input"></div>'
     +     '<div class="okpi-fld"><label>메모<span class="okpi-tag-req">*</span></label>'
-    +       '<input type="text" id="okpiF_memo" class="okpi-fld-input" placeholder="대응 상세내용"></div>'
+    +       '<input type="text" id="okpiF_memo" class="okpi-fld-input" placeholder="' + okpi_form_memoPlaceholder(c1Default) + '"></div>'
     +     '<button type="button" id="okpiF_submitBtn" class="okpi-form-submit" onclick="okpi_form_submit()">+ 기록</button>'
     +   '</div>'
     +   '<input type="hidden" id="okpiF_h_contractNo">'
