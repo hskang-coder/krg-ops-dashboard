@@ -7469,6 +7469,17 @@ function cG_parsePdfText(text){
   var data = {};
   // [v186] 전처리 — 원형 숫자 제거(①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮)
   text = String(text || '').replace(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]\.?/g, ' ');
+
+  // [DOCX 보강] Word/DOCX는 한 줄에 여러 라벨이 붙어 추출됨 → 라벨 앞에 강제 줄바꿈
+  // (a) 알려진 필드 라벨 (X 텍스트... 라벨: 값 ... 다음라벨: 값 형식 분리)
+  //     주의: '호실'은 '주소 + 호실' 같은 복합 라벨에서 깨지지 않도록 제외
+  var FIELD_LABELS = '이름|주소|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|긴급연락처|비상연락(?:망|처)|관계|월세|보증금|관리비';
+  var fieldBreakRe = new RegExp('([^\\n])\\s+(' + FIELD_LABELS + ')\\s*(?:\\([^)]*\\))?\\s*(?=[:：])', 'g');
+  text = text.replace(fieldBreakRe, '$1\n$2');
+  // (b) 섹션 헤더 (10. 임차인 정보 / 9. 계좌 정보 등 — 숫자.섹션 앞에 줄바꿈)
+  var SECTION_NAMES = '임대인\\s*정보|임차인\\s*정보|공동\\s*임차인|계좌\\s*정보|임대료|임대\\s*조건|특약사항|계약\\s*조건|임대차\\s*계약\\s*기간|계약\\s*기간';
+  var sectionBreakRe = new RegExp('([^\\n])\\s*(\\d{1,2}\\s*\\.?\\s*)?(' + SECTION_NAMES + ')', 'g');
+  text = text.replace(sectionBreakRe, '$1\n$2$3');
   // ── 헬퍼 ──
   // [v183] 날짜 다양 형식 지원: 2026년5월7일 / 2026.5.7 / 2026-5-7 / 2026/5/7
   var parseKDate = function(s){
