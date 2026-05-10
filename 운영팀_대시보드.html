@@ -7630,9 +7630,25 @@ function cG_parsePdfText(text){
   // [긴급연락처] 비상연락망(=긴급연락처) 서브섹션 — 관계/이름/연락처
   var emergSec = section(/긴급\s*연락처|비상\s*연락(?:망|처)/, /공동\s*임차인|임대\s*조건|^[가-힣\s]+정보/m);
   if (emergSec) {
+    // 1) 멀티라인 라벨 형식 — "관계 : 부 / 이름 : 홍길동 / 연락처 : 010-..."
     data.emergPhone = pickIn(emergSec, /(?:긴급\s*연락처|비상\s*연락(?:망|처)|연락처)\s*(?:\([^)]*\))?\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
     data.emergRel   = pickIn(emergSec, /관계\s*(?:\([^)]*\))?\s*[:：]\s*([^\n,/]+?)(?=\s*(?:이름|연락처|주민|$|\n))/).trim();
     data.emergName  = pickIn(emergSec, /이름\s*(?:\([^)]*\))?\s*[:：]\s*([^\n,/]+?)(?=\s*(?:관계|연락처|주민|$|\n))/).trim();
+
+    // 2) 인라인 한 줄 형식 폴백 — "비상연락망- 부, 010-9016-4332" / "긴급연락처: 부 / 홍길동 / 010-..."
+    var inlineRe = /(?:긴급\s*연락처|비상\s*연락(?:망|처))\s*(?:\([^)]*\))?\s*[\-:：/·]+\s*([^\n]+)/;
+    var inlineM  = emergSec.match(inlineRe);
+    if (inlineM) {
+      var inline = inlineM[1].trim();
+      var phM = inline.match(/(\d{2,3}-\d{3,4}-\d{4})/);
+      if (phM && !data.emergPhone) data.emergPhone = phM[1];
+      // 전화번호 제거 후 구분자(, / · -) 분리 → 토큰 배열
+      var rest  = inline.replace(/\d{2,3}-\d{3,4}-\d{4}/, '').replace(/[,/·\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+      var parts = rest ? rest.split(/\s+/).filter(Boolean) : [];
+      if (parts.length >= 1 && !data.emergRel)  data.emergRel  = parts[0];
+      if (parts.length >= 2 && !data.emergName) data.emergName = parts[1];
+    }
+
     // 라벨 침범 방지 (다음 라벨로 시작하면 빈값으로)
     if (data.emergRel && LABEL_KEYWORDS.test(data.emergRel)) data.emergRel = '';
     if (data.emergName && LABEL_KEYWORDS.test(data.emergName)) data.emergName = '';
