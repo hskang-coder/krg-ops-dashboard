@@ -13669,6 +13669,18 @@ function okpi_injectCss(){
     + '.okpi-vstack-legend .l-name{text-align:left;color:#374151;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + '.okpi-vstack-legend .l-val{font-weight:800;color:#1F2937;font-variant-numeric:tabular-nums;text-align:right;min-width:24px}'
     + '.okpi-vstack-legend .l-pct{font-size:10.5px;color:#6B7280;font-weight:600;font-variant-numeric:tabular-nums;text-align:right;min-width:36px}'
+    + '.okpi-guide{background:#FFF7ED;border:1px solid #FED7AA;border-radius:6px;padding:5px 10px;margin-bottom:8px;font-size:11px}'
+    + '.okpi-guide summary{cursor:pointer;color:#9A3412;font-weight:700;list-style:none;user-select:none;display:flex;align-items:center;gap:5px}'
+    + '.okpi-guide summary::-webkit-details-marker{display:none}'
+    + '.okpi-guide summary::before{content:"▶";font-size:8px;color:#C2410C}'
+    + '.okpi-guide[open] summary::before{content:"▼"}'
+    + '.okpi-guide-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px;font-size:10.5px}'
+    + '.okpi-guide-grid > div{background:#fff;border:1px solid #FED7AA;border-radius:4px;padding:5px 8px}'
+    + '.okpi-guide-grid b{color:#9A3412;display:block;margin-bottom:2px;font-size:10.5px;font-weight:800}'
+    + '.okpi-guide-grid span{color:#7C2D12;font-size:10px;line-height:1.4}'
+    + '.okpi-guide-rules{margin-top:8px;padding-top:6px;border-top:1px dashed #FED7AA;color:#7C2D12;font-size:10.5px;line-height:1.7}'
+    + '.okpi-guide-rules b{color:#9A3412}'
+    + '.okpi-guide-rules code{background:#fff;border:1px solid #FED7AA;border-radius:3px;padding:1px 5px;font-family:Menlo,monospace;font-size:10px;color:#9A3412}'
     + '.okpi-status.good{background:#D1FAE5;color:#065F46}'
     + '.okpi-status.warn{background:#FED7AA;color:#9A3412}'
     + '.okpi-status.danger{background:#FECACA;color:#991B1B}'
@@ -14635,6 +14647,26 @@ function okpi_form_toast(msg, kind){
   } catch(_){}
 }
 
+// 메모 작성 가이드 (컴팩트 펼침 박스)
+function okpi_renderGuide(){
+  return ''
+    + '<details class="okpi-guide">'
+    +   '<summary>📝 메모 작성 가이드 — 데이터 분석을 위한 표준 (펼치기)</summary>'
+    +   '<div class="okpi-guide-grid">'
+    +     '<div><b>계약(입주)관리</b><span>종료 / 대응중 / 위임 / 이슈</span></div>'
+    +     '<div><b>수납관리</b><span>분납 / 완납 / 미수신 / 대응중</span></div>'
+    +     '<div><b>갱신관리</b><span>갱신희망 / 퇴실 / 협의중 / 거절</span></div>'
+    +     '<div><b>연체관리</b><span>내용증명 / 지급명령 / 중도퇴실 / 완납</span></div>'
+    +     '<div><b>중도퇴실관리</b><span>신고 / 진행중 / 청소중 / 완료</span></div>'
+    +   '</div>'
+    +   '<div class="okpi-guide-rules">'
+    +     '<b>형식:</b> [상태] [정보] / [다음 액션] / [참고]<br>'
+    +     '<b>금액:</b> <code>600,000원</code> · <b>날짜:</b> <code>5/15</code> · <b>구분자:</b> <code> / </code><br>'
+    +     '<b>예시:</b> <code>완납 600,000원 5/10 / -</code> · <code>분납 300,000원 5/15 + 300,000원 5/30 / 본인 동의</code> · <code>미수신 / 5/12 재시도 / 통화불가</code>'
+    +   '</div>'
+    + '</details>';
+}
+
 // 폼 HTML
 function okpi_renderForm(){
   var todayStr = okpi_ymd(new Date());
@@ -14685,6 +14717,7 @@ async function okpi_render(){
     var k = okpi_calcAll();
     host.innerHTML = '<div class="okpi-wrap">'
       + okpi_renderTopBar(k)
+      + okpi_renderGuide()
       + okpi_renderForm()
       + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
       + okpi_renderChart(k)
