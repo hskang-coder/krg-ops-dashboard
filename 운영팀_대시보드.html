@@ -7510,7 +7510,7 @@ function cG_parsePdfText(text){
   };
   // [v186/v195] 라벨 + 콜론 뒤 값 추출 — "예금주(임대인명) : 이경훈" 같은 괄호 주석 무시
   // 빈 필드의 경우 다음 라벨까지 캡처되는 버그 방지
-  var LABEL_KEYWORDS = /^(?:이름|주소|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|긴급연락처|관계|월세|보증금|관리비|호실|호실정보|건물|건물공동현관비번)\s*(?:\([^)]*\))?\s*[:：]/;
+  var LABEL_KEYWORDS = /^(?:이름|주소|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|긴급연락처|비상연락망|비상연락처|관계|월세|보증금|관리비|호실|호실정보|건물|건물공동현관비번)\s*(?:\([^)]*\))?\s*[:：]/;
   var pickField = function(secText, label){
     if (!secText) return '';
     var re = new RegExp(label + '\\s*(?:\\([^)]*\\))?\\s*[:：]\\s*([^\\n]+)');
@@ -7617,14 +7617,25 @@ function cG_parsePdfText(text){
     data.acctHolder = pickField(acctSec, '예금주').replace(/\s+/g, ' ').trim();
   }
 
-  // [v186] 10. 임차인 정보
-  var tenantSec = section(/임차인\s*정보/, /공동\s*임차인/);
+  // [v186] 10. 임차인 정보 — 긴급연락처/비상연락망/공동임차인 직전까지
+  var tenantSec = section(/임차인\s*정보/, /긴급\s*연락처|비상\s*연락(?:망|처)|공동\s*임차인/);
   if (tenantSec) {
     data.tenantName  = pickField(tenantSec, '이름').replace(/\s+/g, ' ').trim();
     data.tenantPhone = pickIn(tenantSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
     data.tenantIdNo  = pickIn(tenantSec, /주민(?:등록)?번호[^\n:：]*[:：]\s*(\d{6}\s*[-–]\s*\d{1,7})/).replace(/\s+/g,'').replace(/–/g,'-');
     data.nationality = pickField(tenantSec, '국적').replace(/\s+/g, ' ').trim();
     data.tenantAddr  = pickAddr(tenantSec);
+  }
+
+  // [긴급연락처] 비상연락망(=긴급연락처) 서브섹션 — 관계/이름/연락처
+  var emergSec = section(/긴급\s*연락처|비상\s*연락(?:망|처)/, /공동\s*임차인|임대\s*조건|^[가-힣\s]+정보/m);
+  if (emergSec) {
+    data.emergPhone = pickIn(emergSec, /(?:긴급\s*연락처|비상\s*연락(?:망|처)|연락처)\s*(?:\([^)]*\))?\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
+    data.emergRel   = pickIn(emergSec, /관계\s*(?:\([^)]*\))?\s*[:：]\s*([^\n,/]+?)(?=\s*(?:이름|연락처|주민|$|\n))/).trim();
+    data.emergName  = pickIn(emergSec, /이름\s*(?:\([^)]*\))?\s*[:：]\s*([^\n,/]+?)(?=\s*(?:관계|연락처|주민|$|\n))/).trim();
+    // 라벨 침범 방지 (다음 라벨로 시작하면 빈값으로)
+    if (data.emergRel && LABEL_KEYWORDS.test(data.emergRel)) data.emergRel = '';
+    if (data.emergName && LABEL_KEYWORDS.test(data.emergName)) data.emergName = '';
   }
 
   // [v186] 11. 공동임차인
@@ -7716,6 +7727,10 @@ function cG_applyParsedData(data){
   setVal('tenantAddr', data.tenantAddr);
   cG_setMaskedRrn('cG_m_tenantIdNo', data.tenantIdNo);
   setVal('nationality', data.nationality);
+  // [긴급연락처] 비상연락망 = 긴급연락처로 인지 → 관계/이름/연락처
+  setVal('emgRel',   data.emergRel);
+  setVal('emgName',  data.emergName);
+  setVal('emgPhone', data.emergPhone);
   setVal('coName', data.coName);
   setVal('coPhone', data.coPhone);
   setVal('coAddr', data.coAddr);
