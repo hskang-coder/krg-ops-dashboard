@@ -1223,8 +1223,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <div id="crResult">
       <div class="cr-empty">계약번호를 입력하고 검색하세요</div>
     </div>
-    <!-- [B 인라인] 빠른 메모 입력 폼 — 검색 후 자동 표시 -->
-    <div id="crQuickFormHost"></div>
+    <!-- [B 인라인] 빠른 메모 입력 폼 — 검색 후 crResult 첫 카드 바로 아래로 동적 삽입 -->
   </div>
 </div>
 
@@ -14717,12 +14716,23 @@ function okpi_renderForm(){
 // ═══════════════════════════════════════════════════════════════════════════
 function crQF_render(no, tenantName){
   try {
-    var host = document.getElementById('crQuickFormHost');
-    if (!host) return;
-    if (!no) {
-      host.innerHTML = '';
-      return;
-    }
+    // [위치 변경] crResult 내부 첫 카드 바로 아래에 동적 삽입
+    // 1. 기존 폼 제거 (있으면)
+    var oldHost = document.getElementById('crQuickFormHost');
+    if (oldHost) oldHost.remove();
+
+    if (!no) return; // 검색 안 한 상태면 폼 표시 X
+
+    var crResult = document.getElementById('crResult');
+    if (!crResult) return;
+    var firstCard = crResult.firstElementChild;
+    if (!firstCard) return; // 결과 비어있으면 표시 X
+
+    // 2. 새 host div 생성 후 첫 카드 다음에 삽입
+    var host = document.createElement('div');
+    host.id = 'crQuickFormHost';
+    firstCard.insertAdjacentElement('afterend', host);
+
     okpi_injectCss(); // okpi CSS 재사용 (.cG-fld 등)
     var todayStr = okpi_ymd(new Date());
     var c1Default = '계약(입주)관리';
@@ -14781,7 +14791,8 @@ function crQF_render(no, tenantName){
               var vac = vacancyRawData.find(function(x){ return String(x.no).trim() === String(v).trim(); });
               if (vac) tenant = vac.tenant1Name || vac.tenantName || '';
             }
-            crQF_render(v, tenant);
+            // 검색 결과 DOM 렌더 후 폼 삽입 (50ms 지연)
+            setTimeout(function(){ crQF_render(v, tenant); }, 100);
           }
         } catch(e){ console.warn('[crQF] hook setter warn:', e); }
       },
@@ -14807,11 +14818,12 @@ function crQF_render(no, tenantName){
             var vac = vacancyRawData.find(function(x){ return String(x.no).trim() === String(no).trim(); });
             if (vac) tenant = vac.tenant1Name || vac.tenantName || '';
           }
-          crQF_render(no, tenant);
+          // 검색 결과 DOM이 그려진 후 폼 삽입 (살짝 지연)
+          setTimeout(function(){ crQF_render(no, tenant); }, 50);
         } else {
-          // 다른 탭으로 이동 시 폼 비우기 (메모리 정리)
+          // 다른 탭으로 이동 시 폼 제거
           var host = document.getElementById('crQuickFormHost');
-          if (host) host.innerHTML = '';
+          if (host) host.remove();
         }
       } catch(e){ console.warn('[crQF] sv hook warn:', e); }
       return ret;
