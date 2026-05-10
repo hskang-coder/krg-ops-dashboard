@@ -1223,6 +1223,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <div id="crResult">
       <div class="cr-empty">계약번호를 입력하고 검색하세요</div>
     </div>
+    <!-- [B 인라인] 빠른 메모 입력 폼 — 검색 후 자동 표시 -->
+    <div id="crQuickFormHost"></div>
   </div>
 </div>
 
@@ -13681,6 +13683,9 @@ function okpi_injectCss(){
     + '.okpi-guide-rules{margin-top:8px;padding-top:6px;border-top:1px dashed #FED7AA;color:#7C2D12;font-size:10.5px;line-height:1.7}'
     + '.okpi-guide-rules b{color:#9A3412}'
     + '.okpi-guide-rules code{background:#fff;border:1px solid #FED7AA;border-radius:3px;padding:1px 5px;font-family:Menlo,monospace;font-size:10px;color:#9A3412}'
+    + '.cr-qf-card{background:#F5F3FF;border:1.5px solid #C4B5FD;border-radius:8px;padding:10px 14px;margin:14px 0 6px}'
+    + '.cr-qf-hd{font-size:12px;font-weight:800;color:#5B21B6;margin-bottom:8px;display:flex;align-items:center;gap:8px}'
+    + '.cr-qf-ctx{background:#fff;color:#1B3976;font-size:11px;font-weight:700;padding:2px 10px;border-radius:4px;border:1px solid #C4B5FD}'
     + '.okpi-status.good{background:#D1FAE5;color:#065F46}'
     + '.okpi-status.warn{background:#FED7AA;color:#9A3412}'
     + '.okpi-status.danger{background:#FECACA;color:#991B1B}'
@@ -14705,6 +14710,116 @@ function okpi_renderForm(){
     + '</div>';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [B 인라인] 입주관리 빠른 입력 폼 — crQuickFormHost에 렌더
+// 운영관리 폼과 동일 함수(okpi_form_*) 재사용. 폼 ID(okpiF_*)도 동일.
+// _crCurrentNo 변경 감지 → 자동 표시 + 자동 채움
+// ═══════════════════════════════════════════════════════════════════════════
+function crQF_render(no, tenantName){
+  try {
+    var host = document.getElementById('crQuickFormHost');
+    if (!host) return;
+    if (!no) {
+      host.innerHTML = '';
+      return;
+    }
+    okpi_injectCss(); // okpi CSS 재사용 (.cG-fld 등)
+    var todayStr = okpi_ymd(new Date());
+    var c1Default = '계약(입주)관리';
+    var c2Opts = okpi_form_cat2Options(c1Default);
+    var ctx = (no || '') + (tenantName ? ' · ' + tenantName : '');
+
+    host.innerHTML = ''
+      + '<div class="cr-qf-card">'
+      +   '<div class="cr-qf-hd">⚡ 빠른 메모 입력 <span class="cr-qf-ctx">현재: ' + ctx + '</span></div>'
+      +   okpi_renderGuide()
+      +   '<div class="okpi-form-wrap">'
+      +     '<div class="okpi-form-row" style="grid-template-columns:0.7fr 0.7fr 0.9fr 1.1fr 0.95fr 1.7fr 0.5fr">'
+      +       '<div class="okpi-fld"><label>일자<span class="okpi-tag-auto">자동</span></label>'
+      +         '<input type="date" id="okpiF_date" value="' + todayStr + '" class="okpi-fld-input okpi-fld-auto"></div>'
+      +       '<div class="okpi-fld"><label>담당자<span class="okpi-tag-req">*</span></label>'
+      +         '<select id="okpiF_person" class="okpi-fld-input">'
+      +           '<option>고송미</option><option>이지희</option><option>김영철</option><option>오진선</option><option>강휘수</option>'
+      +         '</select></div>'
+      +       '<div class="okpi-fld"><label>1차<span class="okpi-tag-req">*</span></label>'
+      +         '<select id="okpiF_cat1" class="okpi-fld-input" onchange="okpi_form_onCat1Change()">'
+      +           Object.keys(window._okpiCat).map(function(k){ return '<option' + (k===c1Default?' selected':'') + '>' + k + '</option>'; }).join('')
+      +         '</select></div>'
+      +       '<div class="okpi-fld"><label>2차<span class="okpi-tag-new">F</span></label>'
+      +         '<select id="okpiF_cat2" class="okpi-fld-input">' + c2Opts + '</select></div>'
+      +       '<div class="okpi-fld"><label id="okpiF_dueLabel">' + okpi_form_dueLabel(c1Default) + '</label>'
+      +         '<input type="date" id="okpiF_dueDate" class="okpi-fld-input"></div>'
+      +       '<div class="okpi-fld"><label>메모<span class="okpi-tag-req">*</span></label>'
+      +         '<input type="text" id="okpiF_memo" class="okpi-fld-input" placeholder="' + okpi_form_memoPlaceholder(c1Default) + '"></div>'
+      +       '<button type="button" id="okpiF_submitBtn" class="okpi-form-submit" onclick="okpi_form_submit()">+ 기록</button>'
+      +     '</div>'
+      +     '<input type="hidden" id="okpiF_h_contractNo" value="' + (no || '') + '">'
+      +     '<input type="hidden" id="okpiF_h_tenant" value="' + (tenantName || '').replace(/"/g, '&quot;') + '">'
+      +     '<input type="hidden" id="okpiF_search" value="">'
+      +     '<div id="okpiF_acBox" style="display:none"></div>'
+      +     '<div id="okpiF_info" class="okpi-form-info" style="display:none"></div>'
+      +     '<div id="okpiF_toast" class="okpi-toast" style="display:none"></div>'
+      +   '</div>'
+      + '</div>';
+  } catch(e){ console.warn('[crQF] render warn:', e); }
+}
+
+// _crCurrentNo 변화 감지 (defineProperty hook) — 안전 가드
+(function crQF_hookContractNo(){
+  try {
+    if (window._crQF_hooked) return;
+    var _val = window._crCurrentNo;
+    Object.defineProperty(window, '_crCurrentNo', {
+      get: function(){ return _val; },
+      set: function(v){
+        _val = v;
+        try {
+          if (currentView === 'contract') {
+            // 임차인명 가져오기 (vacancyRawData에서)
+            var tenant = '';
+            if (v && Array.isArray(vacancyRawData)) {
+              var vac = vacancyRawData.find(function(x){ return String(x.no).trim() === String(v).trim(); });
+              if (vac) tenant = vac.tenant1Name || vac.tenantName || '';
+            }
+            crQF_render(v, tenant);
+          }
+        } catch(e){ console.warn('[crQF] hook setter warn:', e); }
+      },
+      configurable: true
+    });
+    window._crQF_hooked = true;
+  } catch(e){ console.warn('[crQF] hook init warn:', e); }
+})();
+
+// switchView가 contract로 진입할 때 폼 갱신
+(function crQF_hookSwitchView(){
+  try {
+    if (window._crQF_swHooked) return;
+    if (typeof window.switchView !== 'function') return;
+    var origSV = window.switchView;
+    window.switchView = function(view){
+      var ret = origSV.apply(this, arguments);
+      try {
+        if (view === 'contract') {
+          var no = window._crCurrentNo;
+          var tenant = '';
+          if (no && Array.isArray(vacancyRawData)) {
+            var vac = vacancyRawData.find(function(x){ return String(x.no).trim() === String(no).trim(); });
+            if (vac) tenant = vac.tenant1Name || vac.tenantName || '';
+          }
+          crQF_render(no, tenant);
+        } else {
+          // 다른 탭으로 이동 시 폼 비우기 (메모리 정리)
+          var host = document.getElementById('crQuickFormHost');
+          if (host) host.innerHTML = '';
+        }
+      } catch(e){ console.warn('[crQF] sv hook warn:', e); }
+      return ret;
+    };
+    window._crQF_swHooked = true;
+  } catch(e){ console.warn('[crQF] sv hook init warn:', e); }
+})();
+
 // 메인 렌더
 async function okpi_render(){
   try {
@@ -14717,8 +14832,6 @@ async function okpi_render(){
     var k = okpi_calcAll();
     host.innerHTML = '<div class="okpi-wrap">'
       + okpi_renderTopBar(k)
-      + okpi_renderGuide()
-      + okpi_renderForm()
       + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
       + okpi_renderChart(k)
       + okpi_renderPersonCards(k)
