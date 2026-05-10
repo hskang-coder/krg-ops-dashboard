@@ -5129,6 +5129,9 @@ function parseDailyForPayDate(resp, delinqRows) {
   const noIdx_      = findColIdx(_labels, ['계약번호','계약'],              1);
   const payDateIdx_ = findColIdx(_labels, ['입금예정','납부예정','예정일'], 3);
   const contentIdx_ = findColIdx(_labels, ['대응 상세내용','대응내용','상세내용','내용'], 5);  // [v23] E→F
+  // [v214] E열(업무구분) — 수납관리·연체관리 행만 사용 (중도퇴실관리 등 제외)
+  const jobTypeIdx_ = findColIdx(_labels, ['업무구분','업무 구분','구분'], 4);
+  const ALLOWED_JOB = new Set(['수납관리', '연체관리']);
 
   // 연체 계약번호 set 구성
   const delinqSet = new Set((delinqRows || []).map(r => String(r.cno).replace(/\.0$/,'').trim()));
@@ -5144,6 +5147,9 @@ function parseDailyForPayDate(resp, delinqRows) {
     const c = row.c || [];
     const cno = (noIdx_ >= 0 && c[noIdx_]) ? String(c[noIdx_].f ?? c[noIdx_].v ?? '').replace(/\.0$/,'').trim() : '';
     if (!delinqSet.has(cno)) return;
+    // [v214] 업무구분 필터 — 수납관리/연체관리만 통과 (중도퇴실관리 등 제외)
+    const jobType = (jobTypeIdx_ >= 0 && c[jobTypeIdx_]) ? String(c[jobTypeIdx_].f ?? c[jobTypeIdx_].v ?? '').trim() : '';
+    if (!ALLOWED_JOB.has(jobType)) return;
 
     // 대응일 파싱 (헤더 매핑된 인덱스)
     const aCell = dateIdx_ >= 0 ? c[dateIdx_] : null;
