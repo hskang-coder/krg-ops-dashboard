@@ -4268,30 +4268,24 @@ function renderContractRecord(c, payments, responses = []) {
   const curStepLabel   = latestStepText || '—';                  // 과거 이력 불사용
   const zoneW     = (cnt, tot) => `style="flex:${cnt};width:${Math.round(cnt/tot*100)}%"`;
 
-  // [v221] 타임라인 — 0~20 red 그라데이션 + 21번째 셀(overflow) 21일+ 실제 연체일수
+  // [v222] 타임라인 — 0~20 선명한 빨강 그라데이션 (와인색 제거) + 강조 제거하고 라인 균일
   const dayColors = [
-    '#FFF5F5','#FCE4E4','#FACECE','#F7B7B7','#F4A0A0',
-    '#F08888','#EC7070','#E25858','#D04848','#BE3D3D',
-    '#AC3434','#9A2C2C','#8B2626','#7D2020','#701B1B',
-    '#641717','#5A1414','#501313','#461010','#3D0D0D','#350A0A'
+    '#FFEFEF','#FED5D5','#FCBBBB','#FAA1A1','#F88787',
+    '#F66D6D','#F45353','#F23939','#EF2020','#E61515',
+    '#DC1212','#D11010','#C60E0E','#BB0C0C','#AF0A0A',
+    '#A30909','#970707','#8B0606','#7F0505','#730404','#680404'
   ];
-  const overflowColor = '#2C0707';
-  const milestoneDays = new Set([3,7,15,20]);
-  const milestoneBorder = { 3:'#A32D2D', 7:'#A32D2D', 15:'#501313', 20:'#2C0707' };
-  // 텍스트 색상 — 인덱스가 작으면 진한 red, 크면 흰색
-  const stepTextColor = i => i < 3 ? '#A32D2D' : i < 6 ? '#501313' : '#FFFFFF';
+  const overflowColor = '#5C0303';
+  // 텍스트 색상 — 옅은 칸은 진한 red, 짙은 칸은 흰색
+  const stepTextColor = i => i < 3 ? '#A30909' : i < 6 ? '#680404' : '#FFFFFF';
   let steps = Array.from({length:21},(_,i)=>{
     const bg = dayColors[i];
-    const isM = milestoneDays.has(i);
-    const border = isM ? `border:1.5px solid ${milestoneBorder[i]}` : 'border:0.5px solid #E2EAF8';
-    const isCurrent = i === curStep && curStep > 0;
-    const ring = isCurrent ? 'outline:2px solid #FDE047;outline-offset:-2px' : '';
-    return `<div class="cr-tl-step" style="background:${bg};color:${stepTextColor(i)};${border};font-weight:${isM?500:400};font-size:${isM?'11px':'10px'};${ring}">${i}</div>`;
+    return `<div class="cr-tl-step" style="background:${bg};color:${stepTextColor(i)};border:0.5px solid #E2EAF8;font-weight:400;font-size:10px">${i}</div>`;
   }).join('');
   // overflow 셀 — 21일 이상이면 실제 연체일수 표시, 이하면 빈 칸
   const overflowDays = maxDay > 20 ? maxDay : 0;
   const overflowText = overflowDays > 0 ? overflowDays + '일' : '';
-  steps += `<div class="cr-tl-step" style="flex:1.4;background:${overflowColor};color:#FFFFFF;font-weight:600;font-size:11px;border:0.5px solid #2C0707">${overflowText}</div>`;
+  steps += `<div class="cr-tl-step" style="flex:1.4;background:${overflowColor};color:#FFFFFF;font-weight:600;font-size:11px;border:0.5px solid #E2EAF8">${overflowText}</div>`;
 
   // ── 현재 연체 현황 계산 (입금내역 기준) ──
   // [v143] '연체납부'(이미 완납된 건) 제외 — '연체중' 또는 '분납중'만 미납으로 계산
@@ -4405,8 +4399,8 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-tl-zone cr-tl-green" ${zoneW(3,22.4)}>GREEN</div>
         <div class="cr-tl-zone cr-tl-red"   ${zoneW(4,22.4)}>RED</div>
         <div class="cr-tl-zone cr-tl-redp"  ${zoneW(8,22.4)}>RED+</div>
-        <div class="cr-tl-zone cr-tl-redpp" ${zoneW(6,22.4)} style="background:#993C1D;color:#fff">RED++</div>
-        <div class="cr-tl-zone" ${zoneW(1.4,22.4)} style="background:#2C0707;color:#fff;font-weight:600">+</div>
+        <div class="cr-tl-zone cr-tl-redpp" ${zoneW(6,22.4)} style="background:#970707;color:#fff">RED++</div>
+        <div class="cr-tl-zone" ${zoneW(1.4,22.4)} style="background:#5C0303;color:#fff;font-weight:600">+</div>
       </div>
       <div class="cr-tl-steps">${steps}</div>
       <div class="cr-tl-row">
