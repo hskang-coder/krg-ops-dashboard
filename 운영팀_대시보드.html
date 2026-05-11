@@ -366,7 +366,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .cr-party-table tr:nth-child(even) td { background: #F8FAFF; }
 
 /* 연체 레코드 */
-.cr-delinq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 16px 20px; }
+.cr-delinq-grid { display: grid; grid-template-columns: 1fr 0.55fr 1fr; gap: 14px; padding: 16px 20px; } /* [v221] 가운데 갱신심사 카드 추가 */
 @media(max-width:600px){ .cr-delinq-grid { grid-template-columns: 1fr; } }
 .cr-delinq-card { background: #FFF5F5; border: 1px solid #FECACA; border-radius: 10px; padding: 12px 14px; }
 .cr-delinq-card.safe { background: #F0FDF4; border-color: #BBF7D0; }
@@ -1777,6 +1777,8 @@ function parseDailyReport(resp) {
   const personIdx  = findColIdx(labels, ['담당자','대응자'],          5);
   // [v44] G열(6) = 갱신상태 (jobType=갱신관리 행에서만 의미 있음)
   const renewalIdx = findColIdx(labels, ['갱신상태','갱신'],            6);
+  // [v221] I열(8) = 진척사항 (갱신심사 결과 + 카테고리별 진척 단계)
+  const progressIdx = findColIdx(labels, ['진척사항','갱신확인','진척'], 8);
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
@@ -1791,7 +1793,8 @@ function parseDailyReport(resp) {
       content: cell(contentIdx),
       step:    cell(stepIdx),
       person:  cell(personIdx),         // [v67] F열: 담당자
-      renewalStatus: cell(renewalIdx) // [v44] G열
+      renewalStatus: cell(renewalIdx), // [v44] G열
+      progress: cell(progressIdx)      // [v221] I열: 진척사항
     };
   }).filter(Boolean);
 }
@@ -4265,11 +4268,30 @@ function renderContractRecord(c, payments, responses = []) {
   const curStepLabel   = latestStepText || '—';                  // 과거 이력 불사용
   const zoneW     = (cnt, tot) => `style="flex:${cnt};width:${Math.round(cnt/tot*100)}%"`;
 
-  // ── 타임라인 ──
-  const steps = Array.from({length:19},(_,i)=>{
-    const cls = i < curStep ? 'past' : i === curStep && curStep > 0 ? 'current' : '';
-    return `<div class="cr-tl-step ${cls}">${i}</div>`;
+  // [v221] 타임라인 — 0~20 red 그라데이션 + 21번째 셀(overflow) 21일+ 실제 연체일수
+  const dayColors = [
+    '#FFF5F5','#FCE4E4','#FACECE','#F7B7B7','#F4A0A0',
+    '#F08888','#EC7070','#E25858','#D04848','#BE3D3D',
+    '#AC3434','#9A2C2C','#8B2626','#7D2020','#701B1B',
+    '#641717','#5A1414','#501313','#461010','#3D0D0D','#350A0A'
+  ];
+  const overflowColor = '#2C0707';
+  const milestoneDays = new Set([3,7,15,20]);
+  const milestoneBorder = { 3:'#A32D2D', 7:'#A32D2D', 15:'#501313', 20:'#2C0707' };
+  // 텍스트 색상 — 인덱스가 작으면 진한 red, 크면 흰색
+  const stepTextColor = i => i < 3 ? '#A32D2D' : i < 6 ? '#501313' : '#FFFFFF';
+  let steps = Array.from({length:21},(_,i)=>{
+    const bg = dayColors[i];
+    const isM = milestoneDays.has(i);
+    const border = isM ? `border:1.5px solid ${milestoneBorder[i]}` : 'border:0.5px solid #E2EAF8';
+    const isCurrent = i === curStep && curStep > 0;
+    const ring = isCurrent ? 'outline:2px solid #FDE047;outline-offset:-2px' : '';
+    return `<div class="cr-tl-step" style="background:${bg};color:${stepTextColor(i)};${border};font-weight:${isM?500:400};font-size:${isM?'11px':'10px'};${ring}">${i}</div>`;
   }).join('');
+  // overflow 셀 — 21일 이상이면 실제 연체일수 표시, 이하면 빈 칸
+  const overflowDays = maxDay > 20 ? maxDay : 0;
+  const overflowText = overflowDays > 0 ? overflowDays + '일' : '';
+  steps += `<div class="cr-tl-step" style="flex:1.4;background:${overflowColor};color:#FFFFFF;font-weight:600;font-size:11px;border:0.5px solid #2C0707">${overflowText}</div>`;
 
   // ── 현재 연체 현황 계산 (입금내역 기준) ──
   // [v143] '연체납부'(이미 완납된 건) 제외 — '연체중' 또는 '분납중'만 미납으로 계산
@@ -4380,10 +4402,11 @@ function renderContractRecord(c, payments, responses = []) {
     </div>
     <div class="cr-timeline">
       <div class="cr-tl-zones">
-        <div class="cr-tl-zone cr-tl-green" ${zoneW(3,19)}>GREEN</div>
-        <div class="cr-tl-zone cr-tl-red"   ${zoneW(4,19)}>RED</div>
-        <div class="cr-tl-zone cr-tl-redp"  ${zoneW(5,19)}>RED+</div>
-        <div class="cr-tl-zone cr-tl-redpp" ${zoneW(7,19)}>RED+++</div>
+        <div class="cr-tl-zone cr-tl-green" ${zoneW(3,22.4)}>GREEN</div>
+        <div class="cr-tl-zone cr-tl-red"   ${zoneW(4,22.4)}>RED</div>
+        <div class="cr-tl-zone cr-tl-redp"  ${zoneW(8,22.4)}>RED+</div>
+        <div class="cr-tl-zone cr-tl-redpp" ${zoneW(6,22.4)} style="background:#993C1D;color:#fff">RED++</div>
+        <div class="cr-tl-zone" ${zoneW(1.4,22.4)} style="background:#2C0707;color:#fff;font-weight:600">+</div>
       </div>
       <div class="cr-tl-steps">${steps}</div>
       <div class="cr-tl-row">
@@ -4434,6 +4457,23 @@ function renderContractRecord(c, payments, responses = []) {
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">퇴실정산 연체</span><span class="cr-delinq-row-val ${delinqExit>0?'red':''}">${fmtMoney(delinqExit)}</span></div>
         </div>
       </div>
+      ${(function(){
+        // [v221] 갱신심사 결과 — 대응내역의 jobType='갱신관리' 최신 progress 값 (I열)
+        var rp = (responses||[]).filter(function(r){ return r.jobType === '갱신관리' && r.progress; });
+        var rs = rp.length ? rp[0].progress : '';
+        var rsColor = {
+          '갱신희망':       {bg:'#E1F5EE',bd:'#5DCAA5',tx:'#0F6E56'},
+          '묵시적갱신':     {bg:'#E6F1FB',bd:'#85B7EB',tx:'#185FA5'},
+          '조건부승인':     {bg:'#FAEEDA',bd:'#EF9F27',tx:'#854F0B'},
+          '만기퇴실예정':   {bg:'#FAECE7',bd:'#F0997B',tx:'#993C1D'},
+          '갱신거절':       {bg:'#FCEBEB',bd:'#F09595',tx:'#A32D2D'}
+        };
+        var rc = rsColor[rs] || {bg:'#F3F4F6',bd:'#D1D5DB',tx:'#6B7280'};
+        return '<div class="cr-delinq-card" style="background:'+rc.bg+';border:0.5px solid '+rc.bd+';display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:16px 12px">'
+          + '<div class="cr-delinq-title" style="color:'+rc.tx+';font-size:12px;font-weight:500;margin-bottom:8px;display:flex;align-items:center;gap:4px">📋 갱신심사</div>'
+          + '<div style="font-size:'+(rs.length>4?'15px':'18px')+';font-weight:600;color:'+rc.tx+';line-height:1.3">'+(rs||'미진행')+'</div>'
+          + '</div>';
+      })()}
       <div class="cr-delinq-card ${isActive?'safe':''}">
         <div class="cr-delinq-title ${isActive?'safe':''}">계약 상태</div>
         <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
@@ -13975,7 +14015,7 @@ function okpi_injectCss(){
     + '.okpi-ck-bar-fill{height:100%;background:#1B3976;transition:width .3s}'
     + '.okpi-ck-bar-fill.good{background:#10B981}.okpi-ck-bar-fill.mid{background:#F59E0B}.okpi-ck-bar-fill.low{background:#EF4444}'
     + '.okpi-form-wrap{background:#fff;border:1.5px solid #E5E7EB;border-radius:8px;padding:10px 12px;margin-bottom:12px;position:relative}'
-    + '.okpi-form-row{display:grid;grid-template-columns:0.7fr 0.7fr 0.9fr 1.1fr 1.3fr 0.95fr 1.7fr 0.5fr;gap:6px;align-items:end}'
+    + '.okpi-form-row{display:grid;grid-template-columns:0.7fr 0.7fr 0.9fr 1.1fr 1.3fr 0.95fr 0.95fr 1.5fr 0.5fr;gap:6px;align-items:end}' /* [v221] 진척사항 컬럼 추가 (9컬럼) */
     + '.okpi-fld{min-width:0;position:relative}'
     + '.okpi-fld label{display:block;font-size:9.5px;color:#6B7280;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + '.okpi-fld-input{width:100%;height:30px;padding:0 8px;border:1.5px solid #D1D5DB;border-radius:5px;font-size:11.5px;box-sizing:border-box;outline:none;background:#fff;font-family:inherit;color:#1F2937}'
@@ -14589,6 +14629,19 @@ function okpi_form_cat2Options(cat1){
   return arr.map(function(o){ return '<option value="' + o + '">' + o + '</option>'; }).join('');
 }
 
+// [v221] 진척사항 옵션 — 1차 카테고리별 (I열 저장)
+window._okpiProgress = {
+  '계약(입주)관리': ['', '대응중', '종료', '협의중'],
+  '수납관리':       ['', '미수신', '분납', '완납', '강제퇴실확정'],
+  '연체관리':       ['', '미수신', '분납', '완납', '강제퇴실확정'],
+  '갱신관리':       ['', '갱신희망', '묵시적갱신', '만기퇴실예정', '갱신거절', '조건부승인'],
+  '중도퇴실관리':   ['', '대응중', '종료', '협의중']
+};
+function okpi_form_progressOptions(cat1){
+  var arr = window._okpiProgress[cat1] || [''];
+  return arr.map(function(o){ return '<option value="' + o + '">' + (o || '— 선택 —') + '</option>'; }).join('');
+}
+
 // D열 라벨 동적 변경
 function okpi_form_dueLabel(cat1){
   if (cat1 === '수납관리' || cat1 === '연체관리') return '입금예정일';
@@ -14614,6 +14667,9 @@ function okpi_form_onCat1Change(){
     if (lblD) lblD.textContent = okpi_form_dueLabel(c1);
     var memoEl = document.getElementById('okpiF_memo');
     if (memoEl) memoEl.placeholder = okpi_form_memoPlaceholder(c1);
+    // [v221] 진척사항 옵션 동적 갱신
+    var selP = document.getElementById('okpiF_progress');
+    if (selP) selP.innerHTML = okpi_form_progressOptions(c1);
   } catch(e){ console.warn('[okpi] cat1 change:', e); }
 }
 
@@ -14803,13 +14859,21 @@ function okpi_form_submit(){
       }
     };
 
+    // [v221] 진척사항 (I열) — 폼에서 선택. 빈값이면 미입력
+    var progEl = document.getElementById('okpiF_progress');
+    var progress = progEl ? (progEl.value || '') : '';
+    // [v221] 납부약속 자동: dueDate가 입력되고 진척사항이 비어있고 cat1이 수납/연체관리면 '납부약속'으로 자동 설정
+    if (!progress && dueDate && (cat1 === '수납관리' || cat1 === '연체관리')) {
+      progress = '납부약속';
+    }
     var params = new URLSearchParams({
       action: 'kpi_log',
       callback: cb,
       date: dateInput || '',
       person: person, cat1: cat1, cat2: cat2,
       contractNo: contractNo, tenant: tenant,
-      dueDate: dueDate, memo: memo
+      dueDate: dueDate, memo: memo,
+      progress: progress
     });
     var script = document.createElement('script');
     script.id = 'okpi-jsonp-' + cb;
@@ -14960,6 +15024,8 @@ function okpi_renderForm(){
     +     '</div>'
     +     '<div class="okpi-fld"><label id="okpiF_dueLabel">' + okpi_form_dueLabel(c1Default) + '</label>'
     +       '<input type="date" id="okpiF_dueDate" class="okpi-fld-input"></div>'
+    +     '<div class="okpi-fld"><label>진척사항<span class="okpi-tag-new">I</span></label>'
+    +       '<select id="okpiF_progress" class="okpi-fld-input">' + okpi_form_progressOptions(c1Default) + '</select></div>'
     +     '<div class="okpi-fld"><label>메모<span class="okpi-tag-req">*</span></label>'
     +       '<input type="text" id="okpiF_memo" class="okpi-fld-input" placeholder="' + okpi_form_memoPlaceholder(c1Default) + '"></div>'
     +     '<button type="button" id="okpiF_submitBtn" class="okpi-form-submit" onclick="okpi_form_submit()">+ 기록</button>'
@@ -15005,7 +15071,7 @@ function crQF_render(no, tenantName){
       +   '<div class="cr-qf-hd">⚡ 빠른 메모 입력 <span class="cr-qf-ctx">현재: ' + ctx + '</span></div>'
       +   okpi_renderGuide()
       +   '<div class="okpi-form-wrap">'
-      +     '<div class="okpi-form-row" style="grid-template-columns:0.7fr 0.7fr 0.9fr 1.1fr 0.95fr 1.7fr 0.5fr">'
+      +     '<div class="okpi-form-row" style="grid-template-columns:0.7fr 0.7fr 0.9fr 1.1fr 0.95fr 0.95fr 1.5fr 0.5fr">' /* [v221] 진척사항 컬럼 추가 (8컬럼) */
       +       '<div class="okpi-fld"><label>일자<span class="okpi-tag-auto">자동</span></label>'
       +         '<input type="date" id="okpiF_date" value="' + todayStr + '" class="okpi-fld-input okpi-fld-auto"></div>'
       +       '<div class="okpi-fld"><label>담당자<span class="okpi-tag-req">*</span></label>'
@@ -15020,6 +15086,8 @@ function crQF_render(no, tenantName){
       +         '<select id="okpiF_cat2" class="okpi-fld-input">' + c2Opts + '</select></div>'
       +       '<div class="okpi-fld"><label id="okpiF_dueLabel">' + okpi_form_dueLabel(c1Default) + '</label>'
       +         '<input type="date" id="okpiF_dueDate" class="okpi-fld-input"></div>'
+      +       '<div class="okpi-fld"><label>진척사항<span class="okpi-tag-new">I</span></label>'
+      +         '<select id="okpiF_progress" class="okpi-fld-input">' + okpi_form_progressOptions(c1Default) + '</select></div>'
       +       '<div class="okpi-fld"><label>메모<span class="okpi-tag-req">*</span></label>'
       +         '<input type="text" id="okpiF_memo" class="okpi-fld-input" placeholder="' + okpi_form_memoPlaceholder(c1Default) + '"></div>'
       +       '<button type="button" id="okpiF_submitBtn" class="okpi-form-submit" onclick="okpi_form_submit()">+ 기록</button>'
