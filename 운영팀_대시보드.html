@@ -14905,6 +14905,8 @@ function okpi_form_submit(){
     if (!progress && dueDate && (cat1 === '수납관리' || cat1 === '연체관리')) {
       progress = '납부약속';
     }
+    // [v226] 진단 로그 — progress 값이 폼에서 정상 추출되는지 확인
+    console.log('[v226] kpi_log 전송 — progress:', JSON.stringify(progress), 'progEl 존재:', !!progEl, 'progEl.value:', progEl ? JSON.stringify(progEl.value) : 'N/A');
     var params = new URLSearchParams({
       action: 'kpi_log',
       callback: cb,
@@ -14914,6 +14916,7 @@ function okpi_form_submit(){
       dueDate: dueDate, memo: memo,
       progress: progress
     });
+    console.log('[v226] 최종 URL:', CK_API_URL + '?' + params.toString());
     var script = document.createElement('script');
     script.id = 'okpi-jsonp-' + cb;
     script.src = CK_API_URL + '?' + params.toString();
