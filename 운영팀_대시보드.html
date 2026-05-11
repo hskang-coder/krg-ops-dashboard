@@ -2225,12 +2225,16 @@ function buildResponseTableHTML(responses) {
     : responses.filter(r => String(r.jobType||'').trim() === jobFilter);
   if (filtered.length === 0)
     return `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">${jobFilter==='전체'?'대응 내역이 없습니다':jobFilter+' 대응 내역이 없습니다'}</div>`;
+  // [v225] 컬럼 헤더 — jobFilter에 따라 입금예정일 / 재연락일정 동적 변경
+  const dateColLabel = (jobFilter === '수납관리' || jobFilter === '연체관리') ? '입금예정일'
+                     : (jobFilter === '갱신관리' || jobFilter === '중도퇴실관리' || jobFilter === '계약(입주)관리') ? '재연락일정'
+                     : '입금예정일 / 재연락일정';
   return `<div style="overflow-x:auto;padding:0 4px 4px">
     <table class="cr-detail-table">
       <thead><tr>
         <th style="width:36px;text-align:center">No</th>
         <th style="width:100px">대응일</th>
-        <th style="width:130px">입금예정일</th>
+        <th style="width:130px">${dateColLabel}</th>
         <th style="width:110px">업무구분</th>
         <th style="width:90px">담당자</th>
         <th>대응 상세내용</th>
