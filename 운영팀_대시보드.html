@@ -4964,18 +4964,27 @@ async function fetchViaProxy() {
 // gid=418937767 → 전체연체자 카운팅 (bk=정상, aw=임대료납부상태, az=변동관리비납부상태)
 function parseDelinqV3(resp) {
   if (!resp || !resp.table) return { dlqCnoSet:new Set(), imdaDlqSet:new Set(), byunDlqSet:new Set(), delinqCount:0, imdaCount:0, byunCount:0, totalActive:0 };
-  const rows = resp.table.rows || [];
+  const { cols, rows } = resp.table;
+  // [v215] 헤더 라벨 매핑 + 절대 위치 fallback (gid=418937767 시트 컬럼 변경 시 자동 보정)
+  const labels = (cols || []).map(c => (c.label||c.id||'').trim());
+  const cnoIdx = findColIdx(labels, ['계약번호'],          2);   // C
+  const nmIdx  = findColIdx(labels, ['임차인명','임차인'], 13);  // N
+  const telIdx = findColIdx(labels, ['연락처','휴대폰'],   15);  // P
+  const awIdx  = findColIdx(labels, ['임대료납부상태','임대료 납부상태','임대료'], 48);  // AW
+  const azIdx  = findColIdx(labels, ['변동관리비납부상태','변동관리비 납부상태','변동관리비'], 51); // AZ
+  const bkIdx  = findColIdx(labels, ['계약상태'],          62);  // BK
   const imdaSet=new Set(), byunSet=new Set(), totalSet=new Set();
   let totalActive = 0;
   const delinqRowMap = {}; // cno → { nm, tel, delinqType }
   rows.forEach(row => {
     const c = row.c || [];
-    const bk  = c[62] ? String(c[62].v ?? '') : ''; // bk열: 계약상태
-    const aw  = c[48] ? String(c[48].v ?? '') : ''; // aw열: 임대료 납부상태
-    const az  = c[51] ? String(c[51].v ?? '') : ''; // az열: 변동관리비 납부상태
-    const cno = c[2]  ? String(c[2].f  ?? c[2].v ?? '').replace(/\.0$/, '').trim() : '';
-    const nm  = c[13] ? String(c[13].v ?? '') : '';
-    const tel = c[15] ? String(c[15].f ?? c[15].v ?? '') : '';
+    const cellStr = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
+    const bk  = cellStr(bkIdx);
+    const aw  = cellStr(awIdx);
+    const az  = cellStr(azIdx);
+    const cno = cellStr(cnoIdx).replace(/\.0$/, '');
+    const nm  = cellStr(nmIdx);
+    const tel = cellStr(telIdx);
     if (!cno || bk !== '정상') return;
     totalActive++;
     if (aw === '연체') imdaSet.add(cno);
@@ -5001,7 +5010,19 @@ function parseDelinqV3(resp) {
 
 function parseContractMgmt(resp) {
   if (!resp || !resp.table) return { totalContracts:0, delinqCount:0, gradeMap:{}, totalDelinqAmt:0, delinqRows:[], bsMap:{}, terminatedDelinqRows:[] };
-  const rows = resp.table.rows || [];
+  const { cols, rows } = resp.table;
+  // [v215] 헤더 라벨 매핑 + 절대 위치 fallback (시트 컬럼 추가/삭제 시 자동 보정)
+  const labels = (cols || []).map(c => (c.label||c.id||'').trim());
+  const noIdx       = findColIdx(labels, ['계약번호'],          0);   // A
+  const nmIdx       = findColIdx(labels, ['임차인명'],          2);   // C
+  const kIdx        = findColIdx(labels, ['계약상태'],          10);  // K
+  const infoIdx     = findColIdx(labels, ['계약정보','계약구분'], 14); // O
+  const exitIdx     = findColIdx(labels, ['퇴실일'],            25);  // Z (정확매칭 → '실제퇴실일' 분리)
+  const telIdx      = findColIdx(labels, ['임차인휴대폰','임차인 연락처','임차인연락처'], 46); // AU/AV
+  const bpIdx       = findColIdx(labels, ['임대료연체'],        67);  // BP/BQ
+  const bsIdx       = findColIdx(labels, ['기타관리비'],        70);  // BS/BT
+  const byGIdx      = findColIdx(labels, ['연체등급','첫 연체'], 76); // BY/BZ
+  const amtIdx      = findColIdx(labels, ['연체금액'],          77);  // BZ/CA
   let totalContracts = 0, delinqCount = 0;
   const gradeMap = {};
   const bsMap = {};
@@ -5010,15 +5031,17 @@ function parseContractMgmt(resp) {
   const terminatedDelinqRows = []; // k≠'정상' && bp='연체'
   rows.forEach(row => {
     const c = row.c || [];
-    const k   = c[10] ? String(c[10].v ?? '') : '';
-    const bp  = c[67] ? String(c[67].v ?? '') : '';
-    const byG = c[76] ? String(c[76].f ?? c[76].v ?? '') : '';
-    const bs  = c[70] ? String(c[70].f ?? c[70].v ?? '') : '';
-    const amt = c[77] ? Number(c[77].v ?? 0) : 0;
-    const cno  = c[0]  ? String(c[0].f  ?? c[0].v  ?? '') : '';
-    const nm   = c[2]  ? String(c[2].v  ?? '') : '';
-    const info = c[14] ? String(c[14].v ?? '') : '';   // 계약정보(단독/공동/연대)
-    const tel  = c[46] ? String(c[46].v ?? '') : '';   // 임차인 휴대폰
+    const cellStr = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
+    const cellNum = i => (i < 0 || !c[i]) ? 0 : Number(c[i].v ?? 0);
+    const k    = cellStr(kIdx);
+    const bp   = cellStr(bpIdx);
+    const byG  = cellStr(byGIdx);
+    const bs   = cellStr(bsIdx);
+    const amt  = cellNum(amtIdx);
+    const cno  = cellStr(noIdx);
+    const nm   = cellStr(nmIdx);
+    const info = cellStr(infoIdx);
+    const tel  = cellStr(telIdx);
     if (k === '정상') {
       totalContracts++;                      // 전체 정상(계약중) 계약자
       if (bp === '연체') {
@@ -5029,9 +5052,8 @@ function parseContractMgmt(resp) {
         delinqRows.push({ cno, nm, grade: byG, amt, bs, info, tel });
       }
     } else if (bp === '연체' && cno) {
-      // 종료 계약자 중 연체 상태 (퇴실일: Z열=c[25])
-      const exitRaw = c[25] ? (c[25].f != null ? c[25].f : c[25].v) : null;
-      const exitDateStr = exitRaw != null ? String(exitRaw) : '';
+      // 종료 계약자 중 연체 상태 (퇴실일)
+      const exitDateStr = cellStr(exitIdx);
       terminatedDelinqRows.push({ cno, nm, grade: byG, amt, bs, info, tel, exitDateStr });
     }
   });
