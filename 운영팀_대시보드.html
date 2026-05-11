@@ -2133,19 +2133,27 @@ function syncMirrorNow(){
     var ts = new Date();
     var pad = function(n){ return n<10 ? '0'+n : ''+n; };
     var hms = pad(ts.getHours()) + ':' + pad(ts.getMinutes()) + ':' + pad(ts.getSeconds());
-    if (resp && resp.ok) {
+    // [v218] 진단 로그 — 콘솔에서 실제 응답 확인 가능
+    console.log('[v218 syncMirror] 응답:', resp);
+    if (resp && resp.ok === true) {
       if (statusEl) {
         statusEl.style.color = '#059669';
         statusEl.textContent = '⏱ ' + hms + ' 🟢 미러 동기화 OK · ' + resp.srcRows + '행 × ' + resp.cols + '열';
       }
-      // 동기화 직후 대시보드도 자동 갱신
       if (typeof refreshContractsOnly === 'function') {
         setTimeout(function(){ refreshContractsOnly(); }, 500);
       }
     } else {
+      // 진단: 응답이 어떤 형태인지 표시
+      var diag = '';
+      if (!resp) diag = '응답 없음';
+      else if (typeof resp !== 'object') diag = '응답 타입 오류 (' + typeof resp + ')';
+      else if (resp.msg) diag = resp.msg;
+      else if (resp.ok === false) diag = '동기화 실패 (Apps Script 로그 확인)';
+      else diag = 'Apps Script v218 배포 안 됨? (응답 키: ' + Object.keys(resp).slice(0,3).join(',') + ')';
       if (statusEl) {
         statusEl.style.color = '#DC2626';
-        statusEl.textContent = '⏱ ' + hms + ' ⚠ 동기화 실패: ' + (resp && resp.msg ? resp.msg : '응답 오류');
+        statusEl.textContent = '⏱ ' + hms + ' ⚠ ' + diag;
       }
     }
   };
