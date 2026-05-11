@@ -4290,14 +4290,6 @@ function renderContractRecord(c, payments, responses = []) {
   const overflowColor = '#5C0303';
   // 텍스트 색상 — 옅은 칸은 진한 red, 짙은 칸은 흰색
   const stepTextColor = i => i < 3 ? '#A30909' : i < 6 ? '#680404' : '#FFFFFF';
-  let steps = Array.from({length:21},(_,i)=>{
-    const bg = dayColors[i];
-    return `<div class="cr-tl-step" style="background:${bg};color:${stepTextColor(i)};border:0.5px solid #E2EAF8;font-weight:400;font-size:10px">${i}</div>`;
-  }).join('');
-  // overflow 셀 — 21일 이상이면 실제 연체일수 표시, 이하면 빈 칸
-  const overflowDays = maxDay > 20 ? maxDay : 0;
-  const overflowText = overflowDays > 0 ? overflowDays + '일' : '';
-  steps += `<div class="cr-tl-step" style="flex:1.4;background:${overflowColor};color:#FFFFFF;font-weight:600;font-size:11px;border:0.5px solid #E2EAF8">${overflowText}</div>`;
 
   // ── 현재 연체 현황 계산 (입금내역 기준) ──
   // [v143] '연체납부'(이미 완납된 건) 제외 — '연체중' 또는 '분납중'만 미납으로 계산
@@ -4336,6 +4328,26 @@ function renderContractRecord(c, payments, responses = []) {
       .reduce((max, p) => Math.max(max, parseInt(p['연체일수']||0)), 0);
     return fromUnpaid;
   })();
+
+  // [v228] 진척바 — 현재 진행중 최장 연체일에 해당하는 셀만 색상 표시 (나머지는 옅은 회색)
+  // 활성 셀 인덱스: 0~20이면 해당 인덱스, 21 이상이면 overflow(-1)로 표시
+  const activeIdx = longestCurrentDelinq > 20 ? -1 : longestCurrentDelinq;
+  const isOverflow = longestCurrentDelinq > 20;
+  const inactiveBg = '#F5F7FA';
+  const inactiveTextColor = '#B0BDCE';
+  let steps = Array.from({length:21},(_,i)=>{
+    const isActiveCell = (i === activeIdx);
+    const bg = isActiveCell ? dayColors[i] : inactiveBg;
+    const txtColor = isActiveCell ? stepTextColor(i) : inactiveTextColor;
+    const fontWeight = isActiveCell ? 700 : 400;
+    return `<div class="cr-tl-step" style="background:${bg};color:${txtColor};border:0.5px solid #E2EAF8;font-weight:${fontWeight};font-size:10px">${i}</div>`;
+  }).join('');
+  // overflow 셀 — 현재 연체일이 21일 이상이면 색상+실제 연체일수 표시, 이하면 옅은 회색 빈 칸
+  const overflowText = isOverflow ? longestCurrentDelinq + '일' : '';
+  const overflowBg = isOverflow ? overflowColor : inactiveBg;
+  const overflowTextColor = isOverflow ? '#FFFFFF' : inactiveTextColor;
+  const overflowFontWeight = isOverflow ? 700 : 400;
+  steps += `<div class="cr-tl-step" style="flex:1.4;background:${overflowBg};color:${overflowTextColor};font-weight:${overflowFontWeight};font-size:11px;border:0.5px solid #E2EAF8">${overflowText}</div>`;
 
   // 계약 활성 여부
   const contractStatusStr = String(c['계약상태']||'').trim();
