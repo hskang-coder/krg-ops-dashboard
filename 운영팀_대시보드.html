@@ -1743,6 +1743,12 @@ function cG_dateNum(s) {
 
 function findColIdx(labels, keywords, fallbackIdx) {
   if (labels && Array.isArray(keywords)) {
+    // [v215] 1) 정확 일치 먼저 — '퇴실일'이 '실제퇴실일'을 가져가는 부분매칭 충돌 방지
+    for (const kw of keywords) {
+      const i = labels.findIndex(l => l && l.trim() === kw);
+      if (i !== -1) return i;
+    }
+    // 2) 부분 일치 (라벨 변형 대응)
     for (const kw of keywords) {
       const i = labels.findIndex(l => l && l.includes(kw));
       if (i !== -1) return i;
@@ -1855,57 +1861,52 @@ function parseVacancySheet(resp) {
   if (!resp || !resp.table) return [];
   const { cols, rows } = resp.table;
   const labels = cols.map(c => (c.label||c.id||'').trim());
-  // 헤더 + 절대 위치 fallback (시트 헤더 사라져도 안전)
-  const noIdx       = findColIdx(labels, ['계약번호','계약'],         0);  // A열 추정
-  const statusIdx   = findColIdx(labels, ['공실상태'],               65); // BN열
-  const exitDateIdx = findColIdx(labels, ['실제퇴실일'],             66); // BO열 ('퇴실일'은 Z열이라 부분매칭 회피)
-  const jIdx          = 9;  // J열 (0-based index 9) = 중도퇴실
-  const tenant1NameIdx = 2;  // C열 = 계약자1(을) 이름 (실 임차인명)
-  const contractInfoIdx= 14; // O열 = 계약구분 (단독/공동전차인/연대보증인)
-  const depositRecovIdx= 31; // AF열 = 원상회복담보금
-  const depositIdx     = 32; // AG열 = 보증금
-  const landlordPhoneIdx= 41;// AP열 = 임대인 연락처
-  const coNameIdx     = 51; // AZ열 = 공동인(을2/병) 이름
-  const coPhoneIdx    = 52; // BA열 = 공동인(을2/병) 연락처
-  const emergPhoneIdx = 49; // AX열 = 긴급연락처(연락처)
-  const emergInfoIdx  = 50; // AY열 = 긴급연락처(관계,이름)
-  const landlordIdx   = 39; // AO열 (0-based) = 임대인명
-  const tenantIdx     = 44; // AT열 (0-based) = 임차인(이름/연락처)
-  const inspectTypeIdx= 57; // BF열 (0-based) = 심사구분
-  const tenantPhoneIdx= 46; // AU열 (0-based) = 임차인 연락처
-  const rentIdx       = 36; // AK열 (0-based) = 임대료
-  const feeIdx        = 37; // AL열 (0-based) = 서비스 수수료
-  const monthRent1Idx = 33; // AH열 (0-based) = 월세①
-  const monthRent2Idx = 34; // AI열 (0-based) = 월세②
-  const mgmtFeeIdx    = 35; // AJ열 (0-based) = 관리비
-  const billCountIdx  = 70; // BS열 (0-based) = 청구횟수
-  const endDateIdx    = 23; // X열 (0-based) = 만기일 [v44]
-  const tenantRrnIdx  = 47; // AV열 (0-based) = 계약자1 생년월일/주민번호 [v65]
-  const coRrnIdx      = 53; // BB열 (0-based) = 계약자2/연대보증인 생년월일/주민번호 [v65]
-  const payConditionIdx = 18; // S열 (0-based) = 납부조건 [v71]
+  // [v215] 모든 컬럼을 헤더 라벨 매칭 + 절대 위치 fallback로 통일
+  // 시트에 컬럼이 추가/삭제되어도 헤더만 유지되면 자동 추적
+  const noIdx          = findColIdx(labels, ['계약번호'],          0);   // A
+  const tenant1NameIdx = findColIdx(labels, ['임차인명'],          2);   // C
+  const jIdx           = findColIdx(labels, ['중도퇴실'],          9);   // J
+  const contractKindIdx= findColIdx(labels, ['계약상태'],          10);  // K
+  const housingTypeIdx = findColIdx(labels, ['주택유형','전대전환'], 13); // N
+  const contractInfoIdx= findColIdx(labels, ['계약형태','계약구분'], 14); // O
+  const payConditionIdx= findColIdx(labels, ['납부조건'],          18);  // S
+  const propAddrIdx    = findColIdx(labels, ['계약지주소'],        19);  // T
+  const propBuildingIdx= findColIdx(labels, ['건물명'],            20);  // U
+  const propRoomIdx    = findColIdx(labels, ['호수','호실'],       21);  // V
+  const startDateIdx   = findColIdx(labels, ['시작일'],            22);  // W
+  const endDateIdx     = findColIdx(labels, ['종료일','만기일'],   23);  // X
+  const actualExitDateIdx = findColIdx(labels, ['퇴실일'],         25);  // Z (정확매칭 → '실제퇴실일'과 충돌 회피)
+  const depositRecovIdx= findColIdx(labels, ['원상회복담보금'],    31);  // AF
+  const depositIdx     = findColIdx(labels, ['보증금'],            32);  // AG
+  const monthRent1Idx  = findColIdx(labels, ['월세'],              33);  // AH
+  const monthRent2Idx  = findColIdx(labels, ['부가세'],            34);  // AI
+  const mgmtFeeIdx     = findColIdx(labels, ['관리비'],            35);  // AJ
+  const rentIdx        = findColIdx(labels, ['임대료'],            36);  // AK (월세+부가세+관리비 합계)
+  const feeIdx         = findColIdx(labels, ['수수료','서비스수수료'], 37); // AL
+  const landlordIdx    = findColIdx(labels, ['임대인명'],          39);  // AO  ← AM열 추가시 자동 보정
+  const landlordPhoneIdx= findColIdx(labels, ['임대인연락처','임대인 연락처'], 41); // AP/AQ
+  const tenantIdx      = findColIdx(labels, ['임차인'],            44);  // AT (정확매칭 → '임차인명/임차인휴대폰'과 분리)
+  const tenantPhoneIdx = findColIdx(labels, ['임차인휴대폰','임차인 연락처','임차인연락처'], 46); // AU/AV
+  const tenantRrnIdx   = findColIdx(labels, ['주민번호'],          47);  // AV/AW (정확매칭 → '주민번호.1' 분리)
+  const emergPhoneIdx  = findColIdx(labels, ['긴급연락처'],        49);  // AX/AY
+  const emergInfoIdx   = findColIdx(labels, ['관계,이름'],         50);  // AY/AZ
+  const coNameIdx      = findColIdx(labels, ['이름'],              51);  // AZ/BA (정확매칭 → '관계,이름' 분리)
+  const coPhoneIdx     = findColIdx(labels, ['연락처'],            52);  // BA/BB (정확매칭 → '임대인연락처/긴급연락처' 분리)
+  const coRrnIdx       = findColIdx(labels, ['주민번호.1'],        53);  // BB/BC
+  const inspectTypeIdx = findColIdx(labels, ['심사구분'],          57);  // BF/BG
+  const tentativeDateIdx= findColIdx(labels, ['가계약일'],         60);  // BI/BJ
+  const partnerNameIdx = findColIdx(labels, ['부동산명'],          63);  // BL/BM
+  const partnerPersonIdx= findColIdx(labels, ['계약담당자'],       64);  // BM/BN
+  const statusIdx      = findColIdx(labels, ['공실상태'],          65);  // BN/BO
+  const exitDateIdx    = findColIdx(labels, ['실제퇴실일'],        66);  // BO/BP
+  const billCountIdx   = findColIdx(labels, ['청구수','청구횟수'], 70);  // BS/BT
   // [v74] 입주 전 진척 5개 (TRUE/FALSE)
-  const homeBtnIdx   = 80; // CC열 = 홈버튼등록
-  const eContractIdx = 81; // CD열 = 전자계약
-  const feePaidIdx   = 82; // CE열 = 수수료입금
-  const signedIdx    = 83; // CF열 = 서명
-  const nasIdx       = 86; // CI열 = NAS
-  // [v76] 계약관리(파트너 매핑/구분) 컬럼
-  const housingTypeIdx  = 13; // N열 = 주택/상가 구분
-  const partnerNameIdx  = 63; // BL열 = 부동산명
-  const partnerPersonIdx= 64; // BM열 = 부동산 계약담당자
-  // [v81] 계약종류, 원본도착
-  const contractKindIdx = 10; // K열 = 계약종류 / [v210] 계약상태로도 사용 (계약중/정상/예정)
-  // [v148] 계약물건 컬럼 (입금내역서용)
-  const propAddrIdx     = 19; // T열 = 건물주소
-  const propBuildingIdx = 20; // U열 = 건물명
-  const propRoomIdx     = 21; // V열 = 호수
-  const origDeliveredIdx= 85; // CH열 = 원본도착 (TRUE/FALSE)
-  // [v85] 시작일 (W열 = idx 22) — 진척 체크리스트/통계의 출력 기준
-  const startDateIdx    = 22;
-  // [v86/v201] 가계약일 (BI열 = idx 60) — v201에서 BK(62) → BI(60)으로 정정
-  const tentativeDateIdx= 60;
-  // [v102] 실제 퇴실일 (Z열 = idx 25) — 거주기간/갱신차수 계산 기준
-  const actualExitDateIdx = 25;
+  const homeBtnIdx   = findColIdx(labels, ['홈버튼등록'],          80);  // CC/CD
+  const eContractIdx = findColIdx(labels, ['전자계약'],            81);  // CD/CE
+  const feePaidIdx   = findColIdx(labels, ['수수료입금','첫 수수료입금'], 82); // CE/CF
+  const signedIdx    = findColIdx(labels, ['서명'],                83);  // CF/CG
+  const origDeliveredIdx= findColIdx(labels, ['원본'],             85);  // CH/CI
+  const nasIdx       = findColIdx(labels, ['나스','NAS'],          86);  // CI/CJ
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
