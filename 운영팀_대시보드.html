@@ -1606,7 +1606,7 @@ function switchView(view) {
         if (noEl) {
           const no = noEl.textContent.trim();
           const responses = daeungRawData.filter(r => String(r.no).trim() === no)
-            .sort((a, b) => cG_dateNum(b.date) - cG_dateNum(a.date));
+            .sort(cG_sortResponsesNewest);
           updateResponseSection(no, responses);
         }
       }).catch(() => { daeungRawData = []; });
@@ -1779,12 +1779,13 @@ function parseDailyReport(resp) {
   const renewalIdx = findColIdx(labels, ['갱신상태','갱신'],            6);
   // [v221] I열(8) = 진척사항 (갱신심사 결과 + 카테고리별 진척 단계)
   const progressIdx = findColIdx(labels, ['진척사항','갱신확인','진척'], 8);
-  return (rows||[]).map(row => {
+  return (rows||[]).map((row, _i) => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
     const no = cell(noIdx);
     if (!no || !cell(dateIdx)) return null;
     return {
+      _idx:    _i,                     // [v224] 시트 행 인덱스 — 같은 날짜 정렬 보조키 (큰 값 = 최신)
       date:    cell(dateIdx),
       no:      no,
       payDate: cell(payDateIdx),
@@ -1797,6 +1798,13 @@ function parseDailyReport(resp) {
       progress: cell(progressIdx)      // [v221] I열: 진척사항
     };
   }).filter(Boolean);
+}
+
+// [v224] 대응 내역 정렬 — 날짜 내림차순, 동일 날짜면 시트 행 인덱스가 큰(최근 입력) 게 위
+function cG_sortResponsesNewest(a, b) {
+  const d = cG_dateNum(b.date) - cG_dateNum(a.date);
+  if (d !== 0) return d;
+  return (b._idx || 0) - (a._idx || 0);
 }
 
 // 구 파서 (대응관리 시트용 — 대시보드 메인에서 사용)
@@ -2174,7 +2182,7 @@ async function loadContractData() {
       if (noEl) {
         const no = noEl.textContent.trim();
         const responses = daeungRawData.filter(r => String(r.no).trim() === no)
-          .sort((a, b) => cG_dateNum(b.date) - cG_dateNum(a.date));
+          .sort(cG_sortResponsesNewest);
         updateResponseSection(no, responses);
       }
       // 안내 텍스트 업데이트
@@ -2199,7 +2207,7 @@ async function loadContractData() {
         if (c) {
           const payments  = paymentRawData.filter(p => String(p['계약번호']||'').trim() === no);
           const responses = daeungRawData.filter(r => String(r.no).trim() === no)
-            .sort((a, b) => cG_dateNum(b.date) - cG_dateNum(a.date));
+            .sort(cG_sortResponsesNewest);
           renderContractRecord(c, payments, responses);
         }
       }
@@ -4208,7 +4216,7 @@ function selectContractRow(no) {
   if (!contract) return;
   const payments  = paymentRawData.filter(r => String(r['계약번호']).trim() === no);
   const responses = daeungRawData.filter(r => String(r.no).trim() === no)
-    .sort((a, b) => cG_dateNum(b.date) - cG_dateNum(a.date)); // 최신순
+    .sort(cG_sortResponsesNewest); // 최신순
   renderContractRecord(contract, payments, responses);
   document.getElementById('contractView').scrollIntoView({behavior:'smooth', block:'start'});
   // daeungRawData 미로드 시 백그라운드 로드 후 대응내역 업데이트
@@ -4217,7 +4225,7 @@ function selectContractRow(no) {
       daeungRawData = parseDailyReport(dResp);
       const updatedResponses = daeungRawData
         .filter(r => String(r.no).trim() === no)
-        .sort((a, b) => cG_dateNum(b.date) - cG_dateNum(a.date));
+        .sort(cG_sortResponsesNewest);
       updateResponseSection(no, updatedResponses);
     }).catch(() => { daeungRawData = []; });
   }
