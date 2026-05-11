@@ -1002,8 +1002,10 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         </span>
         <button class="refresh-btn" id="refreshBtn" onclick="loadData()">🔄 새로고침</button>
         <!-- [v193] 계약정보 새로고침 — 기존 loadData() 보존, 계약/공실 강제 재로드 -->
-        <button class="refresh-btn" id="refreshContractsBtn" onclick="refreshContractsOnly()" style="margin-left:6px;background:#7C3AED" title="계약·공실 데이터만 다시 받습니다 (캐시 무력화 + 미러 시트 동기화 진단)">📑 계약정보 새로고침</button>
-        <!-- [v199] 마지막 새로고침 시각 + 미러 시트 동기화 상태 -->
+        <button class="refresh-btn" id="refreshContractsBtn" onclick="refreshContractsOnly()" style="margin-left:6px;background:#7C3AED" title="계약·공실 데이터만 다시 받습니다 (캐시 무력화)">📑 계약정보 새로고침</button>
+        <!-- [v218] 미러 시트 수동 동기화 — 마스터(1931755549) → 미러(1953907648) 즉시 복사 -->
+        <button class="refresh-btn" id="syncMirrorBtn" onclick="syncMirrorNow()" style="margin-left:6px;background:#0EA5E9" title="마스터 → 미러 시트 즉시 동기화 (Apps Script 호출)">🔁 미러 동기화</button>
+        <!-- 마지막 새로고침 시각 + 미러 동기화 상태 -->
         <span id="refreshContractsStatus" style="margin-left:8px;font-size:11px;color:#6B7280;font-weight:500;display:none"></span>
       </div>
     </div>
@@ -1297,7 +1299,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 const SHEET_ID        = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
 const DAEUNG_GID      = '1690142748';
 const DAILY_RPT_GID   = '554798125';  // 연체관리(Daily Report) 시트
-const VACANCY_GID     = '1931755549'; // [v217] 마스터 시트 직접 사용 — 미러(1953907648) 폐기, 동기화 지연 없음
+const VACANCY_GID     = '1953907648'; // [v218] 미러 시트 부활 (Apps Script 완전 동기화) — 마스터는 1931755549
 // [v43] 갱신관리 시트 — 사용자가 시트 추가 후 GID 입력 필요
 // 시트 컬럼: A=계약번호, B=갱신상태(갱신희망/묵시적갱신/만기퇴실의사/갱신거절/처리중), C=갱신확인일, D=비고
 var RENEWAL_GID = window.RENEWAL_GID || ''; // 비어있으면 '미응답' 디폴트로 동작
@@ -1990,20 +1992,49 @@ async function fetchSheetByGidFresh(gid){
   }
 }
 
-// [v217] 마스터 시트(1931755549) 직접 로드 진단 — 미러 폐기로 동기화 비교 불필요
+// [v218] 미러 동기화 상태 진단 — 마스터(1931755549) vs 미러(1953907648) 행수 + 최근 행 비교
 async function checkMirrorSync(){
   try {
-    var src = await fetchSheetByGidFresh('1931755549').catch(function(){ return null; });
-    var nSrc = (src && src.table && src.table.rows) ? src.table.rows.length : 0;
-    if (!nSrc) return { ok:false, reason:'마스터 접근 불가', srcRows:0, dstRows:0 };
-    return {
-      ok: true,
-      srcRows: nSrc,
-      dstRows: nSrc, // 미러 폐기 — 마스터 = 데이터 소스
-      reason: '마스터 직접 로드'
+    var SRC = '1931755549';  // 마스터 (운영팀 입력)
+    var DST = '1953907648';  // 미러 (대시보드 사용)
+    var [src, dst] = await Promise.all([
+      fetchSheetByGidFresh(SRC).catch(function(){ return null; }),
+      fetchSheetByGidFresh(DST).catch(function(){ return null; })
+    ]);
+    var srcRows = (src && src.table && src.table.rows) ? src.table.rows : [];
+    var dstRows = (dst && dst.table && dst.table.rows) ? dst.table.rows : [];
+    var nSrc = srcRows.length, nDst = dstRows.length;
+    if (!nSrc && !nDst) return { ok:false, reason:'양쪽 시트 접근 불가', srcRows:0, dstRows:0 };
+    if (!nDst) return { ok:false, reason:'미러 비어있음 — 동기화 필요', srcRows:nSrc, dstRows:0 };
+
+    var diff = Math.abs(nSrc - nDst);
+    // 최근 10행 데이터 비교 (계약번호+임차인명) — 누락 감지
+    var pickKey = function(row){
+      var c = (row && row.c) || [];
+      var no = c[0] ? String(c[0].f ?? c[0].v ?? '').replace(/\.0$/,'').trim() : '';
+      var nm = c[2] ? String(c[2].f ?? c[2].v ?? '').trim() : '';
+      return no ? (no + '|' + nm) : '';
     };
+    var dstKeySet = new Set();
+    dstRows.forEach(function(r){ var k = pickKey(r); if (k) dstKeySet.add(k); });
+    var tail = srcRows.slice(-10);
+    var missing = [];
+    tail.forEach(function(r){
+      var k = pickKey(r);
+      if (k && !dstKeySet.has(k)) missing.push(k);
+    });
+
+    var rowDiffOk = diff <= 5;
+    var contentOk = missing.length === 0;
+    var ok = rowDiffOk && contentOk;
+    var reason;
+    if (ok) reason = '동기화 OK';
+    else if (!contentOk) reason = '⚠ 마스터 최근 ' + missing.length + '행 미러 누락';
+    else reason = '미러 지연 — ' + diff + '행 차이 (15분 트리거 대기 또는 [🔁 미러 동기화] 클릭)';
+
+    return { ok:ok, srcRows:nSrc, dstRows:nDst, diff:diff, missing:missing, reason:reason };
   } catch(e){
-    console.warn('[v217] checkMirrorSync error:', e);
+    console.warn('[v218] checkMirrorSync error:', e);
     return { ok:false, reason:'진단 실패: ' + (e.message||e) };
   }
 }
@@ -2018,7 +2049,7 @@ async function refreshContractsOnly(){
     // 1) 공실현황 (vacancy) — gid=1953907648 (캐시 버스트 적용)
     if (typeof parseVacancySheet === 'function') {
       try {
-        var vResp = await fetchSheetByGidFresh('1931755549'); // [v217] 마스터 직접
+        var vResp = await fetchSheetByGidFresh('1953907648'); // [v218] 미러 (Apps Script 동기화)
         var newVac = parseVacancySheet(vResp);
         if (Array.isArray(newVac) && newVac.length) vacancyRawData = newVac;
       } catch(e) { console.warn('[v199] vacancy refresh failed:', e); }
@@ -2065,6 +2096,85 @@ async function refreshContractsOnly(){
     console.error('[v199] refreshContractsOnly error:', e);
     if (btn) { btn.textContent = '⚠ 실패'; setTimeout(function(){ btn.textContent = orig; btn.disabled = false; }, 1500); }
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// [v218] 미러 시트 수동 동기화 — Apps Script ?action=sync_mirror 호출 (JSONP)
+// 마스터(gid=1931755549 계약관리(Raw DATA)) → 미러(gid=1953907648 계약관리_미러)
+// 동기화 완료 후 대시보드도 자동 갱신
+// ════════════════════════════════════════════════════════════════════════════
+function syncMirrorNow(){
+  var btn = document.getElementById('syncMirrorBtn');
+  var statusEl = document.getElementById('refreshContractsStatus');
+  var orig = btn ? btn.textContent : '';
+  if (typeof CK_API_URL === 'undefined' || !CK_API_URL) {
+    alert('Apps Script API URL이 설정되지 않았습니다.');
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 동기화 중...'; }
+  if (statusEl) {
+    statusEl.style.display = 'inline';
+    statusEl.style.color = '#0EA5E9';
+    statusEl.textContent = '⏳ 마스터 → 미러 동기화 중... (10~30초 소요)';
+  }
+
+  var cb = 'syncm_cb_' + Date.now();
+  var timer = null;
+  var cleanup = function(){
+    try { delete window[cb]; } catch(_){}
+    var s = document.getElementById('syncm-jsonp-' + cb);
+    if (s && s.parentNode) s.parentNode.removeChild(s);
+    if (timer) { clearTimeout(timer); timer = null; }
+  };
+
+  window[cb] = function(resp){
+    cleanup();
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+    var ts = new Date();
+    var pad = function(n){ return n<10 ? '0'+n : ''+n; };
+    var hms = pad(ts.getHours()) + ':' + pad(ts.getMinutes()) + ':' + pad(ts.getSeconds());
+    if (resp && resp.ok) {
+      if (statusEl) {
+        statusEl.style.color = '#059669';
+        statusEl.textContent = '⏱ ' + hms + ' 🟢 미러 동기화 OK · ' + resp.srcRows + '행 × ' + resp.cols + '열';
+      }
+      // 동기화 직후 대시보드도 자동 갱신
+      if (typeof refreshContractsOnly === 'function') {
+        setTimeout(function(){ refreshContractsOnly(); }, 500);
+      }
+    } else {
+      if (statusEl) {
+        statusEl.style.color = '#DC2626';
+        statusEl.textContent = '⏱ ' + hms + ' ⚠ 동기화 실패: ' + (resp && resp.msg ? resp.msg : '응답 오류');
+      }
+    }
+  };
+
+  // 60초 타임아웃 (Apps Script 6분 한도지만 일반적으로 30초 이내)
+  timer = setTimeout(function(){
+    if (window[cb]) {
+      cleanup();
+      if (btn) { btn.disabled = false; btn.textContent = orig; }
+      if (statusEl) {
+        statusEl.style.color = '#DC2626';
+        statusEl.textContent = '⚠ 동기화 타임아웃 (60초) — Apps Script 로그 확인';
+      }
+    }
+  }, 60000);
+
+  var url = CK_API_URL + '?action=sync_mirror&callback=' + cb + '&_t=' + Date.now();
+  var script = document.createElement('script');
+  script.id = 'syncm-jsonp-' + cb;
+  script.src = url;
+  script.onerror = function(){
+    cleanup();
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+    if (statusEl) {
+      statusEl.style.color = '#DC2626';
+      statusEl.textContent = '⚠ Apps Script 호출 실패 — 네트워크 또는 권한 확인';
+    }
+  };
+  document.body.appendChild(script);
 }
 
 async function loadContractData() {
@@ -5326,7 +5436,7 @@ async function renderDelinquency() {
     // 캐시가 2분 이상 됐으면 백그라운드에서 조용히 갱신
     if ((_now - _cache.ts) > DLQ_BG_REFRESH) {
       Promise.all([
-        fetch(gvizUrl(1931755549)).then(r=>r.text()).then(parseGvizLocal), // [v217] 마스터
+        fetch(gvizUrl(1953907648)).then(r=>r.text()).then(parseGvizLocal), // [v218] 미러
         fetch(gvizUrl(131074722,'A:ZZ')).then(r=>r.text()).then(parseGvizLocal),  // [v161] A7:AK → A:ZZ (필터 우회)
         fetch(gvizUrl(554798125)).then(r=>r.text()).then(parseGvizLocal),
         fetch(gvizUrl(418937767)).then(r=>r.text()).then(parseGvizLocal),
@@ -8264,7 +8374,7 @@ function fetchContractForPdf(contractNo) {
     // [v161] range=A:ZZ 명시로 시트 활성 필터 우회
     var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
             + '/gviz/tq?tqx=out:json,responseHandler:' + cbName
-            + '&gid=1931755549&range=A:ZZ&tq=' + tq; // [v217] 마스터 직접
+            + '&gid=1953907648&range=A:ZZ&tq=' + tq; // [v218] 미러 (Apps Script 동기화)
     var script = document.createElement('script');
     var timer  = setTimeout(function() {
       delete window[cbName];
@@ -14384,7 +14494,7 @@ async function okpi_ensureData(){
     for (var a1 = 1; a1 <= 2; a1++) {
       try {
         if (typeof parseVacancySheet === 'function') {
-          var v = await okpi_fetchRaw('1931755549'); // [v217] 마스터 직접
+          var v = await okpi_fetchRaw('1953907648'); // [v218] 미러 (Apps Script 동기화)
           var newVac = parseVacancySheet(v);
           if (Array.isArray(newVac) && newVac.length) {
             vacancyRawData = newVac;
