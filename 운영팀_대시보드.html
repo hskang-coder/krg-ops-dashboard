@@ -1003,7 +1003,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         <button class="refresh-btn" id="refreshBtn" onclick="loadData()">🔄 새로고침</button>
         <!-- [v193] 계약정보 새로고침 — 기존 loadData() 보존, 계약/공실 강제 재로드 -->
         <button class="refresh-btn" id="refreshContractsBtn" onclick="refreshContractsOnly()" style="margin-left:6px;background:#7C3AED" title="계약·공실 데이터만 다시 받습니다 (캐시 무력화)">📑 계약정보 새로고침</button>
-        <!-- [v219] 미러 시트 폐기 — 마스터 직접 사용으로 동기화 버튼 제거 -->
+        <!-- [v220] 미러 시트 수동 동기화 — 마스터(1Z3w9ZhK...) → 미러(1fhp2DBul...) 즉시 복사 -->
+        <button class="refresh-btn" id="syncMirrorBtn" onclick="syncMirrorNow()" style="margin-left:6px;background:#0EA5E9" title="마스터 → 미러 시트 즉시 동기화 (Apps Script 호출)">🔁 미러 동기화</button>
         <span id="refreshContractsStatus" style="margin-left:8px;font-size:11px;color:#6B7280;font-weight:500;display:none"></span>
       </div>
     </div>
@@ -1294,10 +1295,10 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 // ═══════════════════════════════════════════
 // ■ CONFIG
 // ═══════════════════════════════════════════
-const SHEET_ID        = '1Z3w9ZhKwiLfL4JJhs-gfcU27QLKgZAWycyGFCK4iiMc'; // [v219] 마스터 스프레드시트 (개런티즈Dashboard_V7.0) — 미러 폐기, 운영팀 입력 시트 직접 사용
+const SHEET_ID        = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q'; // [v220] 미러 스프레드시트 (Operations Dashboard V1.0) — Apps Script가 마스터(1Z3w9ZhK...)에서 동기화
 const DAEUNG_GID      = '1690142748';
 const DAILY_RPT_GID   = '554798125';  // 연체관리(Daily Report) 시트
-const VACANCY_GID     = '1931755549'; // [v219] 마스터 계약관리 시트 직접 사용 — 미러 폐기
+const VACANCY_GID     = '1953907648'; // [v220] 미러의 계약관리(Raw DATA) — Apps Script가 마스터에서 동기화
 // [v43] 갱신관리 시트 — 사용자가 시트 추가 후 GID 입력 필요
 // 시트 컬럼: A=계약번호, B=갱신상태(갱신희망/묵시적갱신/만기퇴실의사/갱신거절/처리중), C=갱신확인일, D=비고
 var RENEWAL_GID = window.RENEWAL_GID || ''; // 비어있으면 '미응답' 디폴트로 동작
@@ -2013,7 +2014,7 @@ async function refreshContractsOnly(){
     // 1) 공실현황 (vacancy) — gid=1953907648 (캐시 버스트 적용)
     if (typeof parseVacancySheet === 'function') {
       try {
-        var vResp = await fetchSheetByGidFresh('1931755549'); // [v219] 마스터 계약관리 직접
+        var vResp = await fetchSheetByGidFresh('1953907648'); // [v220] 미러 (Apps Script 동기화)
         var newVac = parseVacancySheet(vResp);
         if (Array.isArray(newVac) && newVac.length) vacancyRawData = newVac;
       } catch(e) { console.warn('[v199] vacancy refresh failed:', e); }
@@ -5408,7 +5409,7 @@ async function renderDelinquency() {
     // 캐시가 2분 이상 됐으면 백그라운드에서 조용히 갱신
     if ((_now - _cache.ts) > DLQ_BG_REFRESH) {
       Promise.all([
-        fetch(gvizUrl(1931755549)).then(r=>r.text()).then(parseGvizLocal), // [v219] 마스터
+        fetch(gvizUrl(1953907648)).then(r=>r.text()).then(parseGvizLocal), // [v220] 미러
         fetch(gvizUrl(131074722,'A:ZZ')).then(r=>r.text()).then(parseGvizLocal),  // [v161] A7:AK → A:ZZ (필터 우회)
         fetch(gvizUrl(554798125)).then(r=>r.text()).then(parseGvizLocal),
         fetch(gvizUrl(418937767)).then(r=>r.text()).then(parseGvizLocal),
@@ -8346,7 +8347,7 @@ function fetchContractForPdf(contractNo) {
     // [v161] range=A:ZZ 명시로 시트 활성 필터 우회
     var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID
             + '/gviz/tq?tqx=out:json,responseHandler:' + cbName
-            + '&gid=1931755549&range=A:ZZ&tq=' + tq; // [v219] 마스터 계약관리 직접
+            + '&gid=1953907648&range=A:ZZ&tq=' + tq; // [v220] 미러 (Apps Script 동기화)
     var script = document.createElement('script');
     var timer  = setTimeout(function() {
       delete window[cbName];
@@ -14466,7 +14467,7 @@ async function okpi_ensureData(){
     for (var a1 = 1; a1 <= 2; a1++) {
       try {
         if (typeof parseVacancySheet === 'function') {
-          var v = await okpi_fetchRaw('1931755549'); // [v219] 마스터 계약관리 직접
+          var v = await okpi_fetchRaw('1953907648'); // [v220] 미러 (Apps Script 동기화)
           var newVac = parseVacancySheet(v);
           if (Array.isArray(newVac) && newVac.length) {
             vacancyRawData = newVac;
