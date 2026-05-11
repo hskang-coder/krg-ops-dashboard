@@ -1990,31 +1990,62 @@ async function fetchSheetByGidFresh(gid){
   }
 }
 
-// [v199/v200] 미러 시트 동기화 상태 진단 — 양쪽 gid 행수 + 마지막 행 비교
-// [v200] 미러 gid: 1931755549 → 2078071528 (신규 생성된 "계약관리_미러" 시트)
+// [v216] 미러 시트 동기화 상태 진단 — 마스터(1931755549) → 미러(1953907648)
+// 행수 + 최근 입력 5행의 계약번호·임차인명 실제 데이터 비교
 async function checkMirrorSync(){
   try {
-    var SRC = '1953907648', DST = '2078071528';
+    var SRC = '1931755549';  // 마스터 (개런티즈Dashboard) — 사용자가 직접 입력
+    var DST = '1953907648';  // 미러 (Operations Dashboard) — 대시보드가 사용
     var [src, dst] = await Promise.all([
       fetchSheetByGidFresh(SRC).catch(function(){ return null; }),
       fetchSheetByGidFresh(DST).catch(function(){ return null; })
     ]);
-    var srcRows = (src && src.table && src.table.rows) ? src.table.rows.length : 0;
-    var dstRows = (dst && dst.table && dst.table.rows) ? dst.table.rows.length : 0;
-    if (!srcRows && !dstRows) return { ok:false, reason:'양쪽 시트 모두 비어있음 또는 접근 불가', srcRows:0, dstRows:0 };
-    if (!dstRows) return { ok:false, reason:'미러(계약관리_미러) 비어있음 — Apps Script 트리거 미설정?', srcRows:srcRows, dstRows:0 };
-    var diff = Math.abs(srcRows - dstRows);
-    // 행수 차이가 5행 이내면 OK (실시간 입력 + 15분 트리거 지연 허용)
-    var ok = diff <= 5;
+    var srcRows = (src && src.table && src.table.rows) ? src.table.rows : [];
+    var dstRows = (dst && dst.table && dst.table.rows) ? dst.table.rows : [];
+    var nSrc = srcRows.length, nDst = dstRows.length;
+    if (!nSrc && !nDst) return { ok:false, reason:'양쪽 시트 접근 불가', srcRows:0, dstRows:0 };
+    if (!nDst) return { ok:false, reason:'미러 비어있음 — Apps Script 트리거 미설정?', srcRows:nSrc, dstRows:0 };
+
+    // 1) 행수 비교
+    var diff = Math.abs(nSrc - nDst);
+
+    // 2) 최근 5행 데이터 비교 — 마스터 끝 5행이 미러에도 존재하는지
+    //    Apps Script가 단순 append 또는 upsert일 때 누락 감지
+    var pickKey = function(row){
+      var c = (row && row.c) || [];
+      var no = c[0] ? String(c[0].f ?? c[0].v ?? '').replace(/\.0$/,'').trim() : '';
+      var nm = c[2] ? String(c[2].f ?? c[2].v ?? '').trim() : '';
+      return no ? (no + '|' + nm) : '';
+    };
+    var dstKeySet = new Set();
+    dstRows.forEach(function(r){ var k = pickKey(r); if (k) dstKeySet.add(k); });
+    // 마스터 끝 10행 중 미러에 없는 행 카운트
+    var tail = srcRows.slice(-10);
+    var missing = [];
+    tail.forEach(function(r){
+      var k = pickKey(r);
+      if (k && !dstKeySet.has(k)) missing.push(k);
+    });
+
+    var rowDiffOk = diff <= 5;
+    var contentOk = missing.length === 0;
+    var ok = rowDiffOk && contentOk;
+
+    var reason;
+    if (ok) reason = '동기화 OK';
+    else if (!contentOk) reason = '⚠ 마스터 최근 ' + missing.length + '행 미러 누락 (' + missing.slice(0,3).join(', ') + (missing.length>3?'...':'') + ')';
+    else reason = '미러 지연 — ' + diff + '행 차이 (15분 내 자동 보정)';
+
     return {
       ok: ok,
-      srcRows: srcRows,
-      dstRows: dstRows,
+      srcRows: nSrc,
+      dstRows: nDst,
       diff: diff,
-      reason: ok ? '동기화 OK' : ('미러 지연 — ' + diff + '행 차이 (15분 내 자동 보정)')
+      missing: missing,
+      reason: reason
     };
   } catch(e){
-    console.warn('[v199] checkMirrorSync error:', e);
+    console.warn('[v216] checkMirrorSync error:', e);
     return { ok:false, reason:'진단 실패: ' + (e.message||e) };
   }
 }
