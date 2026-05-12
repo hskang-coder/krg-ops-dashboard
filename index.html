@@ -11011,13 +11011,14 @@ function cmgProgDownloadExcel(){
     return {
       'No': i + 1,
       '계약번호': r.cno || '',
-      '계약자': r.tenantName || '',
-      '연락처': r.tenantPhone || '',
+      '계약자': r.name || r.tenantName || '',
+      '연락처': r.tel || r.tenantPhone || '',
+      '주소': r.addr || '',                                                          // [v235] 주소 컬럼 신규 추가
       '계약정보': r.contractInfo || '',
       '시작일': fmtDate(r.startDate) || '',
       '가계약일': fmtDate(r.tentativeDate) || '',
-      '부동산': r.broker || r.estateName || '',
-      '계약담당자': r.agent || r.contractManager || '',
+      '부동산': r.partnerName || r.broker || r.estateName || '',
+      '계약담당자': r.partnerPerson || r.agent || r.contractManager || '',
       '계약상태': r.contractStatus || '',
       '홈버튼': r.checks[0] ? '✓' : '',
       '전자계약': r.checks[1] ? '✓' : '',
@@ -11029,7 +11030,8 @@ function cmgProgDownloadExcel(){
     };
   });
   var ws = XLSX.utils.json_to_sheet(data);
-  ws['!cols'] = [{wch:5},{wch:10},{wch:10},{wch:14},{wch:12},{wch:12},{wch:12},{wch:14},{wch:18},{wch:10},{wch:7},{wch:8},{wch:7},{wch:6},{wch:6},{wch:24},{wch:9}];
+  // [v235] 컬럼 폭 — '주소' 추가로 18개
+  ws['!cols'] = [{wch:5},{wch:10},{wch:10},{wch:14},{wch:36},{wch:12},{wch:12},{wch:12},{wch:14},{wch:18},{wch:10},{wch:7},{wch:8},{wch:7},{wch:6},{wch:6},{wch:24},{wch:9}];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '진척체크리스트');
   var today = (function(){ var d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
@@ -12220,15 +12222,19 @@ function cmgBuildProgress(){
     var checks = [v.homeBtn, v.eContract, v.feePaid, v.signed, v.nas];
     var trueCnt = checks.filter(function(x){ return x === true; }).length;
     var pct = Math.round(trueCnt / 5 * 100);
+    // [v235] contractMap에서 부동산/계약담당자/주소 fallback — 화면엔 보이지만 엑셀에 비어있던 문제 해결
+    var addr = [v.propAddr, v.propBuilding, v.propRoom].filter(function(s){ return s && String(s).trim(); }).join(' ');
+    if (!addr && c) addr = [c['계약지주소'], c['건물명'], c['호수']].filter(function(s){ return s && String(s).trim(); }).join(' ');
     rows.push({
       cno: cno,
-      name: v.tenant1Name || v.tenantName || '',
-      tel: v.tenantPhone || '',
-      contractInfo: v.contractInfo || '', // [v86] O열 계약정보
+      name: v.tenant1Name || v.tenantName || (c && (c['임차인명']||c['임차인'])) || '',
+      tel: v.tenantPhone || (c && c['임차인휴대폰']) || '',
+      addr: addr,                                                                    // [v235] 주소 (계약지주소+건물명+호수)
+      contractInfo: v.contractInfo || (c && c['계약형태']) || '',                   // [v86] O열 계약정보
       startDate: startDate,
-      tentativeDate: v.tentativeDate || '', // [v86/v201] BI열 가계약일
-      partnerName: v.partnerName || '', // [v88] BL열 부동산
-      partnerPerson: v.partnerPerson || '', // [v88] BM열 계약담당자
+      tentativeDate: v.tentativeDate || '',                                          // [v86/v201] BI열 가계약일
+      partnerName: v.partnerName || (c && c['부동산명']) || '',                     // [v88/v235] BM열 부동산 + fallback
+      partnerPerson: v.partnerPerson || (c && c['계약담당자']) || '',                // [v88/v235] BN열 계약담당자 + fallback
       contractStatus: c ? (c['계약상태']||'') : '',
       checks: checks,
       trueCnt: trueCnt,
