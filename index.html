@@ -8418,6 +8418,33 @@ function cG_buildTsvFromManual(d){
   var cols = [d.contractNo, d.tenantName, d.startDate, d.endDate, d.address, d.deposit, d.rent, d.mgmtFee, d.landlordName, d.landlordPhone||'', d.bank||'', d.account||'', d.tenantPhone, d.tenantIdNo, d.coName||'', d.coPhone||'', d.coIdNo||''];
   return cols.join('\t');
 }
+// [v247] 시트 입력용 TSV 한 줄 — 사용자 지정 컬럼 순서
+// 순서: 주소호실 | 전차인이름 | 연락처 | 주소 | 주민등록번호 | 긴급연락처 | 관계/이름 | 공동전차인이름 | 연락처 | 주소 | 주민등록번호 | 긴급연락처 | 관계/이름
+function cG_buildTsvForSheet(d){
+  d = d || {};
+  var trim = function(v){ return v != null ? String(v).trim() : ''; };
+  var phoneFmt = function(v){
+    if (!v) return '';
+    return (typeof fmtPhone === 'function') ? fmtPhone(v) : trim(v);
+  };
+  var addr = [d.address, d.buildingName, d.roomNo].filter(function(s){return s && trim(s);}).join(' ');
+  var cols = [
+    addr,                          // 1. 주소호실
+    trim(d.tenantName),            // 2. 전차인이름
+    phoneFmt(d.tenantPhone),       // 3. 연락처
+    trim(d.tenantAddr),            // 4. 주소
+    trim(d.tenantIdNo),            // 5. 주민등록번호
+    phoneFmt(d.emergPhone),        // 6. 긴급연락처
+    trim(d.emergInfo),             // 7. 관계/이름
+    trim(d.coName),                // 8. 공동전차인이름
+    phoneFmt(d.coPhone),           // 9. 연락처
+    trim(d.coAddr),                // 10. 주소
+    trim(d.coIdNo),                // 11. 주민등록번호
+    phoneFmt(d.coEmergPhone),      // 12. 긴급연락처
+    trim(d.coEmergInfo)            // 13. 관계/이름
+  ];
+  return cols.join('\t');
+}
 // [v246] 계약필수정보 텍스트 포맷 — 클립보드 복사용 (사용자 친화적 양식)
 function cG_buildContractInfoText(d){
   d = d || {};
@@ -8571,11 +8598,11 @@ function cG_submit(contractNo){
     var d = cG_collectManualData();
     var modal = document.getElementById('cG_modal');
     if (modal) modal.remove();
-    // [v246] 계약필수정보 텍스트 클립보드 복사 (기존 TSV 대신 사용자 친화적 양식)
+    // [v247] 시트 입력용 TSV 클립보드 복사 — 컬럼 순서 사용자 지정
     try {
-      var infoText = cG_buildContractInfoText(d);
-      navigator.clipboard.writeText(infoText).then(function(){
-        console.log('[v246] 계약필수정보 텍스트 복사 완료');
+      var tsv = cG_buildTsvForSheet(d);
+      navigator.clipboard.writeText(tsv).then(function(){
+        console.log('[v247] TSV 복사 완료');
       }).catch(function(){});
     } catch(e){}
     // [v175] 사용자 입력 특약사항 수집 — buildGuaranteezContractHtml 내부에서 자동 조항과 결합
@@ -8590,7 +8617,7 @@ function cG_submit(contractNo){
     win.document.write(html);
     win.document.close();
     setTimeout(function(){
-      alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 [계약필수정보] 텍스트가 클립보드에 복사되었습니다.\nSlack/카카오톡/메모장에 Cmd+V로 붙여넣어 사용하세요.');
+      alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 시트 입력용 TSV가 클립보드에 복사되었습니다.\n운영 시트의 적절한 행에 Cmd+V로 붙여넣을 수 있습니다.\n\n[순서] 주소호실 | 전차인(이름·연락처·주소·주민번호) | 긴급연락처·관계,이름 | 공동전차인(이름·연락처·주소·주민번호) | 긴급연락처·관계,이름');
     }, 500);
   } else {
     // 검색 모드 — 기존 함수
@@ -8778,15 +8805,15 @@ function generateGuaranteezPdf(contractNo) {
     if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
     win.document.write(html);
     win.document.close();
-    // [v246] 계약필수정보 텍스트 클립보드 복사
+    // [v247] 시트 입력용 TSV 클립보드 복사 — 컬럼 순서 사용자 지정
     try {
-      var infoText = cG_buildContractInfoText(data);
-      navigator.clipboard.writeText(infoText).then(function(){
+      var tsv = cG_buildTsvForSheet(data);
+      navigator.clipboard.writeText(tsv).then(function(){
         setTimeout(function(){
-          alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 [계약필수정보] 텍스트가 클립보드에 복사되었습니다.\nSlack/카카오톡/메모장에 Cmd+V로 붙여넣어 사용하세요.');
+          alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 시트 입력용 TSV가 클립보드에 복사되었습니다.\n운영 시트의 적절한 행에 Cmd+V로 붙여넣을 수 있습니다.\n\n[순서] 주소호실 | 전차인(이름·연락처·주소·주민번호) | 긴급연락처·관계,이름 | 공동전차인(이름·연락처·주소·주민번호) | 긴급연락처·관계,이름');
         }, 300);
       }).catch(function(){});
-    } catch(e){ console.warn('[v246] info text copy fail:', e); }
+    } catch(e){ console.warn('[v247] TSV copy fail:', e); }
   }).catch(function(e) {
     var loaderEl = document.getElementById('cG_loader');
     if (loaderEl) loaderEl.remove();
