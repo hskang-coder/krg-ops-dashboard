@@ -8434,23 +8434,25 @@ function cG_buildTsvForSheet(d){
     return (typeof fmtPhone === 'function') ? fmtPhone(v) : trim(v);
   };
   var addr = [d.address, d.buildingName, d.roomNo].filter(function(s){return s && trim(s);}).join(' ');
-  // [v248] 매핑 변경 — 사용자 요청에 따라:
-  //   전차인 6/7 컬럼(긴급연락처/관계,이름) ← 공동전차인 연락처/이름
-  //   공동전차인 12/13 컬럼(긴급연락처/관계,이름) ← 공동전차인 연락처/이름 (동일 값 반복)
+  // [v250] 공동계약일 경우 — 긴급연락처/관계,이름 상호 교환
+  //   계약자(전차인): 긴급연락처 ← 공동의 연락처 / 관계,이름 ← 공동의 이름
+  //   공동계약자:   긴급연락처 ← 계약자 연락처 / 관계,이름 ← 계약자 이름
+  //   ※ 단독계약(공동 없음)일 때 8~13 + 6/7 모두 빈값 (잘못된 데이터 방지)
+  var hasCo = !!(trim(d.coName) || trim(d.coPhone) || trim(d.coIdNo));
   var cols = [
-    addr,                          // 1. 주소호실
-    trim(d.tenantName),            // 2. 전차인이름
-    phoneFmt(d.tenantPhone),       // 3. 연락처
-    trim(d.tenantAddr),            // 4. 주소
-    trim(d.tenantIdNo),            // 5. 주민등록번호
-    phoneFmt(d.coPhone),           // 6. 전차인 긴급연락처 ← 공동전차인 연락처 [v248]
-    trim(d.coName),                // 7. 전차인 관계/이름 ← 공동전차인 이름 [v248]
-    trim(d.coName),                // 8. 공동전차인이름
-    phoneFmt(d.coPhone),           // 9. 공동전차인 연락처
-    trim(d.coAddr),                // 10. 공동전차인 주소
-    trim(d.coIdNo),                // 11. 공동전차인 주민등록번호
-    phoneFmt(d.coPhone),           // 12. 공동전차인 긴급연락처 ← 공동전차인 연락처 [v248]
-    trim(d.coName)                 // 13. 공동전차인 관계/이름 ← 공동전차인 이름 [v248]
+    addr,                                                       // 1. 주소호실
+    trim(d.tenantName),                                         // 2. 전차인이름
+    phoneFmt(d.tenantPhone),                                    // 3. 연락처
+    trim(d.tenantAddr),                                         // 4. 주소
+    trim(d.tenantIdNo),                                         // 5. 주민등록번호
+    hasCo ? phoneFmt(d.coPhone) : '',                           // 6. 전차인 긴급연락처 ← 공동 연락처
+    hasCo ? trim(d.coName) : '',                                // 7. 전차인 관계/이름 ← 공동 이름
+    hasCo ? trim(d.coName) : '',                                // 8. 공동전차인이름
+    hasCo ? phoneFmt(d.coPhone) : '',                           // 9. 공동전차인 연락처
+    hasCo ? trim(d.coAddr) : '',                                // 10. 공동전차인 주소
+    hasCo ? trim(d.coIdNo) : '',                                // 11. 공동전차인 주민등록번호
+    hasCo ? phoneFmt(d.tenantPhone) : '',                       // 12. 공동 긴급연락처 ← 전차인 연락처
+    hasCo ? trim(d.tenantName) : ''                             // 13. 공동 관계/이름 ← 전차인 이름
   ];
   return cols.join('\t');
 }
