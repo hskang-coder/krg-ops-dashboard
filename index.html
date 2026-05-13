@@ -2531,7 +2531,7 @@ function renderContractListTable(filter) {
       <td>${c['임차인명']||c['임차인']||'—'}</td>
       <td>${c['건물명']||'—'} ${c['호수']||''}</td>
       <td style="font-size:11px;color:#5A6A8A">${c['시작일']||'—'} ~ ${c['종료일']||'—'}</td>
-      <td><span style="font-size:11px;font-weight:700;color:${c['계약상태']==='정상'?'#16A34A':'#DC2626'}">${c['계약상태']||'—'}</span></td>
+      <td><span style="font-size:11px;font-weight:700;color:${(c['계약상태']==='정상'||c['계약상태']==='계약중')?'#16A34A':'#DC2626'}">${c['계약상태']||'—'}</span></td>
       <td><span class="cr-grade-pill" style="background:${gradeColor(g)}22;color:${gradeColor(g)}">${g||'—'}등급</span></td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" style="text-align:center;color:#B0BDCE;padding:20px">결과 없음</td></tr>';
@@ -5170,7 +5170,8 @@ function parseDelinqV3(resp) {
     const cno = cellStr(cnoIdx).replace(/\.0$/, '');
     const nm  = cellStr(nmIdx);
     const tel = cellStr(telIdx);
-    if (!cno || bk !== '정상') return;
+    // [v237] '정상' / '계약중' 둘 다 활성계약으로 인식
+    if (!cno || (bk !== '정상' && bk !== '계약중')) return;
     totalActive++;
     if (aw === '연체') imdaSet.add(cno);
     if (az === '연체') byunSet.add(cno);
@@ -5203,11 +5204,12 @@ function parseContractMgmt(resp) {
   const kIdx        = findColIdx(labels, ['계약상태'],          10);  // K
   const infoIdx     = findColIdx(labels, ['계약정보','계약구분'], 14); // O
   const exitIdx     = findColIdx(labels, ['퇴실일'],            25);  // Z (정확매칭 → '실제퇴실일' 분리)
-  const telIdx      = findColIdx(labels, ['임차인휴대폰','임차인 연락처','임차인연락처'], 46); // AU/AV
-  const bpIdx       = findColIdx(labels, ['임대료연체'],        67);  // BP/BQ
-  const bsIdx       = findColIdx(labels, ['기타관리비'],        70);  // BS/BT
-  const byGIdx      = findColIdx(labels, ['연체등급','첫 연체'], 76); // BY/BZ
-  const amtIdx      = findColIdx(labels, ['연체금액'],          77);  // BZ/CA
+  // [v237] AU 이후 모든 컬럼 +1 시프트 보정
+  const telIdx      = findColIdx(labels, ['임차인휴대폰','임차인 연락처','임차인연락처'], 47); // AV
+  const bpIdx       = findColIdx(labels, ['임대료연체'],        68);  // BQ
+  const bsIdx       = findColIdx(labels, ['기타관리비'],        71);  // BT
+  const byGIdx      = findColIdx(labels, ['연체등급','첫 연체'], 77); // BZ
+  const amtIdx      = findColIdx(labels, ['연체금액'],          78);  // CA
   let totalContracts = 0, delinqCount = 0;
   const gradeMap = {};
   const bsMap = {};
@@ -5227,8 +5229,10 @@ function parseContractMgmt(resp) {
     const nm   = cellStr(nmIdx);
     const info = cellStr(infoIdx);
     const tel  = cellStr(telIdx);
-    if (k === '정상') {
-      totalContracts++;                      // 전체 정상(계약중) 계약자
+    // [v237] '정상' / '계약중' 둘 다 활성계약으로 인식 (v210 표시 통일 후 시트 데이터도 변경됨)
+    var isActive = (k === '정상' || k === '계약중');
+    if (isActive) {
+      totalContracts++;                      // 전체 활성 계약자
       if (bp === '연체') {
         delinqCount++;                       // 임대료 연체 중인 계약자
         totalDelinqAmt += amt;
