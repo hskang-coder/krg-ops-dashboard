@@ -5524,6 +5524,47 @@ async function renderDelinquency() {
         delinqRowMap: rowMap
       };
     }
+    // [v240] paymentRawData에서 납부상태='연체중'인 모든 계약 보강 (시트 BP/BZ 컬럼 stale 케이스 보호)
+    // 58206 장영삼 처럼 시트엔 '-'/₩0 인데 paymentRawData엔 실제 연체중인 경우 누락 방지
+    if (Array.isArray(paymentRawData) && paymentRawData.length > 0) {
+      const beforeCount = dlqV3Data.dlqCnoSet.size;
+      const beforeImda = dlqV3Data.imdaDlqSet.size;
+      const beforeByun = dlqV3Data.byunDlqSet.size;
+      const addedCnos = new Set();
+      paymentRawData.forEach(function(p){
+        const status = String(p['납부상태']||'').trim();
+        if (status !== '연체중') return;
+        const cno = String(p['계약번호']||'').trim();
+        if (!cno) return;
+        const kind = String(p['납부종류']||'').trim();
+        // 활성 계약만 (종료된 건은 종료후 연체 영역에서 처리)
+        const contract = (_dlqContractData.delinqRows||[]).concat([]).find(function(r){return r.cno===cno;});
+        const contractMap = (contractRawData||[]).find(function(c){return String(c['계약번호']||'').trim()===cno;});
+        const kStatus = contractMap ? String(contractMap['계약상태']||'').trim() : '';
+        if (kStatus && kStatus !== '정상' && kStatus !== '계약중') return; // 종료/예정 등 제외
+        dlqV3Data.dlqCnoSet.add(cno);
+        addedCnos.add(cno);
+        if (kind === '임대료' || kind.indexOf('임대료')>=0) dlqV3Data.imdaDlqSet.add(cno);
+        else if (kind === '변동관리비' || kind.indexOf('변동')>=0 || kind.indexOf('관리비')>=0) dlqV3Data.byunDlqSet.add(cno);
+        else dlqV3Data.imdaDlqSet.add(cno); // 기본은 임대료로 분류
+        // delinqRowMap 갱신
+        if (!dlqV3Data.delinqRowMap[cno]) {
+          const dt = (dlqV3Data.imdaDlqSet.has(cno) && dlqV3Data.byunDlqSet.has(cno)) ? '임대료+변동관리비'
+                   : (dlqV3Data.imdaDlqSet.has(cno) ? '임대료' : '변동관리비');
+          dlqV3Data.delinqRowMap[cno] = {
+            nm: contractMap ? (contractMap['임차인명']||contractMap['임차인']||'') : '',
+            tel: contractMap ? (contractMap['임차인휴대폰']||'') : '',
+            delinqType: dt
+          };
+        }
+      });
+      dlqV3Data.delinqCount = dlqV3Data.dlqCnoSet.size;
+      dlqV3Data.imdaCount   = dlqV3Data.imdaDlqSet.size;
+      dlqV3Data.byunCount   = dlqV3Data.byunDlqSet.size;
+      if (addedCnos.size > 0) {
+        console.warn('[v240] paymentRawData(연체중)에서 ' + addedCnos.size + '명 추가 보강 — 시트 BP/BZ 컬럼 stale 보호 (예: 58206 장영삼)');
+      }
+    }
     _dlqIncomeData   = parseIncomeForDlqV2(r2, dlqV3Data.dlqCnoSet);
     window._delinqDaysMap = _dlqIncomeData.delinqDaysMap || {};
     const termCnos = (_dlqContractData.terminatedDelinqRows || [])
