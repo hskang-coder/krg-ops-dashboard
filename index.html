@@ -8418,6 +8418,105 @@ function cG_buildTsvFromManual(d){
   var cols = [d.contractNo, d.tenantName, d.startDate, d.endDate, d.address, d.deposit, d.rent, d.mgmtFee, d.landlordName, d.landlordPhone||'', d.bank||'', d.account||'', d.tenantPhone, d.tenantIdNo, d.coName||'', d.coPhone||'', d.coIdNo||''];
   return cols.join('\t');
 }
+// [v246] 계약필수정보 텍스트 포맷 — 클립보드 복사용 (사용자 친화적 양식)
+function cG_buildContractInfoText(d){
+  d = d || {};
+  var trim = function(v){ return v != null ? String(v).trim() : ''; };
+  var phoneFmt = function(v){
+    if (!v) return '';
+    if (typeof fmtPhone === 'function') return fmtPhone(v);
+    return trim(v);
+  };
+  var amtFmt = function(v){
+    if (v == null || v === '') return '';
+    var n = (typeof parseSafeMoney === 'function') ? parseSafeMoney(v) : (parseFloat(String(v).replace(/[^0-9.\-]/g,''))||0);
+    if (!n) return '';
+    return (n >= 10000 && n % 10000 === 0) ? (n/10000) + '만원' : n.toLocaleString() + '원';
+  };
+  // 구분: useType + vat 보강
+  var category = '';
+  var vatNum = (typeof parseSafeMoney === 'function') ? parseSafeMoney(d.vat) : 0;
+  if (d.useType && String(d.useType).indexOf('상업') >= 0) category = '상업용';
+  else if (vatNum > 0) category = '상업용';
+  else if (d.useType && String(d.useType).indexOf('주거') >= 0) category = '주거용';
+  else if (d.useType) category = trim(d.useType);
+  // 주소
+  var addr = [d.address, d.buildingName, d.roomNo].filter(function(s){return s && trim(s);}).join(' ');
+  // 비상연락처 관계/이름 파싱
+  var emergRel = '', emergName = '';
+  if (d.emergInfo) {
+    var ep = String(d.emergInfo).split(/[,/]\s*|\s+/).filter(function(s){return s && s.trim();});
+    emergRel = (ep[0] || '').trim();
+    emergName = (ep[1] || '').trim();
+  }
+  // 임대인 계좌 — landlordAccountMap에서 (gid=418937767 DH열, '은행/계좌/예금주' 형태일 수도)
+  var accBank = '', accNumber = '', accHolder = '';
+  var accountStr = '';
+  if (typeof landlordAccountMap === 'object' && d.contractNo) {
+    accountStr = landlordAccountMap[String(d.contractNo).trim()] || '';
+  }
+  if (!accountStr && d.account) accountStr = d.account; // 수동 모드
+  if (accountStr) {
+    var parts = String(accountStr).split(/\s*[\/|]\s*/).filter(Boolean);
+    if (parts.length >= 3) { accBank = parts[0]; accNumber = parts[1]; accHolder = parts[2]; }
+    else if (parts.length === 2) { accBank = parts[0]; accNumber = parts[1]; }
+    else { accNumber = accountStr; }
+  }
+  if (!accBank && d.bank) accBank = d.bank;
+  if (!accHolder) accHolder = d.landlordName || '';
+  var vatNote = vatNum > 0 ? ' (부가세 별도)' : '';
+  var natStr = ((d.natType ? trim(d.natType) + ' ' : '') + trim(d.nationality || '')).trim();
+  var L = [];
+  L.push('[계약필수정보] / 뉴개런티즈');
+  L.push('0. 구분 : ' + category);
+  L.push('0. 퇴실청소비 : (변경 시 알려주세요)');
+  L.push('1. 계약 체결일(날일 예정일) : ' + trim(d.contractDate));
+  L.push('');
+  L.push('2. 건물 공동현관 비번 : ');
+  L.push('');
+  L.push('3. 주소, 호실정보: ' + addr);
+  L.push('');
+  L.push('4. 임대차 계약 기간(입주일~만기일 : ' + trim(d.startDate) + '~' + trim(d.endDate) + ')');
+  L.push('');
+  L.push('5. 임대료: ' + amtFmt(d.totalRent));
+  L.push('①. 보증금 : ' + amtFmt(d.deposit));
+  L.push('②. 월세 : ' + amtFmt(d.rent) + vatNote);
+  L.push('③. 고정관리비 : ' + amtFmt(d.mgmtFee));
+  L.push('');
+  L.push('6. 월세납입형태 : 선불');
+  L.push('');
+  L.push('7. 서비스수수료 납부방법 : ' + trim(d.payCondition));
+  L.push('');
+  L.push('8. 임대인 정보');
+  L.push('①. 이름 : ' + trim(d.landlordName));
+  L.push('②. 연락처 : ' + phoneFmt(d.landlordPhone));
+  L.push('③. 주소: ' + trim(d.landlordAddr));
+  L.push('');
+  L.push('9. 임대인 계좌 정보');
+  L.push('①. 은행명 : ' + accBank);
+  L.push('②. 계좌번호 : ' + accNumber);
+  L.push('③. 예금주(임대인명) : ' + accHolder);
+  L.push('');
+  L.push('10. 전차인 정보');
+  L.push('①. 이름 : ' + trim(d.tenantName));
+  L.push('②. 주소 : ' + trim(d.tenantAddr));
+  L.push('③. 연락처 : ' + phoneFmt(d.tenantPhone));
+  L.push('④. 주민등록번호: ' + trim(d.tenantIdNo));
+  L.push('⑤ 국적 : ' + natStr);
+  L.push('');
+  // 공동전차인 — 데이터 있을 때만
+  if (trim(d.coName) || trim(d.coPhone) || trim(d.coIdNo)) {
+    L.push('10. 공동전차인 정보');
+    L.push('①. 이름 : ' + trim(d.coName));
+    L.push('②. 주소 : ' + trim(d.coAddr));
+    L.push('③. 연락처 : ' + phoneFmt(d.coPhone));
+    L.push('④. 주민등록번호: ' + trim(d.coIdNo));
+    L.push('⑤ 국적 : ');
+    L.push('');
+  }
+  L.push('*비상연락처: (' + emergRel + ' , ' + emergName + ') ' + phoneFmt(d.emergPhone));
+  return L.join('\n');
+}
 
 // [v172] 발행 버튼 — 모드별 분기
 function cG_submit(contractNo){
@@ -8472,11 +8571,11 @@ function cG_submit(contractNo){
     var d = cG_collectManualData();
     var modal = document.getElementById('cG_modal');
     if (modal) modal.remove();
-    // TSV 클립보드 복사 (best-effort)
+    // [v246] 계약필수정보 텍스트 클립보드 복사 (기존 TSV 대신 사용자 친화적 양식)
     try {
-      var tsv = cG_buildTsvFromManual(d);
-      navigator.clipboard.writeText(tsv).then(function(){
-        console.log('[v172] TSV copied to clipboard');
+      var infoText = cG_buildContractInfoText(d);
+      navigator.clipboard.writeText(infoText).then(function(){
+        console.log('[v246] 계약필수정보 텍스트 복사 완료');
       }).catch(function(){});
     } catch(e){}
     // [v175] 사용자 입력 특약사항 수집 — buildGuaranteezContractHtml 내부에서 자동 조항과 결합
@@ -8491,7 +8590,7 @@ function cG_submit(contractNo){
     win.document.write(html);
     win.document.close();
     setTimeout(function(){
-      alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 시트 입력용 TSV가 클립보드에 복사되었습니다.\n운영 시트의 적절한 행에 Cmd+V로 붙여넣을 수 있습니다.');
+      alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 [계약필수정보] 텍스트가 클립보드에 복사되었습니다.\nSlack/카카오톡/메모장에 Cmd+V로 붙여넣어 사용하세요.');
     }, 500);
   } else {
     // 검색 모드 — 기존 함수
@@ -8609,6 +8708,9 @@ function fetchContractForPdf(contractNo) {
         contractNo:   g(['계약번호'], 0),
         tenantName:   g(['임차인명','임차인'], 2),
         landlordName: g(['임대인명','임대인'], 40),
+        // [v246] 클립보드 텍스트용 — 임대인 부가정보
+        landlordPhone: g(['임대인연락처','임대인 연락처'], 41),
+        landlordAddr:  g(['임대인주소','임대인 주소'], -1),
         natType:      g(['국적구분'], 7),
         nationality:  g(['국적'], 8),
         useType:      g(['계약형태'], 13),
@@ -8676,6 +8778,15 @@ function generateGuaranteezPdf(contractNo) {
     if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
     win.document.write(html);
     win.document.close();
+    // [v246] 계약필수정보 텍스트 클립보드 복사
+    try {
+      var infoText = cG_buildContractInfoText(data);
+      navigator.clipboard.writeText(infoText).then(function(){
+        setTimeout(function(){
+          alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 [계약필수정보] 텍스트가 클립보드에 복사되었습니다.\nSlack/카카오톡/메모장에 Cmd+V로 붙여넣어 사용하세요.');
+        }, 300);
+      }).catch(function(){});
+    } catch(e){ console.warn('[v246] info text copy fail:', e); }
   }).catch(function(e) {
     var loaderEl = document.getElementById('cG_loader');
     if (loaderEl) loaderEl.remove();
