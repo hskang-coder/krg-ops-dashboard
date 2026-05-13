@@ -8034,8 +8034,14 @@ function cG_parsePdfText(text){
   else if (/주거\s*용/.test(text)) data.useType = '주거용';
 
   // [v183] 섹션 앵커는 점·괄호·공백 변형 모두 허용 — "8.임대인정보" / "8) 임대인정보" / "8 임대인 정보" 등
+  // [v249] 동일 의미의 명칭 변형 모두 지원
+  //   - 전차인(첫째) = 임차인 정보 / 전차인 정보 / 계약자 정보
+  //   - 공동전차인(둘째) = 공동임차인 / 공동전차인 / 공동명의인 / 공동계약자 / 공동임대차인
+  var TENANT_HEAD_RE = /(?:임차인|전차인|계약자)\s*정보/;
+  var CO_HEAD_RE = /공동\s*(?:임차인|전차인|명의인|계약자|임대차인)(?:\s*정보)?/;
+  var TENANT_OR_CO_END_RE = /(?:임차인|전차인|계약자)\s*정보|공동\s*(?:임차인|전차인|명의인|계약자|임대차인)/;
   // [v186] 8. 임대인 정보 — pickField 사용 (괄호 주석 무시)
-  var landlordSec = section(/임대인\s*정보/, /(?:임대인\s*)?계좌\s*(?:정보|계좌)|임차인\s*정보|공동\s*임차인/);
+  var landlordSec = section(/임대인\s*정보/, new RegExp('(?:임대인\\s*)?계좌\\s*(?:정보|계좌)|' + TENANT_OR_CO_END_RE.source));
   if (landlordSec) {
     data.landlordName  = pickField(landlordSec, '이름').replace(/\s+/g, ' ').trim();
     data.landlordPhone = pickIn(landlordSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
@@ -8043,15 +8049,15 @@ function cG_parsePdfText(text){
   }
 
   // [v186] 9. 계좌 정보 — "예금주(임대인명) : 이경훈" 처리
-  var acctSec = section(/(?:임대인\s*)?계좌\s*정보/, /임차인\s*정보|공동\s*임차인/);
+  var acctSec = section(/(?:임대인\s*)?계좌\s*정보/, TENANT_OR_CO_END_RE);
   if (acctSec) {
     data.bank       = pickField(acctSec, '은행명').replace(/\s+/g, ' ').trim();
     data.account    = pickIn(acctSec, /계좌번호\s*[:：]?\s*([\d\-]+)/);
     data.acctHolder = pickField(acctSec, '예금주').replace(/\s+/g, ' ').trim();
   }
 
-  // [v186] 10. 임차인 정보 — 긴급연락처/비상연락망/공동임차인 직전까지
-  var tenantSec = section(/임차인\s*정보/, /긴급\s*연락처|비상\s*연락(?:망|처)|공동\s*임차인/);
+  // [v249] 10. 임차인/전차인/계약자 정보 — 긴급연락처/공동(임차인·전차인·명의인·계약자) 직전까지
+  var tenantSec = section(TENANT_HEAD_RE, new RegExp('긴급\\s*연락처|비상\\s*연락(?:망|처)|' + CO_HEAD_RE.source));
   if (tenantSec) {
     data.tenantName  = pickField(tenantSec, '이름').replace(/\s+/g, ' ').trim();
     data.tenantPhone = pickIn(tenantSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
@@ -8087,8 +8093,8 @@ function cG_parsePdfText(text){
     if (data.emergName && LABEL_KEYWORDS.test(data.emergName)) data.emergName = '';
   }
 
-  // [v186] 11. 공동임차인
-  var coSec = section(/공동\s*임차인/, null);
+  // [v249] 11. 공동전차인 — 다양한 명칭 지원 (공동임차인/공동전차인/공동명의인/공동계약자/공동임대차인)
+  var coSec = section(CO_HEAD_RE, null);
   if (coSec) {
     data.coName  = pickField(coSec, '이름').replace(/\s+/g, ' ').trim();
     data.coPhone = pickIn(coSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
