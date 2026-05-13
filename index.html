@@ -5345,18 +5345,34 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
     contractDetails[cno].amt = amtSumMap[cno] || 0;
   });
   totalContracts = allActiveSet.size;
-  // Segment counts (cumulative)
+  // [v263] KPI 버킷 산출을 목록 표시값(contractDetails.days, 임대료 연체일수)과 일치시킴
+  //   ※ 이전: activeMap.days(모든 납부종류 max) → 임대료 days가 1~3이어도 변동관리비 days가 4+면 상위 버킷으로 누락
+  //   ※ 현재: extDlqCnoSet의 각 cno별 contractDetails.days(임대료/연체중·분납중 max ad29) 기준
   let s1to3=0, s1to15=0, s1to30=0, sOver30=0;
   let activeDelinqAmt = 0;
   const typeBreakdown = {};
-  Object.values(activeMap).forEach(v => {
-    if (v.days >= 1 && v.days <= 3)   s1to3++;
-    if (v.days >= 1 && v.days <= 15)  s1to15++;
-    if (v.days >= 1 && v.days <= 30)  s1to30++;
-    if (v.days > 30)                  sOver30++;
-    const t = v.tipo || '기타';
-    typeBreakdown[t] = (typeBreakdown[t] || 0) + 1;
-  });
+  if (extDlqCnoSet) {
+    extDlqCnoSet.forEach(function(cno){
+      const det = contractDetails[cno] || { days:0, tipo:'기타' };
+      const d = det.days || 0;
+      if (d >= 1 && d <= 3)   s1to3++;
+      if (d >= 1 && d <= 15)  s1to15++;
+      if (d >= 1 && d <= 30)  s1to30++;
+      if (d > 30)             sOver30++;
+      const t = det.group || det.tipo || '기타';
+      typeBreakdown[t] = (typeBreakdown[t] || 0) + 1;
+    });
+  } else {
+    // 폴백: 이전 activeMap 방식
+    Object.values(activeMap).forEach(v => {
+      if (v.days >= 1 && v.days <= 3)   s1to3++;
+      if (v.days >= 1 && v.days <= 15)  s1to15++;
+      if (v.days >= 1 && v.days <= 30)  s1to30++;
+      if (v.days > 30)                  sOver30++;
+      const t = v.tipo || '기타';
+      typeBreakdown[t] = (typeBreakdown[t] || 0) + 1;
+    });
+  }
   // activeDelinqAmt: 연체자(activeMap) 기준 ab열 합산
   Object.keys(activeMap).forEach(cno => { activeDelinqAmt += amtSumMap[cno] || 0; });
   let endedDelinqAmt = 0;
