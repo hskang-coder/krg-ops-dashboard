@@ -7403,6 +7403,12 @@ function cG_buildManualForm(){
         )
       + row('c1', cell('주소', inp('coAddr', '')))
       + row('c1', cell('주민등록번호', inp('coIdNo', '000000-0000000')))
+      // [v254] 공동임차인 긴급연락처 — 디폴트: 계약자 정보 자동 채움
+      + row('c3',
+          cell('긴급연락처 관계 ' + H.opt, inp('coEmgRel', '예: 부, 모, 배우자')),
+          cell('긴급연락처 이름 ' + H.opt, inp('coEmgName', '예: 홍길동')),
+          cell('긴급연락처 ' + H.opt, inp('coEmgPhone', '010-0000-0000'))
+        )
       )
     + '</div>'
     // [v181] 추가 계약자 (공동명의계약인/연대보증인) — 검색 모드와 동일
@@ -8182,14 +8188,34 @@ function cG_applyParsedData(data){
   setVal('tenantAddr', data.tenantAddr);
   cG_setMaskedRrn('cG_m_tenantIdNo', data.tenantIdNo);
   setVal('nationality', data.nationality);
-  // [긴급연락처] 비상연락망 = 긴급연락처로 인지 → 관계/이름/연락처
-  setVal('emgRel',   data.emergRel);
-  setVal('emgName',  data.emergName);
-  setVal('emgPhone', data.emergPhone);
   setVal('coName', data.coName);
   setVal('coPhone', data.coPhone);
   setVal('coAddr', data.coAddr);
   cG_setMaskedRrn('cG_m_coIdNo', data.coIdNo);
+  // [v254] 긴급연락처 디폴트 로직
+  // - 단독계약(공동 정보 없음): PDF에서 추출한 emergRel/emergName/emergPhone 그대로 사용
+  // - 공동계약(공동 이름/연락처 존재): 교차 매핑
+  //     * 계약자(전차인) 긴급연락처: 연락처 ← 공동 연락처, 관계 = "", 이름 ← 공동 이름
+  //     * 공동계약자 긴급연락처:       연락처 ← 계약자 연락처, 관계 = "", 이름 ← 계약자 이름
+  var _hasCo_v254 = !!(
+    (data.coName  && String(data.coName).trim())  ||
+    (data.coPhone && String(data.coPhone).trim())
+  );
+  if (_hasCo_v254) {
+    // 계약자 긴급연락처 ← 공동계약자 정보
+    setVal('emgPhone', data.coPhone);
+    setVal('emgName',  data.coName);
+    // emgRel은 비워둠 (관계 = "")
+    // 공동계약자 긴급연락처 ← 계약자 정보
+    setVal('coEmgPhone', data.tenantPhone);
+    setVal('coEmgName',  data.tenantName);
+    // coEmgRel은 비워둠 (관계 = "")
+  } else {
+    // 단독계약: PDF의 긴급연락처 그대로
+    setVal('emgRel',   data.emergRel);
+    setVal('emgName',  data.emergName);
+    setVal('emgPhone', data.emergPhone);
+  }
   cG_applyAddrHighlight('cG_m_address');
   cG_applyAddrHighlight('cG_m_landlordAddr');
   cG_applyAddrHighlight('cG_m_tenantAddr');
@@ -8406,8 +8432,9 @@ function cG_collectManualData(){
     coPhone:      v('coPhone'),
     coIdNo:       rrn('coIdNo'),
     coAddr:       v('coAddr'),
-    coEmergPhone: '',
-    coEmergInfo:  '',
+    // [v254] 공동임차인 긴급연락처
+    coEmergPhone: v('coEmgPhone'),
+    coEmergInfo:  (function(){ var r = v('coEmgRel'), n = v('coEmgName'); if (!r && !n) return ''; return r + ',' + n; })(),
     contractDate: contractDate,
     // 임대인 추가 (TSV용)
     landlordPhone: v('landlordPhone'),
