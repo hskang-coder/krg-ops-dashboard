@@ -5618,6 +5618,56 @@ async function renderDelinquency() {
       ...termCnos
     ];
     const payData = parseDailyForPayDate(r3, dlqRowsForPay);
+    // [v259] 전체 연체자 카운트 진단 — 79가 어느 정의에 해당하는지 식별
+    try {
+      const _diagPay = Array.isArray(paymentRawData) ? paymentRawData : [];
+      const _activeSet = new Set();
+      const _payDlqImda = new Set();   // paymentRawData 연체중+임대료
+      const _payDlqByun = new Set();   // paymentRawData 연체중+변동관리비
+      const _payDlqAny  = new Set();   // paymentRawData 연체중 (납부종류 무관)
+      _diagPay.forEach(function(p){
+        const cno = String(p['계약번호']||'').trim();
+        const st  = String(p['납부상태']||'').trim();
+        const kind= String(p['납부종류']||'').trim();
+        const kS  = (function(){ const m=(contractRawData||[]).find(c=>String(c['계약번호']||'').trim()===cno); return m?String(m['계약상태']||'').trim():''; })();
+        if (kS === '정상' || kS === '계약중') _activeSet.add(cno);
+        if (st !== '연체중') return;
+        if (kS && kS !== '정상' && kS !== '계약중') return;
+        _payDlqAny.add(cno);
+        if (kind === '임대료' || kind.indexOf('임대료')>=0) _payDlqImda.add(cno);
+        else if (kind.indexOf('변동')>=0 || kind.indexOf('관리비')>=0) _payDlqByun.add(cno);
+        else _payDlqImda.add(cno);
+      });
+      const _payDlqUnion = new Set([..._payDlqImda, ..._payDlqByun]);
+      const _ad29Set = new Set();
+      const r2rows = (r2 && r2.table && r2.table.rows) ? r2.table.rows : [];
+      r2rows.forEach(function(row){
+        const c = row.c || [];
+        const cno  = c[4]  ? String(c[4].f ?? c[4].v ?? '').replace(/\.0$/,'').trim() : '';
+        const n13  = c[13] ? String(c[13].v ?? '') : '';
+        const ad29 = c[29] ? Number(c[29].v ?? 0) : 0;
+        if (cno && n13 === '계약중' && ad29 > 0) _ad29Set.add(cno);
+      });
+      console.group('[v259] 전체 연체자 카운트 진단');
+      console.log('① 카드 표시값(delinqCount, 임대료∪변동 합집합) =', dlqV3Data.delinqCount);
+      console.log('② 임대료만(imdaCount) =', dlqV3Data.imdaCount);
+      console.log('③ 변동관리비만(byunCount) =', dlqV3Data.byunCount);
+      console.log('④ paymentRawData 연체중 임대료 unique =', _payDlqImda.size);
+      console.log('⑤ paymentRawData 연체중 변동/관리비 unique =', _payDlqByun.size);
+      console.log('⑥ paymentRawData 연체중 합집합(④∪⑤) =', _payDlqUnion.size);
+      console.log('⑦ paymentRawData 연체중 전체(임대료+변동 종류 무관) =', _payDlqAny.size);
+      console.log('⑧ 수납내역 ad29>0 & n13=계약중 unique 계약 =', _ad29Set.size);
+      console.log('⑨ 수납내역 활성계약 전체(n13=계약중) =', _activeSet.size);
+      console.log('⑩ parseContractMgmt(계약관리 K=계약중&BQ=연체) =', _dlqContractData.delinqCount);
+      console.log('⑪ activeMap(extDlqCnoSet∩ad29>0&n13=계약중) =', _dlqIncomeData.activeDelinqCount);
+      console.log('⑫ activeMap 버킷 합(1~3 + 4~15 + 16~30 + >30) =',
+        _dlqIncomeData.segs.s1to3 +
+        (_dlqIncomeData.segs.s1to15 - _dlqIncomeData.segs.s1to3) +
+        (_dlqIncomeData.segs.s1to30 - _dlqIncomeData.segs.s1to15) +
+        _dlqIncomeData.segs.sOver30);
+      console.log('▶ 79가 정확하다고 알고 계신 값과 가장 가까운 항목 번호를 알려주시면 카드 산출을 그것으로 변경합니다.');
+      console.groupEnd();
+    } catch(_e){ console.warn('[v259] 진단 로그 실패:', _e); }
     buildDlqUI(_dlqContractData, _dlqIncomeData, payData, dlqV3Data);
   }
 
