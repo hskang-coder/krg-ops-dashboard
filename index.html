@@ -5568,6 +5568,10 @@ async function renderDelinquency() {
         delinqRowMap: rowMap
       };
     }
+    // [v260] v240 augmentation 적용 전 카운트 보존 (진단용)
+    dlqV3Data._preAugImdaCount = dlqV3Data.imdaCount;
+    dlqV3Data._preAugByunCount = dlqV3Data.byunCount;
+    dlqV3Data._preAugDelinqCount = dlqV3Data.delinqCount;
     // [v240] paymentRawData에서 납부상태='연체중'인 모든 계약 보강 (시트 BP/BZ 컬럼 stale 케이스 보호)
     // 58206 장영삼 처럼 시트엔 '-'/₩0 인데 paymentRawData엔 실제 연체중인 경우 누락 방지
     if (Array.isArray(paymentRawData) && paymentRawData.length > 0) {
@@ -5649,9 +5653,12 @@ async function renderDelinquency() {
         if (cno && n13 === '계약중' && ad29 > 0) _ad29Set.add(cno);
       });
       console.group('[v259] 전체 연체자 카운트 진단');
-      console.log('① 카드 표시값(delinqCount, 임대료∪변동 합집합) =', dlqV3Data.delinqCount);
-      console.log('② 임대료만(imdaCount) =', dlqV3Data.imdaCount);
-      console.log('③ 변동관리비만(byunCount) =', dlqV3Data.byunCount);
+      console.log('① delinqCount (임대료∪변동 합집합, v240 보강 후) =', dlqV3Data.delinqCount);
+      console.log('② imdaCount (임대료만, v240 보강 후) — 현재 카드 표시 =', dlqV3Data.imdaCount);
+      console.log('③ byunCount (변동관리비만, v240 보강 후) =', dlqV3Data.byunCount);
+      console.log('②-pre imdaCount (v240 보강 전, gid=418937767만) =', dlqV3Data._preAugImdaCount);
+      console.log('①-pre delinqCount (v240 보강 전) =', dlqV3Data._preAugDelinqCount);
+      console.log('③-pre byunCount (v240 보강 전) =', dlqV3Data._preAugByunCount);
       console.log('④ paymentRawData 연체중 임대료 unique =', _payDlqImda.size);
       console.log('⑤ paymentRawData 연체중 변동/관리비 unique =', _payDlqByun.size);
       console.log('⑥ paymentRawData 연체중 합집합(④∪⑤) =', _payDlqUnion.size);
@@ -5764,9 +5771,8 @@ function buildDlqUI(d1, d2, d3, d4) {
       <div class="dlq-stat-card c-red">
         <div class="dlq-stat-icon">👥</div>
         <div class="dlq-stat-label">전체 연체자<br>(계약중)</div>
-        <div class="dlq-stat-num">${delinqCount}명</div>
+        <div class="dlq-stat-num">${imdaCount}명</div>
         <div class="dlq-stat-sub" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
-          <span style="background:#fee2e2;color:#b91c1c;border-radius:4px;padding:1px 5px;font-size:10px">임대료 ${imdaCount}명</span>
           <span style="background:#ede9fe;color:#7c3aed;border-radius:4px;padding:1px 5px;font-size:10px">변동관리비 ${byunCount}명</span>
         </div>
       </div>
