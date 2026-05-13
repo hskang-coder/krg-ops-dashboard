@@ -1758,6 +1758,26 @@ function findColIdx(labels, keywords, fallbackIdx) {
   if (typeof fallbackIdx === 'number' && fallbackIdx >= 0) return fallbackIdx;
   return -1;
 }
+// [v241] 같은 라벨이 여러 컬럼에 존재할 때 '마지막' 위치를 우선 잡는 헬퍼
+// (예: F열과 BO열 둘 다 '공실상태'인 경우 BO=마지막을 우선 매칭)
+function findColIdxLast(labels, keywords, fallbackIdx) {
+  if (labels && Array.isArray(keywords)) {
+    // 1) 정확 일치 — 뒤에서부터 검색
+    for (const kw of keywords) {
+      for (let i = labels.length - 1; i >= 0; i--) {
+        if (labels[i] && labels[i].trim() === kw) return i;
+      }
+    }
+    // 2) 부분 일치 — 뒤에서부터 검색
+    for (const kw of keywords) {
+      for (let i = labels.length - 1; i >= 0; i--) {
+        if (labels[i] && labels[i].includes(kw)) return i;
+      }
+    }
+  }
+  if (typeof fallbackIdx === 'number' && fallbackIdx >= 0) return fallbackIdx;
+  return -1;
+}
 
 // 연체관리(Daily Report) 시트 파서
 // [v23] 시트 컬럼 (2026-04-28 변경): A=대응일(0) | B=계약번호(1) | C=입금인(2) | D=입금예정(3) | E=업무구분(4) | F=대응 상세내용(5)
@@ -1910,7 +1930,8 @@ function parseVacancySheet(resp) {
   const tentativeDateIdx= findColIdx(labels, ['가계약일'],         61);  // BJ
   const partnerNameIdx = findColIdx(labels, ['부동산명'],          64);  // BM
   const partnerPersonIdx= findColIdx(labels, ['계약담당자'],       65);  // BN
-  const statusIdx      = findColIdx(labels, ['공실상태'],          66);  // BO
+  // [v241] '공실상태' 라벨이 F열·BO열 양쪽에 존재할 가능성 — 마지막(BO) 우선 매칭으로 F열 작업 영향 차단
+  const statusIdx      = findColIdxLast(labels, ['공실상태'],      66);  // BO (마지막 occurrence)
   const exitDateIdx    = findColIdx(labels, ['실제퇴실일'],        67);  // BP
   const billCountIdx   = findColIdx(labels, ['청구수','청구횟수'], 71);  // BT
   // [v74] 입주 전 진척 5개 (TRUE/FALSE)
