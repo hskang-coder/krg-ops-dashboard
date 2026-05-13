@@ -1644,11 +1644,18 @@ function switchView(view) {
 // ■ CONTRACT RECORD
 // ═══════════════════════════════════════════
 
-// [v145] 시트의 액티브 필터·정렬을 우회 — range=A:ZZ 명시 시 gviz가 raw 시트 데이터를 반환
+// [v262] 시트 active filter 영향 영구 차단 — SQL(tq=SELECT *) + range=A:ZZ + 캐시버스트(_t) + cache:'no-store' 4중 안전장치
+//   ※ v145의 range=A:ZZ만으로는 일부 케이스에서 active filter가 gviz 응답에 영향을 미침
+//   ※ v218(okpi) / v257(연체관리)에서 검증된 패턴을 전체 fetch 헬퍼에 적용
 async function fetchSheetByName(sheetName) {
   const enc = encodeURIComponent(sheetName);
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${enc}&range=A:ZZ`;
-  const res = await fetch(url);
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`
+            + `&sheet=${enc}`
+            + `&range=A:ZZ`
+            + `&tq=${encodeURIComponent('SELECT *')}`
+            + `&headers=1`
+            + `&_t=${Date.now()}`;
+  const res = await fetch(url, { cache: 'no-store' });
   const text = await res.text();
   const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
   if (!m) throw new Error('parse error');
@@ -1656,8 +1663,13 @@ async function fetchSheetByName(sheetName) {
 }
 
 async function fetchSheetByGid(gid) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${gid}&range=A:ZZ`;
-  const res = await fetch(url);
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`
+            + `&gid=${gid}`
+            + `&range=A:ZZ`
+            + `&tq=${encodeURIComponent('SELECT *')}`
+            + `&headers=1`
+            + `&_t=${Date.now()}`;
+  const res = await fetch(url, { cache: 'no-store' });
   const text = await res.text();
   const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
   if (!m) throw new Error('parse error');
@@ -5521,6 +5533,14 @@ async function renderDelinquency() {
   const inner = wrap.querySelector('.dlq-inner');
   if (!inner) return;
 
+  // [v262] 연체관리 진입 시 시트 캐시 강제 무효화 — 시트 active filter stale 영향 차단
+  try {
+    Object.keys(localStorage).forEach(function(k){
+      if (k.indexOf('krg_sum_cache_') === 0) localStorage.removeItem(k);
+    });
+    window._dlqRawCache = null;
+  } catch(_){}
+
   const SHEET2 = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q'; // [v219] 미러 스프레드시트 유지 (다른 파생 시트들이 여기 있음)
   function gvizUrl(gid, range) {
     // [v257] 시트 active filter 영향 영구 차단 — SQL(tq=SELECT *) + range=A:ZZ + 캐시버스트(_t) 3중 안전장치
@@ -6304,8 +6324,8 @@ async function loadData() {
   const ctrl = new AbortController();
   const fetchTimer = setTimeout(() => ctrl.abort(), 12000);
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${DAEUNG_GID}&range=A:ZZ&headers=0`;  // [v161] A:R → A:ZZ (필터 우회)
-    const res  = await fetch(url, { signal: ctrl.signal });
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${DAEUNG_GID}&range=A:ZZ&tq=${encodeURIComponent('SELECT *')}&headers=0&_t=${Date.now()}`;  // [v262] SQL+캐시버스트+no-store 4중 안전장치
+    const res  = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
     clearTimeout(fetchTimer);
     const text = await res.text();
     const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
