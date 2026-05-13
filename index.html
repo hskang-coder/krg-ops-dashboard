@@ -983,6 +983,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 
 </style>
 <!-- v1776817031 -->
+<!-- [v243] 케이알지그룹(주) 도장 자동 날인 — 갑 서명 영역에 디폴트 삽입 -->
+<script src="_assets/seal-dataurl.js"></script>
 </head>
 <body>
 
@@ -9366,7 +9368,8 @@ function buildSubAgreementHtml(d) {
     + '<tr><td class="sa-sig-lbl">연락처</td><td class="sa-sig-val">02-6933-0099</td></tr>'
     + '<tr><td class="sa-sig-lbl">이름(법인명)</td><td class="sa-sig-val">케이알지그룹 주식회사</td></tr>'
     + '</table>'
-    + '<div class="sa-sig-mark">서명<br>혹은 인</div>'
+    // [v243] 갑(케이알지그룹) 도장 자동 날인 — SEAL_DATA_URL 로딩 실패 시 텍스트 폴백
+    + '<div class="sa-sig-mark">' + (window.SEAL_DATA_URL ? '<img src="' + window.SEAL_DATA_URL + '" alt="seal" style="width:62px;height:62px;display:block;margin:0 auto" onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'서명<br>혹은 인\'">' : '서명<br>혹은 인') + '</div>'
     + '</div></div>'
     + '</div>';
 
@@ -9712,7 +9715,8 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
     + '<tr><td class="sg-lbl" style="padding:3px 7px">연락처</td><td style="padding:3px 7px">02-6933-0099</td></tr>'
     + '<tr><td class="sg-lbl" style="padding:3px 7px">이름(법인명)</td><td style="padding:3px 7px">케이알지그룹 주식회사</td></tr>'
     + '</table>'
-    + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:5px;border-left:1px dashed #c0c0c0;margin-left:5px">서명<br>혹은 인</div>'
+    // [v243] 갑(케이알지그룹) 도장 자동 날인 — SEAL_DATA_URL 로딩 실패 시 텍스트 폴백
+    + '<div style="text-align:center;padding-top:5px;border-left:1px dashed #c0c0c0;margin-left:5px;display:flex;align-items:center;justify-content:center">' + (window.SEAL_DATA_URL ? '<img src="' + window.SEAL_DATA_URL + '" alt="seal" style="width:55px;height:55px" onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'<span style=&quot;font-size:8pt;color:#6b7280&quot;>서명<br>혹은 인</span>\'">' : '<span style="font-size:8pt;color:#6b7280">서명<br>혹은 인</span>') + '</div>'
     + '</div></div>'
     // 을
     + '<div style="border:2px solid #5b21b6;border-radius:6px;padding:7px 10px;break-inside:avoid;page-break-inside:avoid">'
