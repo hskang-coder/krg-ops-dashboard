@@ -4260,16 +4260,26 @@ function selectContractRow(no) {
 }
 
 function fmt(v) { return v || '—'; }
+// [v244] 안전 금액 파서 — '₩571,277/00' 같은 전(錢) 단위 suffix 제거 후 정확한 원화 추출
+// 시트 셀이 '571,277/00', '571277.00', '571,277원/00전' 등으로 들어와도 정확히 571277 반환
+function parseSafeMoney(v) {
+  if (v == null || v === '') return 0;
+  let raw = String(v).trim();
+  // 끝부분의 '/숫자' 또는 '.숫자' (1~2자리) 제거 — 한국식 전(錢) 표기
+  raw = raw.replace(/[\/]\d{1,2}\s*전?$/, '');
+  // 그 외 모든 비숫자 문자 제거 (음수 부호와 소수점은 보존)
+  const n = parseFloat(raw.replace(/[^0-9.\-]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
 function fmtMoney(v) {
-  const n = parseFloat(String(v).replace(/[^0-9.-]/g,''));
-  if (isNaN(n)) return '—';
+  const n = parseSafeMoney(v);
+  if (n === 0 && (v == null || v === '')) return '—';
   return '₩' + n.toLocaleString('ko-KR');
 }
 
 // 보증금/원상회복 등 빈값을 ₩0으로 표시하는 헬퍼 (— 대신)
 function fmtMoneyZ(v) {
-  const n = parseFloat(String(v||'').replace(/[^0-9.-]/g,''));
-  return '₩' + (isNaN(n) ? 0 : n).toLocaleString('ko-KR');
+  return '₩' + parseSafeMoney(v).toLocaleString('ko-KR');
 }
 
 const TL_PROCESSES = {
@@ -4349,7 +4359,7 @@ function renderContractRecord(c, payments, responses = []) {
       const nm = String(p['청구서명']||p['납부종류']||'');
       return nm.includes(keyword) && (!exclude || !nm.includes(exclude));
     })
-    .reduce((acc, p) => acc + (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0), 0);
+    .reduce((acc, p) => acc + parseSafeMoney(p['미납(연체)금액(원)']), 0); // [v244]
 
   const delinqRent    = sumDelinq('임대료', '수수료');
   const delinqFee     = sumDelinq('수수료');
@@ -4370,7 +4380,7 @@ function renderContractRecord(c, payments, responses = []) {
     if (fromStatus > 0) return fromStatus;
     // 미납금액 기준 fallback
     const fromUnpaid = payments
-      .filter(p => (parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0) > 0)
+      .filter(p => parseSafeMoney(p['미납(연체)금액(원)']) > 0) // [v244]
       .reduce((max, p) => Math.max(max, parseInt(p['연체일수']||0)), 0);
     return fromUnpaid;
   })();
@@ -4421,7 +4431,7 @@ function renderContractRecord(c, payments, responses = []) {
   });
   const detailRows = sortedPayments.map(p => {
     const status = String(p['납부상태']||'').trim();
-    const unpaid = parseFloat(String(p['미납(연체)금액(원)']||'0').replace(/[^0-9.-]/g,''))||0;
+    const unpaid = parseSafeMoney(p['미납(연체)금액(원)']); // [v244]
     const dueStr = String(p['납기일']||'').trim();
     const dueDate = dueStr ? parseKorDate(dueStr) : null;
     const todayD = new Date(); todayD.setHours(0,0,0,0);
@@ -8751,7 +8761,7 @@ function generateIncomeReceipt(contractNo){
     if (!m) return null;
     return new Date(+m[1], +m[2]-1, +m[3]).getTime();
   };
-  var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
+  var parseAmt = parseSafeMoney; // [v244] /00 같은 전(錢) suffix 안전 처리
 
   var rows = (paymentRawData||[]).filter(function(p){
     if (String(p['계약번호']||'').trim() !== String(contractNo)) return false;
@@ -8989,7 +8999,7 @@ function openFeeCalcModal(contractNo){
   var rentRaw = vac && vac.rent ? vac.rent : (contract ? (contract['임대료']||contract['월임대료']||'') : '');
   var feeRaw  = vac && vac.fee  ? vac.fee  : (contract ? (contract['서비스 수수료']||contract['수수료']||'') : '');
   var mgmtRaw = vac && vac.mgmtFee ? vac.mgmtFee : (contract ? (contract['관리비']||contract['월관리비']||'') : '');
-  var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
+  var parseAmt = parseSafeMoney; // [v244] /00 같은 전(錢) suffix 안전 처리
   var rentNum = parseAmt(rentRaw);
   var feeNum  = parseAmt(feeRaw);
   var mgmtNum = parseAmt(mgmtRaw);
@@ -12895,7 +12905,7 @@ function sumCalcKpi(){
       console.log('[v104] paymentRawData keys:', Object.keys(paymentRawData[0]));
       window.__sumPaymentKeysLogged = true;
     }
-    var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
+    var parseAmt = parseSafeMoney; // [v244] /00 같은 전(錢) suffix 안전 처리
     kpi.delqAmount = paymentRawData.reduce(function(sum, p){
       var st = String(p['납부상태']||'').trim();
       if (st.indexOf('연체중') < 0 && st.indexOf('분납중') < 0) return sum;
@@ -13465,7 +13475,7 @@ function sumDrawSection2(){
 // =================================================================
 function sumBuildSection3(){
   if (!Array.isArray(vacancyRawData)) return null;
-  var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
+  var parseAmt = parseSafeMoney; // [v244] /00 같은 전(錢) suffix 안전 처리
   var today = new Date(); today.setHours(0,0,0,0);
   // [v119] 기간 필터
   window._sumS3Period = window._sumS3Period || 'all';
@@ -13776,7 +13786,7 @@ function sumDrawSection3(){
 // =================================================================
 function sumBuildSection4(){
   if (!Array.isArray(vacancyRawData)) return null;
-  var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
+  var parseAmt = parseSafeMoney; // [v244] /00 같은 전(錢) suffix 안전 처리
   var today = new Date(); today.setHours(0,0,0,0);
   var thisYM = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0');
 
@@ -13959,7 +13969,7 @@ function sumBuildSidebar(){
   var s2 = sumBuildSection2();
   var s3 = sumBuildSection3();
   var s4 = sumBuildSection4();
-  var parseAmt = function(v){ return parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')) || 0; };
+  var parseAmt = parseSafeMoney; // [v244] /00 같은 전(錢) suffix 안전 처리
   // MRR (활성 계약 월세 합)
   var mrr = 0, aum = 0;
   if (Array.isArray(vacancyRawData)) {
