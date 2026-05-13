@@ -5505,7 +5505,25 @@ async function renderDelinquency() {
     if (typeof parseVacancySheet === 'function') {
       try { vacancyRawData = parseVacancySheet(r1); } catch(e) { console.warn('parseVacancySheet in dlq:', e); }
     }
-    const dlqV3Data  = parseDelinqV3(r4);
+    let dlqV3Data  = parseDelinqV3(r4);
+    // [v239] gid=418937767 시트가 비어있으면 parseContractMgmt(r1) 결과로 폴백
+    if ((dlqV3Data.delinqCount|0) === 0 && (_dlqContractData.delinqCount|0) > 0) {
+      console.warn('[v239] parseDelinqV3 빈 결과 — _dlqContractData로 폴백 (delinqCount=' + _dlqContractData.delinqCount + ')');
+      const dRows = _dlqContractData.delinqRows || [];
+      const cnoSet = new Set(dRows.map(r => String(r.cno).trim()));
+      const rowMap = {};
+      dRows.forEach(r => { rowMap[String(r.cno).trim()] = { nm: r.nm, tel: r.tel, delinqType: '임대료' }; });
+      dlqV3Data = {
+        dlqCnoSet:   cnoSet,
+        imdaDlqSet:  cnoSet,
+        byunDlqSet:  new Set(),
+        delinqCount: dRows.length,
+        imdaCount:   dRows.length,
+        byunCount:   0,
+        totalActive: _dlqContractData.totalContracts,
+        delinqRowMap: rowMap
+      };
+    }
     _dlqIncomeData   = parseIncomeForDlqV2(r2, dlqV3Data.dlqCnoSet);
     window._delinqDaysMap = _dlqIncomeData.delinqDaysMap || {};
     const termCnos = (_dlqContractData.terminatedDelinqRows || [])
