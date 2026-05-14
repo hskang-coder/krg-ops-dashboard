@@ -5211,7 +5211,7 @@ async function fetchViaProxy() {
 
 // gid=418937767 → 전체연체자 카운팅 (bk=정상, aw=임대료납부상태, az=변동관리비납부상태)
 function parseDelinqV3(resp) {
-  if (!resp || !resp.table) return { dlqCnoSet:new Set(), imdaDlqSet:new Set(), byunDlqSet:new Set(), delinqCount:0, imdaCount:0, byunCount:0, totalActive:0 };
+  if (!resp || !resp.table) return { dlqCnoSet:new Set(), imdaDlqSet:new Set(), byunDlqSet:new Set(), etcDlqSet:new Set(), depDlqSet:new Set(), delinqCount:0, imdaCount:0, byunCount:0, etcCount:0, depCount:0, totalActive:0 };
   const { cols, rows } = resp.table;
   // [v215] 헤더 라벨 매핑 + 절대 위치 fallback (gid=418937767 시트 컬럼 변경 시 자동 보정)
   const labels = (cols || []).map(c => (c.label||c.id||'').trim());
@@ -5220,8 +5220,11 @@ function parseDelinqV3(resp) {
   const telIdx = findColIdx(labels, ['연락처','휴대폰'],   15);  // P
   const awIdx  = findColIdx(labels, ['임대료납부상태','임대료 납부상태','임대료'], 48);  // AW
   const azIdx  = findColIdx(labels, ['변동관리비납부상태','변동관리비 납부상태','변동관리비'], 51); // AZ
+  // [v271] 기타계약금(BC=54) + 계약보증금(BF=57) 컬럼 추가 — 윤재희 #50497 BF=연체 사례 기반
+  const bcIdx  = findColIdx(labels, ['기타계약금납부상태','기타계약금 납부상태','기타계약금'], 54);  // BC
+  const bfIdx  = findColIdx(labels, ['계약보증금납부상태','계약보증금 납부상태','계약보증금'], 57);  // BF
   const bkIdx  = findColIdx(labels, ['계약상태'],          62);  // BK
-  const imdaSet=new Set(), byunSet=new Set(), totalSet=new Set();
+  const imdaSet=new Set(), byunSet=new Set(), etcSet=new Set(), depSet=new Set(), totalSet=new Set();
   let totalActive = 0;
   const delinqRowMap = {}; // cno → { nm, tel, delinqType }
   rows.forEach(row => {
@@ -5230,6 +5233,8 @@ function parseDelinqV3(resp) {
     const bk  = cellStr(bkIdx);
     const aw  = cellStr(awIdx);
     const az  = cellStr(azIdx);
+    const bc  = cellStr(bcIdx);
+    const bf  = cellStr(bfIdx);
     const cno = cellStr(cnoIdx).replace(/\.0$/, '');
     const nm  = cellStr(nmIdx);
     const tel = cellStr(telIdx);
@@ -5238,20 +5243,29 @@ function parseDelinqV3(resp) {
     totalActive++;
     if (aw === '연체') imdaSet.add(cno);
     if (az === '연체') byunSet.add(cno);
-    if (aw === '연체' || az === '연체') {
+    if (bc === '연체') etcSet.add(cno);
+    if (bf === '연체') depSet.add(cno);
+    if (aw === '연체' || az === '연체' || bc === '연체' || bf === '연체') {
       totalSet.add(cno);
-      const dt = (aw === '연체' && az === '연체') ? '임대료+변동관리비'
-               : (aw === '연체' ? '임대료' : '변동관리비');
-      delinqRowMap[cno] = { nm, tel, delinqType: dt };
+      const types = [];
+      if (aw === '연체') types.push('임대료');
+      if (az === '연체') types.push('변동관리비');
+      if (bc === '연체') types.push('기타계약금');
+      if (bf === '연체') types.push('계약보증금');
+      delinqRowMap[cno] = { nm, tel, delinqType: types.join('+') };
     }
   });
   return {
     dlqCnoSet:    totalSet,
     imdaDlqSet:   imdaSet,
     byunDlqSet:   byunSet,
+    etcDlqSet:    etcSet,
+    depDlqSet:    depSet,
     delinqCount:  totalSet.size,
     imdaCount:    imdaSet.size,
     byunCount:    byunSet.size,
+    etcCount:     etcSet.size,
+    depCount:     depSet.size,
     totalActive,
     delinqRowMap
   };
@@ -5954,6 +5968,8 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-filter-btn active" data-group="delinqType" onclick="dlqApplyFilter('delinqType','all',this)">전체 ${delinqCount}</button>
           <button class="dlq-filter-btn" data-group="delinqType" onclick="dlqApplyFilter('delinqType','임대료',this)">임대료 ${imdaCount}</button>
           <button class="dlq-filter-btn" data-group="delinqType" onclick="dlqApplyFilter('delinqType','변동관리비',this)">변동관리비 ${byunCount}</button>
+          <button class="dlq-filter-btn" data-group="delinqType" onclick="dlqApplyFilter('delinqType','기타계약금',this)">기타계약금 ${d4 ? (d4.etcCount||0) : 0}</button>
+          <button class="dlq-filter-btn" data-group="delinqType" onclick="dlqApplyFilter('delinqType','계약보증금',this)">계약보증금 ${d4 ? (d4.depCount||0) : 0}</button>
         </div>
         <div class="dlq-filter-group">
           <span class="dlq-filter-label">연체일수</span>
