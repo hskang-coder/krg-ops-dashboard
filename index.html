@@ -4559,12 +4559,30 @@ function renderContractRecord(c, payments, responses = []) {
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">임대료 연체</span><span class="cr-delinq-row-val ${delinqRent>0?'red':''}">${fmtMoney(delinqRent)}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">수수료 연체</span><span class="cr-delinq-row-val ${delinqFee>0?'red':''}">${fmtMoney(delinqFee)}</span></div>
           ${(function(){
-            // [v274] 기타 = 퇴실정산 + 기타계약금 + 계약보증금 (3종 합산)
+            // [v275] 기타 = 퇴실정산 + 기타계약금 + 계약보증금 (3종 합산)
+            //   소스 1: window._delinqAmtMap (gid=418937767 BC/BE/BF/BH 컬럼) — 연체관리 방문 후 채워짐
+            //   소스 2: paymentRawData에서 키워드 매칭 (청구서명·납부종류) — 항상 사용 가능
+            //   → 두 소스 max 값 사용 (중복 카운트 방지)
             var cnoKey = String(c['계약번호']||'').trim();
             var amtRec = (window._delinqAmtMap && cnoKey) ? (window._delinqAmtMap[cnoKey] || {}) : {};
-            var etcAmt = amtRec.etc || 0;   // 기타계약금 (gid=418937767 BF/BH)
-            var depAmt = amtRec.dep || 0;   // 계약보증금 (gid=418937767 BC/BE)
+            var etcFromMap = amtRec.etc || 0;
+            var depFromMap = amtRec.dep || 0;
+            var etcFromPay = sumDelinq('기타계약금');
+            var depFromPay = sumDelinq('계약보증금');
+            var etcAmt = Math.max(etcFromMap, etcFromPay);
+            var depAmt = Math.max(depFromMap, depFromPay);
             var etcAll = (delinqExit||0) + etcAmt + depAmt;
+            // 진단 로그 (1회 한정)
+            if (!window._dbgEtcLogged && cnoKey) {
+              window._dbgEtcLogged = true;
+              console.log('[v275] #' + cnoKey + ' 기타 연체 진단:',
+                '퇴실정산:', delinqExit,
+                '기타계약금(map):', etcFromMap, '(pay):', etcFromPay,
+                '계약보증금(map):', depFromMap, '(pay):', depFromPay,
+                '합계:', etcAll,
+                '_delinqAmtMap 존재:', !!window._delinqAmtMap,
+                'amtMap 항목수:', window._delinqAmtMap ? Object.keys(window._delinqAmtMap).length : 0);
+            }
             return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">기타 (퇴실정산·기타계약금·계약보증금)</span><span class="cr-delinq-row-val ' + (etcAll>0?'red':'') + '">' + fmtMoney(etcAll) + '</span></div>';
           })()}
         </div>
