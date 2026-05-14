@@ -8283,7 +8283,7 @@ function cG_parsePdfText(text){
   var landlordSec = section(/임대인\s*정보/, new RegExp('(?:임대인\\s*)?계좌\\s*(?:정보|계좌)|' + TENANT_OR_CO_END_RE.source));
   if (landlordSec) {
     data.landlordName  = pickField(landlordSec, '이름').replace(/\s+/g, ' ').trim();
-    data.landlordPhone = pickIn(landlordSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
+    data.landlordPhone = pickIn(landlordSec, /연락처\s*[:：]?\s*(0\d{1,2}-?\d{3,4}-?\d{4})/);
     data.landlordAddr  = pickAddr(landlordSec);
   }
 
@@ -8299,7 +8299,7 @@ function cG_parsePdfText(text){
   var tenantSec = section(TENANT_HEAD_RE, new RegExp('긴급\\s*연락처|비상\\s*연락(?:망|처)|' + CO_HEAD_RE.source));
   if (tenantSec) {
     data.tenantName  = pickField(tenantSec, '이름').replace(/\s+/g, ' ').trim();
-    data.tenantPhone = pickIn(tenantSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
+    data.tenantPhone = pickIn(tenantSec, /연락처\s*[:：]?\s*(0\d{1,2}-?\d{3,4}-?\d{4})/);
     data.tenantIdNo  = pickIn(tenantSec, /주민(?:등록)?번호[^\n:：]*[:：]\s*(\d{6}\s*[-–]\s*\d{1,7})/).replace(/\s+/g,'').replace(/–/g,'-');
     data.nationality = pickField(tenantSec, '국적').replace(/\s+/g, ' ').trim();
     data.tenantAddr  = pickAddr(tenantSec);
@@ -8336,7 +8336,7 @@ function cG_parsePdfText(text){
   var coSec = section(CO_HEAD_RE, null);
   if (coSec) {
     data.coName  = pickField(coSec, '이름').replace(/\s+/g, ' ').trim();
-    data.coPhone = pickIn(coSec, /연락처\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
+    data.coPhone = pickIn(coSec, /연락처\s*[:：]?\s*(0\d{1,2}-?\d{3,4}-?\d{4})/);
     data.coIdNo  = pickIn(coSec, /주민(?:등록)?번호[^\n:：]*[:：]\s*(\d{6}\s*[-–]\s*\d{1,7})/).replace(/\s+/g,'').replace(/–/g,'-');
     data.coAddr  = pickAddr(coSec);
   }
