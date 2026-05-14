@@ -5458,6 +5458,50 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
   };
 }
 
+// [v278] 절대 안전 통합 날짜 파서 — 어떤 형식이 와도 처리
+//   지원: Date 객체 / gviz "Date(Y,M,D)" / ISO / YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD /
+//         YYYY년MM월DD일 (공백 포함 모든 변형) / Sheets 직렬숫자 / 일반 Date.parse
+//   실패 시 null (호출부에서 원본 텍스트 폴백 처리)
+function _parseAnyDateCell(cell) {
+  if (cell == null) return null;
+  // Cell 객체일 수도 있고 raw value일 수도 있음
+  var raw = (typeof cell === 'object' && (cell.v !== undefined || cell.f !== undefined))
+    ? (cell.v != null ? cell.v : cell.f)
+    : cell;
+  if (raw == null || raw === '') return null;
+  if (raw instanceof Date) return isNaN(raw.getTime()) ? null : new Date(raw);
+  var s = String(raw).trim();
+  if (!s || s === '-') return null;
+  // 1) gviz Date(YYYY,M,D[,h,m,s]) — month는 0-indexed
+  var m1 = s.match(/^Date\((\d+),(\d+),(\d+)/i);
+  if (m1) {
+    var d1 = new Date(+m1[1], +m1[2], +m1[3]);
+    if (!isNaN(d1.getTime())) return d1;
+  }
+  // 2) ISO/표준 YYYY-MM-DD (T시간 포함 가능) — 1-indexed
+  var m2 = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m2) {
+    var d2 = new Date(+m2[1], +m2[2]-1, +m2[3]);
+    if (!isNaN(d2.getTime())) return d2;
+  }
+  // 3) 슬래시/점/한글 — 모든 구분자(공백 포함)
+  var m3 = s.match(/(\d{4})[\/\-\.년\s]+(\d{1,2})[\/\-\.월\s]+(\d{1,2})/);
+  if (m3) {
+    var d3 = new Date(+m3[1], +m3[2]-1, +m3[3]);
+    if (!isNaN(d3.getTime())) return d3;
+  }
+  // 4) Sheets 직렬숫자 (Excel 기준, 1899-12-30 epoch)
+  var n = parseFloat(s);
+  if (!isNaN(n) && n > 25569 && n < 100000 && /^[\d.]+$/.test(s)) {
+    var d4 = new Date((n - 25569) * 86400000);
+    if (!isNaN(d4.getTime())) return d4;
+  }
+  // 5) 마지막 fallback — Date.parse
+  var t = Date.parse(s);
+  if (!isNaN(t)) return new Date(t);
+  return null;
+}
+
 // gid=554798125 → 납부예정일 현황 (C열)
 function parseDailyForPayDate(resp, delinqRows) {
   // delinqRows: gid=1953907648에서 k=정상, bp=연체인 계약 목록
@@ -5477,6 +5521,8 @@ function parseDailyForPayDate(resp, delinqRows) {
 
   // 연체 계약번호 set 구성
   const delinqSet = new Set((delinqRows || []).map(r => String(r.cno).replace(/\.0$/,'').trim()));
+  // [v278] 진단 카운터 — 파싱 실패 케이스 추적
+  var _dbg_dateOk = 0, _dbg_dateFail = 0, _dbg_failSamples = [];
 
   const today = new Date();
   today.setHours(0,0,0,0);
@@ -5493,43 +5539,45 @@ function parseDailyForPayDate(resp, delinqRows) {
     const jobType = (jobTypeIdx_ >= 0 && c[jobTypeIdx_]) ? String(c[jobTypeIdx_].f ?? c[jobTypeIdx_].v ?? '').trim() : '';
     if (!ALLOWED_JOB.has(jobType)) return;
 
-    // [v242] 대응일 파싱 — 슬래시(/) / 하이픈(-) / 점(.) / 한글(년월일) 모든 구분자 지원
+    // [v278] 대응일 파싱 — 통합 파서 사용 (모든 형식 지원)
     const aCell = dateIdx_ >= 0 ? c[dateIdx_] : null;
-    let aDate = null;
-    if (aCell && (aCell.v != null || aCell.f)) {
-      const vRaw = String(aCell.v != null ? aCell.v : (aCell.f || ''));
-      const ma = vRaw.match(/Date\((\d+),(\d+),(\d+)\)/);
-      if (ma) aDate = new Date(+ma[1], +ma[2], +ma[3]);
-      if (!aDate) {
-        // [v242] 시트 포맷 "2025/ 4/ 4" 같은 슬래시+공백 포함 모든 구분자 매칭
-        const ma2 = vRaw.match(/(\d{4})[\/\-\.년\s]+(\d{1,2})[\/\-\.월\s]+(\d{1,2})/);
-        if (ma2) aDate = new Date(+ma2[1], +ma2[2]-1, +ma2[3]);
-      }
+    let aDate = _parseAnyDateCell(aCell);
+    // 진단 + 원본 텍스트 보존 (UI 표시용)
+    let aDateRaw = '';
+    if (aCell && (aCell.v != null || aCell.f != null)) {
+      aDateRaw = String(aCell.f != null ? aCell.f : aCell.v).trim();
     }
-    if (!aDate) return; // 대응일 없는 행 무시
+    if (aDate) { _dbg_dateOk++; }
+    else if (aDateRaw) {
+      _dbg_dateFail++;
+      if (_dbg_failSamples.length < 5) _dbg_failSamples.push(aDateRaw);
+    }
+    // [v278] 대응일 파싱 실패해도 행은 사용 — 정렬 키만 없을 뿐 표시는 가능
+    if (!aDate && !aDateRaw) return; // 진짜 빈 행만 무시
 
-    // 가장 최신 대응일 행만 유지
+    // 가장 최신 대응일 행만 유지 (날짜 비교 가능한 경우)
     const prev = contractLatestRow[cno];
-    if (prev && prev.aDate && aDate < prev.aDate) return;
+    if (prev && prev.aDate && aDate && aDate < prev.aDate) return;
+    // 새 행이 날짜 없는데 기존에 날짜 있으면 기존 유지
+    if (prev && prev.aDate && !aDate) return;
 
-    // [v242] 입금예정일 파싱 — 슬래시(/) / 하이픈(-) / 점(.) / 한글(년월일) 모든 구분자 지원
+    // [v278] 입금예정일 파싱 — 통합 파서
     const dateCell = payDateIdx_ >= 0 ? c[payDateIdx_] : null;
-    let payDate = null;
-    if (dateCell && (dateCell.v != null || dateCell.f)) {
-      const vStr = String(dateCell.v != null ? dateCell.v : (dateCell.f || ''));
-      const m1 = vStr.match(/Date\((\d+),(\d+),(\d+)\)/);
-      if (m1) payDate = new Date(+m1[1], +m1[2], +m1[3]);
-      if (!payDate) {
-        const m2 = vStr.match(/(\d{4})[\/\-\.년\s]+(\d{1,2})[\/\-\.월\s]+(\d{1,2})/);
-        if (m2) payDate = new Date(+m2[1], +m2[2]-1, +m2[3]);
-      }
+    let payDate = _parseAnyDateCell(dateCell);
+    let payDateRaw = '';
+    if (dateCell && (dateCell.v != null || dateCell.f != null)) {
+      payDateRaw = String(dateCell.f != null ? dateCell.f : dateCell.v).trim();
     }
 
     // 대응내용 — 같은 행에서 (헤더 매핑된 인덱스)
     const content = (contentIdx_ >= 0 && c[contentIdx_]) ? String(c[contentIdx_].f || c[contentIdx_].v || '') : '';
 
-    contractLatestRow[cno] = { aDate, payDate, content };
+    contractLatestRow[cno] = { aDate, aDateRaw, payDate, payDateRaw, content };
   });
+  // [v278] 진단 로그 — 파싱 실패 케이스 추적 (개발자 콘솔에서 확인 가능)
+  if (_dbg_dateFail > 0) {
+    console.warn('[v278 parseDailyForPayDate] 대응일 파싱 실패:', _dbg_dateFail, '건 / 성공:', _dbg_dateOk, '건 / 실패 샘플:', _dbg_failSamples);
+  }
 
   // 지남/오늘/미도래 카운팅 + payDateMap 생성
   let past=0, todayCount=0, future=0;
@@ -5537,7 +5585,9 @@ function parseDailyForPayDate(resp, delinqRows) {
   delinqSet.forEach(cno => {
     const entry = contractLatestRow[cno];
     const aDate = entry ? entry.aDate : null;
+    const aDateRaw = entry ? (entry.aDateRaw || '') : '';
     const d     = entry ? entry.payDate : null;
+    const dRaw  = entry ? (entry.payDateRaw || '') : '';
     const content = entry ? entry.content : '-';
     let dateStr = '-', payStatus = null;
     if (d) {
@@ -5548,6 +5598,10 @@ function parseDailyForPayDate(resp, delinqRows) {
       if (d.getTime() < todayTime)      { payStatus = 'past';   past++; }
       else if (d.getTime() === todayTime){ payStatus = 'today';  todayCount++; }
       else                               { payStatus = 'future'; future++; }
+    } else if (dRaw) {
+      // [v278] 입금예정일 파싱 실패했지만 원본 값 있음 → 원본 그대로 표시 (정렬은 안 되지만 정보 보존)
+      dateStr = dRaw;
+      payStatus = 'unknown';
     } else if (entry) {
       // 대응일은 있지만 입금예정일이 비어있음 → 긴급대응필요
       dateStr = '긴급대응필요';
@@ -5558,6 +5612,9 @@ function parseDailyForPayDate(resp, delinqRows) {
       const am = String(aDate.getMonth()+1).padStart(2,'0');
       const ad = String(aDate.getDate()).padStart(2,'0');
       actionDateStr = `${aDate.getFullYear()}.${am}.${ad}`;
+    } else if (aDateRaw) {
+      // [v278] 대응일 파싱 실패해도 원본 텍스트 표시 (─ 표시 방지)
+      actionDateStr = aDateRaw;
     }
     payDateMap[cno] = { dateStr, payStatus, content, actionDateStr };
   });
