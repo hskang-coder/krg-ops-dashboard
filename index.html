@@ -4458,13 +4458,27 @@ function renderContractRecord(c, payments, responses = []) {
     const s = String(p['납부상태']||'').trim();
     return s === '연체중' || s === '분납중';
   };
+  // [v269] 미납 금액 컬럼 — 신/구 헤더 모두 자동 인식 (직접 후보 + 키워드 자동 탐색)
+  const _unpaidAmt = (p) => {
+    var direct = p['미납(연체)금액(원)'] || p['미납'] || p['미납액'] || p['미납금액']
+               || p['미수금'] || p['미수액'] || p['미납(원)'] || p['연체금액'] || p['잔액'];
+    if (direct) return parseSafeMoney(direct);
+    for (var k in p) {
+      if (!p.hasOwnProperty(k)) continue;
+      if (/(미납|연체금|잔액|미수)/.test(k) && !/(납부|예정|회차|일수|율|상태|종류)/.test(k)) {
+        var n = parseSafeMoney(p[k]);
+        if (n > 0) return n;
+      }
+    }
+    return 0;
+  };
   const sumDelinq = (keyword, exclude) => payments
     .filter(p => isDelinqStatus(p))
     .filter(p => {
       const nm = String(p['청구서명']||p['납부종류']||'');
       return nm.includes(keyword) && (!exclude || !nm.includes(exclude));
     })
-    .reduce((acc, p) => acc + parseSafeMoney(p['미납(연체)금액(원)']), 0); // [v244]
+    .reduce((acc, p) => acc + _unpaidAmt(p), 0);
 
   const delinqRent    = sumDelinq('임대료', '수수료');
   const delinqFee     = sumDelinq('수수료');
@@ -4485,7 +4499,7 @@ function renderContractRecord(c, payments, responses = []) {
     if (fromStatus > 0) return fromStatus;
     // 미납금액 기준 fallback
     const fromUnpaid = payments
-      .filter(p => parseSafeMoney(p['미납(연체)금액(원)']) > 0) // [v244]
+      .filter(p => _unpaidAmt(p) > 0) // [v269] 다중 헤더 매칭
       .reduce((max, p) => Math.max(max, parseInt(p['연체일수']||0)), 0);
     return fromUnpaid;
   })();
@@ -4536,7 +4550,7 @@ function renderContractRecord(c, payments, responses = []) {
   });
   const detailRows = sortedPayments.map(p => {
     const status = String(p['납부상태']||'').trim();
-    const unpaid = parseSafeMoney(p['미납(연체)금액(원)']); // [v244]
+    const unpaid = _unpaidAmt(p); // [v269] 다중 헤더 매칭
     const dueStr = String(p['납기일']||'').trim();
     const dueDate = dueStr ? parseKorDate(dueStr) : null;
     const todayD = new Date(); todayD.setHours(0,0,0,0);
