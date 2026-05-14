@@ -4458,10 +4458,39 @@ function renderContractRecord(c, payments, responses = []) {
     const s = String(p['납부상태']||'').trim();
     return s === '연체중' || s === '분납중';
   };
-  // [v266] 미납 금액 컬럼 — 시트 헤더 변형(미납 / 미납(연체)금액(원) / 미납액 등) 모두 대응
-  const _unpaidAmt = (p) => parseSafeMoney(
-    p['미납(연체)금액(원)'] || p['미납'] || p['미납액'] || p['미수금'] || p['미수액'] || p['미납(원)'] || 0
-  );
+  // [v267] 미납 금액 컬럼 — 시트 헤더 변형 모두 대응 + 자동 키 탐지(미납/연체/잔액 키워드 포함)
+  const _unpaidAmt = (p) => {
+    var direct = p['미납(연체)금액(원)'] || p['미납'] || p['미납액'] || p['미수금'] || p['미수액'] || p['미납(원)'] || p['미납금액'] || p['연체금액'] || p['잔액'];
+    if (direct) return parseSafeMoney(direct);
+    // 폴백: 미납/연체/잔액 키워드 포함하는 컬럼 자동 탐색 (납부금액·납부예정 등 제외)
+    for (var k in p) {
+      if (!p.hasOwnProperty(k)) continue;
+      if (/(미납|연체금|잔액|미수)/.test(k) && !/(납부|예정|회차|일수|율)/.test(k)) {
+        var n = parseSafeMoney(p[k]);
+        if (n > 0) return n;
+      }
+    }
+    return 0;
+  };
+  // [v267] 진단: 검색 상세 진입 시 첫 1회 한정으로 paymentRawData 컬럼 키 출력
+  if (!window._dbgPayKeysLogged && payments && payments.length > 0) {
+    window._dbgPayKeysLogged = true;
+    var sample = payments[0];
+    console.group('[v267] 검색 상세 진단 — paymentRawData 첫 행 키/값');
+    console.log('계약번호:', String(c['계약번호']||''));
+    console.log('payments.length:', payments.length);
+    console.log('첫 행 키 목록:', Object.keys(sample));
+    console.log('첫 행 전체:', sample);
+    console.log('미납 후보 컬럼 값:');
+    ['미납(연체)금액(원)','미납','미납액','미납금액','미수금','미수액','미납(원)','연체금액','잔액'].forEach(function(k){
+      if (sample[k] !== undefined) console.log('  ' + k + ':', sample[k]);
+    });
+    console.log('납부상태 값:', sample['납부상태']);
+    console.log('납부종류 값:', sample['납부종류']);
+    console.log('청구서명 값:', sample['청구서명']);
+    console.log('연체중/분납중 행 수:', payments.filter(function(x){var s=String(x['납부상태']||'').trim();return s==='연체중'||s==='분납중';}).length);
+    console.groupEnd();
+  }
   const sumDelinq = (keyword, exclude) => payments
     .filter(p => isDelinqStatus(p))
     .filter(p => {
