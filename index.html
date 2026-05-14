@@ -4458,13 +4458,17 @@ function renderContractRecord(c, payments, responses = []) {
     const s = String(p['납부상태']||'').trim();
     return s === '연체중' || s === '분납중';
   };
+  // [v266] 미납 금액 컬럼 — 시트 헤더 변형(미납 / 미납(연체)금액(원) / 미납액 등) 모두 대응
+  const _unpaidAmt = (p) => parseSafeMoney(
+    p['미납(연체)금액(원)'] || p['미납'] || p['미납액'] || p['미수금'] || p['미수액'] || p['미납(원)'] || 0
+  );
   const sumDelinq = (keyword, exclude) => payments
     .filter(p => isDelinqStatus(p))
     .filter(p => {
       const nm = String(p['청구서명']||p['납부종류']||'');
       return nm.includes(keyword) && (!exclude || !nm.includes(exclude));
     })
-    .reduce((acc, p) => acc + parseSafeMoney(p['미납(연체)금액(원)']), 0); // [v244]
+    .reduce((acc, p) => acc + _unpaidAmt(p), 0);
 
   const delinqRent    = sumDelinq('임대료', '수수료');
   const delinqFee     = sumDelinq('수수료');
@@ -4485,7 +4489,7 @@ function renderContractRecord(c, payments, responses = []) {
     if (fromStatus > 0) return fromStatus;
     // 미납금액 기준 fallback
     const fromUnpaid = payments
-      .filter(p => parseSafeMoney(p['미납(연체)금액(원)']) > 0) // [v244]
+      .filter(p => _unpaidAmt(p) > 0) // [v266] 다중 헤더 매칭
       .reduce((max, p) => Math.max(max, parseInt(p['연체일수']||0)), 0);
     return fromUnpaid;
   })();
@@ -4536,7 +4540,7 @@ function renderContractRecord(c, payments, responses = []) {
   });
   const detailRows = sortedPayments.map(p => {
     const status = String(p['납부상태']||'').trim();
-    const unpaid = parseSafeMoney(p['미납(연체)금액(원)']); // [v244]
+    const unpaid = _unpaidAmt(p); // [v266] 다중 헤더 매칭
     const dueStr = String(p['납기일']||'').trim();
     const dueDate = dueStr ? parseKorDate(dueStr) : null;
     const todayD = new Date(); todayD.setHours(0,0,0,0);
