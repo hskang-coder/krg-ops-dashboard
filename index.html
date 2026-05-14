@@ -2433,7 +2433,7 @@ function searchContract() {
       String(r['계약지주소']||'').toLowerCase().includes(kw) ||
       String(r['건물명']||'').toLowerCase().includes(kw) ||
       String(r['임대인주소']||'').toLowerCase().includes(kw) ||
-      String(r['주소임(전)차인']||'').toLowerCase().includes(kw)
+      String(r['주소임차인']||'').toLowerCase().includes(kw)
     );
   }
 
@@ -8138,7 +8138,7 @@ function cG_parsePdfText(text){
   var fieldBreakRe = new RegExp('([^\\n])\\s+(' + FIELD_LABELS + ')\\s*(?:\\([^)]*\\))?\\s*(?=[:：])', 'g');
   text = text.replace(fieldBreakRe, '$1\n$2');
   // (b) 섹션 헤더 (10. 임(전)차인 정보 / 9. 계좌 정보 등 — 숫자.섹션 앞에 줄바꿈)
-  var SECTION_NAMES = '임대인\\s*정보|임(전)차인\\s*정보|공동\\s*임(전)차인|계좌\\s*정보|임대료|임대\\s*조건|특약사항|계약\\s*조건|임대차\\s*계약\\s*기간|계약\\s*기간';
+  var SECTION_NAMES = '임대인\\s*정보|(?:임|전)차인\\s*정보|공동\\s*(?:임|전)차인|계좌\\s*정보|임대료|임대\\s*조건|특약사항|계약\\s*조건|임대차\\s*계약\\s*기간|계약\\s*기간';
   var sectionBreakRe = new RegExp('([^\\n])\\s*(\\d{1,2}\\s*\\.?\\s*)?(' + SECTION_NAMES + ')', 'g');
   text = text.replace(sectionBreakRe, '$1\n$2$3');
   // ── 헬퍼 ──
@@ -8276,9 +8276,9 @@ function cG_parsePdfText(text){
   // [v249] 동일 의미의 명칭 변형 모두 지원
   //   - 전차인(첫째) = 임(전)차인 정보 / 전차인 정보 / 계약자 정보
   //   - 공동전차인(둘째) = 공동임(전)차인 / 공동전차인 / 공동명의인 / 공동계약자 / 공동임대차인
-  var TENANT_HEAD_RE = /(?:임(전)차인|전차인|계약자)\s*정보/;
-  var CO_HEAD_RE = /공동\s*(?:임(전)차인|전차인|명의인|계약자|임대차인)(?:\s*정보)?/;
-  var TENANT_OR_CO_END_RE = /(?:임(전)차인|전차인|계약자)\s*정보|공동\s*(?:임(전)차인|전차인|명의인|계약자|임대차인)/;
+  var TENANT_HEAD_RE = /(?:임차인|전차인|계약자)\s*정보/;
+  var CO_HEAD_RE = /공동\s*(?:임차인|전차인|명의인|계약자|임대차인)(?:\s*정보)?/;
+  var TENANT_OR_CO_END_RE = /(?:임차인|전차인|계약자)\s*정보|공동\s*(?:임차인|전차인|명의인|계약자|임대차인)/;
   // [v186] 8. 임대인 정보 — pickField 사용 (괄호 주석 무시)
   var landlordSec = section(/임대인\s*정보/, new RegExp('(?:임대인\\s*)?계좌\\s*(?:정보|계좌)|' + TENANT_OR_CO_END_RE.source));
   if (landlordSec) {
@@ -8306,7 +8306,7 @@ function cG_parsePdfText(text){
   }
 
   // [긴급연락처] 비상연락망(=긴급연락처) 서브섹션 — 관계/이름/연락처
-  var emergSec = section(/긴급\s*연락처|비상\s*연락(?:망|처)/, /공동\s*임(전)차인|임대\s*조건|^[가-힣\s]+정보/m);
+  var emergSec = section(/긴급\s*연락처|비상\s*연락(?:망|처)/, /공동\s*임차인|임대\s*조건|^[가-힣\s]+정보/m);
   if (emergSec) {
     // 1) 멀티라인 라벨 형식 — "관계 : 부 / 이름 : 홍길동 / 연락처 : 010-..."
     data.emergPhone = pickIn(emergSec, /(?:긴급\s*연락처|비상\s*연락(?:망|처)|연락처)\s*(?:\([^)]*\))?\s*[:：]?\s*(\d{2,3}-\d{3,4}-\d{4})/);
