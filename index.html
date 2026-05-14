@@ -4558,7 +4558,15 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-delinq-breakdown">
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">임대료 연체</span><span class="cr-delinq-row-val ${delinqRent>0?'red':''}">${fmtMoney(delinqRent)}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">수수료 연체</span><span class="cr-delinq-row-val ${delinqFee>0?'red':''}">${fmtMoney(delinqFee)}</span></div>
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">퇴실정산 연체</span><span class="cr-delinq-row-val ${delinqExit>0?'red':''}">${fmtMoney(delinqExit)}</span></div>
+          ${(function(){
+            // [v274] 기타 = 퇴실정산 + 기타계약금 + 계약보증금 (3종 합산)
+            var cnoKey = String(c['계약번호']||'').trim();
+            var amtRec = (window._delinqAmtMap && cnoKey) ? (window._delinqAmtMap[cnoKey] || {}) : {};
+            var etcAmt = amtRec.etc || 0;   // 기타계약금 (gid=418937767 BF/BH)
+            var depAmt = amtRec.dep || 0;   // 계약보증금 (gid=418937767 BC/BE)
+            var etcAll = (delinqExit||0) + etcAmt + depAmt;
+            return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">기타 (퇴실정산·기타계약금·계약보증금)</span><span class="cr-delinq-row-val ' + (etcAll>0?'red':'') + '">' + fmtMoney(etcAll) + '</span></div>';
+          })()}
         </div>
       </div>
       ${(function(){
@@ -5220,16 +5228,29 @@ function parseDelinqV3(resp) {
   const telIdx = findColIdx(labels, ['연락처','휴대폰'],   15);  // P
   const awIdx  = findColIdx(labels, ['임대료납부상태','임대료 납부상태','임대료'], 48);  // AW
   const azIdx  = findColIdx(labels, ['변동관리비납부상태','변동관리비 납부상태','변동관리비'], 51); // AZ
-  // [v271] 기타계약금(BC=54) + 계약보증금(BF=57) 컬럼 추가 — 윤재희 #50497 BF=연체 사례 기반
-  const bcIdx  = findColIdx(labels, ['기타계약금납부상태','기타계약금 납부상태','기타계약금'], 54);  // BC
-  const bfIdx  = findColIdx(labels, ['계약보증금납부상태','계약보증금 납부상태','계약보증금'], 57);  // BF
+  // [v274] 매핑 SWAP — 사용자 검증(#50497 BF=연체=기타계약금)에 맞춰 BC↔BF 교환
+  //   BC(54): 계약보증금 / BE(56): 금액
+  //   BF(57): 기타계약금 / BH(59): 금액
+  const bcIdx  = findColIdx(labels, ['계약보증금납부상태','계약보증금 납부상태','계약보증금'], 54);  // BC
+  const beIdx  = 56;  // BE 금액
+  const bfIdx  = findColIdx(labels, ['기타계약금납부상태','기타계약금 납부상태','기타계약금'], 57);  // BF
+  const bhIdx  = 59;  // BH 금액
   const bkIdx  = findColIdx(labels, ['계약상태'],          62);  // BK
   const imdaSet=new Set(), byunSet=new Set(), etcSet=new Set(), depSet=new Set(), totalSet=new Set();
+  // [v274] 계약번호별 금액 맵 (입주관리 검색 상세에서 활용)
+  const amtMap = {}; // cno → { etc, dep }
   let totalActive = 0;
   const delinqRowMap = {}; // cno → { nm, tel, delinqType }
   rows.forEach(row => {
     const c = row.c || [];
     const cellStr = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
+    const cellNum = i => {
+      if (i < 0 || !c[i]) return 0;
+      var raw = c[i].v != null ? c[i].v : c[i].f;
+      if (typeof raw === 'number') return raw;
+      var s = String(raw||'').replace(/[^0-9.\-]/g,'');
+      return parseFloat(s) || 0;
+    };
     const bk  = cellStr(bkIdx);
     const aw  = cellStr(awIdx);
     const az  = cellStr(azIdx);
@@ -5243,18 +5264,27 @@ function parseDelinqV3(resp) {
     totalActive++;
     if (aw === '연체') imdaSet.add(cno);
     if (az === '연체') byunSet.add(cno);
-    if (bc === '연체') etcSet.add(cno);
-    if (bf === '연체') depSet.add(cno);
+    // [v274] BC=계약보증금 / BF=기타계약금 (SWAP 적용)
+    if (bc === '연체') depSet.add(cno);
+    if (bf === '연체') etcSet.add(cno);
+    // 금액 추출 (연체 상태일 때만)
+    var depAmt = (bc === '연체') ? cellNum(beIdx) : 0;
+    var etcAmt = (bf === '연체') ? cellNum(bhIdx) : 0;
+    if (depAmt > 0 || etcAmt > 0) {
+      amtMap[cno] = { etc: etcAmt, dep: depAmt };
+    }
     if (aw === '연체' || az === '연체' || bc === '연체' || bf === '연체') {
       totalSet.add(cno);
       const types = [];
       if (aw === '연체') types.push('임대료');
       if (az === '연체') types.push('변동관리비');
-      if (bc === '연체') types.push('기타계약금');
-      if (bf === '연체') types.push('계약보증금');
+      if (bf === '연체') types.push('기타계약금');
+      if (bc === '연체') types.push('계약보증금');
       delinqRowMap[cno] = { nm, tel, delinqType: types.join('+') };
     }
   });
+  // [v274] 검색 상세 화면에서 사용 가능하도록 글로벌 노출
+  window._delinqAmtMap = amtMap;
   return {
     dlqCnoSet:    totalSet,
     imdaDlqSet:   imdaSet,
@@ -5267,7 +5297,8 @@ function parseDelinqV3(resp) {
     etcCount:     etcSet.size,
     depCount:     depSet.size,
     totalActive,
-    delinqRowMap
+    delinqRowMap,
+    amtMap
   };
 }
 
