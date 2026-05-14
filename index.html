@@ -9117,10 +9117,17 @@ function openIncomeReceiptModal(contractNo) {
   // [v277] 계약 종료일 디폴트 — vacancy.exitDate 우선, 없으면 contract['종료일']
   var vacInit = (window.vacancyRawData||vacancyRawData||[]).find(function(v){ return String(v.no||'').trim() === String(contractNo); });
   var exitInit = fmt((vacInit && vacInit.exitDate) || contract['종료일']) || '';
-  // 안전하게 빌딩+호수 표시 (NaN 방지)
-  var bldStr = String(contract['건물명']||'').trim();
-  var roomStr = String(contract['호수']||'').trim();
+  // [v279] 안전 표시 헬퍼 — NaN/undefined/null/빈값/문자열"NaN" 모두 제거
+  var _safe = function(v){
+    if (v == null) return '';
+    var s = String(v).trim();
+    if (!s || s === 'NaN' || s === 'undefined' || s === 'null' || s === '-') return '';
+    return s;
+  };
+  var bldStr = _safe(contract['건물명']);
+  var roomStr = _safe(contract['호수']);
   var subTitle = [bldStr, roomStr].filter(Boolean).join(' ');
+  var tenantStr = _safe(contract['임차인명']) || _safe(contract['임차인']) || '-';
 
   overlay.innerHTML = ''
     + '<div style="background:#fff;border-radius:10px;width:100%;max-width:520px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.15)">'
@@ -9131,7 +9138,7 @@ function openIncomeReceiptModal(contractNo) {
     +   '<div style="padding:16px 20px">'
     +     // 계약 정보
     +     '<div style="margin-bottom:14px;padding:8px 11px;background:#F8FAFC;border-left:3px solid #0F172A;border-radius:4px;font-size:12px;color:#334155">'
-    +       '<b>' + (contract['임차인명']||contract['임차인']||'-') + '</b> · 계약 #' + contractNo + (subTitle ? ' · ' + subTitle : '')
+    +       '<b>' + tenantStr + '</b> · 계약 #' + contractNo + (subTitle ? ' · ' + subTitle : '')
     +     '</div>'
     +     // 발행 용도
     +     '<div style="margin-bottom:12px">'
