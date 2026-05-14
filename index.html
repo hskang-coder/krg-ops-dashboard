@@ -9057,68 +9057,83 @@ function openIncomeReceiptModal(contractNo) {
   var overlay = document.createElement('div');
   overlay.id = 'crIncRcptModal';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  // [v277] 계약 종료일 디폴트 — vacancy.exitDate 우선, 없으면 contract['종료일']
+  var vacInit = (window.vacancyRawData||vacancyRawData||[]).find(function(v){ return String(v.no||'').trim() === String(contractNo); });
+  var exitInit = fmt((vacInit && vacInit.exitDate) || contract['종료일']) || '';
+  // 안전하게 빌딩+호수 표시 (NaN 방지)
+  var bldStr = String(contract['건물명']||'').trim();
+  var roomStr = String(contract['호수']||'').trim();
+  var subTitle = [bldStr, roomStr].filter(Boolean).join(' ');
+
   overlay.innerHTML = ''
-    + '<div style="background:#fff;border-radius:12px;width:100%;max-width:560px;overflow:hidden">'
-    +   '<div style="padding:14px 20px;background:linear-gradient(135deg,#059669,#10B981);color:#fff;display:flex;align-items:center;gap:10px">'
-    +     '<div style="font-size:18px;font-weight:800;flex:1">💰 납부증빙 발행</div>'
-    +     '<button onclick="closeIncomeReceiptModal()" style="background:rgba(255,255,255,.2);border:none;width:30px;height:30px;border-radius:50%;color:#fff;font-size:16px;cursor:pointer">✕</button>'
+    + '<div style="background:#fff;border-radius:10px;width:100%;max-width:520px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.15)">'
+    +   '<div style="padding:14px 18px;background:#0F172A;color:#fff;display:flex;align-items:center;gap:10px">'
+    +     '<div style="font-size:16px;font-weight:700;flex:1">💰 납부증빙 발행</div>'
+    +     '<button onclick="closeIncomeReceiptModal()" style="background:transparent;border:none;width:26px;height:26px;color:#fff;font-size:18px;cursor:pointer;opacity:.7">✕</button>'
     +   '</div>'
-    +   '<div style="padding:18px 20px">'
-    +     '<div style="margin-bottom:14px;padding:10px 12px;background:#F0FDF4;border-radius:8px;font-size:12px;color:#166534">'
-    +       '<b>' + (contract['임차인명']||contract['임차인']||'-') + '</b> · 계약 #' + contractNo + ' · ' + (contract['건물명']||'') + ' ' + (contract['호수']||'')
+    +   '<div style="padding:16px 20px">'
+    +     // 계약 정보
+    +     '<div style="margin-bottom:14px;padding:8px 11px;background:#F8FAFC;border-left:3px solid #0F172A;border-radius:4px;font-size:12px;color:#334155">'
+    +       '<b>' + (contract['임차인명']||contract['임차인']||'-') + '</b> · 계약 #' + contractNo + (subTitle ? ' · ' + subTitle : '')
     +     '</div>'
-    +     '<div style="margin-bottom:14px">'
-    +       '<label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px">📋 발행 용도 (필수)</label>'
-    +       '<div style="display:flex;gap:6px">'
-    +         '<label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid #10B981;border-radius:8px;background:#D1FAE5;cursor:pointer;font-weight:700;color:#065F46;font-size:12.5px">'
-    +           '<input type="radio" name="crIncRcptPurpose" id="crIncRcptP1" value="payment_confirm" checked onchange="cG_togglePurposeOptions()"> 📜 납부확인서'
-    +         '</label>'
-    +         '<label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid #DC2626;border-radius:8px;background:#FEE2E2;cursor:pointer;font-weight:700;color:#991B1B;font-size:12.5px">'
-    +           '<input type="radio" name="crIncRcptPurpose" id="crIncRcptP2" value="contract_close" onchange="cG_togglePurposeOptions()"> 📋 계약해지증명서'
-    +         '</label>'
-    +       '</div>'
-    +       '<div style="font-size:10.5px;color:#6B7280;margin-top:5px;line-height:1.5">'
-    +         '<b>📜 납부확인서</b>: 임차인 일반 납부 증빙용 (계약상태에 따라 문구 자동 분기)<br>'
-    +         '<b>📋 계약해지증명서</b>: 보증금 반환·분쟁 등 강력한 법적 증빙 (계약 종료 케이스만 권장)'
-    +       '</div>'
-    +     '</div>'
+    +     // 발행 용도
     +     '<div style="margin-bottom:12px">'
-    +       '<label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px">📅 발행 기간 (납기일 기준)</label>'
-    +       '<div style="display:flex;align-items:center;gap:8px">'
-    +         '<input type="date" id="crIncRcptFrom" value="' + startD + '" style="flex:1;padding:8px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px">'
-    +         '<span style="color:#6B7280">~</span>'
-    +         '<input type="date" id="crIncRcptTo" value="' + endD + '" style="flex:1;padding:8px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px">'
-    +       '</div>'
-    +     '</div>'
-    +     '<div style="margin-bottom:14px">'
-    +       '<label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px">💵 납부 종류 (다중선택)</label>'
+    +       '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:6px">발행 용도</label>'
     +       '<div style="display:flex;gap:6px">'
-    +         '<label style="flex:1;display:flex;align-items:center;gap:6px;padding:9px 12px;border:2px solid #10B981;border-radius:8px;background:#D1FAE5;cursor:pointer;font-weight:700;color:#065F46;font-size:12.5px"><input type="checkbox" id="crIncRcptT1" checked value="임대료"> 임대료</label>'
-    +         '<label style="flex:1;display:flex;align-items:center;gap:6px;padding:9px 12px;border:2px solid #3B82F6;border-radius:8px;background:#DBEAFE;cursor:pointer;font-weight:700;color:#1E40AF;font-size:12.5px"><input type="checkbox" id="crIncRcptT2" value="변동관리비"> 변동관리비</label>'
+    +         '<label class="cG_purposeOpt" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 10px;border:1.5px solid #10B981;border-radius:6px;background:#ECFDF5;cursor:pointer;font-weight:600;color:#065F46;font-size:12.5px">'
+    +           '<input type="radio" name="crIncRcptPurpose" id="crIncRcptP1" value="payment_confirm" checked onchange="cG_togglePurposeOptions()" style="accent-color:#10B981"> 📜 납부확인서'
+    +         '</label>'
+    +         '<label class="cG_purposeOpt" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 10px;border:1.5px solid #E5E7EB;border-radius:6px;background:#fff;cursor:pointer;font-weight:600;color:#6B7280;font-size:12.5px">'
+    +           '<input type="radio" name="crIncRcptPurpose" id="crIncRcptP2" value="contract_close" onchange="cG_togglePurposeOptions()" style="accent-color:#DC2626"> 📋 계약해지증명서'
+    +         '</label>'
     +       '</div>'
     +     '</div>'
-    +     // [v273] 계약해지증명서 전용 추가 옵션 (디폴트 hidden)
-    +     '<div id="crIncRcptCloseOpts" style="display:none;margin-bottom:14px;padding:12px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px">'
-    +       '<label style="font-size:12px;font-weight:700;color:#991B1B;display:block;margin-bottom:8px">⚙️ 해지 정산 항목 (해당사항 체크)</label>'
-    +       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;color:#7F1D1D">'
-    +         '<label style="display:flex;align-items:center;gap:6px;padding:6px;background:#fff;border:1px solid #FCA5A5;border-radius:5px;cursor:pointer"><input type="checkbox" id="crIncRcptOptDeposit"> 보증금 반환 완료</label>'
-    +         '<label style="display:flex;align-items:center;gap:6px;padding:6px;background:#fff;border:1px solid #FCA5A5;border-radius:5px;cursor:pointer"><input type="checkbox" id="crIncRcptOptRestore"> 원상회복 합의 완료</label>'
-    +         '<label style="display:flex;align-items:center;gap:6px;padding:6px;background:#fff;border:1px solid #FCA5A5;border-radius:5px;cursor:pointer"><input type="checkbox" id="crIncRcptOptPenalty"> 위약금/정산금 처리 완료</label>'
-    +         '<label style="display:flex;align-items:center;gap:6px;padding:6px;background:#fff;border:1px solid #FCA5A5;border-radius:5px;cursor:pointer"><input type="checkbox" id="crIncRcptOptKeyReturn"> 열쇠/명도 반환 완료</label>'
+    +     // 발행 기간
+    +     '<div style="margin-bottom:12px">'
+    +       '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:6px">발행 기간 (납기일 기준)</label>'
+    +       '<div style="display:flex;align-items:center;gap:8px">'
+    +         '<input type="date" id="crIncRcptFrom" value="' + startD + '" style="flex:1;padding:7px 9px;border:1px solid #CBD5E1;border-radius:5px;font-size:12.5px">'
+    +         '<span style="color:#94A3B8">~</span>'
+    +         '<input type="date" id="crIncRcptTo" value="' + endD + '" style="flex:1;padding:7px 9px;border:1px solid #CBD5E1;border-radius:5px;font-size:12.5px">'
     +       '</div>'
     +     '</div>'
-    +     '<div style="font-size:11px;color:#6B7280;margin-bottom:8px">※ 납기일 기준 기간 내 납부 완료된 건만 발행됩니다 (납부상태: 정상납부, 연체납부)</div>'
+    +     // 납부 종류
+    +     '<div style="margin-bottom:12px">'
+    +       '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:6px">납부 종류 (다중선택)</label>'
+    +       '<div style="display:flex;gap:6px">'
+    +         '<label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 10px;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:12.5px;color:#334155"><input type="checkbox" id="crIncRcptT1" checked value="임대료" style="accent-color:#10B981"> 임대료</label>'
+    +         '<label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 10px;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:12.5px;color:#334155"><input type="checkbox" id="crIncRcptT2" value="변동관리비" style="accent-color:#3B82F6"> 변동관리비</label>'
+    +       '</div>'
+    +     '</div>'
+    +     // [v277] 계약해지증명서 전용 — 종료일 + 정산 항목 (디폴트 hidden)
+    +     '<div id="crIncRcptCloseOpts" style="display:none;margin-bottom:12px;padding:11px;background:#FEF2F2;border:1px solid #FECACA;border-radius:6px">'
+    +       '<div style="margin-bottom:10px">'
+    +         '<label style="font-size:11.5px;font-weight:600;color:#991B1B;display:block;margin-bottom:5px">📅 계약 종료일 (수동 입력 가능)</label>'
+    +         '<input type="date" id="crIncRcptExitDate" value="' + exitInit + '" style="width:100%;padding:7px 9px;border:1px solid #FCA5A5;border-radius:5px;font-size:12.5px;background:#fff">'
+    +       '</div>'
+    +       '<div>'
+    +         '<label style="font-size:11.5px;font-weight:600;color:#991B1B;display:block;margin-bottom:5px">⚙️ 해지 정산 항목 (해당사항 체크)</label>'
+    +         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:12px;color:#7F1D1D">'
+    +           '<label style="display:flex;align-items:center;gap:5px;padding:5px 7px;background:#fff;border:1px solid #FECACA;border-radius:4px;cursor:pointer"><input type="checkbox" id="crIncRcptOptDeposit" style="accent-color:#DC2626"> 보증금 반환 완료</label>'
+    +           '<label style="display:flex;align-items:center;gap:5px;padding:5px 7px;background:#fff;border:1px solid #FECACA;border-radius:4px;cursor:pointer"><input type="checkbox" id="crIncRcptOptRestore" style="accent-color:#DC2626"> 원상회복 합의 완료</label>'
+    +           '<label style="display:flex;align-items:center;gap:5px;padding:5px 7px;background:#fff;border:1px solid #FECACA;border-radius:4px;cursor:pointer"><input type="checkbox" id="crIncRcptOptPenalty" style="accent-color:#DC2626"> 위약금/정산금 처리 완료</label>'
+    +           '<label style="display:flex;align-items:center;gap:5px;padding:5px 7px;background:#fff;border:1px solid #FECACA;border-radius:4px;cursor:pointer"><input type="checkbox" id="crIncRcptOptKeyReturn" style="accent-color:#DC2626"> 열쇠/명도 반환 완료</label>'
+    +         '</div>'
+    +       '</div>'
+    +     '</div>'
+    +     '<div style="font-size:10.5px;color:#94A3B8">※ 납기일 기준 기간 내 납부 완료된 건만 발행됩니다 (납부상태: 정상납부, 연체납부)</div>'
     +   '</div>'
-    +   '<div style="padding:12px 20px;background:#F9FAFB;border-top:1px solid #E5E7EB;display:flex;gap:8px">'
-    +     '<button onclick="closeIncomeReceiptModal()" style="background:#FFF;color:#6B7280;border:1px solid #D1D5DB;padding:9px 16px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;margin-left:auto">취소</button>'
-    +     '<button id="crIncRcptGenBtn" onclick="generateIncomeReceipt(\'' + contractNo + '\')" style="background:#059669;color:#fff;border:none;padding:9px 18px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">📄 납부확인서 생성</button>'
+    +   '<div style="padding:11px 18px;background:#F8FAFC;border-top:1px solid #E2E8F0;display:flex;gap:6px">'
+    +     '<button onclick="closeIncomeReceiptModal()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:8px 14px;border-radius:5px;font-size:12.5px;font-weight:600;cursor:pointer;margin-left:auto">취소</button>'
+    +     '<button id="crIncRcptGenBtn" onclick="generateIncomeReceipt(\'' + contractNo + '\')" style="background:#10B981;color:#fff;border:none;padding:8px 16px;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer">📄 납부확인서 생성</button>'
     +   '</div>'
     + '</div>';
   document.body.appendChild(overlay);
 }
 
-// [v273] 발행 용도 변경 시 추가 옵션 토글 + 버튼 라벨 업데이트
+// [v277] 발행 용도 변경 시 추가 옵션 토글 + 버튼 라벨 + 라디오 라벨 활성/비활성 스타일
 function cG_togglePurposeOptions(){
+  var p1 = document.getElementById('crIncRcptP1');
   var p2 = document.getElementById('crIncRcptP2');
   var opts = document.getElementById('crIncRcptCloseOpts');
   var btn = document.getElementById('crIncRcptGenBtn');
@@ -9126,7 +9141,20 @@ function cG_togglePurposeOptions(){
   var isClose = p2.checked;
   opts.style.display = isClose ? 'block' : 'none';
   btn.textContent = isClose ? '📋 계약해지증명서 생성' : '📄 납부확인서 생성';
-  btn.style.background = isClose ? '#DC2626' : '#059669';
+  btn.style.background = isClose ? '#DC2626' : '#10B981';
+  // 라디오 라벨 active 스타일 토글
+  if (p1 && p1.parentElement) {
+    var l1 = p1.parentElement;
+    l1.style.borderColor = isClose ? '#E5E7EB' : '#10B981';
+    l1.style.background  = isClose ? '#fff' : '#ECFDF5';
+    l1.style.color       = isClose ? '#6B7280' : '#065F46';
+  }
+  if (p2 && p2.parentElement) {
+    var l2 = p2.parentElement;
+    l2.style.borderColor = isClose ? '#DC2626' : '#E5E7EB';
+    l2.style.background  = isClose ? '#FEF2F2' : '#fff';
+    l2.style.color       = isClose ? '#991B1B' : '#6B7280';
+  }
 }
 function closeIncomeReceiptModal(){ var m = document.getElementById('crIncRcptModal'); if (m) m.remove(); }
 
@@ -9148,6 +9176,8 @@ function generateIncomeReceipt(contractNo){
     penalty:   !!(document.getElementById('crIncRcptOptPenalty')||{}).checked,
     keyReturn: !!(document.getElementById('crIncRcptOptKeyReturn')||{}).checked
   };
+  // [v277] 사용자 수동 입력 종료일 (계약해지증명서 전용)
+  var manualExitDate = (document.getElementById('crIncRcptExitDate')||{}).value || '';
 
   var contract = (contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim() === String(contractNo); });
   if (!contract) { alert('계약 데이터 없음'); return; }
@@ -9326,8 +9356,10 @@ function generateIncomeReceipt(contractNo){
     var lastRow = rows[rows.length-1];
     lastPaidDateStr = fmtKr(lastRow['납부일'] || lastRow['납기일']);
   }
-  // 종료일 (vacancy.exitDate 우선, 없으면 contract['종료일'])
-  var exitDateStr = (vac && vac.exitDate) ? fmtKr(vac.exitDate) : fmtKr(contract['종료일']);
+  // [v277] 종료일 — 사용자 수동 입력값 우선, 없으면 vacancy.exitDate, 없으면 contract['종료일']
+  var exitDateStr = manualExitDate
+    ? fmtKr(manualExitDate)
+    : ((vac && vac.exitDate) ? fmtKr(vac.exitDate) : fmtKr(contract['종료일']));
 
   // 본문 declaration 동적 생성
   var declarationHtml = '';
