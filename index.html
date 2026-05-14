@@ -1007,10 +1007,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         <button class="refresh-btn" id="refreshContractsBtn" onclick="refreshContractsOnly()" style="margin-left:6px;background:#7C3AED;min-width:140px;text-align:center" title="계약·공실 데이터만 다시 받습니다 (캐시 무력화)">📑 계약정보갱신</button>
         <!-- [v220] 미러 시트 수동 동기화 — 마스터(1Z3w9ZhK...) → 미러(1fhp2DBul...) 즉시 복사 -->
         <button class="refresh-btn" id="syncMirrorBtn" onclick="syncMirrorNow()" style="margin-left:6px;background:#0EA5E9;min-width:140px;text-align:center" title="마스터 → 미러 시트 즉시 동기화 (Apps Script 호출)">🔁 미러동기화</button>
-        <!-- [v265] 연체정보 수동 갱신 — gid=1785963369 → gid=418937767 + gid=131074722 (15분 자동 동기화 없음, 클릭 전용) -->
-        <button class="refresh-btn" id="syncDlqBtn" onclick="syncDlqSheetsNow()" style="margin-left:6px;background:#F59E0B;min-width:140px;text-align:center" title="연체정보 수동 갱신 (gid=1785963369 → 418937767, 131074722) — 하루 1회 클릭 권장">📊 연체정보갱신</button>
+        <!-- [v270] 연체정보갱신 버튼 제거 (gid=131074722 1행 메타 오염 이슈로 사용자 요청에 의해 삭제) -->
         <span id="refreshContractsStatus" style="margin-left:8px;font-size:11px;color:#6B7280;font-weight:500;display:none"></span>
-        <span id="syncDlqStatus" style="margin-left:8px;font-size:11px;color:#6B7280;font-weight:500;display:none"></span>
       </div>
     </div>
   </div>
@@ -2200,95 +2198,8 @@ function syncMirrorNow(){
   document.body.appendChild(script);
 }
 
-// [v264] 연체데이터 수동 동기화 — gid=1785963369 → gid=418937767 + gid=131074722
-//   ※ 15분 자동 동기화 없음(클릭 전용)
-//   ※ 기존 syncMirrorNow / 미러 동기화와 완전 독립 (별도 버튼, 별도 status, 별도 action)
-//   ※ Apps Script(CK_API_URL)에 'action=sync_dlq' 핸들러 필요 (사용자가 별도 추가)
-function syncDlqSheetsNow(){
-  var btn = document.getElementById('syncDlqBtn');
-  var statusEl = document.getElementById('syncDlqStatus');
-  var orig = btn ? btn.textContent : '';
-  if (typeof CK_API_URL === 'undefined' || !CK_API_URL) {
-    alert('Apps Script API URL이 설정되지 않았습니다.');
-    return;
-  }
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 동기화 중...'; }
-  if (statusEl) {
-    statusEl.style.display = 'inline';
-    statusEl.style.color = '#F59E0B';
-    statusEl.textContent = '⏳ 연체데이터 동기화 중... (10~30초 소요)';
-  }
-
-  var cb = 'syncdlq_cb_' + Date.now();
-  var timer = null;
-  var cleanup = function(){
-    try { delete window[cb]; } catch(_){}
-    var s = document.getElementById('syncdlq-jsonp-' + cb);
-    if (s && s.parentNode) s.parentNode.removeChild(s);
-    if (timer) { clearTimeout(timer); timer = null; }
-  };
-
-  window[cb] = function(resp){
-    cleanup();
-    if (btn) { btn.disabled = false; btn.textContent = orig; }
-    var ts = new Date();
-    var pad = function(n){ return n<10 ? '0'+n : ''+n; };
-    var hms = pad(ts.getHours()) + ':' + pad(ts.getMinutes()) + ':' + pad(ts.getSeconds());
-    console.log('[v264 syncDlq] 응답:', resp);
-    if (resp && resp.ok === true) {
-      if (statusEl) {
-        statusEl.style.color = '#059669';
-        var rows = resp.srcRows != null ? (' · ' + resp.srcRows + '행') : '';
-        var cols = resp.cols    != null ? (' × ' + resp.cols + '열') : '';
-        statusEl.textContent = '⏱ ' + hms + ' 🟢 연체데이터 동기화 OK' + rows + cols;
-      }
-      // 연체관리 캐시 무효화 (다음 진입 시 새 데이터로 재로드)
-      try {
-        window._dlqRawCache = null;
-        Object.keys(localStorage).forEach(function(k){
-          if (k.indexOf('krg_sum_cache_') === 0) localStorage.removeItem(k);
-        });
-      } catch(_){}
-    } else {
-      var diag = '';
-      if (!resp) diag = '응답 없음';
-      else if (typeof resp !== 'object') diag = '응답 타입 오류 (' + typeof resp + ')';
-      else if (resp.msg) diag = resp.msg;
-      else if (resp.ok === false) diag = '동기화 실패 (Apps Script 로그 확인)';
-      else diag = 'Apps Script에 action=sync_dlq 핸들러 추가 필요 (응답 키: ' + Object.keys(resp).slice(0,3).join(',') + ')';
-      if (statusEl) {
-        statusEl.style.color = '#DC2626';
-        statusEl.textContent = '⏱ ' + hms + ' ⚠ ' + diag;
-      }
-    }
-  };
-
-  // 60초 타임아웃
-  timer = setTimeout(function(){
-    if (window[cb]) {
-      cleanup();
-      if (btn) { btn.disabled = false; btn.textContent = orig; }
-      if (statusEl) {
-        statusEl.style.color = '#DC2626';
-        statusEl.textContent = '⚠ 동기화 타임아웃 (60초) — Apps Script 로그 확인';
-      }
-    }
-  }, 60000);
-
-  var url = CK_API_URL + '?action=sync_dlq&callback=' + cb + '&_t=' + Date.now();
-  var script = document.createElement('script');
-  script.id = 'syncdlq-jsonp-' + cb;
-  script.src = url;
-  script.onerror = function(){
-    cleanup();
-    if (btn) { btn.disabled = false; btn.textContent = orig; }
-    if (statusEl) {
-      statusEl.style.color = '#DC2626';
-      statusEl.textContent = '⚠ Apps Script 호출 실패 — 네트워크 또는 권한 확인';
-    }
-  };
-  document.body.appendChild(script);
-}
+// [v270] syncDlqSheetsNow 함수 제거 — 연체정보갱신 버튼 삭제와 함께 제거
+//   (gid=131074722 1행 메타 오염 이슈로 사용자 요청에 의해 사용 중단)
 
 async function loadContractData() {
   const el = document.getElementById('crResult');
