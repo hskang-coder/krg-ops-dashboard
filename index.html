@@ -4394,7 +4394,13 @@ function renderContractRecord(c, payments, responses = []) {
   const delinqRent    = sumDelinq('임대료', '수수료');
   const delinqFee     = sumDelinq('수수료');
   const delinqExit    = sumDelinq('퇴실정산');
-  const delinqTotal   = delinqRent + delinqFee + delinqExit;
+  // [v276] 총 연체 = 모든 연체중/분납중 행의 미납 합계 (잔액 방식)
+  //   장점: 임대료/수수료/퇴실정산 외 기타계약금/계약보증금 등 모든 종류 포함
+  //   #50497 윤재희: row 15 "보증금(5..." ₩150,000 연체중 → 자동 합산
+  const delinqAllSum = (payments||[])
+    .filter(function(p){ return isDelinqStatus(p); })
+    .reduce(function(acc, p){ return acc + _unpaidAmt(p); }, 0);
+  const delinqTotal   = delinqAllSum;
   const hasDelinq     = delinqTotal > 0;
 
   // 현재 연체중 항목의 최장 연체일
@@ -4559,30 +4565,11 @@ function renderContractRecord(c, payments, responses = []) {
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">임대료 연체</span><span class="cr-delinq-row-val ${delinqRent>0?'red':''}">${fmtMoney(delinqRent)}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">수수료 연체</span><span class="cr-delinq-row-val ${delinqFee>0?'red':''}">${fmtMoney(delinqFee)}</span></div>
           ${(function(){
-            // [v275] 기타 = 퇴실정산 + 기타계약금 + 계약보증금 (3종 합산)
-            //   소스 1: window._delinqAmtMap (gid=418937767 BC/BE/BF/BH 컬럼) — 연체관리 방문 후 채워짐
-            //   소스 2: paymentRawData에서 키워드 매칭 (청구서명·납부종류) — 항상 사용 가능
-            //   → 두 소스 max 값 사용 (중복 카운트 방지)
-            var cnoKey = String(c['계약번호']||'').trim();
-            var amtRec = (window._delinqAmtMap && cnoKey) ? (window._delinqAmtMap[cnoKey] || {}) : {};
-            var etcFromMap = amtRec.etc || 0;
-            var depFromMap = amtRec.dep || 0;
-            var etcFromPay = sumDelinq('기타계약금');
-            var depFromPay = sumDelinq('계약보증금');
-            var etcAmt = Math.max(etcFromMap, etcFromPay);
-            var depAmt = Math.max(depFromMap, depFromPay);
-            var etcAll = (delinqExit||0) + etcAmt + depAmt;
-            // 진단 로그 (1회 한정)
-            if (!window._dbgEtcLogged && cnoKey) {
-              window._dbgEtcLogged = true;
-              console.log('[v275] #' + cnoKey + ' 기타 연체 진단:',
-                '퇴실정산:', delinqExit,
-                '기타계약금(map):', etcFromMap, '(pay):', etcFromPay,
-                '계약보증금(map):', depFromMap, '(pay):', depFromPay,
-                '합계:', etcAll,
-                '_delinqAmtMap 존재:', !!window._delinqAmtMap,
-                'amtMap 항목수:', window._delinqAmtMap ? Object.keys(window._delinqAmtMap).length : 0);
-            }
+            // [v276] 기타 = 잔액 방식 (전체 연체중 미납 - 임대료 - 수수료)
+            //   장점: 키워드 매칭 의존 X → 청구서명/납부종류 변형(보증금/기타계약/퇴실정산 등) 모두 자동 포함
+            //   사용자 데이터 검증: #50497 row 15 → 청구서명="보증금(5..." 미납=150,000 연체중
+            //                       → delinqTotal=150,000, delinqRent=0, delinqFee=0 → 기타=150,000 ✓
+            var etcAll = Math.max(0, (delinqTotal||0) - (delinqRent||0) - (delinqFee||0));
             return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">기타 (퇴실정산·기타계약금·계약보증금)</span><span class="cr-delinq-row-val ' + (etcAll>0?'red':'') + '">' + fmtMoney(etcAll) + '</span></div>';
           })()}
         </div>
