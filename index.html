@@ -1934,6 +1934,7 @@ function parseVacancySheet(resp) {
   const startDateIdx   = findColIdx(labels, ['시작일'],            22);  // W
   const endDateIdx     = findColIdx(labels, ['종료일','만기일'],   23);  // X
   const actualExitDateIdx = findColIdx(labels, ['퇴실일'],         25);  // Z (정확매칭 → '실제퇴실일'과 충돌 회피)
+  const livingMonthsIdx = findColIdx(labels, ['거주기간','실제거주개월','거주개월','거주월수'], 27); // AB (v301)
   const depositRecovIdx= findColIdx(labels, ['원상회복담보금'],    31);  // AF
   const depositIdx     = findColIdx(labels, ['보증금'],            32);  // AG
   const monthRent1Idx  = findColIdx(labels, ['월세'],              33);  // AH
@@ -1999,6 +2000,7 @@ function parseVacancySheet(resp) {
       vatRaw:       cell(monthRent2Idx),  // AI열: 부가세 단독 (v293)
       mgmtFee:      cell(mgmtFeeIdx),     // AJ열: 관리비
       doorPwd:      cell(doorPwdIdx),     // F열: 현관 비밀번호 (v293)
+      livingMonths: cell(livingMonthsIdx), // AB열: 실제 거주개월 (v301)
       billCount:    cell(billCountIdx),  // BS열: 청구횟수
       endDate:      cell(endDateIdx),     // X열: 만기일 [v44]
       tenantRrn:    cell(tenantRrnIdx), // AV열: 계약자1 생년월일/주민번호 [v65]
@@ -17503,13 +17505,24 @@ async function okpi_render(){
     allOfRoom.forEach(function(c){
       var status = String(c['계약상태']||'').trim();
       var midStr = String(c['중도퇴실']||'').trim();
-      // 거주개월 계산 (시작일 ~ 종료일/실제퇴실일)
-      var sd = parseKorDate(String(c['시작일']||''));
-      var ed = parseKorDate(String(c['종료일']||c['실제퇴실일']||''));
-      if (sd && ed && ed > sd) {
-        var months = (ed.getFullYear()-sd.getFullYear())*12 + (ed.getMonth()-sd.getMonth());
-        if (months > 0 && months < 120) { totalMonths += months; monthCnt++; }
+      // [v301] 거주개월 — vacancyRawData AB열(livingMonths) 우선, 없으면 시작일~종료일 폴백
+      var months = 0;
+      var vacMatch = (vacancyRawData||[]).find(function(v){
+        return String(v.no||'').trim() === String(c['계약번호']||'').trim();
+      });
+      if (vacMatch && vacMatch.livingMonths) {
+        var lm = parseFloat(String(vacMatch.livingMonths).replace(/[^0-9.\-]/g,''));
+        if (!isNaN(lm) && lm > 0) months = lm;
       }
+      if (months === 0) {
+        // 폴백: 시작일 ~ 종료일/실제퇴실일 계산
+        var sd = parseKorDate(String(c['시작일']||''));
+        var ed = parseKorDate(String(c['종료일']||c['실제퇴실일']||''));
+        if (sd && ed && ed > sd) {
+          months = (ed.getFullYear()-sd.getFullYear())*12 + (ed.getMonth()-sd.getMonth());
+        }
+      }
+      if (months > 0 && months < 120) { totalMonths += months; monthCnt++; }
       // 중도/만기 분류 (계약상태 또는 J열 기반)
       if (status.includes('종료') || status.includes('해지') || midStr) {
         totalEnded++;
