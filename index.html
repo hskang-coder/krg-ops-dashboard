@@ -17341,7 +17341,7 @@ async function okpi_render(){
   function prp_injectCss(){
     if (prpCssInjected) return;
     var css = ''
-      + '.prop-inner{padding:14px 18px}'
+      + '.prop-inner{max-width:1500px;margin:0 auto;padding:14px 18px}'
       // KPI — 다른 탭과 통일된 톤 (평면, 옅은 보더, 깔끔)
       + '.prp-kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:12px}'
       + '.prp-kpi{background:#fff;border:1px solid #E2E8F0;border-radius:7px;padding:10px 12px;transition:border-color .15s}'
@@ -17469,23 +17469,25 @@ async function okpi_render(){
       var st = String(c['계약상태']||'').trim();
       return !st.includes('종료') && !st.includes('해지') && !st.includes('퇴실');
     });
-    // 호실별 담당자: 현재 계약자 우선, 없으면 가장 최근 계약자, 그것도 없으면 vac.partnerPerson
-    var staff = '';
-    var staffPhone = '';
+    // 호실별 담당자 + 계약 부동산: 현재 계약자 우선, 없으면 가장 최근 계약자, 그것도 없으면 vac.partner*
+    var staff = '', staffPhone = '', partnerName = '';
     if (current) {
       staff = current['계약담당자'] || '';
       staffPhone = current['계약담당자연락처'] || current['담당자연락처'] || '';
+      partnerName = current['부동산명'] || current['파트너부동산'] || '';
     }
-    if (!staff && allOfRoom.length > 0) {
-      var latest = allOfRoom[0]; // contractRawData 정렬에 따름
-      staff = latest['계약담당자'] || '';
-      staffPhone = latest['계약담당자연락처'] || latest['담당자연락처'] || '';
+    if ((!staff || !partnerName) && allOfRoom.length > 0) {
+      var latest = allOfRoom[0];
+      if (!staff) staff = latest['계약담당자'] || '';
+      if (!staffPhone) staffPhone = latest['계약담당자연락처'] || latest['담당자연락처'] || '';
+      if (!partnerName) partnerName = latest['부동산명'] || latest['파트너부동산'] || '';
     }
     if (!staff && vac.partnerPerson) staff = vac.partnerPerson;
+    if (!partnerName && vac.partnerName) partnerName = vac.partnerName;
     return {
       bldg: bldg, room: room, key: key,
       currentTenant: current ? (current['임차인명']||current['임차인']||'') : '',
-      staff: staff, staffPhone: staffPhone,
+      staff: staff, staffPhone: staffPhone, partnerName: partnerName,
       avgMonths: avgMonths, midExit: midExit, expExit: expExit, midRate: midRate,
       renewCount: renewCount, totalContracts: allOfRoom.length,
       score: score, grade: grade, blackList: blackList, watchList: watchList,
@@ -17653,9 +17655,11 @@ async function okpi_render(){
         var mgmtNum = parseFloat(String(r.vac.mgmtFee||'').replace(/[^0-9.-]/g,''))||0;
         var midPct = r.midExit > 0 && r.totalContracts > 0 ? Math.round(r.midRate*100) : 0;
         var staffHtml = r.staff ? (escapeHtml(r.staff) + (r.staffPhone ? '<br><small style="color:#9CA3AF;font-size:9.5px">'+(typeof fmtPhone==='function'?fmtPhone(r.staffPhone):r.staffPhone)+'</small>' : '')) : '<span style="color:#9CA3AF">-</span>';
+        var partnerHtml = r.partnerName ? escapeHtml(r.partnerName) : '<span style="color:#9CA3AF">-</span>';
         return '<tr class="'+cls+'">'
           + '<td>'+escapeHtml(r.room)+'</td>'
           + '<td>'+tenantHtml+'</td>'
+          + '<td>'+partnerHtml+'</td>'
           + '<td>'+staffHtml+'</td>'
           + '<td style="text-align:right">'+(rentNum?fmtNum(rentNum):'-')+'</td>'
           + '<td style="text-align:right;'+(vatNum?'color:#D97706;font-weight:700':'color:#9CA3AF')+'">'+(vatNum?fmtNum(vatNum):'-')+'</td>'
@@ -17684,7 +17688,7 @@ async function okpi_render(){
         +     '<div class="prp-mg"><span class="l">📝 건물 메모</span><span class="v" style="color:#9CA3AF">Phase 2 — 시트 컬럼 연동 예정</span></div>'
         +   '</div>'
         +   '<table class="prp-tbl"><thead><tr>'
-        +     '<th>호실</th><th>현재 임차인</th><th>담당자</th><th style="text-align:right">월세</th><th style="text-align:right">부가세</th><th style="text-align:right">고정관리비</th>'
+        +     '<th>호실</th><th>현재 임차인</th><th>계약 부동산</th><th>담당자</th><th style="text-align:right">월세</th><th style="text-align:right">부가세</th><th style="text-align:right">고정관리비</th>'
         +     '<th>평균 거주</th><th>중도퇴실</th><th>갱신</th><th>매력도</th><th>상태</th>'
         +   '</tr></thead><tbody>'+roomRows+'</tbody></table>'
         + '</div>';
@@ -17750,9 +17754,11 @@ async function okpi_render(){
         var mgmtNum = parseFloat(String(r.vac.mgmtFee||'').replace(/[^0-9.-]/g,''))||0;
         var midPct = r.midExit > 0 && r.totalContracts > 0 ? Math.round(r.midRate*100) : 0;
         var staffHtml = r.staff ? (escapeHtml(r.staff) + (r.staffPhone ? '<br><small style="color:#9CA3AF;font-size:9.5px">'+(typeof fmtPhone==='function'?fmtPhone(r.staffPhone):r.staffPhone)+'</small>' : '')) : '<span style="color:#9CA3AF">-</span>';
+        var partnerHtml = r.partnerName ? escapeHtml(r.partnerName) : '<span style="color:#9CA3AF">-</span>';
         return '<tr class="'+cls+'">'
           + '<td>'+escapeHtml(r.room)+'</td>'
           + '<td>'+tenantHtml+'</td>'
+          + '<td>'+partnerHtml+'</td>'
           + '<td>'+staffHtml+'</td>'
           + '<td style="text-align:right">'+(rentNum?fmtNum(rentNum):'-')+'</td>'
           + '<td style="text-align:right;'+(vatNum?'color:#D97706;font-weight:700':'color:#9CA3AF')+'">'+(vatNum?fmtNum(vatNum):'-')+'</td>'
@@ -17781,7 +17787,7 @@ async function okpi_render(){
         +     '<div class="prp-mg"><span class="l">📝 건물 메모</span><span class="v" style="color:#9CA3AF">Phase 2 — 시트 컬럼 연동 예정</span></div>'
         +   '</div>'
         +   '<table class="prp-tbl"><thead><tr>'
-        +     '<th>호실</th><th>현재 임차인</th><th>담당자</th><th style="text-align:right">월세</th><th style="text-align:right">부가세</th><th style="text-align:right">고정관리비</th>'
+        +     '<th>호실</th><th>현재 임차인</th><th>계약 부동산</th><th>담당자</th><th style="text-align:right">월세</th><th style="text-align:right">부가세</th><th style="text-align:right">고정관리비</th>'
         +     '<th>평균 거주</th><th>중도퇴실</th><th>갱신</th><th>매력도</th><th>상태</th>'
         +   '</tr></thead><tbody>'+roomRows+'</tbody></table>'
         + '</div>';
