@@ -5697,8 +5697,23 @@ let _dlqDonutChart   = null;
 // [v257] 캐시 키 버전 (시트 필터 우회 강화 — 이전 캐시 무효화)
 window._dlqRawCacheVer = 'v257';
 window._dlqRawCache = null;
-var DLQ_CACHE_TTL   = 5 * 60 * 1000; // 5분
+var DLQ_CACHE_TTL   = 10 * 60 * 1000; // 10분 (v306: 5분→10분)
 var DLQ_BG_REFRESH  = 2 * 60 * 1000; // 2분 이상이면 백그라운드 갱신
+// [v306] sessionStorage 보조 캐시 — 페이지 새로고침해도 즉시 표시
+var DLQ_SESSION_KEY = 'krg_dlq_raw_cache_v306';
+function _dlqSaveCacheSafe(cache){
+  try { sessionStorage.setItem(DLQ_SESSION_KEY, JSON.stringify(cache)); } catch(_){}
+}
+function _dlqLoadCacheSafe(){
+  try {
+    var raw = sessionStorage.getItem(DLQ_SESSION_KEY);
+    if (!raw) return null;
+    var parsed = JSON.parse(raw);
+    if (!parsed || !parsed.r1 || !parsed.r2 || !parsed.r3 || !parsed.r4) return null;
+    if (parsed.ver !== window._dlqRawCacheVer) return null;
+    return parsed;
+  } catch(_){ return null; }
+}
 
 async function renderDelinquency() {
   const wrap = document.getElementById('delinquencyView');
@@ -5706,13 +5721,20 @@ async function renderDelinquency() {
   const inner = wrap.querySelector('.dlq-inner');
   if (!inner) return;
 
-  // [v262] 연체관리 진입 시 시트 캐시 강제 무효화 — 시트 active filter stale 영향 차단
+  // [v262 → v306] 시트 active filter 영향 차단 캐시 무효화는 유지하되,
+  //   _dlqRawCache는 보존 + 메모리에 없으면 sessionStorage에서 복원 (안전 폴백)
   try {
     Object.keys(localStorage).forEach(function(k){
       if (k.indexOf('krg_sum_cache_') === 0) localStorage.removeItem(k);
     });
-    window._dlqRawCache = null;
   } catch(_){}
+  // [v306] 메모리 캐시 없으면 sessionStorage에서 복원 시도 (페이지 새로고침 직후 즉시 표시)
+  if (!window._dlqRawCache) {
+    try {
+      var restored = _dlqLoadCacheSafe();
+      if (restored) window._dlqRawCache = restored;
+    } catch(_){}
+  }
 
   const SHEET2 = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q'; // [v219] 미러 스프레드시트 유지 (다른 파생 시트들이 여기 있음)
   function gvizUrl(gid, range) {
@@ -5888,6 +5910,7 @@ async function renderDelinquency() {
         _dlqFetch(gvizUrl(418937767)).then(r=>r.text()).then(parseGvizLocal),
       ]).then(([r1,r2,r3,r4]) => {
         window._dlqRawCache = { r1, r2, r3, r4, ts: Date.now(), ver: window._dlqRawCacheVer };
+        _dlqSaveCacheSafe(window._dlqRawCache); // [v306]
       }).catch(() => {});
     }
     return;
@@ -5902,7 +5925,8 @@ async function renderDelinquency() {
       _dlqFetch(gvizUrl(554798125)).then(r=>r.text()).then(parseGvizLocal),
       _dlqFetch(gvizUrl(418937767)).then(r=>r.text()).then(parseGvizLocal),
     ]);
-    window._dlqRawCache = { r1, r2, r3, r4, ts: Date.now() };
+    window._dlqRawCache = { r1, r2, r3, r4, ts: Date.now(), ver: window._dlqRawCacheVer };
+    _dlqSaveCacheSafe(window._dlqRawCache); // [v306]
     applyRaw(r1, r2, r3, r4);
   } catch(e) {
     inner.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444">❌ 오류: ${e.message}</div>`;
