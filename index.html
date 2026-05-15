@@ -201,9 +201,9 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   border-radius: 6px; font-size: 12.5px; outline: none; transition: border 0.15s;
 }
 .cr-search-bar input:focus { border-color: #2563A8; }
-.cr-search-btn { background: #1A3A5C; color: #fff; border: none; cursor: pointer; padding: 6px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+.cr-search-btn { background: #1A3A5C; color: #fff; border: none; cursor: pointer; padding: 7px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0; min-width: 84px; text-align: center; }
 .cr-search-btn:hover { background: #2563A8; }
-.cr-contract-pdf-btn { background: #fff; color: #1B3976; border: 1.5px solid #1B3976; cursor: pointer; padding: 6px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; white-space: nowrap; transition: all .2s; flex-shrink: 0; }
+.cr-contract-pdf-btn { background: #fff; color: #1B3976; border: 1.5px solid #1B3976; cursor: pointer; padding: 7px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; white-space: nowrap; transition: all .2s; flex-shrink: 0; min-width: 84px; text-align: center; }
 .cr-contract-pdf-btn:hover:not(:disabled) { background: #1B3976; color: #fff; }
 .cr-contract-pdf-btn:disabled { opacity: .35; cursor: not-allowed; }
 .cr-back-btn { display:none; align-items:center; gap:6px; background:#f1f5f9; color:#475569; border:1.5px solid #cbd5e1; cursor:pointer; padding:7px 14px; border-radius:8px; font-size:13px; font-weight:600; white-space:nowrap; margin-bottom:10px; }
@@ -1202,13 +1202,13 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
       </div>
       <div id="crSearchBox" class="cr-search-bar">
         <input id="crInput" type="text" placeholder="계약번호(숫자) 또는 임(전)차인명(2자 이상) 입력" onkeydown="if(event.key==='Enter')searchContract()">
-        <button class="cr-search-btn" onclick="searchContract()" style="padding:6px 9px;font-size:11px;white-space:nowrap">🔍 검색</button>
-        <button class="cr-contract-pdf-btn" id="crContractPdfBtn" onclick="openContractPdfModal(window._crCurrentNo)" title="계약서 발행" style="margin-left:3px;padding:6px 8px;font-size:11px;white-space:nowrap">📄 계약서</button>
-        <button class="cr-contract-pdf-btn" id="crMgmtCtrBtn" onclick="openMgmtContractModal(window._crCurrentNo)" title="표준 위수탁 계약서(자기관리형-임대인) 발행" style="margin-left:3px;padding:6px 8px;font-size:11px;white-space:nowrap">🏢 위수탁</button>
-        <button class="cr-contract-pdf-btn" id="crSubAgreementBtn" onclick="generateSubAgreement(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (부속합의)" style="margin-left:3px;padding:6px 8px;font-size:11px;white-space:nowrap">📋 부속합의</button>
-        <button class="cr-contract-pdf-btn" id="crIncomeReceiptBtn" onclick="openIncomeReceiptModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (납부증빙)" style="margin-left:3px;padding:6px 8px;font-size:11px;white-space:nowrap;background:#059669;color:#fff;border-color:#059669">💰 납부증빙</button>
-        <button class="cr-contract-pdf-btn" id="crFeeCalcBtn" onclick="openFeeCalcModal(window._crCurrentNo)" title="수수료 / 일할 계산기" style="margin-left:3px;padding:6px 8px;font-size:11px;white-space:nowrap;background:#7C3AED;color:#fff;border-color:#7C3AED">🧮 수수료</button>
-        <button class="cr-contract-pdf-btn" id="crDelqReportBtn" onclick="generateDelqReport(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (연체 대응 종합 REPORT)" style="margin-left:3px;padding:6px 8px;font-size:11px;white-space:nowrap;background:#DC2626;color:#fff;border-color:#DC2626">📊 REPORT</button>
+        <button class="cr-search-btn" onclick="searchContract()">🔍 검색</button>
+        <button class="cr-contract-pdf-btn" id="crContractPdfBtn" onclick="openContractPdfModal(window._crCurrentNo)" title="계약서 발행">📄 계약서</button>
+        <button class="cr-contract-pdf-btn" id="crMgmtCtrBtn" onclick="openMgmtContractModal(window._crCurrentNo)" title="표준 위수탁 계약서(자기관리형-임대인) 발행">🏢 위수탁</button>
+        <button class="cr-contract-pdf-btn" id="crSubAgreementBtn" onclick="generateSubAgreement(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (부속합의)">📋 부속합의</button>
+        <button class="cr-contract-pdf-btn" id="crIncomeReceiptBtn" onclick="openIncomeReceiptModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (납부증빙)" style="background:#059669;color:#fff;border-color:#059669">💰 납부증빙</button>
+        <button class="cr-contract-pdf-btn" id="crFeeCalcBtn" onclick="openFeeCalcModal(window._crCurrentNo)" title="수수료 / 일할 계산기" style="background:#7C3AED;color:#fff;border-color:#7C3AED">🧮 수수료</button>
+        <button class="cr-contract-pdf-btn" id="crDelqReportBtn" onclick="openReportChooser(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (연체 대응 REPORT)" style="background:#DC2626;color:#fff;border-color:#DC2626">📊 리포트</button>
       </div>
       <div id="crListBox" style="display:none">
         <div class="cr-list-filter">
@@ -9698,9 +9698,307 @@ function buildMgmtContractHtml(d){
 }
 
 // ════════════════════════════════════════════════
-// ▶ [v288] 연체 대응 종합 REPORT 발행
+// ▶ [v290] 리포트 선택 모달 — 임(전)차인용 / 임대인용 분기
 // ════════════════════════════════════════════════
-function generateDelqReport(contractNo){
+function openReportChooser(contractNo){
+  if (!contractNo) { alert('먼저 계약을 검색해주세요.'); return; }
+  var prev = document.getElementById('rptChooserModal'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'rptChooserModal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  ov.innerHTML = ''
+    + '<div style="background:#fff;border-radius:14px;width:680px;max-width:94vw;padding:24px;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
+    +   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+    +     '<div style="background:#1B3976;color:#fff;width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:19px;font-style:italic">K</div>'
+    +     '<div><div style="font-size:15px;font-weight:700;color:#1B3976">분석 리포트 발행</div>'
+    +     '<div style="font-size:11.5px;color:#6B7280;margin-top:2px">대상을 선택하세요 — 계약번호 '+contractNo+'</div></div>'
+    +   '</div>'
+    +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
+    /* 임(전)차인용 카드 */
+    +     '<div onclick="generateTenantDelqReport(\''+contractNo+'\');document.getElementById(\'rptChooserModal\').remove()" style="cursor:pointer;border:2px solid #DC2626;border-radius:10px;padding:18px;background:linear-gradient(180deg,#FEF2F2,#fff);transition:transform .15s,box-shadow .15s" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 8px 24px rgba(220,38,38,.18)\'" onmouseout="this.style.transform=\'translateY(0)\';this.style.boxShadow=\'none\'">'
+    +       '<div style="font-size:26px;margin-bottom:6px">📊</div>'
+    +       '<div style="font-size:14.5px;font-weight:900;color:#7F1D1D;margin-bottom:4px">임(전)차인용</div>'
+    +       '<div style="font-size:11px;font-weight:700;color:#991B1B;margin-bottom:8px">연체 대응 종합 리포트</div>'
+    +       '<div style="font-size:10.5px;color:#374151;line-height:1.55">· 연체 패턴 진단 + KPI<br>· 약속 이행 트래커<br>· 대응 신호(위험/협조)<br>· 🎯 급소 + 권장 액션 + 멘트</div>'
+    +     '</div>'
+    /* 임대인용 카드 */
+    +     '<div onclick="generateLandlordReport(\''+contractNo+'\');document.getElementById(\'rptChooserModal\').remove()" style="cursor:pointer;border:2px solid #0F766E;border-radius:10px;padding:18px;background:linear-gradient(180deg,#F0FDFA,#fff);transition:transform .15s,box-shadow .15s" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 8px 24px rgba(15,118,110,.18)\'" onmouseout="this.style.transform=\'translateY(0)\';this.style.boxShadow=\'none\'">'
+    +       '<div style="font-size:26px;margin-bottom:6px">🏢</div>'
+    +       '<div style="font-size:14.5px;font-weight:900;color:#064E3B;margin-bottom:4px">임대인용</div>'
+    +       '<div style="font-size:11px;font-weight:700;color:#065F46;margin-bottom:8px">보증 무결성 리포트</div>'
+    +       '<div style="font-size:10.5px;color:#374151;line-height:1.55">· 보증 무결성 KPI 5개<br>· 월별 임대료 수령 캘린더<br>· 직접계약 vs 위수탁 비교<br>· 🎯 핵심 메시지 + 갱신 안내</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div style="display:flex;justify-content:flex-end;margin-top:16px;border-top:1px solid #e5e7eb;padding-top:12px">'
+    +     '<button onclick="document.getElementById(\'rptChooserModal\').remove()" style="padding:8px 16px;border:1.5px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;font-size:12.5px">취소</button>'
+    +   '</div>'
+    + '</div>';
+  document.body.appendChild(ov);
+}
+
+// 기존 함수명 호환 유지 (대시보드 외부 호출에 대비)
+function generateDelqReport(contractNo){ openReportChooser(contractNo); }
+
+// ════════════════════════════════════════════════
+// ▶ [v290] 임대인용 보증 무결성 리포트
+// ════════════════════════════════════════════════
+function generateLandlordReport(contractNo){
+  if (!contractNo) { alert('먼저 계약을 검색해주세요.'); return; }
+  var c = (contractRawData||[]).find(function(r){ return _krNo(r) === String(contractNo).trim(); });
+  if (!c) { alert('계약 데이터를 찾을 수 없습니다.'); return; }
+  var payments = (paymentRawData||[]).filter(function(p){ return _krNo(p) === String(contractNo).trim(); });
+  var vac = (vacancyRawData||[]).find(function(v){ return String(v.no||'').trim() === String(contractNo).trim(); }) || {};
+
+  // 임대료 항목만 필터 (수수료 제외)
+  var rentRows = payments.filter(function(p){
+    var nm = String(p['청구서명']||p['납부종류']||'');
+    return /임대료|월세/.test(nm) && !/수수료/.test(nm);
+  });
+  // 약정 월 임대료
+  var monthlyRent = parseSafeMoney(c['임대료'] || c['월세'] || (rentRows[0] && (rentRows[0]['청구금액']||rentRows[0]['약정금액']||rentRows[0]['금액'])) || 0);
+  // 청구 횟수
+  var billedCount = rentRows.length;
+  // 정상 납부 횟수 (납부상태='납부' or 미납액 0)
+  var paidCount = rentRows.filter(function(p){
+    var s = String(p['납부상태']||'').trim();
+    var unpaid = parseSafeMoney(p['미납(연체)금액(원)'] || p['미납'] || p['미납액'] || p['연체금액'] || 0);
+    return /납부/.test(s) || unpaid === 0;
+  }).length;
+  // 임대인 수령 횟수 — 케이알지 보증 모델: 모든 청구분에 대해 케이알지가 임대인에게 약정대로 지급
+  // (임차인 연체 여부와 무관하게 임대인은 약정 지급 받음)
+  var landlordReceivedCount = billedCount; // 케이알지 보증 — 모두 정상 수령
+  var landlordReceivedRate = billedCount > 0 ? Math.round((landlordReceivedCount / billedCount) * 100) : 100;
+  // 케이알지 보증 처리 건수 = 임차인이 연체했지만 임대인은 정상 수령한 건수
+  var tenantLateButLandlordPaid = parseInt(c['연체횟수']||0)||0;
+  // 누적 임대인 수령액
+  var cumulativeReceived = monthlyRent * landlordReceivedCount;
+  // 임대인 손실 (케이알지 보증 모델 — 0원 보장)
+  var landlordLoss = 0;
+
+  // 월별 캘린더 — 계약시작일부터 현재까지 월별 상태
+  var startDate = parseKorDate(c['시작일']||'') || (vac.startDate ? new Date(vac.startDate) : null);
+  var endDate = parseKorDate(c['종료일']||'') || (vac.endDate ? new Date(vac.endDate) : null);
+  var today = new Date(); today.setHours(0,0,0,0);
+  var monthCells = [];
+  if (startDate) {
+    var cur = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    var lastM = endDate || new Date(today.getFullYear(), today.getMonth()+1, 1);
+    var lateMonths = {}; // 임차인이 연체한 월 (대략)
+    rentRows.forEach(function(p){
+      var dueStr = String(p['납기일']||'');
+      var due = parseKorDate(dueStr);
+      if (!due) return;
+      var k = due.getFullYear() + '-' + String(due.getMonth()+1).padStart(2,'0');
+      var s = String(p['납부상태']||'').trim();
+      var unpaid = parseSafeMoney(p['미납(연체)금액(원)'] || p['미납'] || p['미납액'] || p['연체금액'] || 0);
+      if (/연체|분납/.test(s) || unpaid > 0) lateMonths[k] = '연체';
+      else if (!lateMonths[k]) lateMonths[k] = '정시';
+    });
+    var safety = 0;
+    while (cur <= lastM && safety < 60) {
+      var k = cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0');
+      var label = (cur.getMonth()+1) + '월';
+      var yr = String(cur.getFullYear()).slice(2);
+      var type, hint;
+      if (cur > today) { type = 'future'; hint = '예정'; }
+      else if (lateMonths[k] === '연체') { type = 'guarantee'; hint = '케이알지 보증 처리'; }
+      else if (lateMonths[k] === '정시') { type = 'ontime'; hint = '정시 수령'; }
+      else { type = 'unknown'; hint = '데이터 없음'; }
+      monthCells.push({ year: yr, label: label, type: type, hint: hint });
+      cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+      safety++;
+    }
+  }
+
+  // D-Day
+  var ddayStr = '', remainMonths = '';
+  if (endDate) {
+    var diff = Math.round((endDate - today) / (24*3600*1000));
+    ddayStr = diff >= 0 ? 'D-'+diff : 'D+'+Math.abs(diff);
+    var monthsLeft = (endDate.getFullYear() - today.getFullYear())*12 + (endDate.getMonth() - today.getMonth());
+    if (monthsLeft >= 0) remainMonths = monthsLeft + '개월 남음';
+  }
+  // 갱신 권장 시점 (만료 2개월 전)
+  var renewSuggest = '';
+  if (endDate) {
+    var renewDate = new Date(endDate.getFullYear(), endDate.getMonth()-2, endDate.getDate());
+    renewSuggest = renewDate.getFullYear() + '-' + String(renewDate.getMonth()+1).padStart(2,'0');
+    var dToRenew = Math.round((renewDate - today) / (24*3600*1000));
+    if (dToRenew >= 0) renewSuggest += ' (D-'+dToRenew+')';
+    else renewSuggest += ' (지났음)';
+  }
+
+  // 핵심 메시지 빌드
+  var coreMsg = '';
+  var statusLine = '';
+  if (tenantLateButLandlordPaid >= 3) {
+    coreMsg = '본 계약은 임차인이 ' + tenantLateButLandlordPaid + '회 연체를 발생시킨 이력이 있으나, 케이알지그룹의 위수탁 보증 구조를 통해 <b>임대인 손실은 0원</b>으로 보장되었습니다. 직접 계약 형태였다면 연체 대응·소송·공실 위험을 모두 임대인이 부담해야 했을 비용·시간·스트레스가 발생했을 수 있습니다.';
+    statusLine = '🛡️ 케이알지 보증 ' + tenantLateButLandlordPaid + '회 작동 — 임대인 안전 수령 ' + landlordReceivedRate + '%';
+  } else if (paidCount === billedCount && billedCount > 0) {
+    coreMsg = '본 계약은 임차인의 정시 납부가 안정적으로 유지되고 있으며, 케이알지그룹의 위수탁 보증 구조를 통해 <b>임대인은 매월 약정 임대료를 안정적으로 수령</b>하고 계십니다. 연체 발생 시에도 케이알지가 즉시 흡수하여 임대인의 수익 안정성을 보장합니다.';
+    statusLine = '✅ 정상 운영 — 임대인 수령률 100%';
+  } else {
+    coreMsg = '본 계약에서 임대인님은 케이알지그룹의 자기관리형 위수탁 서비스를 통해 임차인 연체·공실·소송 리스크와 무관하게 매월 약정대로 임대료를 수령하고 계십니다. 본 서비스는 임대 수익의 안정성을 핵심 가치로 제공합니다.';
+    statusLine = '🛡️ 보증 운영 중 — 임대인 수령률 ' + landlordReceivedRate + '%';
+  }
+
+  // 임대인·임차인 정보
+  var landlordName = c['임대인명'] || vac.landlordName || '-';
+  var tenantName   = c['임차인명'] || c['임차인'] || '-';
+  var building     = c['건물명'] || '-';
+  var room         = c['호수'] || '-';
+
+  var d = {
+    contractNo: c['계약번호']||'', landlordName: landlordName, tenantName: tenantName, building: building, room: room,
+    startDate: c['시작일']||'-', endDate: c['종료일']||'-', ddayStr: ddayStr, remainMonths: remainMonths,
+    monthlyRent: monthlyRent, billedCount: billedCount, paidCount: paidCount,
+    landlordReceivedCount: landlordReceivedCount, landlordReceivedRate: landlordReceivedRate,
+    tenantLateButLandlordPaid: tenantLateButLandlordPaid,
+    cumulativeReceived: cumulativeReceived, landlordLoss: landlordLoss,
+    monthCells: monthCells, coreMsg: coreMsg, statusLine: statusLine,
+    renewSuggest: renewSuggest,
+    todayStr: today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0')
+  };
+  var html = buildLandlordReportHtml(d);
+  var win = window.open('', '_blank', 'width=900,height=1100,scrollbars=yes');
+  if (!win) { alert('팝업이 차단되었습니다.'); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
+function buildLandlordReportHtml(d){
+  var fmtMoney0 = function(n){ n = parseFloat(n)||0; return '₩' + n.toLocaleString('ko-KR'); };
+  var monthCellsHtml = (d.monthCells||[]).map(function(m){
+    var cls = m.type;
+    var color = '#9CA3AF', bg = '#F3F4F6', tx = '#6B7280', mark = '·';
+    if (cls === 'ontime') { color = '#059669'; bg = '#D1FAE5'; tx = '#064E3B'; mark = '✓'; }
+    else if (cls === 'guarantee') { color = '#0EA5E9'; bg = '#DBEAFE'; tx = '#1E3A8A'; mark = '🛡️'; }
+    else if (cls === 'future') { color = '#9CA3AF'; bg = '#F3F4F6'; tx = '#6B7280'; mark = '·'; }
+    return '<div class="mcell" style="border-color:'+color+';background:'+bg+';color:'+tx+'" title="'+m.hint+'"><div class="my">'+m.year+'.'+m.label+'</div><div class="mk">'+mark+'</div></div>';
+  }).join('') || '<div style="grid-column:1/-1;text-align:center;color:#9CA3AF;padding:14px;font-size:11px">계약 기간 데이터 부족</div>';
+  // 비교표 행
+  var compareRows = [
+    {risk:'임차인 연체 발생', direct:'임대인이 임차인 상대로 직접 독촉·받아야 함', krg:'케이알지가 약정대로 임대인에게 정시 지급'},
+    {risk:'명도소송 / 법적조치', direct:'임대인이 변호사 선임·소송 직접 진행', krg:'케이알지가 직접 수행 (비용·시간 부담 X)'},
+    {risk:'공실 발생', direct:'임대인이 공실 기간 임대료 손실 부담', krg:'케이알지가 흡수 — 약정 임대료 정상 지급'},
+    {risk:'임차인 응대 / 민원', direct:'임대인이 24시간 응대·관리 부담', krg:'케이알지 전담 — 임대인 응대 불필요'},
+    {risk:'보증금 분쟁 / 원상복구', direct:'임대인이 분쟁·소송 진행', krg:'케이알지가 표준 절차로 처리'}
+  ];
+  var compareHtml = compareRows.map(function(r){
+    return '<tr><td class="risk">'+r.risk+'</td><td class="bad">✗ '+r.direct+'</td><td class="good">✓ '+r.krg+'</td></tr>';
+  }).join('');
+
+  var css = '*{box-sizing:border-box;margin:0;padding:0;font-family:"Noto Sans KR","Malgun Gothic",sans-serif}'
+    + 'body{background:#F3F4F6;padding:18px;color:#1F2937;font-size:12px;line-height:1.5}'
+    + '.page{max-width:820px;margin:0 auto;background:#fff;padding:22px 26px;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.08)}'
+    + '.hdr{display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:2px solid #0F766E;margin-bottom:14px}'
+    + '.hdr .logo{width:40px;height:40px;background:#0F766E;color:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;font-style:italic}'
+    + '.hdr .ttl{font-size:18px;font-weight:900;color:#0F766E;letter-spacing:-.3px}'
+    + '.hdr .sub{font-size:11px;color:#6B7280;margin-top:2px}'
+    + '.hdr .right{margin-left:auto;text-align:right;font-size:10.5px;color:#9CA3AF}'
+    + '.idstrip{display:grid;grid-template-columns:1.3fr 1.3fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px;padding:10px 12px;background:#F0FDFA;border:1px solid #5EEAD4;border-radius:8px}'
+    + '.idcell{display:flex;flex-direction:column;gap:2px}'
+    + '.idcell .l{font-size:9.5px;color:#0F766E;font-weight:700;letter-spacing:.3px}'
+    + '.idcell .v{font-size:12.5px;color:#064E3B;font-weight:800}'
+    + '.section{margin-bottom:12px}'
+    + '.sectt{font-size:12.5px;font-weight:800;color:#0F766E;margin-bottom:6px;display:flex;align-items:center;gap:6px}'
+    + '.sectt::before{content:"";width:3px;height:13px;background:#0F766E;border-radius:2px}'
+    + '.kpis{display:grid;grid-template-columns:1.2fr 1fr 1fr 1.1fr 1fr;gap:6px}'
+    + '.kpi{background:#fff;border:1px solid #E5E7EB;border-radius:7px;padding:9px 10px;display:flex;flex-direction:column;gap:3px}'
+    + '.kpi .lbl{font-size:9.5px;color:#9CA3AF;font-weight:600}'
+    + '.kpi .val{font-size:17px;font-weight:900;color:#0F172A;line-height:1.1}'
+    + '.kpi .val.good{color:#059669}.kpi .val.teal{color:#0F766E}.kpi .val.amber{color:#D97706}'
+    + '.kpi .sub{font-size:9.5px;color:#6B7280}'
+    + '.kpi.hero{background:linear-gradient(135deg,#D1FAE5,#A7F3D0);border:1.5px solid #059669}'
+    + '.kpi.hero .lbl{color:#065F46}'
+    + '.kpi.hero .val{font-size:18px;color:#064E3B}'
+    + '.cal{background:#fff;border:1px solid #E5E7EB;border-radius:7px;padding:10px 12px}'
+    + '.cal-legend{display:flex;gap:14px;font-size:10px;color:#6B7280;margin-bottom:8px;flex-wrap:wrap}'
+    + '.cal-legend span{display:flex;align-items:center;gap:4px}'
+    + '.cal-legend .dot{width:11px;height:11px;border-radius:3px;display:inline-block}'
+    + '.cal-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}'
+    + '.mcell{border:1.5px solid #9CA3AF;background:#F3F4F6;color:#6B7280;border-radius:5px;padding:6px 3px;text-align:center;font-size:9.5px;font-weight:700;min-height:40px;display:flex;flex-direction:column;justify-content:center;gap:2px}'
+    + '.mcell .my{font-size:9px;opacity:.8;font-weight:600}'
+    + '.mcell .mk{font-size:13px;line-height:1}'
+    + '.cmp-tbl{width:100%;border-collapse:collapse;font-size:10.5px}'
+    + '.cmp-tbl th{background:#F0FDFA;border:1px solid #5EEAD4;padding:7px 9px;font-size:11px;color:#0F766E;text-align:left}'
+    + '.cmp-tbl td{border:1px solid #E5E7EB;padding:6px 8px;line-height:1.4;vertical-align:top}'
+    + '.cmp-tbl td.risk{background:#F8FAFC;font-weight:700;color:#374151;width:130px}'
+    + '.cmp-tbl td.bad{background:#FEF2F2;color:#7F1D1D;width:35%}'
+    + '.cmp-tbl td.good{background:#ECFDF5;color:#065F46;font-weight:600}'
+    + '.msg-box{background:linear-gradient(180deg,#F0FDFA,#fff);border:1.5px solid #0F766E;border-radius:9px;padding:14px 16px}'
+    + '.msg-status{font-size:13px;font-weight:900;color:#0F766E;margin-bottom:8px}'
+    + '.msg-body{font-size:11.5px;color:#1F2937;line-height:1.7}'
+    + '.msg-body b{color:#0F766E;background:#FBBF24;padding:1px 5px;border-radius:3px;font-weight:900}'
+    + '.msg-foot{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px}'
+    + '.msg-foot .f-card{background:#fff;border:1px solid #5EEAD4;border-radius:6px;padding:8px 11px}'
+    + '.msg-foot .f-card .l{font-size:9.5px;color:#0F766E;font-weight:700;margin-bottom:2px}'
+    + '.msg-foot .f-card .v{font-size:12px;font-weight:800;color:#064E3B}'
+    + '.foot{margin-top:14px;padding-top:9px;border-top:1px dashed #D1D5DB;font-size:9.5px;color:#9CA3AF;display:flex;justify-content:space-between}'
+    + '.btnbar{text-align:center;padding:14px;background:#F1F5F9;border-radius:8px;margin-bottom:14px;max-width:820px;margin:0 auto 14px}'
+    + '.btn{padding:9px 18px;background:#0F766E;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;margin:0 5px;font-size:12px}'
+    + '.btn.j{background:#0EA5E9}.btn.c{background:#6B7280}'
+    + '@page{size:A4 portrait;margin:8mm}'
+    + '@media print{body{background:#fff;padding:0}.page{box-shadow:none;border-radius:0}.btnbar{display:none}}';
+
+  var fileName = '임대인보증리포트_' + (d.contractNo||'') + '_' + (d.landlordName||'');
+  return ''
+    + '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+fileName+'</title>'
+    + '<style>'+css+'</style>'
+    + '<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>'
+    + '</head><body>'
+    + '<div class="btnbar">'
+    +   '<button class="btn" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>'
+    +   '<button class="btn j" onclick="(function(){var p=document.querySelector(\'.page\'); if(!p) return; var b=document.querySelector(\'.btnbar\'); if(b) b.style.display=\'none\'; html2canvas(p,{scale:2,backgroundColor:\'#fff\'}).then(function(c){var a=document.createElement(\'a\');a.href=c.toDataURL(\'image/jpeg\',0.95);a.download=\''+fileName+'.jpg\';document.body.appendChild(a);a.click();document.body.removeChild(a);if(b) b.style.display=\'\';}).catch(function(){if(b) b.style.display=\'\'; alert(\'JPG 생성 실패\');});})()">🖼️ JPG 저장</button>'
+    +   '<button class="btn c" onclick="window.close()">닫기</button>'
+    + '</div>'
+    + '<div class="page">'
+    +   '<div class="hdr"><div class="logo">K</div><div><div class="ttl">🏢 임대인 보증 무결성 리포트</div><div class="sub">케이알지그룹 자기관리형 주택임대관리 서비스 운영 보고</div></div><div class="right">발행일 '+d.todayStr+'<br>발행처 케이알지그룹㈜</div></div>'
+    +   '<div class="idstrip">'
+    +     '<div class="idcell"><span class="l">임대인 (귀하)</span><span class="v">'+d.landlordName+'</span></div>'
+    +     '<div class="idcell"><span class="l">물건 / 계약번호</span><span class="v">'+d.building+' '+d.room+' · #'+d.contractNo+'</span></div>'
+    +     '<div class="idcell"><span class="l">임차인 (위탁)</span><span class="v">'+d.tenantName+'</span></div>'
+    +     '<div class="idcell"><span class="l">계약시작일</span><span class="v">'+d.startDate+'</span></div>'
+    +     '<div class="idcell"><span class="l">계약종료일</span><span class="v">'+d.endDate+'</span></div>'
+    +     '<div class="idcell"><span class="l">잔여 / D-Day</span><span class="v">'+(d.remainMonths||'-')+' · '+(d.ddayStr||'-')+'</span></div>'
+    +   '</div>'
+    +   '<div class="section"><div class="sectt">보증 무결성 KPI</div>'
+    +     '<div class="kpis">'
+    +       '<div class="kpi hero"><span class="lbl">임대인 손실액 (보장)</span><span class="val">'+fmtMoney0(d.landlordLoss)+'</span><span class="sub">케이알지 위수탁 보증으로 항상 0원</span></div>'
+    +       '<div class="kpi"><span class="lbl">약정 월 임대료</span><span class="val teal">'+fmtMoney0(d.monthlyRent)+'</span><span class="sub">케이알지 → 임대인</span></div>'
+    +       '<div class="kpi"><span class="lbl">정시 수령률 (임대인 기준)</span><span class="val good">'+d.landlordReceivedRate+'%</span><span class="sub">'+d.landlordReceivedCount+' / '+d.billedCount+'회</span></div>'
+    +       '<div class="kpi"><span class="lbl">누적 임대인 수령액</span><span class="val teal">'+fmtMoney0(d.cumulativeReceived)+'</span><span class="sub">계약 시작 이후</span></div>'
+    +       '<div class="kpi"><span class="lbl">케이알지 보증 처리</span><span class="val amber">'+d.tenantLateButLandlordPaid+'건</span><span class="sub">임차인 연체→임대인 정상 수령</span></div>'
+    +     '</div></div>'
+    +   '<div class="section"><div class="sectt">월별 임대료 수령 현황 (계약시작 ~ 종료)</div>'
+    +     '<div class="cal">'
+    +       '<div class="cal-legend">'
+    +         '<span><span class="dot" style="background:#D1FAE5;border:1.5px solid #059669"></span>정시 수령 ✓</span>'
+    +         '<span><span class="dot" style="background:#DBEAFE;border:1.5px solid #0EA5E9"></span>케이알지 보증 처리 🛡️ (임차인 연체 → 임대인은 정상 수령)</span>'
+    +         '<span><span class="dot" style="background:#F3F4F6;border:1.5px solid #9CA3AF"></span>예정 ·</span>'
+    +       '</div>'
+    +       '<div class="cal-grid">'+monthCellsHtml+'</div>'
+    +     '</div></div>'
+    +   '<div class="section"><div class="sectt">직접계약 vs 케이알지 위수탁 비교 — 임대인 메리트</div>'
+    +     '<table class="cmp-tbl"><thead><tr><th style="width:130px">리스크 항목</th><th>① 임대인 직접계약 시</th><th>② 케이알지 위수탁 (현재)</th></tr></thead><tbody>'+compareHtml+'</tbody></table>'
+    +   '</div>'
+    +   '<div class="section"><div class="msg-box">'
+    +     '<div class="msg-status">'+d.statusLine+'</div>'
+    +     '<div class="msg-body">'+d.coreMsg+'</div>'
+    +     '<div class="msg-foot">'
+    +       '<div class="f-card"><div class="l">보증 유효기간</div><div class="v">'+d.endDate+' 까지 ('+(d.remainMonths||'-')+')</div></div>'
+    +       '<div class="f-card"><div class="l">갱신 권장 시점</div><div class="v">'+(d.renewSuggest||'-')+'</div></div>'
+    +     '</div>'
+    +   '</div></div>'
+    +   '<div class="foot"><div>본 리포트는 임대인 '+d.landlordName+'님 전용 자동 생성 문서입니다</div><div>케이알지그룹㈜ · 자기관리형 주택임대관리업자 · '+d.todayStr+'</div></div>'
+    + '</div>'
+    + '</body></html>';
+}
+
+// ════════════════════════════════════════════════
+// ▶ [v288] 연체 대응 종합 REPORT 발행 (임(전)차인용)
+// ════════════════════════════════════════════════
+function generateTenantDelqReport(contractNo){
   if (!contractNo) { alert('먼저 계약을 검색해주세요.'); return; }
   var c = (contractRawData||[]).find(function(r){ return _krNo(r) === String(contractNo).trim(); });
   if (!c) { alert('계약 데이터를 찾을 수 없습니다.'); return; }
