@@ -4270,7 +4270,7 @@ function selectContractRow(no) {
   // 돌아가기 버튼 표시 여부
   var btn = document.getElementById('crBackBtn');
   if (btn) {
-    var labels = { payment:'← 수납관리로 돌아가기', delinquency:'← 연체관리로 돌아가기', renewal:'← 갱신관리로 돌아가기', contractMgmt:'← 계약관리로 돌아가기' };
+    var labels = { payment:'← 수납관리로 돌아가기', delinquency:'← 연체관리로 돌아가기', renewal:'← 갱신관리로 돌아가기', contractMgmt:'← 계약관리로 돌아가기', property:'← 물건관리로 돌아가기' };
     if (window._crPrevView && labels[window._crPrevView]) {
       btn.textContent = labels[window._crPrevView];
       btn.classList.add('visible');
@@ -17571,6 +17571,16 @@ async function okpi_render(){
       var st = String(c['계약상태']||'').trim();
       return !st.includes('종료') && !st.includes('해지') && !st.includes('퇴실');
     });
+    // [v302] 가장 최근 계약자 (공실 표시 + 입주관리 드릴 다운용)
+    var sortedAll = allOfRoom.slice().sort(function(a, b){
+      var sa = parseKorDate(String(a['시작일']||'')); var sb = parseKorDate(String(b['시작일']||''));
+      return (sb?sb.getTime():0) - (sa?sa.getTime():0);
+    });
+    var lastTenant = '';
+    if (!current && sortedAll.length > 0) {
+      lastTenant = sortedAll[0]['임차인명'] || sortedAll[0]['임차인'] || '';
+    }
+    var drillContractNo = current ? (current['계약번호']||'') : (sortedAll[0] ? (sortedAll[0]['계약번호']||'') : '');
     // 호실별 담당자 + 계약 부동산: 현재 계약자 우선, 없으면 가장 최근 계약자, 그것도 없으면 vac.partner*
     var staff = '', staffPhone = '', partnerName = '';
     if (current) {
@@ -17589,6 +17599,7 @@ async function okpi_render(){
     return {
       bldg: bldg, room: room, key: key,
       currentTenant: current ? (current['임차인명']||current['임차인']||'') : '',
+      lastTenant: lastTenant, drillContractNo: drillContractNo,
       staff: staff, staffPhone: staffPhone, partnerName: partnerName,
       avgMonths: avgMonths, midExit: midExit, expExit: expExit, midRate: midRate,
       renewCount: renewCount, totalContracts: allOfRoom.length,
@@ -17947,7 +17958,9 @@ async function okpi_render(){
       }).map(function(r){
         var cls = r.blackList ? 'bl' : r.watchList ? 'wt' : '';
         var statusTag = r.blackList ? '<span class="prp-tag bl">🚨 블랙</span>' : r.watchList ? '<span class="prp-tag wt">🟡 주의</span>' : (!r.currentTenant ? '<span class="prp-tag empty">공실</span>' : '-');
-        var tenantHtml = r.currentTenant ? r.currentTenant : '<span style="color:#9CA3AF">공실</span>';
+        var tenantHtml = r.currentTenant
+          ? r.currentTenant
+          : ('<span style="color:#9CA3AF">공실' + (r.lastTenant ? ' <small style="color:#94A3B8">(직전: '+escapeHtml(r.lastTenant)+')</small>' : '') + '</span>');
         // 금액
         var rentNum = parseFloat(String(r.vac.monthRentRaw||'').replace(/[^0-9.-]/g,''))||0;
         var vatNum = parseFloat(String(r.vac.vatRaw||'').replace(/[^0-9.-]/g,''))||0;
@@ -17955,7 +17968,8 @@ async function okpi_render(){
         var midPct = r.midExit > 0 && r.totalContracts > 0 ? Math.round(r.midRate*100) : 0;
         var staffHtml = r.staff ? (escapeHtml(r.staff) + (r.staffPhone ? '<br><small style="color:#9CA3AF;font-size:9.5px">'+(typeof fmtPhone==='function'?fmtPhone(r.staffPhone):r.staffPhone)+'</small>' : '')) : '<span style="color:#9CA3AF">-</span>';
         var partnerHtml = r.partnerName ? escapeHtml(r.partnerName) : '<span style="color:#9CA3AF">-</span>';
-        return '<tr class="'+cls+'">'
+        var rowClick = r.drillContractNo ? ' onclick="prp_drillToContract(\''+String(r.drillContractNo).replace(/\'/g,"\\\'")+'\')" style="cursor:pointer" title="클릭 시 입주관리에서 계약 상세 보기"' : '';
+        return '<tr class="'+cls+'"'+rowClick+'>'
           + '<td>'+escapeHtml(r.room)+'</td>'
           + '<td>'+tenantHtml+'</td>'
           + '<td>'+partnerHtml+'</td>'
@@ -18069,14 +18083,17 @@ async function okpi_render(){
       }).map(function(r){
         var cls = r.blackList ? 'bl' : r.watchList ? 'wt' : '';
         var statusTag = r.blackList ? '<span class="prp-tag bl">🚨 블랙</span>' : r.watchList ? '<span class="prp-tag wt">🟡 주의</span>' : (!r.currentTenant ? '<span class="prp-tag empty">공실</span>' : '-');
-        var tenantHtml = r.currentTenant ? r.currentTenant : '<span style="color:#9CA3AF">공실</span>';
+        var tenantHtml = r.currentTenant
+          ? r.currentTenant
+          : ('<span style="color:#9CA3AF">공실' + (r.lastTenant ? ' <small style="color:#94A3B8">(직전: '+escapeHtml(r.lastTenant)+')</small>' : '') + '</span>');
         var rentNum = parseFloat(String(r.vac.monthRentRaw||'').replace(/[^0-9.-]/g,''))||0;
         var vatNum = parseFloat(String(r.vac.vatRaw||'').replace(/[^0-9.-]/g,''))||0;
         var mgmtNum = parseFloat(String(r.vac.mgmtFee||'').replace(/[^0-9.-]/g,''))||0;
         var midPct = r.midExit > 0 && r.totalContracts > 0 ? Math.round(r.midRate*100) : 0;
         var staffHtml = r.staff ? (escapeHtml(r.staff) + (r.staffPhone ? '<br><small style="color:#9CA3AF;font-size:9.5px">'+(typeof fmtPhone==='function'?fmtPhone(r.staffPhone):r.staffPhone)+'</small>' : '')) : '<span style="color:#9CA3AF">-</span>';
         var partnerHtml = r.partnerName ? escapeHtml(r.partnerName) : '<span style="color:#9CA3AF">-</span>';
-        return '<tr class="'+cls+'">'
+        var rowClick = r.drillContractNo ? ' onclick="prp_drillToContract(\''+String(r.drillContractNo).replace(/\'/g,"\\\'")+'\')" style="cursor:pointer" title="클릭 시 입주관리에서 계약 상세 보기"' : '';
+        return '<tr class="'+cls+'"'+rowClick+'>'
           + '<td>'+escapeHtml(r.room)+'</td>'
           + '<td>'+tenantHtml+'</td>'
           + '<td>'+partnerHtml+'</td>'
@@ -18137,6 +18154,21 @@ async function okpi_render(){
   window.prp_setMode = function(m){ window._prpFilter.mode = m; renderPropertyView(); setTimeout(function(){ var i = document.getElementById('prpQ'); if (i) i.focus(); }, 30); };
   window.prp_selectBldg = function(b){ window._prpFilter.selectedBldg = b||''; renderPropertyView(); };
   window.prp_drillBldg = function(b){ window._prpFilter.selectedBldg = b||''; renderPropertyView(); };
+  // [v302] 호실 클릭 → 입주관리에서 해당 계약 상세 보기
+  window.prp_drillToContract = function(no){
+    if (!no) return;
+    try {
+      if (typeof crNavFromView === 'function') {
+        crNavFromView(String(no).trim(), 'property');
+      } else if (typeof selectContractRow === 'function' && typeof switchView === 'function') {
+        window._crPrevView = 'property';
+        selectContractRow(String(no).trim());
+        switchView('contract');
+      } else {
+        alert('입주관리 모듈을 찾을 수 없습니다');
+      }
+    } catch(e){ console.error('[v302] drill to contract:', e); }
+  };
   window.prp_backToOverview = function(){
     window._prpFilter.q = '';
     window._prpFilter.selectedBldg = '';
