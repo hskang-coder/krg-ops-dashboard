@@ -1,0 +1,210 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>연체 대응 REPORT — 목업</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Noto Sans KR","Malgun Gothic",sans-serif}
+body{background:#F3F4F6;padding:24px;color:#1F2937;font-size:12px;line-height:1.5}
+.page{max-width:820px;margin:0 auto;background:#fff;padding:22px 26px;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+.hdr{display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:2px solid #1B3976;margin-bottom:14px}
+.hdr .logo{width:40px;height:40px;background:#1B3976;color:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;font-style:italic}
+.hdr .ttl{font-size:18px;font-weight:900;color:#1B3976;letter-spacing:-.3px}
+.hdr .sub{font-size:11px;color:#6B7280;margin-top:2px}
+.hdr .right{margin-left:auto;text-align:right;font-size:10.5px;color:#9CA3AF}
+
+/* ① Identity Strip */
+.idstrip{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px;padding:10px 12px;background:#F8FAFC;border:1px solid #E5E7EB;border-radius:8px}
+.idcell{display:flex;flex-direction:column;gap:2px}
+.idcell .l{font-size:9.5px;color:#9CA3AF;font-weight:600;letter-spacing:.3px}
+.idcell .v{font-size:12.5px;color:#0F172A;font-weight:800}
+.idcell .v .grade{display:inline-block;padding:1px 7px;border-radius:3px;background:#DC2626;color:#fff;font-size:10.5px;margin-left:4px}
+.idcell .v.warn{color:#DC2626}
+
+/* ② Diagnostic */
+.section{margin-bottom:12px}
+.sectt{font-size:12.5px;font-weight:800;color:#1B3976;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.sectt::before{content:'';width:3px;height:13px;background:#1B3976;border-radius:2px}
+.diag{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;gap:6px}
+.kpi{background:#fff;border:1px solid #E5E7EB;border-radius:7px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.kpi .lbl{font-size:9.5px;color:#9CA3AF;font-weight:600}
+.kpi .val{font-size:18px;font-weight:900;color:#0F172A;line-height:1.1}
+.kpi .val.red{color:#DC2626}
+.kpi .val.amber{color:#D97706}
+.kpi .val.green{color:#059669}
+.kpi .sub{font-size:9.5px;color:#6B7280}
+.kpi.pat{background:linear-gradient(135deg,#FEE2E2,#FECACA);border:1.5px solid #DC2626}
+.kpi.pat .lbl{color:#991B1B}
+.kpi.pat .val{font-size:15px;color:#7F1D1D}
+
+/* ③ Promise Tracker */
+.tracker{background:#FFFBEB;border:1px solid #FDE68A;border-radius:7px;padding:10px 12px}
+.tk-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+.tk-hd .lbl{font-size:11px;color:#92400E;font-weight:700}
+.tk-rate{font-size:14px;font-weight:900;color:#92400E}
+.tk-list{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.tk-cell{background:#fff;border:1px solid #FCD34D;border-radius:5px;padding:5px 7px;font-size:10px}
+.tk-cell .d{color:#6B7280;font-weight:600;font-size:9.5px}
+.tk-cell .r{font-weight:800;margin-top:2px}
+.tk-cell.bad{border-color:#FCA5A5;background:#FEF2F2}
+.tk-cell.bad .r{color:#B91C1C}
+.tk-cell.late{border-color:#FCD34D;background:#FFFBEB}
+.tk-cell.late .r{color:#B45309}
+.tk-cell.good{border-color:#A7F3D0;background:#ECFDF5}
+.tk-cell.good .r{color:#065F46}
+
+/* ④ 대응 패턴 */
+.resp{display:grid;grid-template-columns:1.4fr 1fr;gap:10px}
+.resp-list{background:#F9FAFB;border:1px solid #E5E7EB;border-radius:7px;padding:8px 10px;max-height:152px;overflow-y:auto}
+.resp-row{display:grid;grid-template-columns:55px 50px 1fr;gap:6px;padding:4px 0;border-bottom:1px dashed #E5E7EB;font-size:10.5px}
+.resp-row:last-child{border-bottom:none}
+.resp-row .dt{color:#6B7280;font-weight:600;font-size:10px}
+.resp-row .ow{color:#1B3976;font-weight:700;font-size:10px}
+.resp-row .ms{color:#374151;line-height:1.4}
+.resp-row .ms b{color:#DC2626}
+.signals{display:flex;flex-direction:column;gap:6px}
+.sig-box{padding:7px 10px;border-radius:7px;font-size:10.5px;line-height:1.5}
+.sig-warn{background:#FEF2F2;border-left:3px solid #DC2626;color:#7F1D1D}
+.sig-good{background:#ECFDF5;border-left:3px solid #10B981;color:#065F46}
+.sig-box b{display:block;font-size:11px;margin-bottom:2px}
+
+/* ⑤ Action */
+.action{background:linear-gradient(180deg,#FEF2F2,#FFFFFF);border:1.5px solid #DC2626;border-radius:9px;padding:11px 14px}
+.action-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.action-hd .ttl{font-size:13px;font-weight:900;color:#7F1D1D}
+.action-step{background:#DC2626;color:#fff;padding:3px 10px;border-radius:14px;font-size:10.5px;font-weight:800}
+.act-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.act-card{background:#fff;border:1px solid #FCA5A5;border-radius:7px;padding:8px 10px}
+.act-card .ttl{font-size:11px;font-weight:800;color:#991B1B;margin-bottom:5px;display:flex;align-items:center;gap:4px}
+.act-card ul{padding-left:18px;font-size:10.5px;color:#374151;line-height:1.6}
+.act-card.next{border-color:#10B981}
+.act-card.next .ttl{color:#065F46}
+.act-card.next ul{padding-left:0;list-style:none}
+.act-card.next li{position:relative;padding-left:22px;margin-bottom:5px}
+.act-card.next li::before{content:counter(li);counter-increment:li;position:absolute;left:0;top:0;background:#10B981;color:#fff;width:16px;height:16px;border-radius:50%;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.act-card.next ul{counter-reset:li}
+.focal{margin-top:8px;background:#1B3976;color:#fff;padding:7px 11px;border-radius:6px;font-size:10.5px;line-height:1.5}
+.focal b{color:#FBBF24}
+
+/* footer */
+.foot{margin-top:14px;padding-top:9px;border-top:1px dashed #D1D5DB;font-size:9.5px;color:#9CA3AF;display:flex;justify-content:space-between}
+.btnbar{text-align:center;padding:14px;background:#F1F5F9;border-radius:8px;margin-bottom:14px;max-width:820px;margin:0 auto 14px}
+.btn{padding:9px 18px;background:#1B3976;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;margin:0 5px;font-size:12px}
+.btn.j{background:#0EA5E9}.btn.c{background:#6B7280}
+@page{size:A4 portrait;margin:8mm}
+@media print{body{background:#fff;padding:0}.page{box-shadow:none;border-radius:0}.btnbar{display:none}}
+</style></head><body>
+<div class="btnbar">
+  <button class="btn" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>
+  <button class="btn j">🖼️ JPG 저장</button>
+  <button class="btn c">닫기</button>
+</div>
+
+<div class="page">
+
+  <!-- 헤더 -->
+  <div class="hdr">
+    <div class="logo">K</div>
+    <div>
+      <div class="ttl">📊 연체 대응 종합 REPORT</div>
+      <div class="sub">계약자 수납·연체 패턴 분석 + 대응 핵심 액션</div>
+    </div>
+    <div class="right">발행일 2026-05-15<br>담당자 김영철</div>
+  </div>
+
+  <!-- ① Identity Strip -->
+  <div class="idstrip">
+    <div class="idcell"><span class="l">계약자 / 호실</span><span class="v">진흥창 · 갤럭시 하우스 107호 <span class="grade">E등급</span></span></div>
+    <div class="idcell"><span class="l">계약번호</span><span class="v">50051</span></div>
+    <div class="idcell"><span class="l">계약상태</span><span class="v">계약중</span></div>
+    <div class="idcell"><span class="l">시작일</span><span class="v">2025-02-12</span></div>
+    <div class="idcell"><span class="l">종료일 / D-Day</span><span class="v warn">2027-02-11 · D-272</span></div>
+    <div class="idcell"><span class="l">현재 프로세스</span><span class="v warn">② D2 연체독촉</span></div>
+  </div>
+
+  <!-- ② Diagnostic -->
+  <div class="section">
+    <div class="sectt">연체 패턴 진단</div>
+    <div class="diag">
+      <div class="kpi pat">
+        <span class="lbl">자동 분류</span>
+        <span class="val">⚠️ 만성 분할 연체 · 최근 악화</span>
+        <span class="sub">8/16회 연체 + 약속 미이행 4회</span>
+      </div>
+      <div class="kpi"><span class="lbl">연체율</span><span class="val red">50%</span><span class="sub">8/16회</span></div>
+      <div class="kpi"><span class="lbl">최장 연체일</span><span class="val red">32일</span><span class="sub">2025-11 발생</span></div>
+      <div class="kpi"><span class="lbl">누적 연체일</span><span class="val amber">68일</span><span class="sub">전체 기간</span></div>
+      <div class="kpi"><span class="lbl">현재 미납 / 연체</span><span class="val green">₩0 / 0일</span><span class="sub">전월 분 완납</span></div>
+    </div>
+  </div>
+
+  <!-- ③ Promise Tracker -->
+  <div class="section">
+    <div class="sectt">약속 이행 트래커 (최근 입금예정일 vs 실제 납부)</div>
+    <div class="tracker">
+      <div class="tk-hd"><span class="lbl">대응 시 약속한 입금예정일과 실제 납부일 매칭</span><span class="tk-rate">이행률 25% (1/4)</span></div>
+      <div class="tk-list">
+        <div class="tk-cell bad"><div class="d">약속 4/30</div><div class="r">❌ 미납 (D+15)</div></div>
+        <div class="tk-cell bad"><div class="d">약속 4/27</div><div class="r">❌ 미납 (D+18)</div></div>
+        <div class="tk-cell late"><div class="d">약속 4/27</div><div class="r">⚠️ 4/30 (+3일)</div></div>
+        <div class="tk-cell good"><div class="d">약속 3/30</div><div class="r">✓ 3/30 정시</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ④ 최근 대응 + 신호 -->
+  <div class="section">
+    <div class="sectt">최근 대응 패턴 (최근 6건) + 자동 신호 추출</div>
+    <div class="resp">
+      <div class="resp-list">
+        <div class="resp-row"><span class="dt">04-30</span><span class="ow">김영철</span><span class="ms">부재/이후 내전옴. 아직 돈 준다는 사람이 연락 두절. <b>법무적 대응 검토</b>, 17시 통화예정</span></div>
+        <div class="resp-row"><span class="dt">04-27</span><span class="ow">김영철</span><span class="ms">말일까지 상가/거주지 마무리 약속(200정도), <b>CB 망가짐</b>, 여기저기 터진 상태</span></div>
+        <div class="resp-row"><span class="dt">04-23</span><span class="ow">김준영</span><span class="ms"><b>지인통해</b> 돈빌려서 해결하기로</span></div>
+        <div class="resp-row"><span class="dt">04-20</span><span class="ow">김준영</span><span class="ms">27일 <b>지인통해</b> 돈빌려서 마련한다고 함</span></div>
+        <div class="resp-row"><span class="dt">04-10</span><span class="ow">김준영</span><span class="ms">통화중 <b>부재</b></span></div>
+        <div class="resp-row"><span class="dt">04-01</span><span class="ow">김준영</span><span class="ms">6일까지 납부 약속, 대출받는다고 함</span></div>
+      </div>
+      <div class="signals">
+        <div class="sig-box sig-warn"><b>🚨 위험 신호 (4)</b>
+          · 약속 미이행 4회 ("지인통해" 반복)<br>
+          · 자산 신호 — CB 망가짐 / 상가·거주지 정리<br>
+          · 응답 저하 — 부재 1회 / 두절 1회<br>
+          · 외부 의존 발언 (지인·대출) 4회 누적
+        </div>
+        <div class="sig-box sig-good"><b>✅ 협조 신호 (1)</b>
+          · 최근 자발적 통화 시도 (04-30 17시)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤ Action Box -->
+  <div class="section">
+    <div class="action">
+      <div class="action-hd"><span class="ttl">🎯 대응 핵심 액션 (Action Plan)</span><span class="action-step">현재 단계 ② D2 연체독촉</span></div>
+      <div class="act-grid">
+        <div class="act-card">
+          <div class="ttl">⚠ 급소 (Pressure Points)</div>
+          <ul>
+            <li><b>약속 4회 연속 미이행</b> — 추가 약속은 신뢰성 낮음</li>
+            <li><b>CB 등급 손상 자인</b> — 신규 대출/카드 차단 안내 가능</li>
+            <li>자산 정리 시점 임박 — <b>보증금 잠식 ETA</b> 계산 필요</li>
+            <li>법무 대응 발언 — <b>D3 단계 진입</b> 정당성 충분</li>
+          </ul>
+        </div>
+        <div class="act-card next">
+          <div class="ttl">✓ 권장 액션 (Next Steps)</div>
+          <ul>
+            <li>17시 통화 결과 확인 후 <b>D3 연체경고</b> 단계 진입 검토</li>
+            <li>임대인에게 <b>현황 1차 통지</b> + 대응방향 협의</li>
+            <li>보증금 잔여 개월수 산출 → 명도 준비 시점 백 계산</li>
+          </ul>
+        </div>
+      </div>
+      <div class="focal">💬 <b>다음 통화 핵심 멘트</b> — "지난 4회 약속이 모두 미이행됐습니다. 17시까지 구체적 입금 일자(통장 입금 확인 가능한 일자)를 못 주시면 임대인 통보 및 D3 단계 진입이 불가피합니다."</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div>📞 임대인 정진안 · 010-1234-5678</div>
+    <div>본 REPORT는 자동 생성됨 · 데이터 기준 2026-05-15</div>
+  </div>
+
+</div>
+</body></html>
