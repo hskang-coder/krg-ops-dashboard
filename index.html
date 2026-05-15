@@ -17341,22 +17341,23 @@ async function okpi_render(){
   function prp_injectCss(){
     if (prpCssInjected) return;
     var css = ''
-      + '.prop-inner{padding:18px 22px}'
-      + '.prp-kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:14px}'
-      + '.prp-kpi{background:#F8FAFC;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px}'
-      + '.prp-kpi .l{font-size:10.5px;color:#9CA3AF;font-weight:600;margin-bottom:4px}'
-      + '.prp-kpi .v{font-size:22px;font-weight:900;color:#0F172A;line-height:1.1}'
-      + '.prp-kpi .s{font-size:10px;color:#6B7280;margin-top:3px}'
+      + '.prop-inner{padding:14px 18px}'
+      // KPI — 다른 탭과 통일된 톤 (평면, 옅은 보더, 깔끔)
+      + '.prp-kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:12px}'
+      + '.prp-kpi{background:#fff;border:1px solid #E2E8F0;border-radius:7px;padding:10px 12px;transition:border-color .15s}'
+      + '.prp-kpi:hover{border-color:#CBD5E1}'
+      + '.prp-kpi .l{font-size:10.5px;color:#64748B;font-weight:600;margin-bottom:4px;line-height:1.3}'
+      + '.prp-kpi .v{font-size:20px;font-weight:800;color:#1E293B;line-height:1.1}'
+      + '.prp-kpi .s{font-size:10px;color:#94A3B8;margin-top:3px;line-height:1.35}'
       + '.prp-kpi.warn .v{color:#DC2626}.prp-kpi.amber .v{color:#D97706}.prp-kpi.good .v{color:#059669}.prp-kpi.teal .v{color:#0F766E}'
-      + '.prp-kpi.hero{background:linear-gradient(135deg,#F0F4FF,#fff);border:1.5px solid #1B3976}'
-      + '.prp-kpi.hero .l{color:#1B3976}.prp-kpi.hero .v{color:#1B3976}'
-      + '.prp-kpi.cyan{background:linear-gradient(135deg,#ECFEFF,#fff);border:1.5px solid #0E7490}'
-      + '.prp-kpi.cyan .l{color:#0E7490}.prp-kpi.cyan .v{color:#0E7490}'
-      + '.prp-flt{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 14px;background:#fff;border:1px solid #E5E7EB;border-radius:8px;margin-bottom:14px}'
-      + '.prp-flt input,.prp-flt select{height:32px;padding:0 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:12px;outline:none}'
+      + '.prp-kpi.hero{border-color:#94A3B8}'
+      + '.prp-kpi.hero .v{color:#1B3976}'
+      + '.prp-kpi.cyan .v{color:#0E7490;font-size:15px}'
+      + '.prp-flt{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:#fff;border:1px solid #E2E8F0;border-radius:7px;margin-bottom:12px}'
+      + '.prp-flt input,.prp-flt select{height:32px;padding:0 10px;border:1px solid #CBD5E1;border-radius:5px;font-size:12px;outline:none;background:#fff}'
       + '.prp-flt input{flex:1;min-width:220px}'
-      + '.prp-flt input:focus,.prp-flt select:focus{border-color:#1B3976}'
-      + '.prp-btn{padding:6px 11px;background:#fff;color:#1B3976;border:1.5px solid #D1D5DB;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700}'
+      + '.prp-flt input:focus,.prp-flt select:focus{border-color:#1B3976;box-shadow:0 0 0 2px rgba(27,57,118,.08)}'
+      + '.prp-btn{padding:6px 11px;background:#fff;color:#475569;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600}'
       + '.prp-btn.on{background:#1B3976;color:#fff;border-color:#1B3976}'
       + '.prp-btn.danger{border-color:#DC2626;color:#DC2626}.prp-btn.danger.on{background:#DC2626;color:#fff}'
       + '.prp-meta{margin-left:auto;font-size:11px;color:#6B7280}'
@@ -17389,6 +17390,14 @@ async function okpi_render(){
   }
 
   window._prpFilter = window._prpFilter || { q: '', grade: '', blOnly: false };
+  window._prpRoomsCache = window._prpRoomsCache || null;
+  window._prpSearchTimer = null;
+
+  // 캐시 키 — 데이터 크기 변경 시 무효화
+  function prp_cacheKey(){
+    return (Array.isArray(vacancyRawData)?vacancyRawData.length:0) + '|' + (Array.isArray(contractRawData)?contractRawData.length:0);
+  }
+  function prp_invalidateCache(){ window._prpRoomsCache = null; }
 
   // 호실별 통계 집계
   function prp_aggregateRoom(vac, contracts){
@@ -17437,9 +17446,23 @@ async function okpi_render(){
       var st = String(c['계약상태']||'').trim();
       return !st.includes('종료') && !st.includes('해지') && !st.includes('퇴실');
     });
+    // 호실별 담당자: 현재 계약자 우선, 없으면 가장 최근 계약자, 그것도 없으면 vac.partnerPerson
+    var staff = '';
+    var staffPhone = '';
+    if (current) {
+      staff = current['계약담당자'] || '';
+      staffPhone = current['계약담당자연락처'] || current['담당자연락처'] || '';
+    }
+    if (!staff && allOfRoom.length > 0) {
+      var latest = allOfRoom[0]; // contractRawData 정렬에 따름
+      staff = latest['계약담당자'] || '';
+      staffPhone = latest['계약담당자연락처'] || latest['담당자연락처'] || '';
+    }
+    if (!staff && vac.partnerPerson) staff = vac.partnerPerson;
     return {
       bldg: bldg, room: room, key: key,
       currentTenant: current ? (current['임차인명']||current['임차인']||'') : '',
+      staff: staff, staffPhone: staffPhone,
       avgMonths: avgMonths, midExit: midExit, expExit: expExit, midRate: midRate,
       renewCount: renewCount, totalContracts: allOfRoom.length,
       score: score, grade: grade, blackList: blackList, watchList: watchList,
@@ -17487,20 +17510,26 @@ async function okpi_render(){
       return;
     }
 
-    // 1. 호실별 집계 (unique by bldg+room) — 최신 vac 행 1개씩 추출
-    var roomMap = {};
-    vacancyRawData.forEach(function(v){
-      var bldg = String(v.propBuilding||'').trim();
-      var room = String(v.propRoom||'').trim();
-      if (!bldg || !room) return;
-      var key = bldg + '||' + room;
-      // 가장 최근(시작일 큰) 행 우선
-      var sd = parseKorDate(String(v.startDate||''));
-      if (!roomMap[key] || (sd && parseKorDate(String(roomMap[key].startDate||'')) < sd)) {
-        roomMap[key] = v;
-      }
-    });
-    var rooms = Object.values(roomMap).map(function(v){ return prp_aggregateRoom(v, contractRawData); });
+    // 1. 호실별 집계 (캐싱 — 매 검색 키 입력마다 재집계 방지)
+    var ck = prp_cacheKey();
+    var rooms;
+    if (window._prpRoomsCache && window._prpRoomsCache.key === ck) {
+      rooms = window._prpRoomsCache.data;
+    } else {
+      var roomMap = {};
+      vacancyRawData.forEach(function(v){
+        var bldg = String(v.propBuilding||'').trim();
+        var room = String(v.propRoom||'').trim();
+        if (!bldg || !room) return;
+        var key = bldg + '||' + room;
+        var sd = parseKorDate(String(v.startDate||''));
+        if (!roomMap[key] || (sd && parseKorDate(String(roomMap[key].startDate||'')) < sd)) {
+          roomMap[key] = v;
+        }
+      });
+      rooms = Object.values(roomMap).map(function(v){ return prp_aggregateRoom(v, contractRawData); });
+      window._prpRoomsCache = { key: ck, data: rooms };
+    }
 
     // 2. 부동산별 그룹핑
     var bldgGroups = {};
@@ -17599,9 +17628,11 @@ async function okpi_render(){
         var vatNum = parseFloat(String(r.vac.vatRaw||'').replace(/[^0-9.-]/g,''))||0;
         var mgmtNum = parseFloat(String(r.vac.mgmtFee||'').replace(/[^0-9.-]/g,''))||0;
         var midPct = r.midExit > 0 && r.totalContracts > 0 ? Math.round(r.midRate*100) : 0;
+        var staffHtml = r.staff ? (escapeHtml(r.staff) + (r.staffPhone ? '<br><small style="color:#9CA3AF;font-size:9.5px">'+(typeof fmtPhone==='function'?fmtPhone(r.staffPhone):r.staffPhone)+'</small>' : '')) : '<span style="color:#9CA3AF">-</span>';
         return '<tr class="'+cls+'">'
           + '<td>'+escapeHtml(r.room)+'</td>'
           + '<td>'+tenantHtml+'</td>'
+          + '<td>'+staffHtml+'</td>'
           + '<td style="text-align:right">'+(rentNum?fmtNum(rentNum):'-')+'</td>'
           + '<td style="text-align:right;'+(vatNum?'color:#D97706;font-weight:700':'color:#9CA3AF')+'">'+(vatNum?fmtNum(vatNum):'-')+'</td>'
           + '<td style="text-align:right">'+(mgmtNum?fmtNum(mgmtNum):'-')+'</td>'
@@ -17615,7 +17646,7 @@ async function okpi_render(){
       return ''
         + '<div class="prp-bldg">'
         +   '<div class="prp-bldg-hd">'
-        +     '<div class="nm">'+escapeHtml(b)+' <small>· '+escapeHtml(firstAddr)+'</small><div class="stf">📞 '+staffHtml+'</div></div>'
+        +     '<div class="nm">'+escapeHtml(b)+' <small>· '+escapeHtml(firstAddr)+'</small></div>'
         +     '<div class="prp-stat"><span>호실</span><b>'+ag.total+'</b></div>'
         +     '<div class="prp-stat'+(ag.vacant>0?' warn':'')+'"><span>공실</span><b>'+ag.vacant+'</b></div>'
         +     '<div class="prp-stat'+(ag.avgMonths>=12?' good':'')+'"><span>평균 거주</span><b>'+(ag.avgMonths.toFixed(1))+'m</b></div>'
@@ -17629,7 +17660,7 @@ async function okpi_render(){
         +     '<div class="prp-mg"><span class="l">📝 건물 메모</span><span class="v" style="color:#9CA3AF">Phase 2 — 시트 컬럼 연동 예정</span></div>'
         +   '</div>'
         +   '<table class="prp-tbl"><thead><tr>'
-        +     '<th>호실</th><th>현재 임차인</th><th style="text-align:right">월세</th><th style="text-align:right">부가세</th><th style="text-align:right">고정관리비</th>'
+        +     '<th>호실</th><th>현재 임차인</th><th>담당자</th><th style="text-align:right">월세</th><th style="text-align:right">부가세</th><th style="text-align:right">고정관리비</th>'
         +     '<th>평균 거주</th><th>중도퇴실</th><th>갱신</th><th>매력도</th><th>상태</th>'
         +   '</tr></thead><tbody>'+roomRows+'</tbody></table>'
         + '</div>';
@@ -17637,19 +17668,112 @@ async function okpi_render(){
 
     if (!bldgHtml) bldgHtml = '<div class="prp-empty">검색 결과가 없습니다 (필터 초기화 시 전체 표시)</div>';
 
-    host.innerHTML = kpiHtml + fltHtml + bldgHtml;
+    // 3-영역 분리: KPI / 필터 / 리스트 — 검색 시 리스트만 갱신해 input focus 유지
+    host.innerHTML = ''
+      + '<div id="prpKpiArea">'+kpiHtml+'</div>'
+      + '<div id="prpFltArea">'+fltHtml+'</div>'
+      + '<div id="prpListArea">'+bldgHtml+'</div>';
+    // 보존된 검색어로 input 채우기
+    var qIn = document.getElementById('prpQ');
+    if (qIn && flt.q) qIn.value = flt.q;
   };
 
-  // 필터 인터랙션
+  // 리스트 영역만 재렌더 (검색·필터 변경 시 input focus 유지)
+  function prp_renderListOnly(){
+    var listArea = document.getElementById('prpListArea');
+    var metaSpan = document.querySelector('#prpFltArea .prp-meta');
+    if (!listArea) { renderPropertyView(); return; }
+    var ck = prp_cacheKey();
+    var rooms = (window._prpRoomsCache && window._prpRoomsCache.key === ck) ? window._prpRoomsCache.data : null;
+    if (!rooms) { renderPropertyView(); return; }
+    var flt = window._prpFilter;
+    var bldgGroups = {};
+    rooms.forEach(function(r){ if (!bldgGroups[r.bldg]) bldgGroups[r.bldg] = []; bldgGroups[r.bldg].push(r); });
+    var bldgList = Object.keys(bldgGroups).sort();
+    var fmtNum = function(n){ n = parseFloat(n)||0; return n.toLocaleString('ko-KR'); };
+    var fmtPhoneSafe = function(p){ try { return (typeof fmtPhone === 'function') ? fmtPhone(p) : (p||''); } catch(e){ return p||''; } };
+    var matchFilter = function(r){
+      if (flt.blOnly && !r.blackList) return false;
+      if (flt.grade && r.grade !== flt.grade) return false;
+      if (flt.q) {
+        var q = flt.q.toLowerCase();
+        if (!(r.bldg+' '+r.room+' '+(r.currentTenant||'')).toLowerCase().includes(q)) return false;
+      }
+      return true;
+    };
+    var visibleRoomCount = 0;
+    var visibleBldgCount = 0;
+    var bldgHtml = bldgList.map(function(b){
+      var arr = bldgGroups[b].filter(matchFilter);
+      if (arr.length === 0) return '';
+      visibleBldgCount++;
+      visibleRoomCount += arr.length;
+      var ag = prp_aggregateBuilding(bldgGroups[b]);
+      var pwd = '';
+      bldgGroups[b].forEach(function(r){ if (!pwd && r.vac && r.vac.doorPwd) pwd = String(r.vac.doorPwd).trim(); });
+      var pwdMasked = pwd ? ('****' + pwd.slice(-4) + '<small style="margin-left:4px;color:#9CA3AF;cursor:pointer" onclick="prp_togglePwd(event,this,\''+pwd.replace(/\'/g,"\\\'")+'\')">(보기)</small>') : '<span style="color:#9CA3AF">미등록</span>';
+      var firstAddr = (bldgGroups[b][0] && bldgGroups[b][0].vac && bldgGroups[b][0].vac.propAddr) || '';
+      var roomRows = arr.sort(function(a,b){
+        var ra = parseInt(String(a.room).replace(/[^0-9]/g,''))||0;
+        var rb = parseInt(String(b.room).replace(/[^0-9]/g,''))||0;
+        return ra - rb;
+      }).map(function(r){
+        var cls = r.blackList ? 'bl' : r.watchList ? 'wt' : '';
+        var statusTag = r.blackList ? '<span class="prp-tag bl">🚨 블랙</span>' : r.watchList ? '<span class="prp-tag wt">🟡 주의</span>' : (!r.currentTenant ? '<span class="prp-tag empty">공실</span>' : '-');
+        var tenantHtml = r.currentTenant ? r.currentTenant : '<span style="color:#9CA3AF">공실</span>';
+        var rentNum = parseFloat(String(r.vac.monthRentRaw||'').replace(/[^0-9.-]/g,''))||0;
+        var vatNum = parseFloat(String(r.vac.vatRaw||'').replace(/[^0-9.-]/g,''))||0;
+        var mgmtNum = parseFloat(String(r.vac.mgmtFee||'').replace(/[^0-9.-]/g,''))||0;
+        var midPct = r.midExit > 0 && r.totalContracts > 0 ? Math.round(r.midRate*100) : 0;
+        var staffHtml = r.staff ? (escapeHtml(r.staff) + (r.staffPhone ? '<br><small style="color:#9CA3AF;font-size:9.5px">'+(typeof fmtPhone==='function'?fmtPhone(r.staffPhone):r.staffPhone)+'</small>' : '')) : '<span style="color:#9CA3AF">-</span>';
+        return '<tr class="'+cls+'">'
+          + '<td>'+escapeHtml(r.room)+'</td>'
+          + '<td>'+tenantHtml+'</td>'
+          + '<td>'+staffHtml+'</td>'
+          + '<td style="text-align:right">'+(rentNum?fmtNum(rentNum):'-')+'</td>'
+          + '<td style="text-align:right;'+(vatNum?'color:#D97706;font-weight:700':'color:#9CA3AF')+'">'+(vatNum?fmtNum(vatNum):'-')+'</td>'
+          + '<td style="text-align:right">'+(mgmtNum?fmtNum(mgmtNum):'-')+'</td>'
+          + '<td>'+(r.avgMonths?r.avgMonths.toFixed(1)+'월':'-')+'</td>'
+          + '<td>'+(r.midExit?r.midExit+'회 ('+midPct+'%)':'0회')+'</td>'
+          + '<td>'+(r.renewCount||0)+'회</td>'
+          + '<td><span class="prp-tag '+r.grade+'">'+r.grade+' '+r.score+'</span></td>'
+          + '<td>'+statusTag+'</td>'
+          + '</tr>';
+      }).join('');
+      return ''
+        + '<div class="prp-bldg">'
+        +   '<div class="prp-bldg-hd">'
+        +     '<div class="nm">'+escapeHtml(b)+' <small>· '+escapeHtml(firstAddr)+'</small></div>'
+        +     '<div class="prp-stat"><span>호실</span><b>'+ag.total+'</b></div>'
+        +     '<div class="prp-stat'+(ag.vacant>0?' warn':'')+'"><span>공실</span><b>'+ag.vacant+'</b></div>'
+        +     '<div class="prp-stat'+(ag.avgMonths>=12?' good':'')+'"><span>평균 거주</span><b>'+(ag.avgMonths.toFixed(1))+'m</b></div>'
+        +     '<div class="prp-stat"><span>⭐ 매력도</span><b style="color:#1B3976">'+ag.avgScore+' <span class="prp-tag '+ag.avgGrade+'" style="font-size:9px">'+ag.avgGrade+'</span></b></div>'
+        +     '<div class="prp-stat'+(ag.black>0?' warn':' good')+'"><span>블랙</span><b>'+ag.black+'</b></div>'
+        +     '<button class="prp-btn" onclick="alert(\'Phase 2: 물건 REPORT 발행 기능 예정\');event.stopPropagation()" style="background:#1B3976;color:#fff;border-color:#1B3976">📋 리포트</button>'
+        +   '</div>'
+        +   '<div class="prp-mgmt">'
+        +     '<div class="prp-mg"><span class="l">🔑 현관 비밀번호</span><span class="v pwdv">'+pwdMasked+'</span></div>'
+        +     '<div class="prp-mg"><span class="l">💰 변동관리비</span><span class="v" style="color:#9CA3AF">Phase 2 — 시트 컬럼 연동 예정</span></div>'
+        +     '<div class="prp-mg"><span class="l">📝 건물 메모</span><span class="v" style="color:#9CA3AF">Phase 2 — 시트 컬럼 연동 예정</span></div>'
+        +   '</div>'
+        +   '<table class="prp-tbl"><thead><tr>'
+        +     '<th>호실</th><th>현재 임차인</th><th>담당자</th><th style="text-align:right">월세</th><th style="text-align:right">부가세</th><th style="text-align:right">고정관리비</th>'
+        +     '<th>평균 거주</th><th>중도퇴실</th><th>갱신</th><th>매력도</th><th>상태</th>'
+        +   '</tr></thead><tbody>'+roomRows+'</tbody></table>'
+        + '</div>';
+    }).join('');
+    if (!bldgHtml) bldgHtml = '<div class="prp-empty">검색 결과가 없습니다 (필터 초기화 시 전체 표시)</div>';
+    listArea.innerHTML = bldgHtml;
+    if (metaSpan) metaSpan.textContent = visibleRoomCount + '개 호실 · ' + visibleBldgCount + '개 부동산';
+  }
+
+  // 필터 인터랙션 — 리스트만 갱신
   window.prp_setQ = function(v){
     window._prpFilter.q = v;
-    renderPropertyView();
-    setTimeout(function(){
-      var i2 = document.getElementById('prpQ');
-      if (i2) { i2.focus(); var c = i2.value.length; try { i2.setSelectionRange(c,c); } catch(_){} }
-    }, 0);
+    if (window._prpSearchTimer) clearTimeout(window._prpSearchTimer);
+    window._prpSearchTimer = setTimeout(function(){ prp_renderListOnly(); }, 200);
   };
-  window.prp_setGrade = function(v){ window._prpFilter.grade = v; renderPropertyView(); };
+  window.prp_setGrade = function(v){ window._prpFilter.grade = v; prp_renderListOnly(); };
   window.prp_toggleBl = function(){ window._prpFilter.blOnly = !window._prpFilter.blOnly; renderPropertyView(); };
   window.prp_clearFilter = function(){ window._prpFilter = { q: '', grade: '', blOnly: false }; renderPropertyView(); };
   window.prp_togglePwd = function(ev, el, pwd){
