@@ -10044,10 +10044,11 @@ function generateTenantDelqReport(contractNo){
   var TL = (typeof TL_PROCESSES !== 'undefined') ? TL_PROCESSES : {};
   if (!dLabel || dLabel === '정상') dLabel = TL[dStep] || '정상';
 
-  // ── 약속 이행 트래커 ──
-  // 대응내역의 입금예정일을 약속일로 보고, 그 이후 paymentRawData에 실제 납부일이 있는지 매칭
+  // ── 약속/납부 이행 트래커 ──
+  // 1순위: 대응내역의 입금예정일을 약속일로 보고 paymentRawData 납부일 매칭
+  // 2순위(폴백): 약속 데이터 없을 때 납기일↔납부일 비교 (S등급/연체없음 케이스)
   var promiseRows = (responses||[]).filter(function(r){ return r.payDate && r.jobType !== '갱신관리'; }).slice(0, 8);
-  var promiseStats = { total:0, kept:0, late:0, broken:0, cells:[] };
+  var promiseStats = { total:0, kept:0, late:0, broken:0, cells:[], source:'responses' };
   var today0 = new Date(); today0.setHours(0,0,0,0);
   promiseRows.forEach(function(r){
     var promiseDate = parseKorDate(r.payDate || '');
@@ -10075,6 +10076,46 @@ function generateTenantDelqReport(contractNo){
       promiseStats.cells.push({type:'late', d:'약속 '+promiseStr, r:'⚠️ '+(paid.pd.getMonth()+1)+'/'+paid.pd.getDate()+' (+'+paid.gap+'일)'});
     }
   });
+  // 폴백 — 약속 트래커 데이터가 없으면 납부 이력(납기일↔납부일)로 분석
+  if (promiseStats.total === 0) {
+    promiseStats.source = 'payments';
+    var rentPayRows = (payments||[]).filter(function(p){
+      var nm = String(p['청구서명']||p['납부종류']||'');
+      return /임대료|월세/.test(nm) && !/수수료/.test(nm);
+    });
+    // 납기일 기준 최신 순 정렬 → 최근 8건만
+    rentPayRows.sort(function(a,b){
+      var da = parseKorDate(String(a['납기일']||'')); var db = parseKorDate(String(b['납기일']||''));
+      return (db?db.getTime():0) - (da?da.getTime():0);
+    });
+    rentPayRows.slice(0, 8).reverse().forEach(function(p){
+      var due = parseKorDate(String(p['납기일']||''));
+      var paid = parseKorDate(String(p['납부일']||''));
+      var status = String(p['납부상태']||'').trim();
+      if (!due) return;
+      promiseStats.total++;
+      var dueStr = (due.getMonth()+1) + '/' + due.getDate();
+      if (paid && /납부/.test(status)) {
+        var gap = Math.round((paid - due) / (24*3600*1000));
+        var paidStr = (paid.getMonth()+1) + '/' + paid.getDate();
+        if (gap <= 0) {
+          promiseStats.kept++;
+          var prefix = gap < 0 ? '✓ ' + paidStr + ' (D-' + Math.abs(gap) + ' 선납)' : '✓ ' + paidStr + ' 정시';
+          promiseStats.cells.push({type:'good', d:'납기 '+dueStr, r: prefix});
+        } else {
+          promiseStats.late++;
+          promiseStats.cells.push({type:'late', d:'납기 '+dueStr, r:'⚠️ '+paidStr+' (+'+gap+'일)'});
+        }
+      } else if (due > today0) {
+        promiseStats.cells.push({type:'pending', d:'납기 '+dueStr, r:'⏳ 납기 도래 예정'});
+      } else {
+        // 납기 지났는데 미납 상태
+        var daysFromDue = Math.round((today0 - due) / (24*3600*1000));
+        promiseStats.broken++;
+        promiseStats.cells.push({type:'bad', d:'납기 '+dueStr, r:'❌ 미납 (D+'+daysFromDue+')'});
+      }
+    });
+  }
   var keepRate = promiseStats.total > 0 ? Math.round((promiseStats.kept / promiseStats.total) * 100) : null;
 
   // ── 자동 신호 추출 ──
@@ -10187,7 +10228,7 @@ function generateTenantDelqReport(contractNo){
     dStep: dStep, dLabel: dLabel,
     lateRate: lateRate, lateCount: lateCount, billCount: billCount, maxLateDays: maxLateDays, totalLateDays: totalLateDays,
     currentUnpaid: currentUnpaid, currentLateDays: currentLateDays, rentDel: rentDel, feeDel: feeDel, etcDel: etcDel,
-    pattern: pattern, keepRate: keepRate, promiseStats: promiseStats,
+    pattern: pattern, keepRate: keepRate, promiseStats: promiseStats, promiseSource: promiseStats.source,
     riskHits: riskHits, goodHits: goodHits,
     recentRows: recentRows, pressurePoints: pressurePoints, nextActions: nextActions, focalMsg: focalMsg,
     landlordName: landlordName, landlordPhone: landlordPhone,
@@ -10223,8 +10264,10 @@ function buildDelqReportHtml(d){
 
   var trackerCells = (d.promiseStats.cells||[]).slice(0,8).map(function(c){
     return '<div class="tk-cell '+c.type+'"><div class="d">'+c.d+'</div><div class="r">'+c.r+'</div></div>';
-  }).join('') || '<div style="grid-column:1/-1;text-align:center;color:#9CA3AF;padding:14px;font-size:11px">입금예정일이 기록된 대응이 없습니다</div>';
-  var trackerRate = d.keepRate !== null ? d.keepRate + '% (' + d.promiseStats.kept + '/' + d.promiseStats.total + ')' : '데이터 부족';
+  }).join('') || '<div style="grid-column:1/-1;text-align:center;color:#059669;padding:14px;font-size:12px;font-weight:700;background:#ECFDF5;border:1px dashed #6EE7B7;border-radius:6px">🏆 연체·약속 데이터 없음 — 우수 납부 이력 (이행률 100% 간주)</div>';
+  var trackerRate = (d.promiseStats.cells && d.promiseStats.cells.length === 0)
+    ? '100% (우수 등급)'
+    : (d.keepRate !== null ? d.keepRate + '% (' + d.promiseStats.kept + '/' + d.promiseStats.total + ')' : '데이터 부족');
 
   var recentRowsHtml = (d.recentRows||[]).map(function(r){
     return '<div class="resp-row"><span class="dt">'+r.dt+'</span><span class="ow">'+r.ow+'</span><span class="ms">'+r.ms+'</span></div>';
@@ -10339,8 +10382,8 @@ function buildDelqReportHtml(d){
     +       '<div class="kpi"><span class="lbl">누적 연체일</span><span class="val '+totalDaysClass+'">'+d.totalLateDays+'일</span><span class="sub">전체 기간</span></div>'
     +       '<div class="kpi"><span class="lbl">현재 미납 / 연체</span><span class="val '+unpaidClass+'">'+unpaidLbl+'</span><span class="sub">임대료 '+fmtMoney0(d.rentDel)+' / 수수료 '+fmtMoney0(d.feeDel)+'</span></div>'
     +     '</div></div>'
-    +   '<div class="section"><div class="sectt">약속 이행 트래커 (대응 시 입금예정일 ↔ 실제 납부)</div>'
-    +     '<div class="tracker"><div class="tk-hd"><span class="lbl">약속한 입금예정일과 실제 납부일 매칭 (최근 8건)</span><span class="tk-rate">이행률 '+trackerRate+'</span></div><div class="tk-list">'+trackerCells+'</div></div>'
+    +   '<div class="section"><div class="sectt">' + (d.promiseSource === 'payments' ? '납부 이행 트래커 (납기일 ↔ 실제 납부일)' : '약속 이행 트래커 (대응 시 입금예정일 ↔ 실제 납부)') + '</div>'
+    +     '<div class="tracker"><div class="tk-hd"><span class="lbl">' + (d.promiseSource === 'payments' ? '납부 이력 기반 — 납기일과 실제 납부일 매칭 (최근 8건, S/A등급 우수 패턴 분석)' : '약속한 입금예정일과 실제 납부일 매칭 (최근 8건)') + '</span><span class="tk-rate">' + (d.promiseSource === 'payments' ? '정시 납부율' : '이행률') + ' '+trackerRate+'</span></div><div class="tk-list">'+trackerCells+'</div></div>'
     +   '</div>'
     +   '<div class="section"><div class="sectt">최근 대응 6건 + 자동 신호 추출</div>'
     +     '<div class="resp"><div class="resp-list">'+recentRowsHtml+'</div><div class="signals">'+riskBox+goodBox+'</div></div>'
