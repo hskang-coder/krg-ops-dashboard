@@ -9775,39 +9775,41 @@ function generateLandlordReport(contractNo){
   // 임대인 손실 (케이알지 보증 모델 — 0원 보장)
   var landlordLoss = 0;
 
-  // 월별 캘린더 — 계약시작일부터 현재까지 월별 상태
+  // 월별 캘린더 — 최근 12개월 (오늘 기준 -11 ~ 오늘)
   var startDate = parseKorDate(c['시작일']||'') || (vac.startDate ? new Date(vac.startDate) : null);
   var endDate = parseKorDate(c['종료일']||'') || (vac.endDate ? new Date(vac.endDate) : null);
   var today = new Date(); today.setHours(0,0,0,0);
   var monthCells = [];
-  if (startDate) {
-    var cur = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-    var lastM = endDate || new Date(today.getFullYear(), today.getMonth()+1, 1);
-    var lateMonths = {}; // 임차인이 연체한 월 (대략)
-    rentRows.forEach(function(p){
-      var dueStr = String(p['납기일']||'');
-      var due = parseKorDate(dueStr);
-      if (!due) return;
-      var k = due.getFullYear() + '-' + String(due.getMonth()+1).padStart(2,'0');
-      var s = String(p['납부상태']||'').trim();
-      var unpaid = parseSafeMoney(p['미납(연체)금액(원)'] || p['미납'] || p['미납액'] || p['연체금액'] || 0);
-      if (/연체|분납/.test(s) || unpaid > 0) lateMonths[k] = '연체';
-      else if (!lateMonths[k]) lateMonths[k] = '정시';
-    });
-    var safety = 0;
-    while (cur <= lastM && safety < 60) {
-      var k = cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0');
-      var label = (cur.getMonth()+1) + '월';
-      var yr = String(cur.getFullYear()).slice(2);
-      var type, hint;
-      if (cur > today) { type = 'future'; hint = '예정'; }
-      else if (lateMonths[k] === '연체') { type = 'guarantee'; hint = '케이알지 보증 처리'; }
-      else if (lateMonths[k] === '정시') { type = 'ontime'; hint = '정시 수령'; }
-      else { type = 'unknown'; hint = '데이터 없음'; }
-      monthCells.push({ year: yr, label: label, type: type, hint: hint });
-      cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
-      safety++;
-    }
+  // 임차인 연체 월 맵 (납기일 기준)
+  var lateMonths = {};
+  rentRows.forEach(function(p){
+    var dueStr = String(p['납기일']||'');
+    var due = parseKorDate(dueStr);
+    if (!due) return;
+    var k = due.getFullYear() + '-' + String(due.getMonth()+1).padStart(2,'0');
+    var s = String(p['납부상태']||'').trim();
+    var unpaid = parseSafeMoney(p['미납(연체)금액(원)'] || p['미납'] || p['미납액'] || p['연체금액'] || 0);
+    if (/연체|분납/.test(s) || unpaid > 0) lateMonths[k] = '연체';
+    else if (!lateMonths[k]) lateMonths[k] = '정시';
+  });
+  // 윈도우: 오늘 기준 -11개월 ~ 오늘 (12개월)
+  var winEnd = new Date(today.getFullYear(), today.getMonth(), 1);
+  var winStart = new Date(winEnd.getFullYear(), winEnd.getMonth() - 11, 1);
+  var cur = new Date(winStart);
+  for (var ci = 0; ci < 12; ci++) {
+    var k = cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0');
+    var label = (cur.getMonth()+1) + '월';
+    var yr = String(cur.getFullYear()).slice(2);
+    var type, hint;
+    var curMonthEnd = new Date(cur.getFullYear(), cur.getMonth()+1, 0);
+    if (startDate && curMonthEnd < startDate) { type = 'before'; hint = '계약 시작 전'; }
+    else if (endDate && cur > endDate) { type = 'after'; hint = '계약 종료 후'; }
+    else if (cur > today) { type = 'future'; hint = '예정'; }
+    else if (lateMonths[k] === '연체') { type = 'guarantee'; hint = '케이알지 보증 처리'; }
+    else if (lateMonths[k] === '정시') { type = 'ontime'; hint = '정시 수령'; }
+    else { type = 'unknown'; hint = '데이터 없음'; }
+    monthCells.push({ year: yr, label: label, type: type, hint: hint });
+    cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
   }
 
   // D-Day
@@ -9874,6 +9876,7 @@ function buildLandlordReportHtml(d){
     if (cls === 'ontime') { color = '#059669'; bg = '#D1FAE5'; tx = '#064E3B'; mark = '✓'; }
     else if (cls === 'guarantee') { color = '#0EA5E9'; bg = '#DBEAFE'; tx = '#1E3A8A'; mark = '🛡️'; }
     else if (cls === 'future') { color = '#9CA3AF'; bg = '#F3F4F6'; tx = '#6B7280'; mark = '·'; }
+    else if (cls === 'before' || cls === 'after') { color = '#E5E7EB'; bg = '#FAFAFA'; tx = '#D1D5DB'; mark = '–'; }
     return '<div class="mcell" style="border-color:'+color+';background:'+bg+';color:'+tx+'" title="'+m.hint+'"><div class="my">'+m.year+'.'+m.label+'</div><div class="mk">'+mark+'</div></div>';
   }).join('') || '<div style="grid-column:1/-1;text-align:center;color:#9CA3AF;padding:14px;font-size:11px">계약 기간 데이터 부족</div>';
   // 비교표 행
@@ -9970,12 +9973,13 @@ function buildLandlordReportHtml(d){
     +       '<div class="kpi"><span class="lbl">누적 임대인 수령액</span><span class="val teal">'+fmtMoney0(d.cumulativeReceived)+'</span><span class="sub">계약 시작 이후</span></div>'
     +       '<div class="kpi"><span class="lbl">케이알지 보증 처리</span><span class="val amber">'+d.tenantLateButLandlordPaid+'건</span><span class="sub">임차인 연체→임대인 정상 수령</span></div>'
     +     '</div></div>'
-    +   '<div class="section"><div class="sectt">월별 임대료 수령 현황 (계약시작 ~ 종료)</div>'
+    +   '<div class="section"><div class="sectt">월별 임대료 수령 현황 (최근 12개월)</div>'
     +     '<div class="cal">'
     +       '<div class="cal-legend">'
     +         '<span><span class="dot" style="background:#D1FAE5;border:1.5px solid #059669"></span>정시 수령 ✓</span>'
     +         '<span><span class="dot" style="background:#DBEAFE;border:1.5px solid #0EA5E9"></span>케이알지 보증 처리 🛡️ (임차인 연체 → 임대인은 정상 수령)</span>'
     +         '<span><span class="dot" style="background:#F3F4F6;border:1.5px solid #9CA3AF"></span>예정 ·</span>'
+    +         '<span><span class="dot" style="background:#FAFAFA;border:1.5px solid #E5E7EB"></span>계약 외 –</span>'
     +       '</div>'
     +       '<div class="cal-grid">'+monthCellsHtml+'</div>'
     +     '</div></div>'
