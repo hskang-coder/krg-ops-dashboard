@@ -17433,9 +17433,32 @@ async function okpi_render(){
     var avgMonths = monthCnt > 0 ? (totalMonths / monthCnt) : 0;
     var midRate = totalEnded > 0 ? (midExit / totalEnded) : 0;
     var expRate = totalEnded > 0 ? (expExit / totalEnded) : 0;
-    // 매력도 점수: (평균거주월 × 0.4) + (만기퇴실 비율 × 30) + (갱신 점수 × 30)
-    var renewScore = Math.min(renewCount * 30, 30); // 최대 30
-    var score = Math.round((Math.min(avgMonths, 50) * 0.8) + (expRate * 30) + renewScore);
+    // [v295] 매력도 공식 — 현실 반영 (신규 호실 vs 검증 호실 분기)
+    // 현재 진행 중 계약의 진행 개월수 계산
+    var today_ = new Date(); today_.setHours(0,0,0,0);
+    var monthsActiveMax = 0;
+    allOfRoom.forEach(function(c){
+      var sd = parseKorDate(String(c['시작일']||''));
+      if (sd) {
+        var m = (today_.getFullYear()-sd.getFullYear())*12 + (today_.getMonth()-sd.getMonth());
+        if (m > monthsActiveMax) monthsActiveMax = m;
+      }
+    });
+    var score, isNew = false;
+    if (totalEnded === 0) {
+      // 신규 호실 — 종료 이력 0건 (갱신 기회 미도래)
+      // baseline 65 + 거주 진행 가점 (24개월 만점 +25)
+      isNew = true;
+      score = Math.round(65 + Math.min(monthsActiveMax, 24) / 24 * 25);
+      // 24개월+ 거주 중이고 갱신/연체 흔적 없으면 추가 가점 (실거주 안정성)
+      if (monthsActiveMax >= 24) score = Math.min(score + 5, 95);
+    } else {
+      // 검증 호실 — 종료 이력 1건 이상 (평가 가능)
+      var monthsScore = Math.min(avgMonths, 36) / 36 * 50; // 0~50점
+      var expScore = expRate * 30;                          // 0~30점
+      var renewScore = Math.min(renewCount, 2) * 10;        // 0~20점
+      score = Math.round(monthsScore + expScore + renewScore);
+    }
     score = Math.max(0, Math.min(100, score));
     var grade = score >= 80 ? 'S' : score >= 60 ? 'A' : score >= 40 ? 'B' : score >= 20 ? 'C' : 'D';
     // 블랙·주의 판정
@@ -17466,6 +17489,7 @@ async function okpi_render(){
       avgMonths: avgMonths, midExit: midExit, expExit: expExit, midRate: midRate,
       renewCount: renewCount, totalContracts: allOfRoom.length,
       score: score, grade: grade, blackList: blackList, watchList: watchList,
+      isNew: isNew, monthsActiveMax: monthsActiveMax,
       vac: vac
     };
   }
@@ -17639,7 +17663,7 @@ async function okpi_render(){
           + '<td>'+(r.avgMonths?r.avgMonths.toFixed(1)+'월':'-')+'</td>'
           + '<td>'+(r.midExit?r.midExit+'회 ('+midPct+'%)':'0회')+'</td>'
           + '<td>'+(r.renewCount||0)+'회</td>'
-          + '<td><span class="prp-tag '+r.grade+'">'+r.grade+' '+r.score+'</span></td>'
+          + '<td><span class="prp-tag '+r.grade+'">'+r.grade+' '+r.score+'</span>'+(r.isNew?'<span style="margin-left:4px;font-size:9px;color:#0EA5E9;font-weight:700">🆕</span>':'')+'</td>'
           + '<td>'+statusTag+'</td>'
           + '</tr>';
       }).join('');
@@ -17736,7 +17760,7 @@ async function okpi_render(){
           + '<td>'+(r.avgMonths?r.avgMonths.toFixed(1)+'월':'-')+'</td>'
           + '<td>'+(r.midExit?r.midExit+'회 ('+midPct+'%)':'0회')+'</td>'
           + '<td>'+(r.renewCount||0)+'회</td>'
-          + '<td><span class="prp-tag '+r.grade+'">'+r.grade+' '+r.score+'</span></td>'
+          + '<td><span class="prp-tag '+r.grade+'">'+r.grade+' '+r.score+'</span>'+(r.isNew?'<span style="margin-left:4px;font-size:9px;color:#0EA5E9;font-weight:700">🆕</span>':'')+'</td>'
           + '<td>'+statusTag+'</td>'
           + '</tr>';
       }).join('');
