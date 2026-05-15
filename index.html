@@ -17430,7 +17430,7 @@ async function okpi_render(){
     prpCssInjected = true;
   }
 
-  window._prpFilter = window._prpFilter || { q: '', grade: '', blOnly: false, selectedBldg: '', mode: 'room', sort: 'score', sortDir: 'desc' };
+  window._prpFilter = window._prpFilter || { q: '', grade: '', blOnly: false, selectedBldg: '', mode: 'room', sort: 'score', sortDir: 'desc', showInactive: false };
   // [v299/Phase2] 임대인 성향 데이터 (gid=554798125 H열)
   window._prpLandlordTraits = window._prpLandlordTraits || null;
   function prp_fetchLandlordTraits(){
@@ -17845,6 +17845,14 @@ async function okpi_render(){
       var summaries = bldgList.map(function(b){
         return prp_aggregateBuildingSummary(b, bldgGroups[b]);
       });
+      // [v304] 디폴트: 계약중 호실 있는 부동산만 (showInactive 토글로 변경 가능)
+      var totalBldg = summaries.length;
+      var hiddenInactive = 0;
+      if (!flt.showInactive) {
+        var filtered = summaries.filter(function(s){ return s.activeRooms > 0; });
+        hiddenInactive = totalBldg - filtered.length;
+        summaries = filtered;
+      }
       // 정렬
       var sortKey = flt.sort || 'score';
       var sortDir = flt.sortDir || 'desc';
@@ -17911,10 +17919,14 @@ async function okpi_render(){
           + '<td style="text-align:center">'+(hasBl?'<span class="prp-tag bl" title="블랙 호실 '+s.blackCnt+'개">🚨 '+s.blackCnt+'</span>':'-')+'</td>'
           + '</tr>';
       }).join('');
+      var inactiveToggle = ''
+        + '<button onclick="prp_toggleInactive()" style="padding:5px 10px;background:'+(flt.showInactive?'#1B3976':'#fff')+';color:'+(flt.showInactive?'#fff':'#1B3976')+';border:1px solid #1B3976;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;margin-left:10px">'
+        +   (flt.showInactive ? '✓ 미운영 포함 ('+totalBldg+'개)' : '미운영 보기'+(hiddenInactive>0?' ('+hiddenInactive+'개 숨김)':''))
+        + '</button>';
       return ''
         + dashHtml
         + '<div class="prp-overview">'
-        +   '<div class="prp-overview-hd"><div class="ttl">📋 부동산 단위 요약</div><div class="meta">'+summaries.length+'개 부동산 · 클릭 시 호실 상세 보기 · '+(window._prpLandlordTraits?'임대인 성향 자동 분류':'<span style="color:#9CA3AF">임대인 성향 로딩 중...</span>')+'</div></div>'
+        +   '<div class="prp-overview-hd"><div class="ttl">📋 부동산 단위 요약</div><div class="meta">'+summaries.length+'개 부동산 · 클릭 시 호실 상세 보기 · '+(window._prpLandlordTraits?'임대인 성향 자동 분류':'<span style="color:#9CA3AF">임대인 성향 로딩 중...</span>')+inactiveToggle+'</div></div>'
         +   '<table class="prp-ov-tbl">'
         +     '<thead><tr>'
         +       th('name','임대인 · 주소 · 부동산명','style="min-width:240px"')
@@ -18150,7 +18162,8 @@ async function okpi_render(){
   };
   window.prp_setGrade = function(v){ window._prpFilter.grade = v; renderPropertyView(); };
   window.prp_toggleBl = function(){ window._prpFilter.blOnly = !window._prpFilter.blOnly; renderPropertyView(); };
-  window.prp_clearFilter = function(){ window._prpFilter = { q: '', grade: '', blOnly: false, selectedBldg: '', mode: 'room' }; renderPropertyView(); };
+  window.prp_clearFilter = function(){ window._prpFilter = { q: '', grade: '', blOnly: false, selectedBldg: '', mode: 'room', sort: 'score', sortDir: 'desc', showInactive: false }; renderPropertyView(); };
+  window.prp_toggleInactive = function(){ window._prpFilter.showInactive = !window._prpFilter.showInactive; renderPropertyView(); };
   window.prp_setMode = function(m){ window._prpFilter.mode = m; renderPropertyView(); setTimeout(function(){ var i = document.getElementById('prpQ'); if (i) i.focus(); }, 30); };
   window.prp_selectBldg = function(b){ window._prpFilter.selectedBldg = b||''; renderPropertyView(); };
   window.prp_drillBldg = function(b){ window._prpFilter.selectedBldg = b||''; renderPropertyView(); };
