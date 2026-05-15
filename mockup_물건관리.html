@@ -1,0 +1,254 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>물건관리 — 목업 v1</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Noto Sans KR","Malgun Gothic",sans-serif}
+body{background:#F1F5F9;padding:20px;color:#1F2937;font-size:12.5px;line-height:1.5}
+.app{max-width:1280px;margin:0 auto}
+
+/* Header */
+.hd{background:#1B3976;color:#fff;padding:14px 22px;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:12px}
+.hd .logo{width:36px;height:36px;background:#FBBF24;color:#1B3976;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;font-style:italic}
+.hd .ttl{font-size:17px;font-weight:900}
+.hd .sub{font-size:11px;color:#CBD5E1;margin-top:1px}
+.hd .right{margin-left:auto;font-size:11px;color:#CBD5E1}
+
+/* KPI Summary */
+.kpis{background:#fff;padding:18px 22px;display:grid;grid-template-columns:repeat(7,1fr);gap:8px;border-bottom:1px solid #E5E7EB}
+.kpi{background:#F8FAFC;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px}
+.kpi .l{font-size:10.5px;color:#9CA3AF;font-weight:600;margin-bottom:4px}
+.kpi .v{font-size:22px;font-weight:900;color:#0F172A;line-height:1.1}
+.kpi .s{font-size:10px;color:#6B7280;margin-top:3px}
+.kpi.warn .v{color:#DC2626}
+.kpi.amber .v{color:#D97706}
+.kpi.good .v{color:#059669}
+.kpi.teal .v{color:#0F766E}
+
+/* Filters */
+.flt{background:#fff;padding:14px 22px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #E5E7EB;flex-wrap:wrap}
+.flt input,.flt select{height:34px;padding:0 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:12.5px;outline:none}
+.flt input{flex:1;min-width:240px}
+.flt input:focus,.flt select:focus{border-color:#1B3976}
+.flt-btn{padding:7px 12px;background:#fff;color:#1B3976;border:1.5px solid #D1D5DB;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700}
+.flt-btn.on{background:#1B3976;color:#fff;border-color:#1B3976}
+.flt-btn.danger{border-color:#DC2626;color:#DC2626}
+.flt-btn.danger.on{background:#DC2626;color:#fff}
+.flt-meta{margin-left:auto;font-size:11px;color:#6B7280}
+
+/* Map toggle */
+.maparea{background:#fff;border-bottom:1px solid #E5E7EB;display:none;padding:8px 22px}
+.maparea.on{display:block}
+.map-stub{height:260px;background:linear-gradient(135deg,#E0F2FE,#F0FDFA);border:1px dashed #5EEAD4;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#0F766E;font-weight:700}
+
+/* Property group */
+.body{background:#fff;border-radius:0 0 10px 10px;padding:0 22px 22px;border:1px solid #E5E7EB;border-top:none}
+.bldg{margin-top:14px;border:1px solid #E5E7EB;border-radius:9px;overflow:hidden}
+.bldg-hd{display:grid;grid-template-columns:1.4fr auto auto auto auto auto auto;gap:14px;padding:12px 16px;background:#F8FAFC;border-bottom:1px solid #E5E7EB;cursor:pointer;align-items:center}
+.bldg-hd .nm{font-size:14px;font-weight:800;color:#0F172A;display:flex;flex-direction:column;gap:3px}
+.bldg-hd .nm small{font-size:10.5px;color:#6B7280;font-weight:600;margin-left:6px}
+.bldg-hd .bldg-staff{font-size:11px;color:#374151;font-weight:500;display:flex;align-items:center;gap:4px;margin-left:0}
+.bldg-hd .bldg-staff b{color:#1B3976;font-weight:700;margin-right:2px}
+.bldg-hd .stat{display:flex;flex-direction:column;align-items:center;font-size:9.5px;color:#9CA3AF;font-weight:600}
+.bldg-hd .stat b{font-size:13.5px;color:#1B3976;margin-top:1px}
+.bldg-hd .stat.warn b{color:#DC2626}
+.bldg-hd .stat.good b{color:#059669}
+.bldg-hd .toggle{font-size:14px;color:#6B7280}
+.rpt-btn{background:#1B3976;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.rpt-btn:hover{background:#2563A8}
+
+.bldg-mgmt{display:grid;grid-template-columns:1fr 1fr 2.2fr;gap:1px;background:#E5E7EB;border-bottom:1px solid #E5E7EB}
+.mg-cell{background:#F8FAFC;padding:9px 14px;display:flex;align-items:center;gap:10px;font-size:11.5px}
+.mg-cell .l{font-size:10.5px;color:#1B3976;font-weight:700;white-space:nowrap}
+.mg-cell .v{color:#0F172A;font-weight:600;flex:1}
+.pwd-v{font-family:Menlo,monospace;letter-spacing:1px}
+.pwd-v small{margin-left:4px;color:#9CA3AF;font-family:inherit;cursor:pointer}
+.mg-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;color:#374151}
+.mg-toggle input{accent-color:#0F766E}
+.mg-edit{background:#fff;border:1px solid #CBD5E1;border-radius:4px;padding:3px 8px;font-size:10px;color:#1B3976;font-weight:700;cursor:pointer}
+.mg-memo{flex-direction:column;align-items:flex-start;gap:3px}
+.mg-memo .v{font-size:11px;color:#374151;line-height:1.5;font-weight:500}
+.mg-memo .mg-edit{margin-left:6px}
+.rooms{padding:0}
+.tbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.tbl thead th{background:#F1F5F9;padding:8px 9px;text-align:left;font-size:10.5px;color:#475569;font-weight:700;border-bottom:1.5px solid #E5E7EB}
+.tbl tbody td{padding:7px 9px;border-bottom:1px solid #F1F5F9;color:#1F2937;vertical-align:middle}
+.tbl tbody tr:hover{background:#FAFBFE;cursor:pointer}
+.tbl tbody tr.bl{background:#FEF2F2}
+.tbl tbody tr.bl:hover{background:#FECACA}
+.tbl tbody tr.wt{background:#FFFBEB}
+
+.tag{display:inline-block;padding:1.5px 6px;border-radius:3px;font-size:10px;font-weight:700}
+.tag-S{background:#059669;color:#fff}
+.tag-A{background:#10B981;color:#fff}
+.tag-B{background:#FBBF24;color:#78350F}
+.tag-C{background:#F97316;color:#fff}
+.tag-D{background:#DC2626;color:#fff}
+.tag-bl{background:#7F1D1D;color:#fff}
+.tag-wt{background:#F59E0B;color:#fff}
+.tag-empty{background:#E5E7EB;color:#6B7280}
+
+.pwd{font-family:Menlo,monospace;font-size:12px;color:#0F172A;cursor:pointer;user-select:none}
+.pwd small{color:#9CA3AF;margin-left:4px}
+.cb{accent-color:#0F766E;cursor:pointer}
+.memo-btn{background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:14px}
+.memo-btn:hover{color:#1B3976}
+
+/* Detail panel */
+.detail{margin-top:16px;background:linear-gradient(180deg,#F0F4FF,#fff);border:1.5px solid #1B3976;border-radius:9px;padding:16px 20px;display:none}
+.detail.on{display:block}
+.detail-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.detail-hd .t{font-size:14px;font-weight:900;color:#1B3976}
+.detail-hd .c{background:transparent;border:none;cursor:pointer;font-size:18px;color:#6B7280}
+.detail-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:14px}
+.detail-card{background:#fff;border:1px solid #E5E7EB;border-radius:7px;padding:11px 13px}
+.detail-card .ttl{font-size:11px;font-weight:800;color:#1B3976;margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid #E5E7EB}
+.hist-row{display:grid;grid-template-columns:80px 1fr 60px 80px;gap:8px;padding:4px 0;border-bottom:1px dashed #F1F5F9;font-size:10.5px}
+.hist-row:last-child{border-bottom:none}
+.hist-row .dt{color:#6B7280;font-weight:600}
+.hist-row .nm{color:#0F172A;font-weight:700}
+.hist-row .mo{text-align:center;color:#1B3976;font-weight:700}
+.hist-row .ex{text-align:right;font-weight:700;font-size:10px;padding:1px 6px;border-radius:3px;align-self:start}
+.hist-row .ex.mid{background:#FEE2E2;color:#7F1D1D}
+.hist-row .ex.exp{background:#D1FAE5;color:#065F46}
+.hist-row .ex.cur{background:#DBEAFE;color:#1E3A8A}
+
+.meta-row{display:flex;justify-content:space-between;padding:5px 0;font-size:11px;border-bottom:1px dashed #F1F5F9}
+.meta-row:last-child{border-bottom:none}
+.meta-row .l{color:#6B7280;font-weight:600}
+.meta-row .v{color:#0F172A;font-weight:700}
+.memo-area{width:100%;min-height:60px;padding:8px 10px;border:1px solid #D1D5DB;border-radius:5px;font-size:11.5px;resize:vertical;outline:none;font-family:inherit;margin-top:6px}
+.save-btn{margin-top:6px;padding:6px 12px;background:#1B3976;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700}
+</style></head>
+<body><div class="app">
+
+<!-- Header -->
+<div class="hd">
+  <div class="logo">K</div>
+  <div><div class="ttl">🏢 물건관리</div><div class="sub">계약 주소지·호실 매력도 분석 + 비밀번호·변동관리비 트래킹</div></div>
+  <div class="right">데이터 기준 2026-05-15 · 총 7개 부동산 · 56개 호실</div>
+</div>
+
+<!-- KPI Summary -->
+<div class="kpis">
+  <div class="kpi"><div class="l">전체 호실</div><div class="v">56</div><div class="s">7개 부동산</div></div>
+  <div class="kpi amber"><div class="l">현재 공실</div><div class="v">8</div><div class="s">공실률 14.3%</div></div>
+  <div class="kpi good"><div class="l">평균 거주개월</div><div class="v">17.8</div><div class="s">전체 호실 평균</div></div>
+  <div class="kpi" style="background:linear-gradient(135deg,#F0F4FF,#fff);border:1.5px solid #1B3976"><div class="l" style="color:#1B3976">⭐ 건물 매력도 (전체 평균)</div><div class="v" style="color:#1B3976">68 <span class="tag tag-A" style="font-size:11px;vertical-align:middle">A</span></div><div class="s">최고 갤럭시 82 · 최저 신림빌라 41</div></div>
+  <div class="kpi" style="background:linear-gradient(135deg,#ECFEFF,#fff);border:1.5px solid #0E7490"><div class="l" style="color:#0E7490">🌐 주변 시세 대비</div><div class="v" style="color:#0E7490">+4.6%</div><div class="s">포트폴리오 68만 / 직방 65만 (관악구 평균)</div></div>
+  <div class="kpi warn"><div class="l">🚨 블랙리스트</div><div class="v">3</div><div class="s">중도퇴실 빈번 호실</div></div>
+  <div class="kpi teal"><div class="l">갱신 임박 (D-30)</div><div class="v">5</div><div class="s">상단 노출 중</div></div>
+</div>
+
+<!-- Filters -->
+<div class="flt">
+  <input type="text" placeholder="부동산명 또는 호실 검색 (예: 갤럭시 / 107호)">
+  <select><option>담당자 (전체)</option><option>김영철</option><option>김준영</option><option>고송미</option></select>
+  <select><option>매력도 (전체)</option><option>S 등급</option><option>A 등급</option><option>B 이하</option></select>
+  <button class="flt-btn">갱신 임박만</button>
+  <button class="flt-btn danger on">🚨 블랙리스트만</button>
+  <button class="flt-btn">📍 지도 표시</button>
+  <button class="flt-btn">📥 CSV 내보내기</button>
+  <span class="flt-meta">3개 결과</span>
+</div>
+
+<!-- Map area (예시 — 토글 OFF 기본) -->
+<div class="maparea">
+  <div class="map-stub">📍 카카오맵 영역 (부동산 단위 마커 · 매력도 색상 · 토글 ON 시 활성)</div>
+</div>
+
+<!-- Body -->
+<div class="body">
+
+  <!-- 부동산 1 -->
+  <div class="bldg">
+    <div class="bldg-hd">
+      <div class="nm">갤럭시 하우스 <small>· 서울 관악구 신림동 441-25</small>
+        <div class="bldg-staff">📞 <b>김영철</b> 010-1234-5678 · <b>김준영</b> 010-9876-5432</div>
+      </div>
+      <div class="stat"><span>호실</span><b>12</b></div>
+      <div class="stat warn"><span>공실</span><b>2</b></div>
+      <div class="stat good"><span>평균 거주</span><b>18.2m</b></div>
+      <div class="stat"><span>⭐ 매력도</span><b style="color:#1B3976">82 <span class="tag tag-S" style="font-size:9px">S</span></b></div>
+      <div class="stat warn"><span>블랙</span><b>1</b></div>
+      <button class="rpt-btn">📋 물건 리포트</button>
+    </div>
+    <!-- 건물 단위 관리 정보 (비밀번호·변동관리비·메모) -->
+    <div class="bldg-mgmt">
+      <div class="mg-cell"><span class="l">🔑 현관 비밀번호</span><span class="v pwd-v">****2741<small>(보기)</small></span><button class="mg-edit">편집</button></div>
+      <div class="mg-cell"><span class="l">💰 변동관리비</span><label class="mg-toggle"><input type="checkbox" checked><span>매월 확인 필요</span></label></div>
+      <div class="mg-cell mg-memo"><span class="l">📝 건물 메모 (전 직원 공유)</span><span class="v">옥상 누수 보수 2025-08 완료 · 107호 천장 누수 이력 · 보일러 노후 점검 중<button class="mg-edit">편집</button></span></div>
+    </div>
+    <table class="tbl">
+      <thead><tr>
+        <th>호실</th>
+        <th>현재 임차인</th>
+        <th style="text-align:right">월세</th>
+        <th style="text-align:right">부가세</th>
+        <th style="text-align:right">고정관리비</th>
+        <th>평균 거주</th>
+        <th>중도퇴실</th>
+        <th>갱신</th>
+        <th>매력도</th>
+        <th>상태</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>101호</td><td>김도연</td><td style="text-align:right">680,000</td><td style="text-align:right;color:#9CA3AF">-</td><td style="text-align:right">50,000</td><td>24.5월</td><td>0회 (0%)</td><td>2회</td><td><span class="tag tag-S">S 92</span></td><td>-</td></tr>
+        <tr><td>102호</td><td>이상민</td><td style="text-align:right">680,000</td><td style="text-align:right;color:#9CA3AF">-</td><td style="text-align:right">50,000</td><td>20.1월</td><td>0회 (0%)</td><td>1회</td><td><span class="tag tag-A">A 78</span></td><td>-</td></tr>
+        <tr><td>103호</td><td><span style="color:#9CA3AF">공실</span></td><td style="text-align:right">680,000</td><td style="text-align:right;color:#9CA3AF">-</td><td style="text-align:right">50,000</td><td>14.2월</td><td>1회 (33%)</td><td>0회</td><td><span class="tag tag-B">B 52</span></td><td><span class="tag tag-empty">공실</span></td></tr>
+        <tr class="bl"><td>107호</td><td>진흥창</td><td style="text-align:right">680,000</td><td style="text-align:right;color:#9CA3AF">-</td><td style="text-align:right">50,000</td><td>6.8월</td><td>3회 (75%)</td><td>0회</td><td><span class="tag tag-D">D 18</span></td><td><span class="tag tag-bl">🚨 블랙</span></td></tr>
+        <tr><td>201호</td><td>박지수 <span style="background:#FEF3C7;color:#92400E;padding:1px 5px;border-radius:3px;font-size:9.5px;font-weight:700;margin-left:3px">상업</span></td><td style="text-align:right">900,000</td><td style="text-align:right;color:#D97706;font-weight:700">90,000</td><td style="text-align:right">70,000</td><td>18.0월</td><td>0회 (0%)</td><td>1회</td><td><span class="tag tag-A">A 70</span></td><td>-</td></tr>
+        <tr class="wt"><td>203호</td><td>최영호</td><td style="text-align:right">680,000</td><td style="text-align:right;color:#9CA3AF">-</td><td style="text-align:right">50,000</td><td>10.5월</td><td>2회 (50%)</td><td>0회</td><td><span class="tag tag-C">C 32</span></td><td><span class="tag tag-wt">🟡 주의</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 부동산 2 (접힌 상태 예시) -->
+  <div class="bldg">
+    <div class="bldg-hd">
+      <div class="nm">꿈마을 <small>· 서울 관악구 신림동 1459-12</small>
+        <div class="bldg-staff">📞 <b>고송미</b> 010-2468-1357</div>
+      </div>
+      <div class="stat"><span>호실</span><b>8</b></div>
+      <div class="stat"><span>공실</span><b>1</b></div>
+      <div class="stat good"><span>평균 거주</span><b>22.4m</b></div>
+      <div class="stat"><span>⭐ 매력도</span><b style="color:#059669">76 <span class="tag tag-A" style="font-size:9px">A</span></b></div>
+      <div class="stat good"><span>블랙</span><b>0</b></div>
+      <button class="rpt-btn">📋 물건 리포트</button>
+    </div>
+    <!-- 행 생략 (접힘) -->
+  </div>
+
+  <!-- 호실 상세 (107호 클릭한 상태) -->
+  <div class="detail on">
+    <div class="detail-hd">
+      <div class="t">🚨 갤럭시 하우스 107호 — 블랙리스트 상세</div>
+      <button class="c">✕</button>
+    </div>
+    <div class="detail-grid">
+      <!-- 좌측: 과거 계약 이력 -->
+      <div class="detail-card">
+        <div class="ttl">📜 과거 계약 이력 (4건)</div>
+        <div class="hist-row"><span class="dt">2026.02~</span><span class="nm">진흥창</span><span class="mo">진행</span><span class="ex cur">계약 중</span></div>
+        <div class="hist-row"><span class="dt">2025.04~25.10</span><span class="nm">김OO</span><span class="mo">6.2m</span><span class="ex mid">중도퇴실</span></div>
+        <div class="hist-row"><span class="dt">2024.08~25.03</span><span class="nm">이OO</span><span class="mo">7.0m</span><span class="ex mid">중도퇴실</span></div>
+        <div class="hist-row"><span class="dt">2023.11~24.07</span><span class="nm">박OO</span><span class="mo">8.1m</span><span class="ex mid">중도퇴실</span></div>
+        <div class="hist-row"><span class="dt">2022.04~23.10</span><span class="nm">최OO</span><span class="mo">18.2m</span><span class="ex exp">만기퇴실</span></div>
+        <div style="margin-top:8px;padding:7px 10px;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:5px;font-size:10.5px;color:#7F1D1D;line-height:1.5">
+          ⚠️ <b>블랙리스트 판정 사유</b>: 최근 3회 연속 중도퇴실 (6.2m / 7.0m / 8.1m) — 평균 거주 6.8m로 짧은 사이클 반복. 임대인 협의 또는 시설 점검 권장.
+        </div>
+      </div>
+      <!-- 우측: 호실 통계 -->
+      <div class="detail-card">
+        <div class="ttl">📊 호실 통계</div>
+        <div class="meta-row"><span class="l">평균 거주개월</span><span class="v" style="color:#DC2626">6.8m (단기 사이클)</span></div>
+        <div class="meta-row"><span class="l">중도퇴실 / 총 계약</span><span class="v" style="color:#DC2626">3 / 4 (75%)</span></div>
+        <div class="meta-row"><span class="l">갱신 횟수</span><span class="v">0회</span></div>
+        <div class="meta-row"><span class="l">매력도 점수</span><span class="v"><span class="tag tag-D">D 18</span></span></div>
+        <div class="meta-row"><span class="l">건물 평균 대비</span><span class="v" style="color:#DC2626">-64점 (건물 82 / 호실 18)</span></div>
+        <div style="margin-top:10px;padding:9px 11px;background:#F0F4FF;border-left:3px solid #1B3976;border-radius:5px;font-size:11px;color:#374151;line-height:1.55">
+          💡 <b>건물 관리 정보는 상단 건물 헤더에서 확인·편집</b>하실 수 있어요 (현관 비밀번호 · 변동관리비 · 건물 메모)
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div></body></html>

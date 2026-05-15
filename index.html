@@ -1023,6 +1023,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <button class="view-tab"        onclick="switchView('renewal')">🔄 갱신관리</button>
     <button class="view-tab"        onclick="switchView('payment')">💰 수납관리</button>
     <button class="view-tab"        onclick="switchView('delinquency')">🚨 연체관리</button>
+    <button class="view-tab"        onclick="switchView('property')">🏢 물건관리</button>
   </div>
 
   <!-- Person tabs (checklist only) -->
@@ -1291,6 +1292,10 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   <!-- [Phase 2a] 운영관리 (KPI) — 격리된 신규 탭 -->
   <div id="opskpiView" class="view-content">
     <div class="okpi-inner"></div>
+  </div>
+  <!-- [v293] 물건관리 — 호실 단위 매력도/관리정보 -->
+  <div id="propertyView" class="view-content">
+    <div class="prop-inner"></div>
   </div>
 </div>
 
@@ -1573,20 +1578,23 @@ function switchView(view) {
   // [Phase 2a] 운영관리 (KPI) 탭 — 격리 모듈
   try { document.getElementById('opskpiView').classList.toggle('active', view === 'opskpi'); } catch(e){}
   if (view === 'opskpi') { try { if (typeof okpi_syncFromGlobal === 'function') okpi_syncFromGlobal(); okpi_render(); } catch(e) { console.error('[okpi] render error:', e); } }
+  // [v293] 물건관리
+  try { document.getElementById('propertyView').classList.toggle('active', view === 'property'); } catch(e){}
+  if (view === 'property') { try { renderPropertyView(); } catch(e){ console.error('[property] render error:', e); } }
   if (view === 'delinquency') renderDelinquency();
   if (view === 'renewal') renderRenewalView();  // [v43]
   if (view === 'contractMgmt') renderContractMgmtView();  // [v74]
   if (view === 'summary') renderSummaryDashboard(); // [v102]
   document.getElementById('personTabsRow').style.display = view === 'checklist' ? 'flex' : 'none';
   // [v74] contractMgmt 추가
-  const titles = { dashboard:'운영관리(구)', opskpi:'운영관리', checklist:'업무 체크리스트', contract:'입주관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리', contractMgmt:'계약관리', summary:'K.R.G. Enterprize' };
+  const titles = { dashboard:'운영관리(구)', opskpi:'운영관리', checklist:'업무 체크리스트', contract:'입주관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리', contractMgmt:'계약관리', summary:'K.R.G. Enterprize', property:'물건관리' };
   document.getElementById('pageTitle').textContent = titles[view] || '';
   document.getElementById('refreshBtn').style.display = view === 'dashboard' ? '' : 'none';
 
   // [v74] 7개 탭 (dashboard/checklist/contract/contractMgmt/payment/delinquency/renewal)
   document.querySelectorAll('.view-tab').forEach((btn,i) => {
     // [v101] DOM 순서와 일치 (v94: dashboard/checklist/contractMgmt/contract/renewal/payment/delinquency)
-    btn.classList.toggle('active', ['summary','opskpi','checklist','contractMgmt','contract','renewal','payment','delinquency'][i] === view);
+    btn.classList.toggle('active', ['summary','opskpi','checklist','contractMgmt','contract','renewal','payment','delinquency','property'][i] === view);
   });
 
   if (view === 'checklist') {
@@ -1914,6 +1922,7 @@ function parseVacancySheet(resp) {
   // 시트에 컬럼이 추가/삭제되어도 헤더만 유지되면 자동 추적
   const noIdx          = findColIdx(labels, ['계약번호'],          0);   // A
   const tenant1NameIdx = findColIdx(labels, ['임차인명'],          2);   // C
+  const doorPwdIdx     = findColIdx(labels, ['현관비밀번호','비밀번호','현관'], 5);  // F (v293)
   const jIdx           = findColIdx(labels, ['중도퇴실'],          9);   // J
   const contractKindIdx= findColIdx(labels, ['계약상태'],          10);  // K
   const housingTypeIdx = findColIdx(labels, ['주택유형','전대전환'], 13); // N
@@ -1986,7 +1995,10 @@ function parseVacancySheet(resp) {
       fee:          cell(feeIdx),        // AL열: 서비스 수수료
       monthRent:    (parseFloat(String(cell(monthRent1Idx)).replace(/[^0-9.-]/g,'')||0)
                    + parseFloat(String(cell(monthRent2Idx)).replace(/[^0-9.-]/g,'')||0)) || cell(monthRent1Idx),
+      monthRentRaw: cell(monthRent1Idx),  // AH열: 월세 단독 (v293)
+      vatRaw:       cell(monthRent2Idx),  // AI열: 부가세 단독 (v293)
       mgmtFee:      cell(mgmtFeeIdx),     // AJ열: 관리비
+      doorPwd:      cell(doorPwdIdx),     // F열: 현관 비밀번호 (v293)
       billCount:    cell(billCountIdx),  // BS열: 청구횟수
       endDate:      cell(endDateIdx),     // X열: 만기일 [v44]
       tenantRrn:    cell(tenantRrnIdx), // AV열: 계약자1 생년월일/주민번호 [v65]
@@ -17319,6 +17331,345 @@ async function okpi_render(){
     if (host) host.innerHTML = '<div class="okpi-empty">❌ 렌더링 실패: ' + (e.message||e) + '</div>';
   }
 }
+
+// ════════════════════════════════════════════════
+// ▶ [v293] 물건관리 — 호실 단위 매력도/관리정보
+// ════════════════════════════════════════════════
+(function(){
+  // CSS 주입 (1회)
+  var prpCssInjected = false;
+  function prp_injectCss(){
+    if (prpCssInjected) return;
+    var css = ''
+      + '.prop-inner{padding:18px 22px}'
+      + '.prp-kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:14px}'
+      + '.prp-kpi{background:#F8FAFC;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px}'
+      + '.prp-kpi .l{font-size:10.5px;color:#9CA3AF;font-weight:600;margin-bottom:4px}'
+      + '.prp-kpi .v{font-size:22px;font-weight:900;color:#0F172A;line-height:1.1}'
+      + '.prp-kpi .s{font-size:10px;color:#6B7280;margin-top:3px}'
+      + '.prp-kpi.warn .v{color:#DC2626}.prp-kpi.amber .v{color:#D97706}.prp-kpi.good .v{color:#059669}.prp-kpi.teal .v{color:#0F766E}'
+      + '.prp-kpi.hero{background:linear-gradient(135deg,#F0F4FF,#fff);border:1.5px solid #1B3976}'
+      + '.prp-kpi.hero .l{color:#1B3976}.prp-kpi.hero .v{color:#1B3976}'
+      + '.prp-kpi.cyan{background:linear-gradient(135deg,#ECFEFF,#fff);border:1.5px solid #0E7490}'
+      + '.prp-kpi.cyan .l{color:#0E7490}.prp-kpi.cyan .v{color:#0E7490}'
+      + '.prp-flt{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 14px;background:#fff;border:1px solid #E5E7EB;border-radius:8px;margin-bottom:14px}'
+      + '.prp-flt input,.prp-flt select{height:32px;padding:0 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:12px;outline:none}'
+      + '.prp-flt input{flex:1;min-width:220px}'
+      + '.prp-flt input:focus,.prp-flt select:focus{border-color:#1B3976}'
+      + '.prp-btn{padding:6px 11px;background:#fff;color:#1B3976;border:1.5px solid #D1D5DB;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700}'
+      + '.prp-btn.on{background:#1B3976;color:#fff;border-color:#1B3976}'
+      + '.prp-btn.danger{border-color:#DC2626;color:#DC2626}.prp-btn.danger.on{background:#DC2626;color:#fff}'
+      + '.prp-meta{margin-left:auto;font-size:11px;color:#6B7280}'
+      + '.prp-bldg{margin-top:12px;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden;background:#fff}'
+      + '.prp-bldg-hd{display:grid;grid-template-columns:1.5fr auto auto auto auto auto auto;gap:12px;padding:11px 14px;background:#F8FAFC;border-bottom:1px solid #E5E7EB;cursor:pointer;align-items:center}'
+      + '.prp-bldg-hd .nm{font-size:13.5px;font-weight:800;color:#0F172A;display:flex;flex-direction:column;gap:3px}'
+      + '.prp-bldg-hd .nm small{font-size:10.5px;color:#6B7280;font-weight:600;margin-left:6px}'
+      + '.prp-bldg-hd .stf{font-size:11px;color:#374151;font-weight:500}'
+      + '.prp-bldg-hd .stf b{color:#1B3976;font-weight:700;margin-right:2px}'
+      + '.prp-stat{display:flex;flex-direction:column;align-items:center;font-size:9.5px;color:#9CA3AF;font-weight:600}'
+      + '.prp-stat b{font-size:13px;color:#1B3976;margin-top:1px}'
+      + '.prp-stat.warn b{color:#DC2626}.prp-stat.good b{color:#059669}'
+      + '.prp-tbl{width:100%;border-collapse:collapse;font-size:11px}'
+      + '.prp-tbl thead th{background:#F1F5F9;padding:7px 8px;text-align:left;font-size:10px;color:#475569;font-weight:700;border-bottom:1.5px solid #E5E7EB;white-space:nowrap}'
+      + '.prp-tbl tbody td{padding:6px 8px;border-bottom:1px solid #F1F5F9;color:#1F2937;vertical-align:middle}'
+      + '.prp-tbl tbody tr:hover{background:#FAFBFE;cursor:pointer}'
+      + '.prp-tbl tbody tr.bl{background:#FEF2F2}.prp-tbl tbody tr.bl:hover{background:#FECACA}'
+      + '.prp-tbl tbody tr.wt{background:#FFFBEB}'
+      + '.prp-tag{display:inline-block;padding:1.5px 6px;border-radius:3px;font-size:9.5px;font-weight:700;white-space:nowrap}'
+      + '.prp-tag.S{background:#059669;color:#fff}.prp-tag.A{background:#10B981;color:#fff}.prp-tag.B{background:#FBBF24;color:#78350F}.prp-tag.C{background:#F97316;color:#fff}.prp-tag.D{background:#DC2626;color:#fff}'
+      + '.prp-tag.bl{background:#7F1D1D;color:#fff}.prp-tag.wt{background:#F59E0B;color:#fff}.prp-tag.empty{background:#E5E7EB;color:#6B7280}'
+      + '.prp-mgmt{display:grid;grid-template-columns:1fr 1fr 2fr;gap:1px;background:#E5E7EB;border-bottom:1px solid #E5E7EB}'
+      + '.prp-mg{background:#F8FAFC;padding:8px 12px;display:flex;align-items:center;gap:10px;font-size:11px}'
+      + '.prp-mg .l{font-size:10px;color:#1B3976;font-weight:700;white-space:nowrap}'
+      + '.prp-mg .v{color:#0F172A;font-weight:600;flex:1}'
+      + '.prp-mg .pwdv{font-family:Menlo,monospace;letter-spacing:1px}'
+      + '.prp-empty{padding:30px;text-align:center;color:#9CA3AF;font-size:13px}';
+    var s = document.createElement('style'); s.textContent = css; document.head.appendChild(s);
+    prpCssInjected = true;
+  }
+
+  window._prpFilter = window._prpFilter || { q: '', grade: '', blOnly: false };
+
+  // 호실별 통계 집계
+  function prp_aggregateRoom(vac, contracts){
+    // 같은 부동산+호수 조합의 모든 계약 가져오기
+    var bldg = String(vac.propBuilding||'').trim();
+    var room = String(vac.propRoom||'').trim();
+    var key = bldg + '||' + room;
+    var allOfRoom = (contracts||[]).filter(function(c){
+      return String(c['건물명']||'').trim() === bldg && String(c['호수']||'').trim() === room;
+    });
+    // 통계
+    var totalEnded = 0, midExit = 0, expExit = 0, renewCount = 0;
+    var totalMonths = 0, monthCnt = 0;
+    allOfRoom.forEach(function(c){
+      var status = String(c['계약상태']||'').trim();
+      var midStr = String(c['중도퇴실']||'').trim();
+      // 거주개월 계산 (시작일 ~ 종료일/실제퇴실일)
+      var sd = parseKorDate(String(c['시작일']||''));
+      var ed = parseKorDate(String(c['종료일']||c['실제퇴실일']||''));
+      if (sd && ed && ed > sd) {
+        var months = (ed.getFullYear()-sd.getFullYear())*12 + (ed.getMonth()-sd.getMonth());
+        if (months > 0 && months < 120) { totalMonths += months; monthCnt++; }
+      }
+      // 중도/만기 분류 (계약상태 또는 J열 기반)
+      if (status.includes('종료') || status.includes('해지') || midStr) {
+        totalEnded++;
+        if (midStr || status.includes('중도') || status.includes('해지')) midExit++;
+        else if (status.includes('만기') || status.includes('종료')) expExit++;
+      }
+      // 갱신: 계약번호 패턴 또는 별도 컬럼 필요 — 일단 같은 호실의 2회+ 계약 수에서 -1
+    });
+    if (allOfRoom.length > 1) renewCount = allOfRoom.length - 1; // 거친 추정
+    var avgMonths = monthCnt > 0 ? (totalMonths / monthCnt) : 0;
+    var midRate = totalEnded > 0 ? (midExit / totalEnded) : 0;
+    var expRate = totalEnded > 0 ? (expExit / totalEnded) : 0;
+    // 매력도 점수: (평균거주월 × 0.4) + (만기퇴실 비율 × 30) + (갱신 점수 × 30)
+    var renewScore = Math.min(renewCount * 30, 30); // 최대 30
+    var score = Math.round((Math.min(avgMonths, 50) * 0.8) + (expRate * 30) + renewScore);
+    score = Math.max(0, Math.min(100, score));
+    var grade = score >= 80 ? 'S' : score >= 60 ? 'A' : score >= 40 ? 'B' : score >= 20 ? 'C' : 'D';
+    // 블랙·주의 판정
+    var blackList = (midExit >= 3) || (avgMonths > 0 && avgMonths < 6 && midExit >= 2);
+    var watchList = !blackList && midExit >= 2;
+    // 현재 임차인 (계약중 상태의 임차인)
+    var current = allOfRoom.find(function(c){
+      var st = String(c['계약상태']||'').trim();
+      return !st.includes('종료') && !st.includes('해지') && !st.includes('퇴실');
+    });
+    return {
+      bldg: bldg, room: room, key: key,
+      currentTenant: current ? (current['임차인명']||current['임차인']||'') : '',
+      avgMonths: avgMonths, midExit: midExit, expExit: expExit, midRate: midRate,
+      renewCount: renewCount, totalContracts: allOfRoom.length,
+      score: score, grade: grade, blackList: blackList, watchList: watchList,
+      vac: vac
+    };
+  }
+
+  // 부동산 집계
+  function prp_aggregateBuilding(rooms){
+    var totalScore = 0, scoreCnt = 0, vacant = 0, black = 0, watch = 0;
+    var totalMonths = 0, monthCnt = 0;
+    rooms.forEach(function(r){
+      totalScore += r.score; scoreCnt++;
+      if (r.avgMonths > 0) { totalMonths += r.avgMonths; monthCnt++; }
+      if (!r.currentTenant) vacant++;
+      if (r.blackList) black++;
+      if (r.watchList) watch++;
+    });
+    var avgScore = scoreCnt > 0 ? Math.round(totalScore / scoreCnt) : 0;
+    var avgMonths = monthCnt > 0 ? (totalMonths / monthCnt) : 0;
+    var avgGrade = avgScore >= 80 ? 'S' : avgScore >= 60 ? 'A' : avgScore >= 40 ? 'B' : avgScore >= 20 ? 'C' : 'D';
+    return { total: rooms.length, vacant: vacant, avgMonths: avgMonths, avgScore: avgScore, avgGrade: avgGrade, black: black, watch: watch };
+  }
+
+  // 메인 렌더
+  window.renderPropertyView = function(){
+    prp_injectCss();
+    var host = document.querySelector('#propertyView .prop-inner');
+    if (!host) return;
+    if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) {
+      host.innerHTML = '<div class="prp-empty">📡 공실현황 데이터 로딩 중...</div>';
+      try {
+        if (typeof VACANCY_GID !== 'undefined' && typeof fetchSheetByGid === 'function') {
+          fetchSheetByGid(VACANCY_GID).then(function(r){
+            vacancyRawData = parseVacancySheet(r);
+            renderPropertyView();
+          }).catch(function(e){ host.innerHTML = '<div class="prp-empty">❌ 로드 실패: '+(e.message||e)+'</div>'; });
+        }
+      } catch(e){}
+      return;
+    }
+    if (!Array.isArray(contractRawData) || !contractRawData.length) {
+      host.innerHTML = '<div class="prp-empty">📡 계약 데이터 로딩 중...</div>';
+      try { if (typeof loadContractData === 'function') loadContractData().then(function(){ setTimeout(renderPropertyView, 200); }); } catch(e){}
+      return;
+    }
+
+    // 1. 호실별 집계 (unique by bldg+room) — 최신 vac 행 1개씩 추출
+    var roomMap = {};
+    vacancyRawData.forEach(function(v){
+      var bldg = String(v.propBuilding||'').trim();
+      var room = String(v.propRoom||'').trim();
+      if (!bldg || !room) return;
+      var key = bldg + '||' + room;
+      // 가장 최근(시작일 큰) 행 우선
+      var sd = parseKorDate(String(v.startDate||''));
+      if (!roomMap[key] || (sd && parseKorDate(String(roomMap[key].startDate||'')) < sd)) {
+        roomMap[key] = v;
+      }
+    });
+    var rooms = Object.values(roomMap).map(function(v){ return prp_aggregateRoom(v, contractRawData); });
+
+    // 2. 부동산별 그룹핑
+    var bldgGroups = {};
+    rooms.forEach(function(r){
+      if (!bldgGroups[r.bldg]) bldgGroups[r.bldg] = [];
+      bldgGroups[r.bldg].push(r);
+    });
+    var bldgList = Object.keys(bldgGroups).sort();
+
+    // 3. KPI 계산
+    var totalRooms = rooms.length;
+    var totalVacant = rooms.filter(function(r){ return !r.currentTenant; }).length;
+    var totalBlack = rooms.filter(function(r){ return r.blackList; }).length;
+    var sumScore = 0, scoreCnt = 0, sumMonths = 0, monthCnt = 0;
+    rooms.forEach(function(r){
+      if (r.score > 0) { sumScore += r.score; scoreCnt++; }
+      if (r.avgMonths > 0) { sumMonths += r.avgMonths; monthCnt++; }
+    });
+    var avgScore = scoreCnt > 0 ? Math.round(sumScore / scoreCnt) : 0;
+    var avgMonths = monthCnt > 0 ? (sumMonths / monthCnt) : 0;
+    var avgGrade = avgScore >= 80 ? 'S' : avgScore >= 60 ? 'A' : avgScore >= 40 ? 'B' : avgScore >= 20 ? 'C' : 'D';
+    // 최고/최저 부동산
+    var bldgScores = bldgList.map(function(b){
+      var arr = bldgGroups[b]; var ag = prp_aggregateBuilding(arr); return { name: b, score: ag.avgScore };
+    }).sort(function(a,b){ return b.score - a.score; });
+    var topBldg = bldgScores[0]||{}, botBldg = bldgScores[bldgScores.length-1]||{};
+
+    // 4. 필터링
+    var flt = window._prpFilter;
+    var fmtNum = function(n){ n = parseFloat(n)||0; return n.toLocaleString('ko-KR'); };
+    var matchFilter = function(r){
+      if (flt.blOnly && !r.blackList) return false;
+      if (flt.grade && r.grade !== flt.grade) return false;
+      if (flt.q) {
+        var q = flt.q.toLowerCase();
+        if (!(r.bldg+' '+r.room+' '+(r.currentTenant||'')).toLowerCase().includes(q)) return false;
+      }
+      return true;
+    };
+
+    // 5. HTML 빌드
+    var kpiHtml = ''
+      + '<div class="prp-kpis">'
+      +   '<div class="prp-kpi"><div class="l">전체 호실</div><div class="v">'+totalRooms+'</div><div class="s">'+bldgList.length+'개 부동산</div></div>'
+      +   '<div class="prp-kpi amber"><div class="l">현재 공실</div><div class="v">'+totalVacant+'</div><div class="s">공실률 '+(totalRooms?Math.round(totalVacant*100/totalRooms):0)+'%</div></div>'
+      +   '<div class="prp-kpi good"><div class="l">평균 거주개월</div><div class="v">'+(avgMonths.toFixed(1))+'</div><div class="s">전체 호실 평균</div></div>'
+      +   '<div class="prp-kpi hero"><div class="l">⭐ 건물 매력도 (평균)</div><div class="v">'+avgScore+' <span class="prp-tag '+avgGrade+'" style="vertical-align:middle">'+avgGrade+'</span></div><div class="s">최고 '+(topBldg.name||'-')+' '+(topBldg.score||0)+' / 최저 '+(botBldg.name||'-')+' '+(botBldg.score||0)+'</div></div>'
+      +   '<div class="prp-kpi cyan"><div class="l">🌐 주변 시세 대비</div><div class="v" style="font-size:14px;color:#0E7490">Phase 2</div><div class="s">직방·다방 연동 예정</div></div>'
+      +   '<div class="prp-kpi warn"><div class="l">🚨 블랙리스트</div><div class="v">'+totalBlack+'</div><div class="s">중도퇴실 빈번 호실</div></div>'
+      +   '<div class="prp-kpi teal"><div class="l">갱신 임박 (D-30)</div><div class="v" style="font-size:14px;color:#0F766E">Phase 2</div><div class="s">상단 노출 기능 예정</div></div>'
+      + '</div>';
+
+    var fltHtml = ''
+      + '<div class="prp-flt">'
+      +   '<input id="prpQ" type="text" placeholder="부동산명 또는 호실 검색" value="'+escapeHtml(flt.q)+'" oninput="prp_setQ(this.value)">'
+      +   '<select onchange="prp_setGrade(this.value)">'
+      +     '<option value="">매력도 등급 (전체)</option>'
+      +     ['S','A','B','C','D'].map(function(g){ return '<option value="'+g+'"'+(flt.grade===g?' selected':'')+'>'+g+' 등급</option>'; }).join('')
+      +   '</select>'
+      +   '<button class="prp-btn danger '+(flt.blOnly?'on':'')+'" onclick="prp_toggleBl()">🚨 블랙리스트만</button>'
+      +   '<button class="prp-btn" onclick="prp_clearFilter()">↺ 초기화</button>'
+      +   '<span class="prp-meta">'+totalRooms+'개 호실 · '+bldgList.length+'개 부동산</span>'
+      + '</div>';
+
+    var fmtPhoneSafe = function(p){ try { return (typeof fmtPhone === 'function') ? fmtPhone(p) : (p||''); } catch(e){ return p||''; } };
+    var bldgHtml = bldgList.map(function(b){
+      var arr = bldgGroups[b].filter(matchFilter);
+      if (arr.length === 0) return '';
+      var ag = prp_aggregateBuilding(bldgGroups[b]); // 통계는 전체 기준
+      // 계약담당자 (가장 최근 contract 행에서)
+      var staff = {};
+      bldgGroups[b].forEach(function(r){
+        if (r.vac && r.vac.partnerPerson) staff[r.vac.partnerPerson] = r.vac.partnerPersonPhone || '';
+        // contractRawData 보강
+        var cm = (contractRawData||[]).find(function(c){ return String(c['건물명']||'').trim() === r.bldg && String(c['호수']||'').trim() === r.room; });
+        if (cm && cm['계약담당자']) staff[cm['계약담당자']] = cm['계약담당자연락처']||cm['담당자연락처']||staff[cm['계약담당자']]||'';
+      });
+      var staffHtml = Object.keys(staff).map(function(nm){ return '<b>'+nm+'</b> '+fmtPhoneSafe(staff[nm]); }).join(' · ') || '<span style="color:#9CA3AF">담당자 미지정</span>';
+      // 비밀번호 (vac.doorPwd 첫 비어있지 않은 값)
+      var pwd = '';
+      bldgGroups[b].forEach(function(r){ if (!pwd && r.vac && r.vac.doorPwd) pwd = String(r.vac.doorPwd).trim(); });
+      var pwdMasked = pwd ? ('****' + pwd.slice(-4) + '<small style="margin-left:4px;color:#9CA3AF;cursor:pointer" onclick="prp_togglePwd(event,this,\''+pwd.replace(/'/g,"\\'")+'\')">(보기)</small>') : '<span style="color:#9CA3AF">미등록</span>';
+      // 첫 행 주소
+      var firstAddr = (bldgGroups[b][0] && bldgGroups[b][0].vac && bldgGroups[b][0].vac.propAddr) || '';
+      // 호실 행
+      var roomRows = arr.sort(function(a,b){
+        var ra = parseInt(String(a.room).replace(/[^0-9]/g,''))||0;
+        var rb = parseInt(String(b.room).replace(/[^0-9]/g,''))||0;
+        return ra - rb;
+      }).map(function(r){
+        var cls = r.blackList ? 'bl' : r.watchList ? 'wt' : '';
+        var statusTag = r.blackList ? '<span class="prp-tag bl">🚨 블랙</span>' : r.watchList ? '<span class="prp-tag wt">🟡 주의</span>' : (!r.currentTenant ? '<span class="prp-tag empty">공실</span>' : '-');
+        var tenantHtml = r.currentTenant ? r.currentTenant : '<span style="color:#9CA3AF">공실</span>';
+        // 금액
+        var rentNum = parseFloat(String(r.vac.monthRentRaw||'').replace(/[^0-9.-]/g,''))||0;
+        var vatNum = parseFloat(String(r.vac.vatRaw||'').replace(/[^0-9.-]/g,''))||0;
+        var mgmtNum = parseFloat(String(r.vac.mgmtFee||'').replace(/[^0-9.-]/g,''))||0;
+        var midPct = r.midExit > 0 && r.totalContracts > 0 ? Math.round(r.midRate*100) : 0;
+        return '<tr class="'+cls+'">'
+          + '<td>'+escapeHtml(r.room)+'</td>'
+          + '<td>'+tenantHtml+'</td>'
+          + '<td style="text-align:right">'+(rentNum?fmtNum(rentNum):'-')+'</td>'
+          + '<td style="text-align:right;'+(vatNum?'color:#D97706;font-weight:700':'color:#9CA3AF')+'">'+(vatNum?fmtNum(vatNum):'-')+'</td>'
+          + '<td style="text-align:right">'+(mgmtNum?fmtNum(mgmtNum):'-')+'</td>'
+          + '<td>'+(r.avgMonths?r.avgMonths.toFixed(1)+'월':'-')+'</td>'
+          + '<td>'+(r.midExit?r.midExit+'회 ('+midPct+'%)':'0회')+'</td>'
+          + '<td>'+(r.renewCount||0)+'회</td>'
+          + '<td><span class="prp-tag '+r.grade+'">'+r.grade+' '+r.score+'</span></td>'
+          + '<td>'+statusTag+'</td>'
+          + '</tr>';
+      }).join('');
+      return ''
+        + '<div class="prp-bldg">'
+        +   '<div class="prp-bldg-hd">'
+        +     '<div class="nm">'+escapeHtml(b)+' <small>· '+escapeHtml(firstAddr)+'</small><div class="stf">📞 '+staffHtml+'</div></div>'
+        +     '<div class="prp-stat"><span>호실</span><b>'+ag.total+'</b></div>'
+        +     '<div class="prp-stat'+(ag.vacant>0?' warn':'')+'"><span>공실</span><b>'+ag.vacant+'</b></div>'
+        +     '<div class="prp-stat'+(ag.avgMonths>=12?' good':'')+'"><span>평균 거주</span><b>'+(ag.avgMonths.toFixed(1))+'m</b></div>'
+        +     '<div class="prp-stat"><span>⭐ 매력도</span><b style="color:#1B3976">'+ag.avgScore+' <span class="prp-tag '+ag.avgGrade+'" style="font-size:9px">'+ag.avgGrade+'</span></b></div>'
+        +     '<div class="prp-stat'+(ag.black>0?' warn':' good')+'"><span>블랙</span><b>'+ag.black+'</b></div>'
+        +     '<button class="prp-btn" onclick="alert(\'Phase 2: 물건 REPORT 발행 기능 예정\');event.stopPropagation()" style="background:#1B3976;color:#fff;border-color:#1B3976">📋 리포트</button>'
+        +   '</div>'
+        +   '<div class="prp-mgmt">'
+        +     '<div class="prp-mg"><span class="l">🔑 현관 비밀번호</span><span class="v pwdv">'+pwdMasked+'</span></div>'
+        +     '<div class="prp-mg"><span class="l">💰 변동관리비</span><span class="v" style="color:#9CA3AF">Phase 2 — 시트 컬럼 연동 예정</span></div>'
+        +     '<div class="prp-mg"><span class="l">📝 건물 메모</span><span class="v" style="color:#9CA3AF">Phase 2 — 시트 컬럼 연동 예정</span></div>'
+        +   '</div>'
+        +   '<table class="prp-tbl"><thead><tr>'
+        +     '<th>호실</th><th>현재 임차인</th><th style="text-align:right">월세</th><th style="text-align:right">부가세</th><th style="text-align:right">고정관리비</th>'
+        +     '<th>평균 거주</th><th>중도퇴실</th><th>갱신</th><th>매력도</th><th>상태</th>'
+        +   '</tr></thead><tbody>'+roomRows+'</tbody></table>'
+        + '</div>';
+    }).join('');
+
+    if (!bldgHtml) bldgHtml = '<div class="prp-empty">검색 결과가 없습니다 (필터 초기화 시 전체 표시)</div>';
+
+    host.innerHTML = kpiHtml + fltHtml + bldgHtml;
+  };
+
+  // 필터 인터랙션
+  window.prp_setQ = function(v){
+    window._prpFilter.q = v;
+    renderPropertyView();
+    setTimeout(function(){
+      var i2 = document.getElementById('prpQ');
+      if (i2) { i2.focus(); var c = i2.value.length; try { i2.setSelectionRange(c,c); } catch(_){} }
+    }, 0);
+  };
+  window.prp_setGrade = function(v){ window._prpFilter.grade = v; renderPropertyView(); };
+  window.prp_toggleBl = function(){ window._prpFilter.blOnly = !window._prpFilter.blOnly; renderPropertyView(); };
+  window.prp_clearFilter = function(){ window._prpFilter = { q: '', grade: '', blOnly: false }; renderPropertyView(); };
+  window.prp_togglePwd = function(ev, el, pwd){
+    ev.stopPropagation();
+    var span = el.parentElement;
+    if (span.dataset.shown === '1') {
+      var masked = '****' + pwd.slice(-4);
+      span.innerHTML = masked + '<small style="margin-left:4px;color:#9CA3AF;cursor:pointer" onclick="prp_togglePwd(event,this,\''+pwd.replace(/\'/g,"\\\'")+'\')">(보기)</small>';
+      span.dataset.shown = '0';
+    } else {
+      span.innerHTML = pwd + '<small style="margin-left:4px;color:#9CA3AF;cursor:pointer" onclick="prp_togglePwd(event,this,\''+pwd.replace(/\'/g,"\\\'")+'\')">(가리기)</small>';
+      span.dataset.shown = '1';
+    }
+  };
+
+  // escape helper (전역 escapeHtml 없을 시 폴백)
+  if (typeof window.escapeHtml !== 'function') {
+    window.escapeHtml = function(s){ return String(s||'').replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); };
+  }
+})();
 
 </script>
 </body>
