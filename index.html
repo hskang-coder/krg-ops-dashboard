@@ -4401,6 +4401,16 @@ function renderContractRecord(c, payments, responses = []) {
     const s = String(p['납부상태']||'').trim();
     return s === '연체중' || s === '분납중';
   };
+  // [v308] 미래 납기일 행은 연체에서 제외 — 5/17 납기일이 5/15 시점에 연체로 잡히는 문제 차단
+  const isPastDue = p => {
+    const dueStr = String(p['납기일']||'').trim();
+    if (!dueStr) return true; // 납기일 없으면 도래 간주 (보수적 처리)
+    const due = parseKorDate(dueStr);
+    if (!due) return true;
+    const _today = new Date(); _today.setHours(0,0,0,0);
+    due.setHours(0,0,0,0);
+    return due <= _today; // 납기일 ≤ 오늘 = 이미 도래 → 연체로 간주
+  };
   // [v269] 미납 금액 컬럼 — 신/구 헤더 모두 자동 인식 (직접 후보 + 키워드 자동 탐색)
   const _unpaidAmt = (p) => {
     var direct = p['미납(연체)금액(원)'] || p['미납'] || p['미납액'] || p['미납금액']
@@ -4416,7 +4426,7 @@ function renderContractRecord(c, payments, responses = []) {
     return 0;
   };
   const sumDelinq = (keyword, exclude) => payments
-    .filter(p => isDelinqStatus(p))
+    .filter(p => isDelinqStatus(p) && isPastDue(p)) // [v308] 미래 납기일 제외
     .filter(p => {
       const nm = String(p['청구서명']||p['납부종류']||'');
       return nm.includes(keyword) && (!exclude || !nm.includes(exclude));
@@ -4427,10 +4437,9 @@ function renderContractRecord(c, payments, responses = []) {
   const delinqFee     = sumDelinq('수수료');
   const delinqExit    = sumDelinq('퇴실정산');
   // [v276] 총 연체 = 모든 연체중/분납중 행의 미납 합계 (잔액 방식)
-  //   장점: 임대료/수수료/퇴실정산 외 기타계약금/계약보증금 등 모든 종류 포함
-  //   #50497 윤재희: row 15 "보증금(5..." ₩150,000 연체중 → 자동 합산
+  //   [v308] 미래 납기일 제외 — 납기 도래 후만 연체로 인정
   const delinqAllSum = (payments||[])
-    .filter(function(p){ return isDelinqStatus(p); })
+    .filter(function(p){ return isDelinqStatus(p) && isPastDue(p); })
     .reduce(function(acc, p){ return acc + _unpaidAmt(p); }, 0);
   const delinqTotal   = delinqAllSum;
   const hasDelinq     = delinqTotal > 0;
