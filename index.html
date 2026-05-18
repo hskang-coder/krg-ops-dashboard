@@ -1943,6 +1943,7 @@ function parseVacancySheet(resp) {
   const rentIdx        = findColIdx(labels, ['임대료'],            36);  // AK (월세+부가세+관리비 합계)
   const feeIdx         = findColIdx(labels, ['수수료','서비스수수료'], 37); // AL
   const landlordIdx    = findColIdx(labels, ['임대인명'],          39);  // AO  ← AM열 추가시 자동 보정
+  const payMethodIdx   = findColIdx(labels, ['월세납입형태','납부방법','납입형태','선후불'], 40); // AO (v311) 선불/후불
   const landlordPhoneIdx= findColIdx(labels, ['임대인연락처','임대인 연락처'], 41); // AP/AQ
   const tenantIdx      = findColIdx(labels, ['임차인'],            44);  // AT (정확매칭 → '임차인명/임차인휴대폰'과 분리)
   // [v233] 시트 컬럼 +1 시프트 보정 (AU 이후 모든 컬럼 한 칸씩 우측 이동)
@@ -1991,6 +1992,7 @@ function parseVacancySheet(resp) {
       emergPhone:   cell(emergPhoneIdx),  // AX열: 긴급연락처(연락처)
       emergInfo:    cell(emergInfoIdx),   // AY열: 긴급연락처(관계,이름)
       landlordName: cell(landlordIdx),   // AO열: 임대인명
+      payMethod:    cell(payMethodIdx),  // AO열: 월세납입형태 (선불/후불) (v311)
       inspectType:  cell(inspectTypeIdx),// BF열: 심사구분
       rent:         cell(rentIdx),       // AK열: 임대료
       fee:          cell(feeIdx),        // AL열: 서비스 수수료
@@ -4688,7 +4690,7 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-field"><span class="cr-field-label">건물주소</span><span class="cr-field-val">${fmt(c['계약지주소'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">건물명/호수</span><span class="cr-field-val">${fmt(c['건물명'])} ${fmt(c['호수'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">계약형태</span><span class="cr-field-val">${fmt(c['계약형태'])} / ${fmt(c['계약구분'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">납기일</span><span class="cr-field-val">매월 ${fmt(c['납기일'])}일</span></div>
+        <div class="cr-field"><span class="cr-field-label">납기일</span><span class="cr-field-val">매월 ${fmt(c['납기일'])}일${(__vacRow.payMethod||c['월세납입형태']||c['납부방법']) ? ' <span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:4px;background:'+(/후불/.test(String(__vacRow.payMethod||c['월세납입형태']||c['납부방법']||''))?'#FEF3C7;color:#92400E':'#DBEAFE;color:#1E40AF')+'">'+(__vacRow.payMethod||c['월세납입형태']||c['납부방법'])+'</span>' : ''}</span></div>
       </div>
       <div class="cr-info-section">
         <div class="cr-info-title">금액 정보</div>
