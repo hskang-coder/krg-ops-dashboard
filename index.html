@@ -5708,21 +5708,12 @@ window._dlqRawCacheVer = 'v257';
 window._dlqRawCache = null;
 var DLQ_CACHE_TTL   = 10 * 60 * 1000; // 10분 (v306: 5분→10분)
 var DLQ_BG_REFRESH  = 2 * 60 * 1000; // 2분 이상이면 백그라운드 갱신
-// [v306] sessionStorage 보조 캐시 — 페이지 새로고침해도 즉시 표시
+// [v306→v309] sessionStorage 보조 캐시 — 긴급 비활성화 (로딩 실패 이슈)
 var DLQ_SESSION_KEY = 'krg_dlq_raw_cache_v306';
-function _dlqSaveCacheSafe(cache){
-  try { sessionStorage.setItem(DLQ_SESSION_KEY, JSON.stringify(cache)); } catch(_){}
-}
-function _dlqLoadCacheSafe(){
-  try {
-    var raw = sessionStorage.getItem(DLQ_SESSION_KEY);
-    if (!raw) return null;
-    var parsed = JSON.parse(raw);
-    if (!parsed || !parsed.r1 || !parsed.r2 || !parsed.r3 || !parsed.r4) return null;
-    if (parsed.ver !== window._dlqRawCacheVer) return null;
-    return parsed;
-  } catch(_){ return null; }
-}
+// [v309] 잘못된 캐시 데이터 자동 정리 (페이지 로드 시 1회)
+try { sessionStorage.removeItem(DLQ_SESSION_KEY); } catch(_){}
+function _dlqSaveCacheSafe(cache){ /* [v309] no-op — 캐시 저장 비활성화 */ }
+function _dlqLoadCacheSafe(){ return null; /* [v309] 항상 null 반환 — 캐시 복원 비활성화 */ }
 
 async function renderDelinquency() {
   const wrap = document.getElementById('delinquencyView');
