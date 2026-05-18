@@ -5749,14 +5749,30 @@ async function renderDelinquency() {
          + `&_t=${Date.now()}`;
   }
   function _dlqFetch(url){ return fetch(url, { cache: 'no-store' }); }
+  // [v310] 강건한 gviz 파서 — lazy match 함정 제거 (큰 JSON에서 partial match 방지)
   function parseGvizLocal(txt) {
-    const m = txt.match(/setResponse\((\{[\s\S]*?\})\)\s*;?\s*$/);
-    if (!m) {
-      const m2 = txt.match(/google\.visualization\.Query\.setResponse\((\{[\s\S]*\})\)/);
-      if (!m2) throw new Error('gviz parse fail');
-      return JSON.parse(m2[1]);
+    if (!txt || typeof txt !== 'string') throw new Error('gviz empty response');
+    var startMarker = txt.indexOf('setResponse(');
+    if (startMarker < 0) {
+      // 응답에 에러 메시지 (HTML 등) 포함되어 있을 가능성
+      throw new Error('gviz parse fail (no setResponse): ' + txt.slice(0, 200).replace(/\s+/g,' '));
     }
-    return JSON.parse(m[1]);
+    var jsonStart = txt.indexOf('(', startMarker) + 1;
+    var jsonEnd = txt.lastIndexOf(')');
+    if (jsonEnd <= jsonStart) throw new Error('gviz parse fail (no closing paren)');
+    var jsonStr = txt.slice(jsonStart, jsonEnd).trim();
+    // 끝에 ; 있으면 제거
+    if (jsonStr.endsWith(';')) jsonStr = jsonStr.slice(0, -1).trim();
+    try {
+      return JSON.parse(jsonStr);
+    } catch(e) {
+      // 1차 lenient: 마지막 } 까지만 시도
+      var lastBrace = jsonStr.lastIndexOf('}');
+      if (lastBrace > 0) {
+        try { return JSON.parse(jsonStr.slice(0, lastBrace + 1)); } catch(_){}
+      }
+      throw new Error('gviz JSON parse fail: ' + (e.message||'').slice(0, 150));
+    }
   }
   function applyRaw(r1, r2, r3, r4) {
     _dlqContractData = parseContractMgmt(r1);
@@ -5918,18 +5934,30 @@ async function renderDelinquency() {
 
   // ── 최초 또는 만료 시 전체 로딩 ───────────────────────
   inner.innerHTML = '<div style="padding:60px;text-align:center;color:#6b7280;font-size:14px">⏳ 연체 데이터 로딩 중...</div>';
+  // [v310] 시트별 진단 — 어느 GID에서 fail 나는지 확인
+  async function fetchSheetDiag(gid, label, range) {
+    var txt = '';
+    try {
+      var resp = await _dlqFetch(gvizUrl(gid, range));
+      txt = await resp.text();
+      return parseGvizLocal(txt);
+    } catch(e) {
+      console.error('[v310] ' + label + ' (gid=' + gid + ') 실패. 응답 첫 400자:', (txt||'').slice(0, 400));
+      throw new Error(label + ' (gid=' + gid + ') — ' + e.message);
+    }
+  }
   try {
     const [r1, r2, r3, r4] = await Promise.all([
-      _dlqFetch(gvizUrl(1953907648)).then(r=>r.text()).then(parseGvizLocal), // [v257] no-store + SQL+캐시버스트 (gvizUrl 내부)
-      _dlqFetch(gvizUrl(131074722,'A:ZZ')).then(r=>r.text()).then(parseGvizLocal),  // [v257] SQL+캐시버스트+no-store 4중 차단
-      _dlqFetch(gvizUrl(554798125)).then(r=>r.text()).then(parseGvizLocal),
-      _dlqFetch(gvizUrl(418937767)).then(r=>r.text()).then(parseGvizLocal),
+      fetchSheetDiag(1953907648, '공실현황'),
+      fetchSheetDiag(131074722, '수납내역', 'A:ZZ'),
+      fetchSheetDiag(554798125, '대응내역'),
+      fetchSheetDiag(418937767, '연체관리'),
     ]);
     window._dlqRawCache = { r1, r2, r3, r4, ts: Date.now(), ver: window._dlqRawCacheVer };
-    _dlqSaveCacheSafe(window._dlqRawCache); // [v306]
+    _dlqSaveCacheSafe(window._dlqRawCache); // [v306→v309 no-op]
     applyRaw(r1, r2, r3, r4);
   } catch(e) {
-    inner.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444">❌ 오류: ${e.message}</div>`;
+    inner.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444"><div style="font-size:14px;font-weight:700;margin-bottom:8px">❌ 시트 로딩 실패</div><div style="font-size:12px;color:#6b7280">${e.message}</div><div style="font-size:11px;color:#9ca3af;margin-top:12px">콘솔(F12) 열어 상세 로그 확인 부탁드려요.<br>1~2분 후 다시 시도 또는 페이지 새로고침(⌘⇧R)</div></div>`;
     console.error('renderDelinquency error:', e);
   }
 }
