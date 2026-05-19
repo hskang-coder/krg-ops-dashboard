@@ -8453,6 +8453,24 @@ function cG_parsePdfText(text){
     data.coAddr  = pickAddr(coSec);
   }
 
+  // [v318] 12. 특약사항 — 라벨 다음부터 서명/계약일/문서 끝까지
+  try {
+    var spM = text.match(/특약\s*사항\s*[:：]?\s*\n?([\s\S]+)$/);
+    if (spM) {
+      var raw = spM[1];
+      // 종료 경계 — 서명 라인 / "위와 같이 계약" / 말미 날짜 (보수적)
+      var endRe = /(?:^|\n)\s*(?:임대인|임차인|전차인|을|갑|병)\s*[\(（]\s*인\s*[\)）]|(?:^|\n)\s*(?:위와\s*같이\s*계약|상기와\s*같이|이\s*계약을\s*증명)|(?:^|\n)\s*\d{4}\s*[년.\-\/]\s*\d{1,2}\s*[월.\-\/]\s*\d{1,2}\s*일?\s*$/m;
+      var endIdx = raw.search(endRe);
+      if (endIdx > 0) raw = raw.slice(0, endIdx);
+      // 줄별 trim + 빈 줄 제거
+      var lines = raw.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
+      // 과도한 양 방어 (200줄 초과면 파싱 실패로 간주)
+      if (lines.length > 0 && lines.length <= 200) {
+        data.specialNotes = lines.join('\n');
+      }
+    }
+  } catch(_e) { /* 파서 실패 시 무시 */ }
+
   return data;
 }
 
@@ -8567,6 +8585,14 @@ function cG_applyParsedData(data){
   cG_applyAddrHighlight('cG_m_coAddr');
   cG_attachRrnMask('cG_m_tenantIdNo');
   cG_attachRrnMask('cG_m_coIdNo');
+  // [v318] 특약사항 textarea 자동 채우기 (사용자가 이미 입력한 내용이 있으면 보존)
+  if (data.specialNotes) {
+    var snEl = document.getElementById('cG_m_specialNotes');
+    if (snEl && !(snEl.value || '').trim()) {
+      snEl.value = data.specialNotes;
+      highlightAuto(snEl);
+    }
+  }
   // [v179] 임대료 합계 + 서비스수수료 자동 계산 트리거
   var sfEl = document.getElementById('cG_m_serviceFee');
   if (sfEl) sfEl.dataset.userEdit = ''; // PDF 추출 시 자동값 다시 적용 가능
