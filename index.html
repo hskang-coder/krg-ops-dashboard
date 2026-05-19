@@ -16976,7 +16976,9 @@ function okpi_form_pickResult(rawJson){
 function okpi_form_reset(keepContext){
   try {
     if (!keepContext) {
-      document.getElementById('okpiF_cat1').value = '계약(입주)관리';
+      document.getElementById('okpiF_cat1').value = ''; // [v314] 디폴트 빈값
+      var _personEl = document.getElementById('okpiF_person');
+      if (_personEl) _personEl.value = ''; // [v314] 담당자도 비움
       okpi_form_onCat1Change();
     }
     document.getElementById('okpiF_search').value = '';
@@ -17195,7 +17197,7 @@ function okpi_renderGuide(){
 // 폼 HTML
 function okpi_renderForm(){
   var todayStr = okpi_ymd(new Date());
-  var c1Default = '계약(입주)관리';
+  var c1Default = ''; // [v314] 디폴트 미선택
   var c2Opts = okpi_form_cat2Options(c1Default);
   return ''
     + '<div class="okpi-section-title">⚡ 빠른 입력 — 1행 = 1건 <span class="pill">gid=554798125</span></div>'
@@ -17205,10 +17207,11 @@ function okpi_renderForm(){
     +       '<input type="date" id="okpiF_date" value="' + todayStr + '" class="okpi-fld-input okpi-fld-auto"></div>'
     +     '<div class="okpi-fld"><label>담당자<span class="okpi-tag-req">*</span></label>'
     +       '<select id="okpiF_person" class="okpi-fld-input okpi-fld-required">'
-    +         '<option>고송미</option><option>이지희</option><option>김영철</option><option>오진선</option><option>강휘수</option>'
+    +         '<option value="" selected>— 선택 —</option><option>고송미</option><option>이지희</option><option>김영철</option><option>오진선</option><option>강휘수</option>' /* [v314] 디폴트 빈값 */
     +       '</select></div>'
     +     '<div class="okpi-fld"><label>1차<span class="okpi-tag-req">*</span></label>'
     +       '<select id="okpiF_cat1" class="okpi-fld-input okpi-fld-required" onchange="okpi_form_onCat1Change()">'
+    +         '<option value="" selected>— 선택 —</option>' /* [v314] 디폴트 빈값 */
     +         Object.keys(window._okpiCat).map(function(k){ return '<option' + (k===c1Default?' selected':'') + '>' + k + '</option>'; }).join('')
     +       '</select></div>'
     +     '<div class="okpi-fld"><label>2차<span class="okpi-tag-new">F</span></label>'
@@ -17257,7 +17260,7 @@ function crQF_render(no, tenantName){
 
     okpi_injectCss(); // okpi CSS 재사용 (.cG-fld 등)
     var todayStr = okpi_ymd(new Date());
-    var c1Default = '계약(입주)관리';
+    var c1Default = ''; // [v314] 디폴트 미선택 — 사용자가 직접 선택해야 함
     var c2Opts = okpi_form_cat2Options(c1Default);
     var ctx = (no || '') + (tenantName ? ' · ' + tenantName : '');
 
@@ -17271,10 +17274,11 @@ function crQF_render(no, tenantName){
       +         '<input type="date" id="okpiF_date" value="' + todayStr + '" class="okpi-fld-input okpi-fld-auto"></div>'
       +       '<div class="okpi-fld"><label>담당자<span class="okpi-tag-req">*</span></label>'
       +         '<select id="okpiF_person" class="okpi-fld-input okpi-fld-required">'
-      +           '<option>고송미</option><option>이지희</option><option>김영철</option><option>오진선</option><option>강휘수</option>'
+      +           '<option value="" selected>— 선택 —</option><option>고송미</option><option>이지희</option><option>김영철</option><option>오진선</option><option>강휘수</option>' /* [v314] 디폴트 빈값 */
       +         '</select></div>'
       +       '<div class="okpi-fld"><label>1차<span class="okpi-tag-req">*</span></label>'
       +         '<select id="okpiF_cat1" class="okpi-fld-input okpi-fld-required" onchange="okpi_form_onCat1Change()">'
+      +           '<option value="" selected>— 선택 —</option>' /* [v314] 디폴트 빈값 */
       +           Object.keys(window._okpiCat).map(function(k){ return '<option' + (k===c1Default?' selected':'') + '>' + k + '</option>'; }).join('')
       +         '</select></div>'
       +       '<div class="okpi-fld"><label>2차<span class="okpi-tag-new">F</span></label>'
