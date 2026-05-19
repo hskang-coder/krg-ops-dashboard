@@ -8453,7 +8453,7 @@ function cG_parsePdfText(text){
     data.coAddr  = pickAddr(coSec);
   }
 
-  // [v318] 12. 특약사항 — 라벨 다음부터 서명/계약일/문서 끝까지
+  // [v318/v319] 12. 특약사항 — 라벨 다음부터 서명/계약일/문서 끝까지 + 단독 붙여넣기 폴백
   try {
     var spM = text.match(/특약\s*사항\s*[:：]?\s*\n?([\s\S]+)$/);
     if (spM) {
@@ -8467,6 +8467,22 @@ function cG_parsePdfText(text){
       // 과도한 양 방어 (200줄 초과면 파싱 실패로 간주)
       if (lines.length > 0 && lines.length <= 200) {
         data.specialNotes = lines.join('\n');
+      }
+    } else {
+      // [v319] 폴백: "특약사항" 라벨이 없는 경우 — 계약서가 아닌 단순 특약 조항만 붙여넣었는지 판정
+      //   조건: 필드 라벨(이름:/연락처:/주민번호:/보증금:/월세: 등)이 1개 이하인 짧은 텍스트 + 특약 키워드 또는 일정 길이
+      //   → 전체 텍스트를 그대로 specialNotes로 사용
+      var labelRe = /(?:^|\n)\s*(?:이름|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|보증금|월세|관리비)\s*(?:\([^)]*\))?\s*[:：]/g;
+      var labelCount = 0; var lm;
+      while ((lm = labelRe.exec(text)) !== null) labelCount++;
+      // 특약 조항 흔적: "제N조" / "위약" / "임차인이" / "임대인이" / 등 일반 문장 패턴
+      var looksLikeClause = /제\s*\d+\s*조|위약|단서|다만|책임|연체|보증|손해/.test(text);
+      if (labelCount <= 1 && looksLikeClause) {
+        var cleanLines = text.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
+        var clean = cleanLines.join('\n').trim();
+        if (clean.length >= 10 && clean.length <= 5000) {
+          data.specialNotes = clean;
+        }
       }
     }
   } catch(_e) { /* 파서 실패 시 무시 */ }
@@ -8585,10 +8601,11 @@ function cG_applyParsedData(data){
   cG_applyAddrHighlight('cG_m_coAddr');
   cG_attachRrnMask('cG_m_tenantIdNo');
   cG_attachRrnMask('cG_m_coIdNo');
-  // [v318] 특약사항 textarea 자동 채우기 (사용자가 이미 입력한 내용이 있으면 보존)
+  // [v318/v319] 특약사항 textarea 자동 채우기 — 추출 성공 시 항상 덮어씀
+  // (텍스트입력/파일업로드는 사용자가 명시적으로 폼 채우기를 요청한 동작이므로 다른 필드와 동일하게 처리)
   if (data.specialNotes) {
     var snEl = document.getElementById('cG_m_specialNotes');
-    if (snEl && !(snEl.value || '').trim()) {
+    if (snEl) {
       snEl.value = data.specialNotes;
       highlightAuto(snEl);
     }
