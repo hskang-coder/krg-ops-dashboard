@@ -9025,6 +9025,14 @@ function cG_submit(contractNo){
       return;
     }
     var d = cG_collectManualData();
+    // [v320] CRITICAL FIX — 모달 제거 전에 textarea/extras 수집해야 함
+    // 기존 버그: modal.remove() 후에 getElementById('cG_m_specialNotes')가 null 반환 → specialNotes 항상 빈값
+    //          → 사용자 입력 특약이 PDF에 누락되던 원인
+    var snEl = document.getElementById('cG_m_specialNotes');
+    var specialNotes = snEl ? (snEl.value || '') : '';
+    // [v181] 추가 계약자 수집 — 모달 제거 전에 (extras도 같은 이슈 영향 가능)
+    var extras = (typeof collectExtraParties === 'function') ? collectExtraParties() : [];
+    // 데이터 수집 완료 후 모달 제거
     var modal = document.getElementById('cG_modal');
     if (modal) modal.remove();
     // [v247] 시트 입력용 TSV 클립보드 복사 — 컬럼 순서 사용자 지정
@@ -9034,11 +9042,6 @@ function cG_submit(contractNo){
         console.log('[v247] TSV 복사 완료');
       }).catch(function(){});
     } catch(e){}
-    // [v175] 사용자 입력 특약사항 수집 — buildGuaranteezContractHtml 내부에서 자동 조항과 결합
-    var snEl = document.getElementById('cG_m_specialNotes');
-    var specialNotes = snEl ? (snEl.value || '') : '';
-    // [v181] 추가 계약자 수집 — 검색 모드와 동일
-    var extras = (typeof collectExtraParties === 'function') ? collectExtraParties() : [];
     // PDF 생성 — 기존 빌더 재사용 (특약: 자동조항 + 사용자 입력 / extras: 기타 공동계약자)
     var html = buildGuaranteezContractHtml(d, specialNotes, extras);
     var win = window.open('', '_blank', 'width=960,height=900,scrollbars=yes');
