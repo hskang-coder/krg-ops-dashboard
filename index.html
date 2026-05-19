@@ -199,8 +199,18 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .cr-search-bar input {
   flex: 1; min-width: 0; padding: 7px 12px; border: 1.5px solid #D0DCEE;
   border-radius: 6px; font-size: 12.5px; outline: none; transition: border 0.15s;
+  -webkit-appearance: none; appearance: none; /* [v316] iOS 기본 둥근모서리/그림자 제거 */
 }
 .cr-search-bar input:focus { border-color: #2563A8; }
+/* [v316] 모바일 — 검색바 자동 줄바꿈 + 입력창 100%폭/큰 글씨(천지인 호환) */
+@media (max-width: 700px) {
+  .cr-search-bar { flex-wrap: wrap; gap: 6px; padding: 10px 12px; }
+  .cr-search-bar input { flex-basis: 100%; min-height: 40px; font-size: 16px; padding: 9px 12px; }
+  .cr-search-bar .cr-search-btn { flex: 1 1 calc(33% - 6px); min-width: 0; padding: 9px 6px; font-size: 12px; }
+  .cr-search-bar .cr-contract-pdf-btn { flex: 1 1 calc(33% - 6px); min-width: 0; padding: 9px 6px; font-size: 11.5px; }
+  .cr-mode-tabs { flex-wrap: wrap; }
+  .cr-mode-tab { flex: 1 1 33%; font-size: 11.5px; padding: 9px 4px; }
+}
 .cr-search-btn { background: #1A3A5C; color: #fff; border: none; cursor: pointer; padding: 7px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0; min-width: 84px; text-align: center; }
 .cr-search-btn:hover { background: #2563A8; }
 .cr-contract-pdf-btn { background: #fff; color: #1B3976; border: 1.5px solid #1B3976; cursor: pointer; padding: 7px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; white-space: nowrap; transition: all .2s; flex-shrink: 0; min-width: 84px; text-align: center; }
@@ -1202,7 +1212,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         <button class="cr-mode-tab"        onclick="switchCrMode('list')">📋 목록 선택</button>
       </div>
       <div id="crSearchBox" class="cr-search-bar">
-        <input id="crInput" type="text" placeholder="계약번호(숫자) 또는 임(전)차인명(2자 이상) 입력" onkeydown="if(event.key==='Enter')searchContract()">
+        <input id="crInput" type="text" placeholder="계약번호 / 임(전)차인명 입력" inputmode="text" enterkeyhint="search" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter'&&!event.isComposing)searchContract()"><!-- [v316] IME 호환 + 모바일 친화 속성 (천지인/한글 합성 안전) -->
         <button class="cr-search-btn" onclick="searchContract()">🔍 검색</button>
         <button class="cr-contract-pdf-btn" id="crContractPdfBtn" onclick="openContractPdfModal(window._crCurrentNo)" title="계약서 발행">📄 계약서</button>
         <button class="cr-contract-pdf-btn" id="crMgmtCtrBtn" onclick="openMgmtContractModal(window._crCurrentNo)" title="표준 위수탁 계약서(자기관리형-임대인) 발행">🏢 위수탁</button>
@@ -1213,7 +1223,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
       </div>
       <div id="crListBox" style="display:none">
         <div class="cr-list-filter">
-          <input id="crListFilter" type="text" placeholder="이름·계약번호·건물명으로 필터..." oninput="filterContractList()">
+          <input id="crListFilter" type="text" placeholder="이름·계약번호·건물명으로 필터..." inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" oninput="if(!this.isComposing)filterContractList()" oncompositionend="filterContractList()"><!-- [v316] IME 합성 중 필터 호출 차단 → 천지인 호환 -->
         </div>
         <div id="crListCount" class="cr-search-result-count"></div>
         <div class="cr-list-wrap"><table class="cr-list-table">
@@ -4715,10 +4725,20 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-field"><span class="cr-field-label">수분양자 정산계좌</span><span class="cr-field-val" style="font-family:monospace;font-size:11px">${fmt(landlordAccountMap[String(c['계약번호']||'').trim()])}</span></div>
         <div class="cr-field"><span class="cr-field-label">계약자1(을)</span><span class="cr-field-val">${fmt(__vacRow.tenant1Name || c['임차인'])} ${c['임차인휴대폰']?'<span style="color:#6B7280">('+fmtPhone(c['임차인휴대폰'])+')</span>':''}${__vacRow.tenantRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.tenantRrn)+'</span>':''}</span></div>
         ${(() => {
-          // [v312] 계약정보 소스 통일 — vacancyRawData(O열) + contractRawData(계약정보) 둘 다 확인
-          var ci = String(__vacRow.contractInfo || c['계약정보'] || c['계약형태'] || c['계약구분'] || '').trim();
-          var isCo = /공동전차인|공동/.test(ci);
+          // [v316] 라벨 결정 — 다중 소스 우선순위 + 키워드 우세 매칭 + 진단 로그
+          // 1) vacancyRawData O열 (gid=1953907648) 우선
+          // 2) contractRawData '계약정보' 라벨 (동일 시트, gvizToObjects)
+          // 3) 레거시 라벨 ('계약형태','계약구분','계약유형')
+          // 4) 어느 소스든 '공동' 키워드만 있고 '연대'가 없으면 공동전차인으로 간주
+          var candidates = [
+            __vacRow && __vacRow.contractInfo,
+            c && c['계약정보'], c && c['계약형태'], c && c['계약구분'], c && c['계약유형']
+          ].map(function(x){ return String(x==null?'':x).replace(/\s+/g,''); }).filter(function(s){ return s.length > 0; });
+          var hasGongdong = candidates.some(function(v){ return /공동전차인|공동인|공동/.test(v); });
+          var hasYeondae  = candidates.some(function(v){ return /연대보증인|연대|보증인/.test(v); });
+          var isCo = hasGongdong && !hasYeondae;
           var label = isCo ? '계약자2(을)' : '연대보증인(병)';
+          try { if (window._dbgLabel) console.log('[v316][coLabel]', { cno: c && c['계약번호'], candidates: candidates, isCo: isCo, label: label }); } catch(_){}
           return `<div class="cr-field"><span class="cr-field-label">${label}</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmtPhone(__vacRow.coPhone)+')</span>':''}${__vacRow.coRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.coRrn)+'</span>':''}</span></div>`;
         })()}
         <div class="cr-field"><span class="cr-field-label">긴급연락처(관계)</span><span class="cr-field-val">${fmtPhone(__vacRow.emergPhone || c['긴급연락처'])}${__vacRow.emergInfo ? ' <span style="color:#6B7280">('+fmt(String(__vacRow.emergInfo).split(',')[0].trim())+')</span>' : ''}</span></div>
