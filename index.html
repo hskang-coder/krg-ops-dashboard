@@ -4605,6 +4605,67 @@ function renderContractRecord(c, payments, responses = []) {
   </div>
 
   <div class="cr-card">
+    <div class="cr-card-title">📄 계약 정보</div>
+    <div class="cr-info-grid">
+      <div class="cr-info-section">
+        <div class="cr-info-title">임대 정보</div>
+        <div class="cr-field"><span class="cr-field-label">계약기간</span><span class="cr-field-val">${fmt(c['시작일'])} ~ ${fmt(c['종료일'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">건물주소</span><span class="cr-field-val">${fmt(c['계약지주소'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">건물명/호수</span><span class="cr-field-val">${fmt(c['건물명'])} ${fmt(c['호수'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">계약형태</span><span class="cr-field-val">${fmt(c['계약형태'])} / ${fmt(c['계약구분'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">납기일</span><span class="cr-field-val">매월 ${fmt(c['납기일'])}일${(__vacRow.payMethod||c['월세납입형태']||c['납부방법']) ? ' <span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:4px;background:'+(/후불/.test(String(__vacRow.payMethod||c['월세납입형태']||c['납부방법']||''))?'#FEF3C7;color:#92400E':'#DBEAFE;color:#1E40AF')+'">'+(__vacRow.payMethod||c['월세납입형태']||c['납부방법'])+'</span>' : ''}</span></div>
+      </div>
+      <div class="cr-info-section">
+        <div class="cr-info-title">금액 정보</div>
+        <div class="cr-field"><span class="cr-field-label">보증금/원상회복</span><span class="cr-field-val"><span style="white-space:nowrap"><span style="color:#6B7280;font-size:10px;font-weight:700;margin-right:5px">보증금</span>${fmtMoneyZ(__vacRow.deposit || c['보증금(원)'])}</span><span style="color:#D1D5DB;font-weight:600;margin:0 14px">/</span><span style="white-space:nowrap"><span style="color:#6B7280;font-size:10px;font-weight:700;margin-right:5px">원상회복담보금</span>${fmtMoneyZ(__vacRow.depositRecov)}</span></span></div>
+        ${(() => {
+          var payCond = String((__vacRow.payCondition||c['납부조건']||'')).trim();
+          var rentNum = parseFloat(String(__vacRow.rent || c['임대료'] || 0).replace(/[^0-9.-]/g,'')) || 0;
+          var feeNum  = parseFloat(String(__vacRow.fee || c['수수료'] || 0).replace(/[^0-9.-]/g,'')) || 0;
+          var includeSvcFee = (payCond === '분할' || payCond === '수수료별도');
+          var monthlyTotal = rentNum + (includeSvcFee ? feeNum : 0);
+          return `<div class="cr-field"><span class="cr-field-label">임대료</span><span class="cr-field-val">${fmtMoney(rentNum)}</span></div>
+        <div class="cr-field"><span class="cr-field-label">월세</span><span class="cr-field-val">${fmtMoney(c['월세'])} <span style="color:#6B7280;font-size:11px;font-weight:500">(부가세 ${fmtMoney(c['부가세'])})</span><span style="color:#D1D5DB;margin:0 8px">|</span>관리비 ${fmtMoney(c['관리비'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">수수료</span><span class="cr-field-val">${fmtMoney(feeNum)}${payCond?` <span style="color:#6B7280;font-size:11px;font-weight:500;background:#F3F4F6;padding:1px 7px;border-radius:8px;margin-left:4px">${payCond}</span>`:''}</span></div>
+        <div class="cr-field"><span class="cr-field-label">월납부금액</span><span class="cr-field-val" style="color:#1B3976;font-weight:700">${fmtMoney(monthlyTotal)}</span></div>`;
+        })()}
+      </div>
+      <div class="cr-info-section">
+        <div class="cr-info-title">계약자 정보</div>
+        <div class="cr-field"><span class="cr-field-label">임대인(갑)</span><span class="cr-field-val">${fmt(c['임대인명'])} ${c['임대인연락처']?'<span style="color:#6B7280">('+fmtPhone(c['임대인연락처'])+')</span>':''}</span></div>
+        <div class="cr-field"><span class="cr-field-label">수분양자 정산계좌</span><span class="cr-field-val" style="font-family:monospace;font-size:11px">${fmt(landlordAccountMap[String(c['계약번호']||'').trim()])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">계약자1(을)</span><span class="cr-field-val">${fmt(__vacRow.tenant1Name || c['임차인'])} ${c['임차인휴대폰']?'<span style="color:#6B7280">('+fmtPhone(c['임차인휴대폰'])+')</span>':''}${__vacRow.tenantRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.tenantRrn)+'</span>':''}</span></div>
+        ${(() => {
+          // [v316] 라벨 결정 — 다중 소스 우선순위 + 키워드 우세 매칭 + 진단 로그
+          // 1) vacancyRawData O열 (gid=1953907648) 우선
+          // 2) contractRawData '계약정보' 라벨 (동일 시트, gvizToObjects)
+          // 3) 레거시 라벨 ('계약형태','계약구분','계약유형')
+          // 4) 어느 소스든 '공동' 키워드만 있고 '연대'가 없으면 공동전차인으로 간주
+          var candidates = [
+            __vacRow && __vacRow.contractInfo,
+            c && c['계약정보'], c && c['계약형태'], c && c['계약구분'], c && c['계약유형']
+          ].map(function(x){ return String(x==null?'':x).replace(/\s+/g,''); }).filter(function(s){ return s.length > 0; });
+          var hasGongdong = candidates.some(function(v){ return /공동전차인|공동인|공동/.test(v); });
+          var hasYeondae  = candidates.some(function(v){ return /연대보증인|연대|보증인/.test(v); });
+          var isCo = hasGongdong && !hasYeondae;
+          var label = isCo ? '계약자2(을)' : '연대보증인(병)';
+          try { if (window._dbgLabel) console.log('[v316][coLabel]', { cno: c && c['계약번호'], candidates: candidates, isCo: isCo, label: label }); } catch(_){}
+          return `<div class="cr-field"><span class="cr-field-label">${label}</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmtPhone(__vacRow.coPhone)+')</span>':''}${__vacRow.coRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.coRrn)+'</span>':''}</span></div>`;
+        })()}
+        <div class="cr-field"><span class="cr-field-label">긴급연락처(관계)</span><span class="cr-field-val">${fmtPhone(__vacRow.emergPhone || c['긴급연락처'])}${__vacRow.emergInfo ? ' <span style="color:#6B7280">('+fmt(String(__vacRow.emergInfo).split(',')[0].trim())+')</span>' : ''}</span></div>
+      </div>
+      <div class="cr-info-section">
+        <div class="cr-info-title">담당 / 부동산</div>
+        <div class="cr-field"><span class="cr-field-label">계약담당자</span><span class="cr-field-val">${fmt(c['계약담당자'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">부동산명</span><span class="cr-field-val">${fmt(c['부동산명'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">심사일</span><span class="cr-field-val">${fmt(c['심사일'])}${inspectType ? `<span style="margin-left:6px;font-size:11px;font-weight:700;color:#2563A8;background:#EFF6FF;padding:1px 7px;border-radius:10px;border:1px solid #BFDBFE">${inspectType}</span>` : ''}</span></div>
+        <div class="cr-field"><span class="cr-field-label">계약체결일</span><span class="cr-field-val">${fmt(c['계약체결일'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">잔여기간</span><span class="cr-field-val">${fmt(c['잔여기간'])}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cr-card">
     <div class="cr-card-title">${hasDelinq?'⚠️':'✅'} 현재 연체 현황</div>
     <div class="cr-delinq-grid">
       <div class="cr-delinq-card ${hasDelinq?'':'safe'}">
@@ -4689,67 +4750,6 @@ function renderContractRecord(c, payments, responses = []) {
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">실제 퇴실(공실)</span><span class="cr-delinq-row-val ${actualExitDate?'red':''}">${actualExitDate ? fmt(actualExitDate) : fmt(c['종료일'])}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">중도퇴실 정보</span><span class="cr-delinq-row-val ${midExitDisplay?'red':''}">${midExitDisplay || '—'}</span></div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="cr-card">
-    <div class="cr-card-title">📄 계약 정보</div>
-    <div class="cr-info-grid">
-      <div class="cr-info-section">
-        <div class="cr-info-title">임대 정보</div>
-        <div class="cr-field"><span class="cr-field-label">계약기간</span><span class="cr-field-val">${fmt(c['시작일'])} ~ ${fmt(c['종료일'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">건물주소</span><span class="cr-field-val">${fmt(c['계약지주소'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">건물명/호수</span><span class="cr-field-val">${fmt(c['건물명'])} ${fmt(c['호수'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">계약형태</span><span class="cr-field-val">${fmt(c['계약형태'])} / ${fmt(c['계약구분'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">납기일</span><span class="cr-field-val">매월 ${fmt(c['납기일'])}일${(__vacRow.payMethod||c['월세납입형태']||c['납부방법']) ? ' <span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:4px;background:'+(/후불/.test(String(__vacRow.payMethod||c['월세납입형태']||c['납부방법']||''))?'#FEF3C7;color:#92400E':'#DBEAFE;color:#1E40AF')+'">'+(__vacRow.payMethod||c['월세납입형태']||c['납부방법'])+'</span>' : ''}</span></div>
-      </div>
-      <div class="cr-info-section">
-        <div class="cr-info-title">금액 정보</div>
-        <div class="cr-field"><span class="cr-field-label">보증금/원상회복</span><span class="cr-field-val"><span style="white-space:nowrap"><span style="color:#6B7280;font-size:10px;font-weight:700;margin-right:5px">보증금</span>${fmtMoneyZ(__vacRow.deposit || c['보증금(원)'])}</span><span style="color:#D1D5DB;font-weight:600;margin:0 14px">/</span><span style="white-space:nowrap"><span style="color:#6B7280;font-size:10px;font-weight:700;margin-right:5px">원상회복담보금</span>${fmtMoneyZ(__vacRow.depositRecov)}</span></span></div>
-        ${(() => {
-          var payCond = String((__vacRow.payCondition||c['납부조건']||'')).trim();
-          var rentNum = parseFloat(String(__vacRow.rent || c['임대료'] || 0).replace(/[^0-9.-]/g,'')) || 0;
-          var feeNum  = parseFloat(String(__vacRow.fee || c['수수료'] || 0).replace(/[^0-9.-]/g,'')) || 0;
-          var includeSvcFee = (payCond === '분할' || payCond === '수수료별도');
-          var monthlyTotal = rentNum + (includeSvcFee ? feeNum : 0);
-          return `<div class="cr-field"><span class="cr-field-label">임대료</span><span class="cr-field-val">${fmtMoney(rentNum)}</span></div>
-        <div class="cr-field"><span class="cr-field-label">월세</span><span class="cr-field-val">${fmtMoney(c['월세'])} <span style="color:#6B7280;font-size:11px;font-weight:500">(부가세 ${fmtMoney(c['부가세'])})</span><span style="color:#D1D5DB;margin:0 8px">|</span>관리비 ${fmtMoney(c['관리비'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">수수료</span><span class="cr-field-val">${fmtMoney(feeNum)}${payCond?` <span style="color:#6B7280;font-size:11px;font-weight:500;background:#F3F4F6;padding:1px 7px;border-radius:8px;margin-left:4px">${payCond}</span>`:''}</span></div>
-        <div class="cr-field"><span class="cr-field-label">월납부금액</span><span class="cr-field-val" style="color:#1B3976;font-weight:700">${fmtMoney(monthlyTotal)}</span></div>`;
-        })()}
-      </div>
-      <div class="cr-info-section">
-        <div class="cr-info-title">계약자 정보</div>
-        <div class="cr-field"><span class="cr-field-label">임대인(갑)</span><span class="cr-field-val">${fmt(c['임대인명'])} ${c['임대인연락처']?'<span style="color:#6B7280">('+fmtPhone(c['임대인연락처'])+')</span>':''}</span></div>
-        <div class="cr-field"><span class="cr-field-label">수분양자 정산계좌</span><span class="cr-field-val" style="font-family:monospace;font-size:11px">${fmt(landlordAccountMap[String(c['계약번호']||'').trim()])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">계약자1(을)</span><span class="cr-field-val">${fmt(__vacRow.tenant1Name || c['임차인'])} ${c['임차인휴대폰']?'<span style="color:#6B7280">('+fmtPhone(c['임차인휴대폰'])+')</span>':''}${__vacRow.tenantRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.tenantRrn)+'</span>':''}</span></div>
-        ${(() => {
-          // [v316] 라벨 결정 — 다중 소스 우선순위 + 키워드 우세 매칭 + 진단 로그
-          // 1) vacancyRawData O열 (gid=1953907648) 우선
-          // 2) contractRawData '계약정보' 라벨 (동일 시트, gvizToObjects)
-          // 3) 레거시 라벨 ('계약형태','계약구분','계약유형')
-          // 4) 어느 소스든 '공동' 키워드만 있고 '연대'가 없으면 공동전차인으로 간주
-          var candidates = [
-            __vacRow && __vacRow.contractInfo,
-            c && c['계약정보'], c && c['계약형태'], c && c['계약구분'], c && c['계약유형']
-          ].map(function(x){ return String(x==null?'':x).replace(/\s+/g,''); }).filter(function(s){ return s.length > 0; });
-          var hasGongdong = candidates.some(function(v){ return /공동전차인|공동인|공동/.test(v); });
-          var hasYeondae  = candidates.some(function(v){ return /연대보증인|연대|보증인/.test(v); });
-          var isCo = hasGongdong && !hasYeondae;
-          var label = isCo ? '계약자2(을)' : '연대보증인(병)';
-          try { if (window._dbgLabel) console.log('[v316][coLabel]', { cno: c && c['계약번호'], candidates: candidates, isCo: isCo, label: label }); } catch(_){}
-          return `<div class="cr-field"><span class="cr-field-label">${label}</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmtPhone(__vacRow.coPhone)+')</span>':''}${__vacRow.coRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.coRrn)+'</span>':''}</span></div>`;
-        })()}
-        <div class="cr-field"><span class="cr-field-label">긴급연락처(관계)</span><span class="cr-field-val">${fmtPhone(__vacRow.emergPhone || c['긴급연락처'])}${__vacRow.emergInfo ? ' <span style="color:#6B7280">('+fmt(String(__vacRow.emergInfo).split(',')[0].trim())+')</span>' : ''}</span></div>
-      </div>
-      <div class="cr-info-section">
-        <div class="cr-info-title">담당 / 부동산</div>
-        <div class="cr-field"><span class="cr-field-label">계약담당자</span><span class="cr-field-val">${fmt(c['계약담당자'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">부동산명</span><span class="cr-field-val">${fmt(c['부동산명'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">심사일</span><span class="cr-field-val">${fmt(c['심사일'])}${inspectType ? `<span style="margin-left:6px;font-size:11px;font-weight:700;color:#2563A8;background:#EFF6FF;padding:1px 7px;border-radius:10px;border:1px solid #BFDBFE">${inspectType}</span>` : ''}</span></div>
-        <div class="cr-field"><span class="cr-field-label">계약체결일</span><span class="cr-field-val">${fmt(c['계약체결일'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">잔여기간</span><span class="cr-field-val">${fmt(c['잔여기간'])}</span></div>
       </div>
     </div>
   </div>
