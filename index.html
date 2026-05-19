@@ -4712,9 +4712,13 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-field"><span class="cr-field-label">임대인(갑)</span><span class="cr-field-val">${fmt(c['임대인명'])} ${c['임대인연락처']?'<span style="color:#6B7280">('+fmtPhone(c['임대인연락처'])+')</span>':''}</span></div>
         <div class="cr-field"><span class="cr-field-label">수분양자 정산계좌</span><span class="cr-field-val" style="font-family:monospace;font-size:11px">${fmt(landlordAccountMap[String(c['계약번호']||'').trim()])}</span></div>
         <div class="cr-field"><span class="cr-field-label">계약자1(을)</span><span class="cr-field-val">${fmt(__vacRow.tenant1Name || c['임차인'])} ${c['임차인휴대폰']?'<span style="color:#6B7280">('+fmtPhone(c['임차인휴대폰'])+')</span>':''}${__vacRow.tenantRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.tenantRrn)+'</span>':''}</span></div>
-        ${__vacRow.contractInfo === '공동전차인'
-          ? `<div class="cr-field"><span class="cr-field-label">계약자2(을)</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmtPhone(__vacRow.coPhone)+')</span>':''}${__vacRow.coRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.coRrn)+'</span>':''}</span></div>`
-          : `<div class="cr-field"><span class="cr-field-label">연대보증인(병)</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmtPhone(__vacRow.coPhone)+')</span>':''}${__vacRow.coRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.coRrn)+'</span>':''}</span></div>`}
+        ${(() => {
+          // [v312] 계약정보 소스 통일 — vacancyRawData(O열) + contractRawData(계약정보) 둘 다 확인
+          var ci = String(__vacRow.contractInfo || c['계약정보'] || c['계약형태'] || c['계약구분'] || '').trim();
+          var isCo = /공동전차인|공동/.test(ci);
+          var label = isCo ? '계약자2(을)' : '연대보증인(병)';
+          return `<div class="cr-field"><span class="cr-field-label">${label}</span><span class="cr-field-val">${fmt(__vacRow.coName)} ${__vacRow.coPhone?'<span style="color:#6B7280">('+fmtPhone(__vacRow.coPhone)+')</span>':''}${__vacRow.coRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.coRrn)+'</span>':''}</span></div>`;
+        })()}
         <div class="cr-field"><span class="cr-field-label">긴급연락처(관계)</span><span class="cr-field-val">${fmtPhone(__vacRow.emergPhone || c['긴급연락처'])}${__vacRow.emergInfo ? ' <span style="color:#6B7280">('+fmt(String(__vacRow.emergInfo).split(',')[0].trim())+')</span>' : ''}</span></div>
       </div>
       <div class="cr-info-section">
