@@ -1927,6 +1927,7 @@ function parseVacancySheet(resp) {
   const contractKindIdx= findColIdx(labels, ['계약상태'],          10);  // K
   const housingTypeIdx = findColIdx(labels, ['주택유형','전대전환'], 13); // N
   const contractInfoIdx= findColIdx(labels, ['계약형태','계약구분'], 14); // O
+  const reviewResultIdx= findColIdx(labels, ['계약심사결과','심사결과','계약심사 결과'], 17); // R (v313)
   const payConditionIdx= findColIdx(labels, ['납부조건'],          18);  // S
   const propAddrIdx    = findColIdx(labels, ['계약지주소'],        19);  // T
   const propBuildingIdx= findColIdx(labels, ['건물명'],            20);  // U
@@ -2008,6 +2009,7 @@ function parseVacancySheet(resp) {
       tenantRrn:    cell(tenantRrnIdx), // AV열: 계약자1 생년월일/주민번호 [v65]
       coRrn:        cell(coRrnIdx),     // BB열: 계약자2/연대보증인 생년월일/주민번호 [v65]
       payCondition: cell(payConditionIdx), // S열: 납부조건 [v71]
+      reviewResult: cell(reviewResultIdx), // R열: 계약심사 결과 (v313)
       // [v74] 입주 전 진척 5개 (Boolean 변환)
       homeBtn:    (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[homeBtnIdx] && (c[homeBtnIdx].v != null ? c[homeBtnIdx].v : c[homeBtnIdx].f)),
       eContract:  (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[eContractIdx] && (c[eContractIdx].v != null ? c[eContractIdx].v : c[eContractIdx].f)),
@@ -4575,7 +4577,7 @@ function renderContractRecord(c, payments, responses = []) {
     <div style="display:grid;grid-template-columns:repeat(4,1fr)">
       <div class="cr-info-section">
         <div class="cr-info-title">계약정보</div>
-        <div class="cr-field"><span class="cr-field-val" style="font-size:13px;font-weight:600;color:#1D4ED8">${fmt(c['계약정보'])}</span></div>
+        <div class="cr-field"><span class="cr-field-val" style="font-size:13px;font-weight:600;color:#1D4ED8">${fmt(c['계약정보'])}${(__vacRow.reviewResult && String(__vacRow.reviewResult).trim() && String(__vacRow.reviewResult).trim() !== '-') ? ' <span style="font-size:11px;color:#6B7280;font-weight:500;margin-left:2px">('+String(__vacRow.reviewResult).trim()+')</span>' : ''}</span></div>
       </div>
       <div class="cr-info-section">
         <div class="cr-info-title">계약조건</div>
