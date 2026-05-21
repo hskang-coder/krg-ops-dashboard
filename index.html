@@ -12486,9 +12486,43 @@ function openRenewalReport(cno){
       + '<tr><th>최근 갱신 대응 의견</th><td style="font-size:10pt;color:#374151">'+esc((latestRenewal&&latestRenewal.content)||'갱신관리 대응 이력 없음')+'</td></tr>'
       + '</table></div></div>'
       // 섹션 2: 제안 옵션 (조건부/거절자 대상)
-      + ((judge === 'cond' || judge === 'deny') ? (
-          '<div class="sec sec-pp"><div class="sec-h">② 승인 전환 제안 (조건부승인/거절자 대상)</div><div class="sec-b">'
-        + '<div style="font-size:10pt;color:#5B21B6;font-weight:600;margin-bottom:4px">A. 서비스 수수료 할증</div>'
+      + ((judge === 'cond' || judge === 'deny') ? (function(){
+          // [v335] 데이터 기반 추천 결론 자동 생성
+          var rec = 125, alt = '계약자 추가 권고';
+          if (judge === 'deny') {
+            if (metrics.rate >= 70 || metrics.sumDays >= 50) { rec = 200; alt = '연대보증인 + 보증금 2배 추가 요구'; }
+            else { rec = 175; alt = '연대보증인 또는 공동전차인 추가'; }
+          } else { // cond
+            if (metrics.rate >= 50 || metrics.sumDays >= 25) rec = 175;
+            else if (metrics.rate >= 30 || metrics.sumDays >= 15) rec = 150;
+            else rec = 125;
+          }
+          var recFee = Math.round(feeNum * rec / 100);
+          var recDiff = recFee - feeNum;
+          var reasonParts = [];
+          reasonParts.push('연체율 <b>' + metrics.rate + '%</b>');
+          reasonParts.push('누적 연체 <b>' + metrics.sumDays + '일</b>');
+          reasonParts.push('연체 횟수 <b>' + metrics.count + '/' + metrics.total + '회</b>');
+          var reason = reasonParts.join(' · ');
+          var riskNote = judge === 'deny'
+            ? '향후 6개월 연체 리스크 <b>HIGH</b> — 갱신 거절이 원칙이나, ' + rec + '% 할증 수용 시 조건부 갱신 가능'
+            : '향후 6개월 연체 리스크 <b>' + (rec >= 175 ? 'HIGH' : rec >= 150 ? 'MID' : 'LOW-MID') + '</b> — 최소 ' + rec + '% 할증 권고';
+          return ''
+          + '<div class="sec sec-pp"><div class="sec-h">② 승인 전환 제안 (조건부승인/거절자 대상)</div><div class="sec-b">'
+          // 추천 결론 박스
+          + '<div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:2px solid #7C3AED;border-radius:8px;padding:12px 14px;margin-bottom:14px">'
+          +   '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">'
+          +     '<span style="background:#7C3AED;color:#fff;padding:2px 9px;border-radius:4px;font-size:9.5pt;font-weight:700">결론</span>'
+          +     '<span style="font-size:13pt;font-weight:800;color:#5B21B6">' + rec + '% 수수료 할증 (' + fmtKRW(recFee) + ')</span>'
+          +     '<span style="font-size:9.5pt;color:#7C3AED;font-weight:600">+ ' + fmtKRW(recDiff) + '/월</span>'
+          +   '</div>'
+          +   '<div style="font-size:10pt;color:#374151;margin-bottom:8px;line-height:1.55"><b style="color:#7C3AED">불가 시 대안:</b> ' + alt + '</div>'
+          +   '<div style="display:flex;align-items:baseline;gap:8px;padding-top:8px;border-top:1px dashed #C4B5FD">'
+          +     '<span style="background:#fff;color:#7C3AED;border:1px solid #7C3AED;padding:1px 8px;border-radius:4px;font-size:9pt;font-weight:700">이유</span>'
+          +     '<span style="font-size:10pt;color:#374151;line-height:1.55;flex:1">' + riskNote + '<br><span style="color:#6B7280;font-size:9.5pt">근거 데이터: ' + reason + '</span></span>'
+          +   '</div>'
+          + '</div>'
+          + '<div style="font-size:10pt;color:#5B21B6;font-weight:600;margin-bottom:4px">A. 서비스 수수료 할증</div>'
         + '<div style="font-size:9.5pt;color:#6B7280;margin-bottom:4px">현재 수수료: <b>'+fmtKRW(feeNum)+'</b></div>'
         + '<div class="opt-grid">'
         + feeOpts.map(function(o){
@@ -12510,8 +12544,8 @@ function openRenewalReport(cno){
         + '<li><b>위약금 강화</b> (4개월 → 6개월 임대료)</li>'
         + '<li>연대보증인 또는 공동전차인 추가 요구</li>'
         + '</ul>'
-        + '</div></div>'
-        ) : '')
+        + '</div></div>';
+        })() : '')
       // 섹션 3: 연체 관점 주의사항
       + '<div class="sec sec-rk"><div class="sec-h">③ 갱신 시 연체 관점 주의사항</div><div class="sec-b">'
       + '<table class="tbl">'
