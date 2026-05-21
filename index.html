@@ -6376,7 +6376,7 @@ function dlqRenderTableRows() {
         <th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>
         <th>계약번호</th><th>그룹</th><th>계약정보</th>
         <th>연체일수</th><th>납부구분</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th>
-        <th>연락처</th><th>연체금액</th><th>대응일</th><th>입금예정일</th><th>최근 대응 내용</th>
+        <th>연락처</th><th>연체금액</th><th title="시작일 25.6.1 이후 계약자: 임대료 × 4개월 (gid=1953907648 W열 ≥ 2025-06-01, AK열 × 4)">위약금</th><th>대응일</th><th>입금예정일</th><th>최근 대응 내용</th>
       </tr></thead>
       <tbody>
         ${rows.map(r => {
@@ -6384,6 +6384,33 @@ function dlqRenderTableRows() {
           const dc = dayClass(r.days||0);
           const payColor = r.payStatus==='past'?'#ef4444':r.payStatus==='today'?'#f59e0b':r.payStatus==='urgent'?'#dc2626':'#22c55e';
           const shortContent = r.content||'-';
+          // [v325] 위약금 계산 — 시작일 25.6.1 이후 계약자 대상, AK열 임대료 × 4
+          const penaltyCell = (function(){
+            try {
+              if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) return '<span style="color:#D1D5DB">-</span>';
+              const vr = vacancyRawData.find(v => String(v.no||'').trim() === String(r.cno||'').trim());
+              if (!vr) return '<span style="color:#D1D5DB">-</span>';
+              // 시작일 파싱 (다양한 포맷 안전 처리)
+              const sd = vr.startDate;
+              if (!sd) return '<span style="color:#D1D5DB">-</span>';
+              let dt = null;
+              if (sd instanceof Date) dt = sd;
+              else {
+                const s = String(sd).trim();
+                // ISO/하이픈/점/슬래시 모두 시도
+                const m = s.match(/(\d{4})[\s\.\-\/년]+(\d{1,2})[\s\.\-\/월]+(\d{1,2})/);
+                if (m) dt = new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+                else { const tt = new Date(s); if (!isNaN(tt)) dt = tt; }
+              }
+              if (!dt || isNaN(dt)) return '<span style="color:#D1D5DB">-</span>';
+              const cutoff = new Date(2025, 5, 1); // 2025-06-01 (월은 0-based)
+              if (dt < cutoff) return '<span style="color:#D1D5DB">-</span>';
+              const rentNum = parseFloat(String(vr.rent||'0').replace(/[^0-9.\-]/g,'')) || 0;
+              if (rentNum <= 0) return '<span style="color:#D1D5DB">-</span>';
+              const penalty = rentNum * 4;
+              return '<span style="color:#B91C1C;font-weight:700">₩' + penalty.toLocaleString() + '</span>';
+            } catch(_e) { return '<span style="color:#D1D5DB">-</span>'; }
+          })();
           return `<tr class="dlq-tbl-row" onclick="dlqGoToContract('${r.cno}')">
             <td onclick="event.stopPropagation()" style="text-align:center;padding:4px">
               <input type="checkbox" class="dlq-cb dlq-row-cb" value="${r.cno}" onchange="dlqToggleSelect('${r.cno}',this.checked)">
@@ -6400,6 +6427,7 @@ function dlqRenderTableRows() {
             <td class="dlq-tbl-nm">${r.nm||'-'}</td>
             <td class="dlq-tbl-tel">${r.tel||'-'}</td>
             <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
+            <td style="white-space:nowrap;font-size:11px">${penaltyCell}</td>
             <td style="white-space:nowrap;font-size:11px;color:#374151">${r.actionDateStr&&r.actionDateStr!=='-'?r.actionDateStr:'—'}</td>
             <td>${r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-'}</td>
             <td class="dlq-tbl-content">${shortContent}</td>
