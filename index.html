@@ -12332,6 +12332,34 @@ function rnwLatestRenewalContent(cno){
   return matches[0].content || '';
 }
 
+// === [v334] 일괄 액션 — 선택된 계약들의 갱신심사 리포트 일괄 발행 ===
+function rnwOpenSelectedReports(){
+  try {
+    var sel = window._rnwSelectedCnos;
+    if (!sel || sel.size === 0) {
+      alert('⚠️ 갱신 심사 리포트를 발행할 계약을 먼저 체크해주세요.');
+      return;
+    }
+    var cnos = Array.from(sel);
+    if (cnos.length > 10) {
+      if (!confirm('⚠️ ' + cnos.length + '건 선택되어 있습니다.\n\n팝업이 ' + cnos.length + '개 열리는데 진행하시겠습니까?\n(브라우저 팝업 차단 주의)')) return;
+    }
+    var ok = 0, fail = 0;
+    cnos.forEach(function(cno, i){
+      try {
+        // 첫 창은 즉시, 나머지는 150ms 간격으로 (브라우저 팝업 차단 회피)
+        setTimeout(function(){
+          try { openRenewalReport(cno); ok++; }
+          catch(e){ fail++; console.warn('[v334] 리포트 발행 실패:', cno, e); }
+        }, i * 150);
+      } catch(e) { fail++; }
+    });
+  } catch(e) {
+    console.error('[v334] rnwOpenSelectedReports:', e);
+    alert('갱신 심사 리포트 발행 실패: ' + e.message);
+  }
+}
+
 // === [v332] 갱신심사 리포트 (새 창 PDF) ===
 function openRenewalReport(cno){
   try {
@@ -12881,8 +12909,10 @@ function renderRenewalView(){
     +       '<label style="' + togStyle + '"><input type="checkbox"' + (searchAll?' checked':'') + ' onchange="rnwToggleSearchAll(this.checked)" style="margin:0">계약자 전체</label>'
     +     '</div>'
     +   '</div>'
-    // ── 우측: 액션 버튼 4개 ──
+    // ── 우측: 액션 버튼 — 갱신 심사 | 만기퇴실 | 조건부승인 | 갱신불가 | 엑셀 ──
     +   '<div style="display:flex;align-items:center;gap:6px">'
+    +     btnAct('#7C3AED', '📊 갱신 심사', "rnwOpenSelectedReports()")
+    +     '<span style="width:1px;height:20px;background:#D1D5DB;margin:0 2px"></span>'
     +     btnAct('#F59E0B', '📨 만기퇴실', "rnwGenerateMsg('expired')")
     +     btnAct('#0EA5E9', '📨 조건부승인', "rnwGenerateMsg('conditional')")
     +     btnAct('#DC2626', '📨 갱신불가', "rnwGenerateMsg('denied')")
@@ -12910,7 +12940,7 @@ function renderRenewalView(){
           return '<tr onclick="crNavFromView(\'' + e.cno + '\',\'renewal\')">'
             + '<td onclick="event.stopPropagation()" style="text-align:center;padding:4px"><input type="checkbox" class="dlq-cb rnw-row-cb" value="' + e.cno + '" onchange="rnwToggleSelect(\'' + e.cno + '\',this.checked)"></td>'
             + '<td style="color:#8A9AB5;font-size:11px">' + (idx+1) + '</td>'
-            + '<td><b style="color:#0E7490">' + e.cno + '</b> <button type="button" onclick="event.stopPropagation();openRenewalReport(\'' + e.cno + '\')" title="갱신심사 리포트 PDF 생성" style="background:#7C3AED;color:#fff;border:none;border-radius:4px;padding:2px 8px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:5px;white-space:nowrap">갱신 심사</button></td>'
+            + '<td><b style="color:#0E7490">' + e.cno + '</b></td>'
             + '<td style="font-size:11px;color:#6B7280">' + (e.group||'—') + '</td>'
             + '<td>' + rnwBadgeContractStatus(e.contractStatus) + '</td>'
             + '<td style="font-size:11px;color:#6B7280">' + (e.vacancyStatus||'—') + '</td>'
