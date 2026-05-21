@@ -12332,6 +12332,182 @@ function rnwLatestRenewalContent(cno){
   return matches[0].content || '';
 }
 
+// === [v332] 갱신심사 리포트 (새 창 PDF) ===
+function openRenewalReport(cno){
+  try {
+    cno = String(cno||'').replace(/\.0$/,'').trim();
+    if (!cno) { alert('계약번호 누락'); return; }
+    var vRow = (Array.isArray(vacancyRawData) ? vacancyRawData : []).find(function(v){ return String(v.no||'').trim() === cno; }) || {};
+    var cRow = (Array.isArray(contractRawData) ? contractRawData : []).find(function(r){ return String(r['계약번호']||'').trim() === cno; }) || {};
+    var inc = (typeof window._rnwIncomeRaw !== 'undefined') ? window._rnwIncomeRaw : null;
+    var metrics = (typeof rnwCalcLateMetrics === 'function' && inc) ? rnwCalcLateMetrics(cno, inc) : { count:0, sumDays:0, rate:0, total:0 };
+    var judge = (typeof rnwClassify === 'function') ? rnwClassify(metrics) : 'none';
+    var endDate = vRow.endDate ? new Date(vRow.endDate) : (cRow['종료일'] ? new Date(cRow['종료일']) : null);
+    var startDate = vRow.startDate ? new Date(vRow.startDate) : null;
+    var today = new Date(); today.setHours(0,0,0,0);
+    var dday = endDate ? Math.floor((endDate.getTime() - today.getTime())/(24*3600*1000)) : null;
+    var rentNum = parseFloat(String(vRow.rent||'0').replace(/[^0-9.\-]/g,'')) || 0;
+    var feeNum = parseFloat(String(vRow.fee||'0').replace(/[^0-9.\-]/g,'')) || 0;
+    var depositNum = parseFloat(String(vRow.deposit||'0').replace(/[^0-9.\-]/g,'')) || 0;
+    // 거주개월수
+    var resMonths = 0;
+    if (startDate) {
+      resMonths = (today.getFullYear()-startDate.getFullYear())*12 + (today.getMonth()-startDate.getMonth());
+      if (today.getDate() < startDate.getDate()) resMonths--;
+      if (resMonths < 0) resMonths = 0;
+    }
+    var renewalCycle = Math.floor(resMonths/12);
+    // 위약금 가능 여부 (시작일 2025-06-01 이후)
+    var penaltyEligible = startDate && startDate >= new Date(2025, 5, 1);
+    var penalty = penaltyEligible ? rentNum*4 : 0;
+    // 대응 이력 (갱신관련)
+    var dList = (Array.isArray(daeungRawData) ? daeungRawData : []).filter(function(r){
+      return String(r.no||'').replace(/\.0$/,'').trim() === cno;
+    }).sort(function(a,b){ return (rnwParseDate(b.date)||0) - (rnwParseDate(a.date)||0); });
+    var dRecent3 = dList.filter(function(r){
+      var d = rnwParseDate(r.date); if (!d) return false;
+      var diff = (today - d)/(24*3600*1000);
+      return diff <= 30;
+    });
+    var cntByCat = {};
+    dList.forEach(function(r){ var k = (r.jobType||'기타'); cntByCat[k] = (cntByCat[k]||0)+1; });
+    var latestRenewal = dList.find(function(r){ return (r.jobType||'').trim() === '갱신관리'; });
+    // 등급 (간이)
+    var grade = (function(){
+      if (judge === 'deny') return 'F';
+      if (judge === 'cond') return 'D';
+      if (metrics.count >= 3) return 'C';
+      if (metrics.count >= 1) return 'B';
+      return 'A';
+    })();
+    // 향후 6개월 연체 리스크
+    var riskScore = (judge === 'deny' ? 'HIGH' : judge === 'cond' ? 'MID' : 'LOW');
+    // 제안: 수수료 할증 옵션
+    var feeOpts = [125,150,175,200].map(function(pct){
+      var newFee = Math.round(feeNum * pct / 100);
+      var diff = newFee - feeNum;
+      return { pct: pct, fee: newFee, diff: diff };
+    });
+    // 보증금 옵션
+    var depOpts = [1.5, 2.0].map(function(mul){
+      return { mul: mul, dep: Math.round(depositNum * mul) };
+    });
+    // 라벨 변환
+    var judgeLabel = { app:'승인 가능', cond:'조건부 승인', deny:'갱신 거절', none:'심사 불가(데이터 부족)' }[judge] || '미분류';
+    var judgeColor = { app:'#059669', cond:'#D97706', deny:'#DC2626', none:'#6B7280' }[judge] || '#6B7280';
+    var riskColor = { LOW:'#059669', MID:'#D97706', HIGH:'#DC2626' }[riskScore];
+    var fmtKRW = function(n){ return n ? '₩' + Number(n).toLocaleString() : '-'; };
+    var fmtDate = function(d){ if (!d) return '-'; if (d instanceof Date) return d.getFullYear()+'.'+(d.getMonth()+1)+'.'+d.getDate(); return String(d); };
+    var esc = function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    var html = ''
+      + '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
+      + '<title>갱신심사 리포트 — ' + cno + '</title>'
+      + '<style>'
+      + '*{box-sizing:border-box;margin:0;padding:0}'
+      + 'body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif;font-size:11pt;color:#1a1a1a;background:#f0f2f5;line-height:1.6}'
+      + '.page{width:210mm;min-height:297mm;padding:14mm 16mm;margin:18px auto;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative}'
+      + '@media print{@page{size:A4 portrait;margin:0}body{background:#fff}.page{margin:0;box-shadow:none;min-height:0}.print-btn{display:none}}'
+      + '.print-btn{position:fixed;top:14px;right:14px;background:#7C3AED;color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;z-index:99;box-shadow:0 4px 12px rgba(124,58,237,.35)}'
+      + '.h1{display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:3px solid #7C3AED;margin-bottom:14px}'
+      + '.h1 .logo{width:42px;height:42px;background:#7C3AED;border-radius:8px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px}'
+      + '.h1 .ttl{font-size:18pt;font-weight:800;color:#5B21B6}.h1 .sub{font-size:9pt;color:#6B7280;margin-top:2px}'
+      + '.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}'
+      + '.meta-cell{background:#F5F3FF;border:1px solid #DDD6FE;border-radius:6px;padding:7px 10px}'
+      + '.meta-lbl{font-size:9pt;color:#7C3AED;font-weight:700}.meta-val{font-size:11pt;font-weight:700;color:#1a1a1a;margin-top:2px}'
+      + '.judge-badge{display:inline-block;padding:6px 16px;border-radius:6px;font-weight:800;font-size:14pt;color:#fff;background:'+judgeColor+'}'
+      + '.sec{border:1.5px solid '+judgeColor+';border-radius:8px;margin-bottom:12px;overflow:hidden}'
+      + '.sec-h{background:'+judgeColor+';color:#fff;padding:7px 14px;font-weight:700;font-size:11pt}'
+      + '.sec-b{padding:12px 14px;font-size:10.5pt}'
+      + '.sec-pp{border-color:#7C3AED}.sec-pp .sec-h{background:#7C3AED}'
+      + '.sec-rk{border-color:'+riskColor+'}.sec-rk .sec-h{background:'+riskColor+'}'
+      + '.tbl{width:100%;border-collapse:collapse;font-size:10pt;margin-top:5px}'
+      + '.tbl th,.tbl td{border:1px solid #E5E7EB;padding:6px 9px;text-align:left}'
+      + '.tbl th{background:#F9FAFB;color:#374151;font-weight:700;width:30%}'
+      + '.opt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}'
+      + '.opt-cell{border:1.5px dashed #C4B5FD;border-radius:6px;padding:8px;text-align:center;background:#FAF5FF}'
+      + '.opt-pct{font-size:13pt;font-weight:800;color:#7C3AED}'
+      + '.opt-fee{font-size:11pt;font-weight:700;color:#1B3976;margin-top:2px}'
+      + '.opt-diff{font-size:9pt;color:#DC2626;margin-top:1px}'
+      + '.tip{background:#FEF9E7;border-left:4px solid #F59E0B;padding:8px 12px;margin-top:6px;font-size:10pt;color:#92400E;border-radius:0 4px 4px 0}'
+      + '.foot{margin-top:18px;text-align:center;font-size:9pt;color:#9CA3AF;border-top:1px solid #E5E7EB;padding-top:10px}'
+      + 'ul{padding-left:18px;margin:4px 0}li{margin-bottom:3px;font-size:10pt}'
+      + '</style></head><body>'
+      + '<button class="print-btn" onclick="window.print()">🖨️ PDF 저장 / 인쇄</button>'
+      + '<div class="page">'
+      // 헤더
+      + '<div class="h1"><div class="logo">📊</div>'
+      + '<div><div class="ttl">갱신심사 리포트</div>'
+      + '<div class="sub">계약번호 ' + esc(cno) + ' · ' + esc(vRow.tenant1Name||vRow.tenantName||cRow['임차인']||'-') + ' · 생성일 ' + fmtDate(today) + '</div></div></div>'
+      // 메타
+      + '<div class="meta">'
+      + '<div class="meta-cell"><div class="meta-lbl">건물/호수</div><div class="meta-val">' + esc((vRow.propBuilding||cRow['건물명']||'-')+' '+(vRow.propRoom||cRow['호수']||'')) + '</div></div>'
+      + '<div class="meta-cell"><div class="meta-lbl">만기일 / D-Day</div><div class="meta-val">' + fmtDate(endDate) + (dday!=null?' (D'+(dday<0?'+'+Math.abs(dday):'-'+dday)+')':'') + '</div></div>'
+      + '<div class="meta-cell"><div class="meta-lbl">거주 / 갱신차수</div><div class="meta-val">' + resMonths + '개월 / ' + renewalCycle + '차</div></div>'
+      + '<div class="meta-cell"><div class="meta-lbl">간이 등급</div><div class="meta-val" style="color:'+judgeColor+'">'+grade+'</div></div>'
+      + '</div>'
+      // 심사 결과
+      + '<div style="text-align:center;margin:14px 0 18px"><span class="judge-badge">'+esc(judgeLabel)+'</span></div>'
+      // 섹션 1: 심사 근거
+      + '<div class="sec"><div class="sec-h">① 심사 근거 (직전 10회 청구 기준)</div><div class="sec-b">'
+      + '<table class="tbl">'
+      + '<tr><th>연체 횟수</th><td><b style="color:'+(metrics.count>=5?'#DC2626':metrics.count>=3?'#D97706':'#059669')+'">'+metrics.count+'회 / '+metrics.total+'회</b></td></tr>'
+      + '<tr><th>누적 연체일</th><td>'+metrics.sumDays+'일</td></tr>'
+      + '<tr><th>연체율</th><td><b style="color:'+(metrics.rate>=60?'#DC2626':metrics.rate>=30?'#D97706':'#059669')+'">'+metrics.rate+'%</b></td></tr>'
+      + '<tr><th>대응 빈도 (최근 30일)</th><td>'+dRecent3.length+'건</td></tr>'
+      + '<tr><th>총 대응 이력</th><td>'+dList.length+'건 (' + Object.keys(cntByCat).map(function(k){ return k+' '+cntByCat[k]; }).join(' · ') + ')</td></tr>'
+      + '<tr><th>최근 갱신 대응 의견</th><td style="font-size:10pt;color:#374151">'+esc((latestRenewal&&latestRenewal.content)||'갱신관리 대응 이력 없음')+'</td></tr>'
+      + '</table></div></div>'
+      // 섹션 2: 제안 옵션 (조건부/거절자 대상)
+      + ((judge === 'cond' || judge === 'deny') ? (
+          '<div class="sec sec-pp"><div class="sec-h">② 승인 전환 제안 (조건부승인/거절자 대상)</div><div class="sec-b">'
+        + '<div style="font-size:10pt;color:#5B21B6;font-weight:600;margin-bottom:4px">A. 서비스 수수료 할증</div>'
+        + '<div style="font-size:9.5pt;color:#6B7280;margin-bottom:4px">현재 수수료: <b>'+fmtKRW(feeNum)+'</b></div>'
+        + '<div class="opt-grid">'
+        + feeOpts.map(function(o){
+            return '<div class="opt-cell"><div class="opt-pct">'+o.pct+'%</div><div class="opt-fee">'+fmtKRW(o.fee)+'</div><div class="opt-diff">+ '+fmtKRW(o.diff)+'/월</div></div>';
+          }).join('')
+        + '</div>'
+        + '<div style="font-size:10pt;color:#5B21B6;font-weight:600;margin-top:14px;margin-bottom:4px">B. 보증금 증액</div>'
+        + '<div style="font-size:9.5pt;color:#6B7280;margin-bottom:4px">현재 보증금: <b>'+fmtKRW(depositNum)+'</b></div>'
+        + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">'
+        + depOpts.map(function(o){
+            return '<div class="opt-cell"><div class="opt-pct">×'+o.mul+'</div><div class="opt-fee">'+fmtKRW(o.dep)+'</div><div class="opt-diff">+ '+fmtKRW(o.dep-depositNum)+'</div></div>';
+          }).join('')
+        + '</div>'
+        + '<div style="font-size:10pt;color:#5B21B6;font-weight:600;margin-top:14px;margin-bottom:4px">C. 계약기간 단축 + 부속합의</div>'
+        + '<ul style="font-size:10pt;color:#374151">'
+        + '<li><b>6개월 갱신</b> + 재심사 권고 (12개월 → 6개월)</li>'
+        + '<li><b>분납 금지 조항</b> 추가 (수수료별도 적용)</li>'
+        + '<li><b>중도해지 통보</b> 의무기간 단축 (3개월 → 2개월)</li>'
+        + '<li><b>위약금 강화</b> (4개월 → 6개월 임대료)</li>'
+        + '<li>연대보증인 또는 공동전차인 추가 요구</li>'
+        + '</ul>'
+        + '</div></div>'
+        ) : '')
+      // 섹션 3: 연체 관점 주의사항
+      + '<div class="sec sec-rk"><div class="sec-h">③ 갱신 시 연체 관점 주의사항</div><div class="sec-b">'
+      + '<table class="tbl">'
+      + '<tr><th>향후 6개월 연체 리스크</th><td><b style="color:'+riskColor+'">'+riskScore+'</b></td></tr>'
+      + '<tr><th>권장 모니터링 강도</th><td>'+ (riskScore==='HIGH'?'<b>D+1 매일 대응 · 내용증명 발행 검토</b>':riskScore==='MID'?'D+3 정기 대응 · KCB 조회':'D+7 일반 대응') +'</td></tr>'
+      + '<tr><th>위약금 적용 여부</th><td>'+ (penaltyEligible?'<b style="color:#DC2626">적용 가능 — '+fmtKRW(penalty)+' (시작일 ≥ 2025.6.1)</b>':'적용 불가 (시작일 2025.6.1 미만)') +'</td></tr>'
+      + '<tr><th>임대료 / 보증금 / 수수료</th><td>'+fmtKRW(rentNum)+' / '+fmtKRW(depositNum)+' / '+fmtKRW(feeNum)+'</td></tr>'
+      + '</table>'
+      + '<div class="tip"><b>⚠️ 주의:</b> 위약금은 시작일 2025.6.1 이후 계약자에게만 적용. 갱신 시 시작일이 갱신일로 재설정되면 위약금 적용 가능 범위 확대됨. 갱신 계약서 작성 시 위약금 조항 명시 권장.</div>'
+      + (judge === 'deny' ? '<div class="tip" style="background:#FEE2E2;border-color:#DC2626;color:#991B1B;margin-top:8px"><b>📌 거절 사유 서면 통지 필수:</b> 주임법 §6의3 — 거절 시 정당 사유를 서면으로 임차인에게 전달. 분쟁 시 핵심 증거.</div>' : '')
+      + '</div></div>'
+      // 푸터
+      + '<div class="foot">본 리포트는 갱신 의사결정 보조 자료입니다. 최종 결정은 운영팀 판단에 따릅니다. · KRG 개런티즈 서비스팀</div>'
+      + '</div></body></html>';
+    var win = window.open('', '_blank', 'width=960,height=900,scrollbars=yes');
+    if (!win) { alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.'); return; }
+    win.document.write(html);
+    win.document.close();
+  } catch(e) {
+    console.error('[v332] openRenewalReport:', e);
+    alert('리포트 생성 실패: ' + e.message);
+  }
+}
+
 // === 직전 10회 청구 기준 연체 산정 (청구일 다음날부터 인정) ===
 function rnwCalcLateMetrics(cno, incomeResp){
   if (!incomeResp || !incomeResp.table) return { count:0, sumDays:0, rate:0, total:0 };
@@ -12734,7 +12910,7 @@ function renderRenewalView(){
           return '<tr onclick="crNavFromView(\'' + e.cno + '\',\'renewal\')">'
             + '<td onclick="event.stopPropagation()" style="text-align:center;padding:4px"><input type="checkbox" class="dlq-cb rnw-row-cb" value="' + e.cno + '" onchange="rnwToggleSelect(\'' + e.cno + '\',this.checked)"></td>'
             + '<td style="color:#8A9AB5;font-size:11px">' + (idx+1) + '</td>'
-            + '<td><b style="color:#0E7490">' + e.cno + '</b></td>'
+            + '<td><b style="color:#0E7490">' + e.cno + '</b> <button type="button" onclick="event.stopPropagation();openRenewalReport(\'' + e.cno + '\')" title="갱신심사 리포트" style="background:#7C3AED;color:#fff;border:none;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;cursor:pointer;margin-left:3px">📊</button></td>'
             + '<td style="font-size:11px;color:#6B7280">' + (e.group||'—') + '</td>'
             + '<td>' + rnwBadgeContractStatus(e.contractStatus) + '</td>'
             + '<td style="font-size:11px;color:#6B7280">' + (e.vacancyStatus||'—') + '</td>'
