@@ -1951,6 +1951,7 @@ function parseVacancySheet(resp) {
   const housingTypeIdx = findColIdx(labels, ['주택유형','전대전환'], 13); // N
   const contractInfoIdx= findColIdx(labels, ['계약형태','계약구분'], 14); // O
   const reviewResultIdx= findColIdx(labels, ['계약심사','계약심사결과','심사결과','계약심사 결과'], 17); // R (v313/v315 라벨 매칭 보강)
+  const terminateDateIdx= findColIdx(labels, ['계약해지일자','해지일자','해지일'], -1); // [v329] 라벨 매칭만 — 미지정 시 표시 안 함
   const payConditionIdx= findColIdx(labels, ['납부조건'],          18);  // S
   const propAddrIdx    = findColIdx(labels, ['계약지주소'],        19);  // T
   const propBuildingIdx= findColIdx(labels, ['건물명'],            20);  // U
@@ -2033,6 +2034,7 @@ function parseVacancySheet(resp) {
       coRrn:        cell(coRrnIdx),     // BB열: 계약자2/연대보증인 생년월일/주민번호 [v65]
       payCondition: cell(payConditionIdx), // S열: 납부조건 [v71]
       reviewResult: cell(reviewResultIdx), // R열: 계약심사 결과 (v313)
+      terminateDate: cell(terminateDateIdx), // 계약해지일자 (라벨 매칭) (v329)
       // [v74] 입주 전 진척 5개 (Boolean 변환)
       homeBtn:    (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[homeBtnIdx] && (c[homeBtnIdx].v != null ? c[homeBtnIdx].v : c[homeBtnIdx].f)),
       eContract:  (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[eContractIdx] && (c[eContractIdx].v != null ? c[eContractIdx].v : c[eContractIdx].f)),
@@ -4789,6 +4791,7 @@ function renderContractRecord(c, payments, responses = []) {
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">시작일</span><span class="cr-delinq-row-val">${fmt(c['시작일'])}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">실제 퇴실(공실)</span><span class="cr-delinq-row-val ${actualExitDate?'red':''}">${actualExitDate ? fmt(actualExitDate) : fmt(c['종료일'])}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">중도퇴실 정보</span><span class="cr-delinq-row-val ${midExitDisplay?'red':''}">${midExitDisplay || '—'}</span></div>
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">계약해지일자</span><span class="cr-delinq-row-val ${(__vacRow.terminateDate && String(__vacRow.terminateDate).trim() && String(__vacRow.terminateDate).trim() !== '-')?'red':''}">${(__vacRow.terminateDate && String(__vacRow.terminateDate).trim() && String(__vacRow.terminateDate).trim() !== '-') ? fmt(__vacRow.terminateDate) : '—'}</span></div>
         </div>
       </div>
     </div>
