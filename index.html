@@ -6477,14 +6477,49 @@ function dlqChangeBsFilter(val) {
 }
 
 async function dlqGoToContract(cno) {
-  const cnoStr = String(cno).replace(/\.0$/, '').trim();
-  window._crPrevView = 'delinquency';
-  switchView('contract');
-  const start = Date.now();
-  while (!(contractRawData && contractRawData.length) && Date.now() - start < 10000) {
-    await new Promise(r => setTimeout(r, 100));
+  // [v323] 안전 진단 + 폴백 — 연체관리 시트 로직은 무변경
+  try {
+    var cnoStr = String(cno == null ? '' : cno).replace(/\.0$/, '').trim();
+    console.log('[v323][dlqGoTo] click cno=', cno, '→ cnoStr=', cnoStr, '/ contractRawData.length=', (contractRawData||[]).length);
+    if (!cnoStr) { console.warn('[v323][dlqGoTo] 빈 계약번호 — 무시'); return; }
+    window._crPrevView = 'delinquency';
+    if (typeof switchView === 'function') {
+      switchView('contract');
+    } else {
+      console.error('[v323][dlqGoTo] switchView 함수 없음');
+      return;
+    }
+    // contractRawData 로드 대기 (최대 10초)
+    var start = Date.now();
+    while (!(contractRawData && contractRawData.length) && Date.now() - start < 10000) {
+      await new Promise(function(r){ setTimeout(r, 100); });
+    }
+    if (!contractRawData || !contractRawData.length) {
+      console.warn('[v323][dlqGoTo] contractRawData 로드 실패 (10초 타임아웃)');
+      try { var crEl = document.getElementById('crResult'); if (crEl) crEl.innerHTML = '<div class="cr-empty">⏳ 계약 데이터 로딩 중... 새로고침 후 다시 시도해주세요.</div>'; } catch(_){}
+      return;
+    }
+    // selectContractRow 호출 + 결과 확인
+    if (typeof selectContractRow === 'function') {
+      selectContractRow(cnoStr);
+      // 매칭 실패 시 친절한 안내
+      setTimeout(function(){
+        var found = (contractRawData||[]).find(function(r){ return String(r['계약번호']||'').trim() === cnoStr; });
+        if (!found) {
+          console.warn('[v323][dlqGoTo] 계약번호 매칭 실패 — cno:', cnoStr, '/ 샘플:', (contractRawData||[]).slice(0,3).map(function(r){ return r['계약번호']; }));
+          try {
+            var crEl = document.getElementById('crResult');
+            if (crEl) crEl.innerHTML = '<div class="cr-empty">⚠️ 계약번호 ' + cnoStr + '를 입주관리에서 찾을 수 없습니다.<br><span style="font-size:12px;color:#9CA3AF">(데이터 동기화 지연 가능 — 우측 상단 📑 계약정보갱신 후 재시도)</span></div>';
+          } catch(_){}
+        }
+      }, 200);
+    } else {
+      console.error('[v323][dlqGoTo] selectContractRow 함수 없음');
+    }
+  } catch(e) {
+    console.error('[v323][dlqGoTo] 예외:', e);
+    // 연체관리 페이지는 그대로 유지 (탭만 이미 contract로 전환됐을 수 있음)
   }
-  if (contractRawData && contractRawData.length) selectContractRow(cnoStr);
 }
 
 
