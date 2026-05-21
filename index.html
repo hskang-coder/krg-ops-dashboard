@@ -4682,6 +4682,30 @@ function renderContractRecord(c, payments, responses = []) {
   <div class="cr-card">
     <div class="cr-card-title">${hasDelinq?'⚠️':'✅'} 현재 연체 현황</div>
     <div class="cr-delinq-grid">
+      ${(function(){
+        // [v328] 위약금 산정 (재사용) — 시작일 25.6.1 이후, 임대료 × 4개월
+        var penalty = 0;
+        try {
+          if (__vacRow && __vacRow.startDate) {
+            var sd = __vacRow.startDate;
+            var dt = null;
+            if (sd instanceof Date) dt = sd;
+            else {
+              var s = String(sd).trim();
+              var m = s.match(/(\d{4})[\s\.\-\/년]+(\d{1,2})[\s\.\-\/월]+(\d{1,2})/);
+              if (m) dt = new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+              else { var tt = new Date(s); if (!isNaN(tt)) dt = tt; }
+            }
+            var cutoff = new Date(2025, 5, 1);
+            if (dt && !isNaN(dt) && dt >= cutoff) {
+              var rentNum = parseFloat(String(__vacRow.rent||'0').replace(/[^0-9.\-]/g,'')) || 0;
+              if (rentNum > 0) penalty = rentNum * 4;
+            }
+          }
+        } catch(_e) { penalty = 0; }
+        window._cr_penalty = penalty; // 폐쇄 외부에서 활용 가능
+        return '';
+      })()}
       <div class="cr-delinq-card ${hasDelinq?'':'safe'}">
         <div class="cr-delinq-title ${hasDelinq?'':'safe'}">${hasDelinq?'연체 총액':'연체 없음'}</div>
         <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
@@ -4689,29 +4713,8 @@ function renderContractRecord(c, payments, responses = []) {
           ${longestCurrentDelinq>0 && hasDelinq?`<div style="display:flex;align-items:baseline;gap:3px">
             <span style="font-size:26px;font-weight:900;color:#DC2626">${longestCurrentDelinq}</span>
             <span style="font-size:13px;font-weight:700;color:#DC2626">일 연체</span>
+            ${window._cr_penalty>0?`<span style="font-size:11px;font-weight:600;color:#9CA3AF;margin-left:3px">(위약금 별도)</span>`:''}
           </div>`:''}
-          ${(function(){
-            // [v327] 위약금 — 같은 줄에 인라인 표시
-            try {
-              if (!__vacRow || !__vacRow.startDate) return '';
-              var sd = __vacRow.startDate;
-              var dt = null;
-              if (sd instanceof Date) dt = sd;
-              else {
-                var s = String(sd).trim();
-                var m = s.match(/(\d{4})[\s\.\-\/년]+(\d{1,2})[\s\.\-\/월]+(\d{1,2})/);
-                if (m) dt = new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
-                else { var tt = new Date(s); if (!isNaN(tt)) dt = tt; }
-              }
-              if (!dt || isNaN(dt)) return '';
-              var cutoff = new Date(2025, 5, 1);
-              if (dt < cutoff) return '';
-              var rentNum = parseFloat(String(__vacRow.rent||'0').replace(/[^0-9.\-]/g,'')) || 0;
-              if (rentNum <= 0) return '';
-              var penalty = rentNum * 4;
-              return '<div style="display:flex;align-items:baseline;gap:4px;font-size:12px"><span style="color:#9CA3AF">(위약금:</span><span style="font-weight:700;color:#B91C1C">'+fmtMoney(penalty)+'</span><span style="color:#9CA3AF">)</span><span style="font-size:10.5px;color:#9CA3AF;margin-left:2px">임대료×4개월</span></div>';
-            } catch(_e) { return ''; }
-          })()}
         </div>
         <div class="cr-delinq-breakdown">
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">임대료 연체</span><span class="cr-delinq-row-val ${delinqRent>0?'red':''}">${fmtMoney(delinqRent)}</span></div>
@@ -4724,6 +4727,7 @@ function renderContractRecord(c, payments, responses = []) {
             var etcAll = Math.max(0, (delinqTotal||0) - (delinqRent||0) - (delinqFee||0));
             return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">기타 (퇴실정산·기타계약금·계약보증금)</span><span class="cr-delinq-row-val ' + (etcAll>0?'red':'') + '">' + fmtMoney(etcAll) + '</span></div>';
           })()}
+          ${window._cr_penalty>0?`<div class="cr-delinq-row" style="margin-top:4px;padding-top:5px;border-top:1px dashed #FCA5A5"><span class="cr-delinq-row-label">위약금<span style="font-size:10px;color:#9CA3AF;margin-left:5px;font-weight:500">임대료×4개월</span></span><span class="cr-delinq-row-val red">${fmtMoney(window._cr_penalty)}</span></div>`:''}
         </div>
       </div>
       ${(function(){
