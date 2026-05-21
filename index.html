@@ -11234,22 +11234,86 @@ function generateSubAgreement(contractNo) {
   var loader = document.createElement('div');
   loader.id = 'cG_subLoader';
   loader.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center';
-  loader.innerHTML = '<div style="background:#fff;padding:24px 36px;border-radius:12px;font-size:14px;color:#1B3976;display:flex;align-items:center;gap:12px;font-weight:600"><span style="font-size:22px">📋</span>부속합의서 생성 중...</div>';
+  loader.innerHTML = '<div style="background:#fff;padding:24px 36px;border-radius:12px;font-size:14px;color:#1B3976;display:flex;align-items:center;gap:12px;font-weight:600"><span style="font-size:22px">📋</span>부속합의서 준비 중...</div>';
   document.body.appendChild(loader);
   fetchContractForPdf(contractNo).then(function(d) {
     var el = document.getElementById('cG_subLoader');
     if (el) el.remove();
     if (!d) { alert('계약 데이터를 찾을 수 없습니다. (계약번호: ' + contractNo + ')'); return; }
-    var html = buildSubAgreementHtml(d);
-    var win = window.open('', '_blank', 'width=960,height=900,scrollbars=yes');
-    if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
-    win.document.write(html);
-    win.document.close();
+    // [v322] 발행 직전 계약참여자 정보 확인/수정 모달 — 자동 채움 + 수동 편집 가능
+    cG_openSubAgreementPartyModal(d);
   }).catch(function(e) {
     var el = document.getElementById('cG_subLoader');
     if (el) el.remove();
     alert('오류: ' + e.message);
   });
+}
+
+// [v322] 부속합의서 계약참여자 확인/편집 모달
+function cG_openSubAgreementPartyModal(d) {
+  var existing = document.getElementById('saPartyModal');
+  if (existing) existing.remove();
+  var esc = function(s){ return String(s==null?'':s).replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
+  var hasAuto = !!(d.coName || d.coPhone || d.coIdNo);
+  var m = document.createElement('div');
+  m.id = 'saPartyModal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px';
+  m.innerHTML = ''
+    + '<div style="background:#fff;border-radius:12px;padding:24px 28px;width:520px;max-width:94vw;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
+    +   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
+    +     '<div style="background:#047857;color:#fff;width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">참</div>'
+    +     '<div><div style="font-size:15px;font-weight:800;color:#1B3976">계약참여자 정보 확인</div>'
+    +     '<div style="font-size:11.5px;color:#6B7280;margin-top:2px">부속합의서 발행 — ' + esc(d.contractNo) + ' · ' + esc(d.tenantName||'') + '</div></div>'
+    +   '</div>'
+    +   '<div style="background:' + (hasAuto?'#ECFDF5':'#FEF3C7') + ';border:1px solid ' + (hasAuto?'#10B981':'#F59E0B') + ';border-radius:8px;padding:8px 12px;margin:14px 0 12px;font-size:11.5px;color:' + (hasAuto?'#065F46':'#92400E') + ';line-height:1.55">'
+    +     (hasAuto
+        ? '✓ 시트에서 자동으로 채워진 정보입니다. 필요시 수정 후 발행하세요.'
+        : '⚠ 시트에 계약참여자 정보가 없습니다. 직접 입력 후 발행하세요. (이름·연락처 필수)')
+    +   '</div>'
+    +   '<div style="display:flex;flex-direction:column;gap:10px">'
+    +     '<div><label style="display:block;font-size:11.5px;font-weight:700;color:#374151;margin-bottom:4px">이름<span style="color:#DC2626;margin-left:3px">*</span></label>'
+    +       '<input type="text" id="saParty_name" value="' + esc(d.coName) + '" placeholder="계약참여자 이름" style="width:100%;border:1.5px solid #D1D5DB;border-radius:6px;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box"></div>'
+    +     '<div><label style="display:block;font-size:11.5px;font-weight:700;color:#374151;margin-bottom:4px">연락처<span style="color:#DC2626;margin-left:3px">*</span></label>'
+    +       '<input type="text" id="saParty_phone" value="' + esc(d.coPhone) + '" placeholder="010-0000-0000" inputmode="tel" autocomplete="off" style="width:100%;border:1.5px solid #D1D5DB;border-radius:6px;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box"></div>'
+    +     '<div><label style="display:block;font-size:11.5px;font-weight:700;color:#374151;margin-bottom:4px">주민등록번호 7자리<span style="color:#9CA3AF;font-weight:500;margin-left:4px">(선택)</span></label>'
+    +       '<input type="text" id="saParty_rrn" value="' + esc(d.coIdNo) + '" placeholder="000000-0 (생략 가능)" inputmode="numeric" autocomplete="off" style="width:100%;border:1.5px solid #D1D5DB;border-radius:6px;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;font-family:Menlo,monospace"></div>'
+    +   '</div>'
+    +   '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
+    +     '<button onclick="document.getElementById(\'saPartyModal\').remove()" style="padding:9px 18px;border:1px solid #D1D5DB;background:#fff;color:#374151;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">취소</button>'
+    +     '<button id="saParty_submit" onclick="cG_confirmSubAgreementParty()" style="padding:9px 22px;background:#1B3976;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:700">📋 발행</button>'
+    +   '</div>'
+    + '</div>';
+  document.body.appendChild(m);
+  // 부속합의 발행 시 필요한 d 객체 보관
+  window._cG_subAgreementData = d;
+  setTimeout(function(){ var n = document.getElementById('saParty_name'); if (n) n.focus(); }, 50);
+}
+
+// [v322] 부속합의서 발행 확정 — 모달 입력값으로 d 객체 덮어쓰기 → buildSubAgreementHtml 호출
+function cG_confirmSubAgreementParty() {
+  var d = window._cG_subAgreementData;
+  if (!d) { alert('계약 데이터가 사라졌습니다. 다시 시도해주세요.'); return; }
+  var name = (document.getElementById('saParty_name').value || '').trim();
+  var phone = (document.getElementById('saParty_phone').value || '').trim();
+  var rrn = (document.getElementById('saParty_rrn').value || '').trim();
+  if (!name || !phone) {
+    alert('⚠ 이름과 연락처는 필수입니다.');
+    var miss = !name ? 'saParty_name' : 'saParty_phone';
+    var me = document.getElementById(miss); if (me) me.focus();
+    return;
+  }
+  // 사용자 입력값으로 override (시트 자동값을 수동값으로 덮어씀)
+  d.coName = name;
+  d.coPhone = phone;
+  d.coIdNo = rrn;
+  var modal = document.getElementById('saPartyModal');
+  if (modal) modal.remove();
+  try { delete window._cG_subAgreementData; } catch(_){}
+  var html = buildSubAgreementHtml(d);
+  var win = window.open('', '_blank', 'width=960,height=900,scrollbars=yes');
+  if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
+  win.document.write(html);
+  win.document.close();
 }
 
 function buildSubAgreementHtml(d) {
