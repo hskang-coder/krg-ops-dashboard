@@ -1728,12 +1728,25 @@ window.sumPrefetch = function(){
 
 
 function gvizToObjects(gviz) {
-  const cols = gviz.table.cols.map(c => c.label.trim());
+  // [v324] 헤더가 비어있어도 안전 — 컬럼 letter (A,B,C...) 폴백 키 추가
+  // 시트의 헤더 셀이 공백/빈값이면 라벨 매칭이 실패해 모든 row가 필터에서 탈락하는 사고 방지
+  const cols = gviz.table.cols.map(c => (c.label || '').trim());
+  const colLetter = function(idx){
+    // 0 → 'A', 25 → 'Z', 26 → 'AA' ...
+    var s = '';
+    var n = idx;
+    do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+    return s;
+  };
   return (gviz.table.rows || []).map(row => {
     const obj = {};
     (row.c || []).forEach((cell, i) => {
-      obj[cols[i]] = cell ? (cell.f ?? cell.v ?? '') : '';
+      const v = cell ? (cell.f ?? cell.v ?? '') : '';
+      if (cols[i]) obj[cols[i]] = v;          // 기존 라벨 키 (있을 때만)
+      obj['_col_' + colLetter(i)] = v;        // 절대 위치 폴백 키 (항상)
     });
+    // [v324] 시트 헤더가 비어있어도 계약번호 키 자동 채움 (A열 = 계약번호 컨벤션)
+    if (!obj['계약번호'] && obj['_col_A']) obj['계약번호'] = obj['_col_A'];
     return obj;
   });
 }
@@ -2234,7 +2247,8 @@ function syncMirrorNow(){
 // [v288] 계약번호 컬럼 폴백 매칭 — 시트 헤더 변형 대응
 function _krNo(r){
   if (!r) return '';
-  return String(r['계약번호'] || r['계약 번호'] || r['계약No'] || r['계약no'] || r['No'] || r['no'] || r['ContractNo'] || '').trim();
+  // [v324] 헤더 빈값일 때 A열 절대위치 폴백
+  return String(r['계약번호'] || r['계약 번호'] || r['계약No'] || r['계약no'] || r['No'] || r['no'] || r['ContractNo'] || r['_col_A'] || '').trim();
 }
 
 async function loadContractData() {
@@ -2692,8 +2706,8 @@ async function loadPaymentTargets() {
         fetchSheetByName(CONTRACT_SHEET),
         fetchSheetByName(INCOME_SHEET)
       ]);
-      contractRawData = gvizToObjects(cGviz).filter(r => r['계약번호']);
-      paymentRawData  = gvizToObjects(pGviz).filter(r => r['계약번호']);
+      contractRawData = gvizToObjects(cGviz).filter(r => _krNo(r));
+      paymentRawData  = gvizToObjects(pGviz).filter(r => _krNo(r));
       crLoaded = true;
     }
     // 공실현황 없으면 로드
@@ -12525,8 +12539,8 @@ function renderRenewalView(){
         fetchSheetByName(CONTRACT_SHEET),
         fetchSheetByName(INCOME_SHEET)
       ]).then(function(arr){
-        contractRawData = gvizToObjects(arr[0]).filter(function(x){return x['계약번호'];});
-        paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return x['계약번호'];});
+        contractRawData = gvizToObjects(arr[0]).filter(function(x){return _krNo(x);});
+        paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return _krNo(x);});
         crLoaded = true;
       }));
     }
@@ -14528,8 +14542,8 @@ function renderContractMgmtView(){
     wrap.innerHTML = '<div class="cmg-empty">📡 계약관리 데이터 로딩 중...</div>';
     var promises = [];
     if (!crLoaded) promises.push(Promise.all([fetchSheetByName(CONTRACT_SHEET), fetchSheetByName(INCOME_SHEET)]).then(function(arr){
-      contractRawData = gvizToObjects(arr[0]).filter(function(x){return x['계약번호'];});
-      paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return x['계약번호'];});
+      contractRawData = gvizToObjects(arr[0]).filter(function(x){return _krNo(x);});
+      paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return _krNo(x);});
       crLoaded = true;
     }));
     if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) promises.push(fetchSheetByGid(VACANCY_GID).then(function(r){ vacancyRawData = parseVacancySheet(r); }));
@@ -14869,8 +14883,8 @@ function renderSummaryDashboard(){
     if (allCached) {
       // 즉시 적용 (stale도 OK — UI 먼저 표시)
       if (!crLoaded) {
-        contractRawData = gvizToObjects(cName1.data).filter(function(x){return x['계약번호'];});
-        paymentRawData  = gvizToObjects(cName2.data).filter(function(x){return x['계약번호'];});
+        contractRawData = gvizToObjects(cName1.data).filter(function(x){return _krNo(x);});
+        paymentRawData  = gvizToObjects(cName2.data).filter(function(x){return _krNo(x);});
         crLoaded = true;
       }
       if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) {
@@ -14885,8 +14899,8 @@ function renderSummaryDashboard(){
           fetchSheetByName(INCOME_SHEET).then(function(d){ window._sumSheetCacheSet('name', INCOME_SHEET, d); return d; }),
           fetchSheetByGid(VACANCY_GID).then(function(d){ window._sumSheetCacheSet('gid', VACANCY_GID, d); return d; })
         ]).then(function(arr){
-          contractRawData = gvizToObjects(arr[0]).filter(function(x){return x['계약번호'];});
-          paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return x['계약번호'];});
+          contractRawData = gvizToObjects(arr[0]).filter(function(x){return _krNo(x);});
+          paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return _krNo(x);});
           vacancyRawData  = parseVacancySheet(arr[2]);
           window._sumBgRefreshing = false;
           renderSummaryDashboard();
@@ -14902,8 +14916,8 @@ function renderSummaryDashboard(){
           window._sumSheetCacheSet('name', CONTRACT_SHEET, arr[0]);
           window._sumSheetCacheSet('name', INCOME_SHEET, arr[1]);
         }
-        contractRawData = gvizToObjects(arr[0]).filter(function(x){return x['계약번호'];});
-        paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return x['계약번호'];});
+        contractRawData = gvizToObjects(arr[0]).filter(function(x){return _krNo(x);});
+        paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return _krNo(x);});
         crLoaded = true;
       }));
       if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) promises.push(fetchSheetByGid(VACANCY_GID).then(function(r){
