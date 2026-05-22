@@ -378,13 +378,13 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 /* 연체 레코드 */
 .cr-delinq-grid { display: grid; grid-template-columns: 1fr 0.55fr 1fr; gap: 14px; padding: 16px 20px; } /* [v221] 가운데 갱신심사 카드 추가 */
 @media(max-width:600px){ .cr-delinq-grid { grid-template-columns: 1fr; } }
-.cr-delinq-card { background: #FFF5F5; border: 1px solid #FECACA; border-radius: 10px; padding: 12px 14px; }
+.cr-delinq-card { background: #FFF5F5; border: 1px solid #FECACA; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; } /* [v340] flex로 점선 정렬 */
 .cr-delinq-card.safe { background: #F0FDF4; border-color: #BBF7D0; }
 .cr-delinq-title { font-size: 10px; font-weight: 700; color: #DC2626; letter-spacing: 0.5px; margin-bottom: 8px; text-transform: uppercase; }
 .cr-delinq-title.safe { color: #16A34A; }
 .cr-delinq-amount { font-size: 22px; font-weight: 900; color: #DC2626; }
 .cr-delinq-amount.safe { color: #16A34A; }
-.cr-delinq-breakdown { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+.cr-delinq-breakdown { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; flex: 1; } /* [v340] flex:1로 카드 높이 채움 */
 .cr-delinq-row { display: flex; justify-content: space-between; font-size: 11px; }
 .cr-delinq-row-label { color: #8A9AB5; }
 .cr-delinq-row-val { color: #1A3A5C; font-weight: 600; }
@@ -4729,7 +4729,7 @@ function renderContractRecord(c, payments, responses = []) {
             var etcAll = Math.max(0, (delinqTotal||0) - (delinqRent||0) - (delinqFee||0));
             return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">기타 (퇴실정산·기타계약금·계약보증금)</span><span class="cr-delinq-row-val ' + (etcAll>0?'red':'') + '">' + fmtMoney(etcAll) + '</span></div>';
           })()}
-          ${window._cr_penalty>0?`<div class="cr-delinq-row" style="margin-top:4px;padding-top:5px;border-top:1px dashed #FCA5A5"><span class="cr-delinq-row-label">위약금<span style="font-size:10px;color:#9CA3AF;margin-left:5px;font-weight:500">임대료×4개월</span></span><span class="cr-delinq-row-val red">${fmtMoney(window._cr_penalty)}</span></div>`:''}
+          ${window._cr_penalty>0?`<div class="cr-delinq-row" style="margin-top:auto;padding-top:5px;border-top:1px dashed #FCA5A5"><span class="cr-delinq-row-label">위약금<span style="font-size:10px;color:#9CA3AF;margin-left:5px;font-weight:500">임대료×4개월</span></span><span class="cr-delinq-row-val red">${fmtMoney(window._cr_penalty)}</span></div>`:''}
         </div>
       </div>
       ${(function(){
@@ -4791,7 +4791,7 @@ function renderContractRecord(c, payments, responses = []) {
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">시작일</span><span class="cr-delinq-row-val">${fmt(c['시작일'])}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">실제 퇴실(공실)</span><span class="cr-delinq-row-val ${actualExitDate?'red':''}">${actualExitDate ? fmt(actualExitDate) : fmt(c['종료일'])}</span></div>
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">중도퇴실 정보</span><span class="cr-delinq-row-val ${midExitDisplay?'red':''}">${midExitDisplay || '—'}</span></div>
-          <div class="cr-delinq-row" style="margin-top:4px;padding-top:5px;border-top:1px dashed #FCA5A5"><span class="cr-delinq-row-label">계약해지일자</span><span class="cr-delinq-row-val ${(__vacRow.terminateDate && String(__vacRow.terminateDate).trim() && String(__vacRow.terminateDate).trim() !== '-')?'red':''}">${(__vacRow.terminateDate && String(__vacRow.terminateDate).trim() && String(__vacRow.terminateDate).trim() !== '-') ? fmt(__vacRow.terminateDate) : '—'}</span></div>
+          <div class="cr-delinq-row" style="margin-top:auto;padding-top:5px;border-top:1px dashed #FCA5A5"><span class="cr-delinq-row-label">계약해지일자</span><span class="cr-delinq-row-val ${(__vacRow.terminateDate && String(__vacRow.terminateDate).trim() && String(__vacRow.terminateDate).trim() !== '-')?'red':''}">${(__vacRow.terminateDate && String(__vacRow.terminateDate).trim() && String(__vacRow.terminateDate).trim() !== '-') ? fmt(__vacRow.terminateDate) : '—'}</span></div>
         </div>
       </div>
     </div>
