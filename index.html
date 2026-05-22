@@ -11312,7 +11312,9 @@ function recalcDay(){
   var fromD = new Date(fromV+'T00:00:00'), toD = new Date(toV+'T00:00:00');
   if (isNaN(fromD.getTime())||isNaN(toD.getTime())||toD<fromD) { box.innerHTML = '<div style="color:#DC2626;font-size:12px;text-align:center">날짜를 다시 확인해주세요</div>'; return; }
   var days = Math.floor((toD - fromD)/86400000) + 1; // 시작일·종료일 양쪽 포함
-  var fmt = function(n){ return '₩' + Math.round(n).toLocaleString(); };
+  // [v339] 10원 단위 절하 — 345,434 → 345,430
+  var floor10 = function(n){ return Math.floor((n||0)/10)*10; };
+  var fmt = function(n){ return '₩' + floor10(n).toLocaleString(); };
   var rentDaily, mgmtDaily, formula;
   if (p===1) {
     // 월 기준: 시작일이 속한 월의 일수 사용 (양 일자 동월일 때 자연; 다월일 경우 시작월 기준)
@@ -11339,12 +11341,12 @@ function recalcDay(){
     +     '<div><span style="color:#92400E;font-weight:700;font-size:12.5px">'+days+'일 임대료 (월세+고정관리비)</span></div>'
     +     '<b style="font-size:18px;color:#B45309">'+fmt(sumTotal)+'</b>'
     +   '</div>'
-    +   '<div style="font-size:10px;color:#9CA3AF;margin-top:3px">1일 ₩'+Math.round(sumDaily).toLocaleString()+' × '+days+'일</div>'
+    +   '<div style="font-size:10px;color:#9CA3AF;margin-top:3px">1일 ₩'+floor10(sumDaily).toLocaleString()+' × '+days+'일</div>'
     + '</div>'
     // 월세 + 관리비 breakdown (2컬럼)
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">'
-    +   '<div style="padding:8px 10px;background:#fff;border-radius:5px"><div style="color:#6B7280;font-size:11px">'+days+'일 월세</div><b style="font-size:14px;color:#065F46">'+fmt(rentTotal)+'</b><div style="font-size:10px;color:#9CA3AF;margin-top:2px">1일 ₩'+Math.round(rentDaily).toLocaleString()+' × '+days+'일</div></div>'
-    +   '<div style="padding:8px 10px;background:#fff;border-radius:5px"><div style="color:#6B7280;font-size:11px">'+days+'일 관리비</div><b style="font-size:14px;color:#1E40AF">'+fmt(mgmtTotal)+'</b><div style="font-size:10px;color:#9CA3AF;margin-top:2px">1일 ₩'+Math.round(mgmtDaily).toLocaleString()+' × '+days+'일</div></div>'
+    +   '<div style="padding:8px 10px;background:#fff;border-radius:5px"><div style="color:#6B7280;font-size:11px">'+days+'일 월세</div><b style="font-size:14px;color:#065F46">'+fmt(rentTotal)+'</b><div style="font-size:10px;color:#9CA3AF;margin-top:2px">1일 ₩'+floor10(rentDaily).toLocaleString()+' × '+days+'일</div></div>'
+    +   '<div style="padding:8px 10px;background:#fff;border-radius:5px"><div style="color:#6B7280;font-size:11px">'+days+'일 관리비</div><b style="font-size:14px;color:#1E40AF">'+fmt(mgmtTotal)+'</b><div style="font-size:10px;color:#9CA3AF;margin-top:2px">1일 ₩'+floor10(mgmtDaily).toLocaleString()+' × '+days+'일</div></div>'
     + '</div>';
 }
 
