@@ -7795,8 +7795,13 @@ function cG_buildManualForm(){
       )
     // ① 계약 기본
     + section('① 계약 기본',
+        // [v357] 계약번호 — 시트 매칭 키 (A열). 기존 계약 발행 시 필수.
+        row('c1',
+          cell('계약번호 ' + H.req + ' <span style="font-size:10px;font-weight:600;color:#6B7280;margin-left:6px">마스터 시트 A열 — 기존 행 업데이트</span>',
+            inp('contractNo', '예: 58221'))
+        )
         // [v195/v196] 1행: 계약유형 / 계약정보구분 / 계약조건
-        row('c3',
+      + row('c3',
           cell('계약유형 ' + H.req,
             '<select id="cG_m_useType" onchange="cG_onUseTypeChange()" class="cG-fld cG-warn">'
             + '<option value="" selected>— 선택하세요 —</option>'
@@ -8306,7 +8311,9 @@ function cG_validateAllFields(){
   // [v354] 단독/공동에 따라 임차인 긴급연락처 라벨/음영 토글
   if (typeof cG_updateEmgRequired === 'function') cG_updateEmgRequired();
   // 발행 차단 필수 9개 (cG_submit과 동일)
+  // [v357] 계약번호 추가 (마스터 시트 A열 매칭 키)
   var required = [
+    {id:'cG_m_contractNo',   label:'계약번호'},
     {id:'cG_m_useType',      label:'계약유형'},
     {id:'cG_m_address',      label:'주소+호실'},
     {id:'cG_m_startDate',    label:'임대차 시작일'},
@@ -8987,7 +8994,9 @@ function cG_collectManualData(){
     return (raw && raw !== el.value) ? raw : (el.value || '').trim();
   };
   var fmtKorDate = function(iso){ if (!iso) return ''; var p = iso.split('-'); if (p.length<3) return iso; return p[0]+'.'+p[1]+'.'+p[2]; };
-  var contractNo = 'M-' + Date.now().toString().slice(-8); // 수동 발행 임시 번호
+  // [v357] 계약번호 — 사용자 입력 우선, 비어있으면 임시 자동 생성 (PDF용)
+  var contractNoInput = v('contractNo');
+  var contractNo = contractNoInput || ('M-' + Date.now().toString().slice(-8));
   var startDate = fmtKorDate(v('startDate'));
   var endDate = fmtKorDate(v('endDate'));
   var contractDate = fmtKorDate(v('contractDate'));
@@ -9217,6 +9226,8 @@ function cG_buildAutoFields(d){
   var emgRelName   = trim(d.emergInfo || '');
   var coEmgRelName = trim(d.coEmergInfo || '');
   return {
+    // [v357] 계약번호 — 시트 A열 매칭 키 (가장 우선)
+    contractNo:    trim(d.contractNo),
     tenantName:    trim(d.tenantName),
     tenantPhone:   trim(d.tenantPhone),
     tenantIdNo:    trim(d.tenantIdNo),
@@ -9245,9 +9256,16 @@ function cG_postUpsert(fields){
   }).then(function(r){ return r.json(); }).catch(function(e){ return { status: 'error', message: 'fetch 실패: ' + (e.message||e) }; });
 }
 
-// [v348/v354] DRY_RUN 테스트 버튼 핸들러 + 단독계약 긴급연락처 검증
+// [v348/v354/v357] DRY_RUN 테스트 버튼 핸들러 + 계약번호/긴급연락처 검증
 function cG_runDryRunTest(){
   var btn = document.getElementById('cG_dryRunBtn');
+  // [v357] 계약번호 필수 — 시트 매칭 키
+  var noEl = document.getElementById('cG_m_contractNo');
+  if (!noEl || !(noEl.value||'').trim()) {
+    alert('⚠ 계약번호를 먼저 입력해주세요\n\n마스터 시트(gid=1931755549) A열의 계약번호와 정확히 일치해야 기존 행을 업데이트할 수 있습니다.');
+    if (noEl && typeof cG_markInvalid === 'function') cG_markInvalid(noEl, '계약번호 필수');
+    return;
+  }
   var nameEl = document.getElementById('cG_m_tenantName');
   if (!nameEl || !(nameEl.value||'').trim()) { alert('⚠ 임차인명을 먼저 입력해주세요'); return; }
   // [v354] 단독계약 시 긴급연락처 3필드 필수 — cG_submit과 동일 정책
@@ -9331,7 +9349,9 @@ function cG_submit(contractNo){
   var mode = window._cG_mode || (contractNo ? 'search' : 'manual');
   if (mode === 'manual') {
     // [v191] 발행 직전 검증 — 9개 필수값 강제. 누락 시 발행 차단
+    // [v357] 계약번호 ⓪ 추가 — 시트 A열 매칭 키 (기존 행 업데이트 보장)
     var REQUIRED = [
+      {id:'cG_m_contractNo',  label:'⓪ 계약번호 (마스터 시트 A열)'},
       {id:'cG_m_useType',     label:'① 계약유형'},
       {id:'cG_m_address',     label:'② 주소 + 호실'},
       {id:'cG_m_startDate',   label:'③ 임대차 시작일'},
