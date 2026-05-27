@@ -8403,7 +8403,8 @@ function cG_parsePdfText(text){
   // [DOCX 보강] Word/DOCX는 한 줄에 여러 라벨이 붙어 추출됨 → 라벨 앞에 강제 줄바꿈
   // (a) 알려진 필드 라벨 (X 텍스트... 라벨: 값 ... 다음라벨: 값 형식 분리)
   //     주의: '호실'은 '주소 + 호실' 같은 복합 라벨에서 깨지지 않도록 제외
-  var FIELD_LABELS = '이름|주소|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|긴급연락처|비상연락(?:망|처)|관계|월세|보증금|관리비';
+  // [v353] 현관/비밀번호/비번 라벨 추가 — 현관 비밀번호 추출 강화
+  var FIELD_LABELS = '이름|주소|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|긴급연락처|비상연락(?:망|처)|관계|월세|보증금|관리비|(?:건물\\s*공동)?\\s*현관(?:\\s*비밀\\s*번호|\\s*비번)?|비밀\\s*번호|비번';
   var fieldBreakRe = new RegExp('([^\\n])\\s+(' + FIELD_LABELS + ')\\s*(?:\\([^)]*\\))?\\s*(?=[:：])', 'g');
   text = text.replace(fieldBreakRe, '$1\n$2');
   // (b) 섹션 헤더 (10. 임(전)차인 정보 / 9. 계좌 정보 등 — 숫자.섹션 앞에 줄바꿈)
@@ -8451,7 +8452,8 @@ function cG_parsePdfText(text){
   };
   // [v186/v195] 라벨 + 콜론 뒤 값 추출 — "예금주(임대인명) : 이경훈" 같은 괄호 주석 무시
   // 빈 필드의 경우 다음 라벨까지 캡처되는 버그 방지
-  var LABEL_KEYWORDS = /^(?:이름|주소|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|긴급연락처|비상연락망|비상연락처|관계|월세|보증금|관리비|호실|호실정보|건물|건물공동현관비번)\s*(?:\([^)]*\))?\s*[:：]/;
+  // [v353] 현관/비밀번호/비번 추가 — 캡처 침범 방지
+  var LABEL_KEYWORDS = /^(?:이름|주소|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|긴급연락처|비상연락망|비상연락처|관계|월세|보증금|관리비|호실|호실정보|건물|건물공동현관비번|현관|현관비밀번호|현관비번|공동현관|공동현관비번|비밀번호|비번)\s*(?:\([^)]*\))?\s*[:：]/;
   var pickField = function(secText, label){
     if (!secText) return '';
     var re = new RegExp(label + '\\s*(?:\\([^)]*\\))?\\s*[:：]\\s*([^\\n]+)');
@@ -8540,6 +8542,25 @@ function cG_parsePdfText(text){
   // [v188] 계약유형 자동 추출 — '상업용' 키워드 우선, 없으면 '주거용'(디폴트)
   if (/상업\s*용/.test(text)) data.useType = '상업용';
   else if (/주거\s*용/.test(text)) data.useType = '주거용';
+
+  // [v353] 현관 비밀번호 추출 — "현관"이 들어간 라벨 우선, "비밀번호"/"비번" 폴백
+  // 매칭 라벨 예: "건물 공동현관 비번", "현관비밀번호", "공동현관 비번", "비밀번호", "비번"
+  (function(){
+    var pv = '';
+    // 1순위: 라벨에 "현관" 포함
+    var m1 = text.match(/(?:^|\n)[^\n:：]*현관[^\n:：]*[:：]\s*([^\n]+)/);
+    if (m1) pv = m1[1].trim();
+    // 2순위: 라벨에 "비밀번호" 또는 "비번" 단독
+    if (!pv) {
+      var m2 = text.match(/(?:^|\n)[^\n:：]*?(?:비밀\s*번호|비번)[^\n:：]*[:：]\s*([^\n]+)/);
+      if (m2) pv = m2[1].trim();
+    }
+    // 라벨 침범 방지 — 다음 라벨로 시작하면 빈 값으로 폐기
+    if (pv && LABEL_KEYWORDS.test(pv)) pv = '';
+    // 숫자/한글 1자 이상 1순위, 너무 긴 텍스트(40자 초과)는 잘못 파싱된 것으로 판단
+    if (pv && pv.length > 40) pv = '';
+    if (pv) data.doorPwd = pv;
+  })();
 
   // [v183] 섹션 앵커는 점·괄호·공백 변형 모두 허용 — "8.임대인정보" / "8) 임대인정보" / "8 임대인 정보" 등
   // [v249] 동일 의미의 명칭 변형 모두 지원
@@ -8722,6 +8743,7 @@ function cG_applyParsedData(data){
   setVal('tenantName', data.tenantName);
   setVal('tenantPhone', data.tenantPhone);
   setVal('tenantAddr', data.tenantAddr);
+  setVal('doorPwd', data.doorPwd); // [v353] 현관 비밀번호 자동 채움 (PDF/DOCX에서 추출)
   cG_setMaskedRrn('cG_m_tenantIdNo', data.tenantIdNo);
   setVal('nationality', data.nationality);
   setVal('coName', data.coName);
@@ -9268,6 +9290,19 @@ function cG_submit(contractNo){
       {id:'cG_m_tenantAddr',  label:'⑧ 임(전)차인 주소'},
       {id:'cG_m_tenantIdNo',  label:'⑨ 임(전)차인 주민등록번호'}
     ];
+    // [v353] 단독계약(공동전차인 미입력)인 경우 긴급연락처 3필드 필수
+    // 공동계약은 공동전차인 정보로 교차 매핑되므로 별도 강제 안 함 (v254 로직)
+    (function(){
+      var coNameEl = document.getElementById('cG_m_coName');
+      var hasCo = coNameEl && String(coNameEl.value||'').trim();
+      if (!hasCo) {
+        REQUIRED.push(
+          {id:'cG_m_emgPhone', label:'⑩ 긴급연락처 — 전화번호 (단독계약 필수)'},
+          {id:'cG_m_emgRel',   label:'⑪ 긴급연락처 — 관계 (단독계약 필수)'},
+          {id:'cG_m_emgName',  label:'⑫ 긴급연락처 — 이름 (단독계약 필수)'}
+        );
+      }
+    })();
     var missing = [];
     var firstMissingEl = null;
     REQUIRED.forEach(function(f){
