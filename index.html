@@ -7633,7 +7633,8 @@ function openContractPdfModal(contractNo) {
     +   cG_buildManualForm()
     + '</div>'
 
-    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:14px">'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:14px">'
+    + '<button id="cG_dryRunBtn" type="button" onclick="cG_runDryRunTest()" title="시트 자동 입력 사전 검증 (실제 쓰지 않음)" style="margin-right:auto;padding:8px 14px;background:#fff;border:1.5px solid #10B981;color:#065F46;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700">🔍 DRY_RUN 테스트</button>'
     + '<button onclick="document.getElementById(\'cG_modal\').remove()" style="padding:9px 18px;border:1.5px solid #d1d5db;background:#fff;border-radius:8px;cursor:pointer;font-size:13px">취소</button>'
     + '<button id="cG_submitBtn" onclick="cG_submit(\'' + (contractNo||'') + '\')" style="padding:9px 22px;background:#1B3976;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">📄 계약서 생성</button>'
     + '</div></div>';
@@ -9129,6 +9130,101 @@ function cG_buildContractInfoText(d){
 }
 
 // [v172] 발행 버튼 — 모드별 분기
+// [v348] 시트 자동 입력용 fields 빌더 — d 객체에서 추출
+function cG_buildAutoFields(d){
+  d = d || {};
+  var trim = function(v){ return v != null ? String(v).trim() : ''; };
+  var emgRel = trim(d.emgRel || '');
+  var emgName = trim(d.emgName || '');
+  var emgRelName = (emgRel && emgName) ? (emgRel + ',' + emgName) : (emgRel || emgName);
+  return {
+    tenantName:  trim(d.tenantName),
+    tenantPhone: trim(d.tenantPhone),
+    tenantIdNo:  trim(d.tenantIdNo),
+    tenantAddr:  trim(d.tenantAddr),
+    doorPwd:     trim(d.doorPwd || ''), // 현재 폼에 없음 — v349 예정. 빈값이면 시트 미수정
+    emgPhone:    trim(d.emgPhone),
+    emgRelName:  emgRelName,
+    coName:      trim(d.coName),
+    coPhone:     trim(d.coPhone),
+    coIdNo:      trim(d.coIdNo),
+    coAddr:      trim(d.coAddr)
+  };
+}
+
+// [v348] Apps Script POST 호출 (action=upsertContract)
+function cG_postUpsert(fields){
+  if (typeof CG_TSV_API_URL === 'undefined' || !CG_TSV_API_URL) {
+    return Promise.resolve({ status: 'error', message: 'CG_TSV_API_URL 미설정 — 운영팀 배포 후 활성화' });
+  }
+  return fetch(CG_TSV_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'upsertContract', token: CG_TSV_API_TOKEN, fields: fields })
+  }).then(function(r){ return r.json(); }).catch(function(e){ return { status: 'error', message: 'fetch 실패: ' + (e.message||e) }; });
+}
+
+// [v348] DRY_RUN 테스트 버튼 핸들러
+function cG_runDryRunTest(){
+  var btn = document.getElementById('cG_dryRunBtn');
+  var nameEl = document.getElementById('cG_m_tenantName');
+  if (!nameEl || !(nameEl.value||'').trim()) { alert('⚠ 임차인명을 먼저 입력해주세요'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 테스트 중...'; }
+  var d = (typeof cG_collectManualData === 'function') ? cG_collectManualData() : {};
+  var fields = cG_buildAutoFields(d);
+  cG_postUpsert(fields).then(function(resp){
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 DRY_RUN 테스트'; }
+    cG_showDryRunResult(resp, fields);
+  });
+}
+
+// [v348] 결과 모달 표시
+function cG_showDryRunResult(resp, fields){
+  var existing = document.getElementById('cG_dryRunModal');
+  if (existing) existing.remove();
+  var esc = function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var isOk = resp && resp.status === 'ok';
+  var isDry = !!(resp && resp.dryRun);
+  var titleColor = isOk ? (isDry ? '#7C3AED' : '#059669') : '#DC2626';
+  var titleText = !isOk ? '❌ 오류' : (isDry ? '🔍 DRY_RUN 결과 (실제 안 씀)' : '✅ 실제 입력 결과');
+  var plannedRows = (resp && resp.planned) ? resp.planned : [];
+  var writtenRows = (resp && resp.written) ? resp.written : [];
+  var unchangedRows = (resp && resp.unchanged) ? resp.unchanged : [];
+  var warnings = (resp && resp.warnings) || [];
+  var html = ''
+    + '<div style="background:#fff;border-radius:12px;padding:22px 26px;width:680px;max-width:94vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
+    +   '<div style="font-size:16px;font-weight:800;color:'+titleColor+';margin-bottom:6px">' + titleText + '</div>'
+    +   '<div style="font-size:12px;color:#6B7280;margin-bottom:14px">' + esc((resp && resp.message) || '') + '</div>'
+    +   (isOk ? (
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">'
+      +   '<div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#075985;font-weight:700">모드</div><div style="font-size:14px;font-weight:800;color:#0C4A6E">' + esc(resp.mode||'-') + '</div></div>'
+      +   '<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#166534;font-weight:700">대상 행</div><div style="font-size:14px;font-weight:800;color:#14532D">' + esc(resp.row||'-') + '행</div></div>'
+      +   '<div style="background:#FAF5FF;border:1px solid #DDD6FE;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5B21B6;font-weight:700">매칭</div><div style="font-size:11px;font-weight:600;color:#5B21B6;line-height:1.3">' + esc(resp.matchedReason||'-') + '</div></div>'
+      + '</div>'
+      ) : '')
+    +   (warnings.length ? '<div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11.5px;color:#92400E">⚠ <b>경고:</b><br>' + warnings.map(function(w){ return '· ' + esc(w); }).join('<br>') + '</div>' : '')
+    +   (plannedRows.length ? '<div style="margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:5px">📝 쓰기 예정 (' + plannedRows.length + '건)</div>'
+      + '<table style="width:100%;border-collapse:collapse;font-size:11.5px">'
+      + '<thead><tr style="background:#F9FAFB;font-weight:700;color:#374151"><th style="border:1px solid #E5E7EB;padding:4px 7px;width:40px">컬럼</th><th style="border:1px solid #E5E7EB;padding:4px 7px">필드</th><th style="border:1px solid #E5E7EB;padding:4px 7px">기존값</th><th style="border:1px solid #E5E7EB;padding:4px 7px">새 값</th></tr></thead><tbody>'
+      + plannedRows.map(function(p){
+          var fbMark = p.usedFallback ? ' <span style="color:#DC2626;font-size:9px">⚠FB</span>' : '';
+          return '<tr><td style="border:1px solid #E5E7EB;padding:3px 7px;text-align:center;font-weight:700;color:#1B3976">' + esc(p.col) + fbMark + '</td><td style="border:1px solid #E5E7EB;padding:3px 7px;color:#6B7280">' + esc(p.field) + '</td><td style="border:1px solid #E5E7EB;padding:3px 7px;color:#9CA3AF">' + esc(p.previousValue||'') + '</td><td style="border:1px solid #E5E7EB;padding:3px 7px;color:#059669;font-weight:600">' + esc(p.value) + '</td></tr>';
+        }).join('')
+      + '</tbody></table></div>' : '')
+    +   (writtenRows.length ? '<div style="background:#ECFDF5;border:1px solid #10B981;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11.5px;color:#065F46">✅ <b>실제 입력 완료:</b> ' + writtenRows.length + '개 컬럼 — ' + writtenRows.map(function(w){ return w.col+'('+w.field+')'; }).join(', ') + '</div>' : '')
+    +   (unchangedRows.length ? '<div style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:10.5px;color:#6B7280">⏸ <b>변경 없음 (No-op):</b> ' + unchangedRows.length + '개 — ' + unchangedRows.map(function(u){ return u.col; }).join(', ') + '</div>' : '')
+    +   (!isOk ? '<pre style="background:#FEE2E2;border:1px solid #DC2626;border-radius:5px;padding:8px;font-size:11px;color:#991B1B;white-space:pre-wrap;word-break:break-word">' + esc(JSON.stringify(resp, null, 2)) + '</pre>' : '')
+    +   '<div style="display:flex;justify-content:flex-end;margin-top:14px">'
+    +     '<button onclick="document.getElementById(\'cG_dryRunModal\').remove()" style="padding:8px 18px;background:#1B3976;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">닫기</button>'
+    +   '</div>'
+    + '</div>';
+  var m = document.createElement('div');
+  m.id = 'cG_dryRunModal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10005;display:flex;align-items:center;justify-content:center;padding:20px';
+  m.innerHTML = html;
+  document.body.appendChild(m);
+}
+
 function cG_submit(contractNo){
   var mode = window._cG_mode || (contractNo ? 'search' : 'manual');
   if (mode === 'manual') {
@@ -9189,6 +9285,10 @@ function cG_submit(contractNo){
     // 데이터 수집 완료 후 모달 제거
     var modal = document.getElementById('cG_modal');
     if (modal) modal.remove();
+    // [v348] 발행 버튼 disable + "처리 중..." (더블클릭/race condition 방지)
+    var _submitBtn = document.getElementById('cG_submitBtn');
+    if (_submitBtn) { _submitBtn.disabled = true; _submitBtn.dataset._origText = _submitBtn.textContent; _submitBtn.textContent = '⏳ 처리 중...'; _submitBtn.style.opacity = '0.6'; _submitBtn.style.cursor = 'not-allowed'; }
+    setTimeout(function(){ if (_submitBtn) { _submitBtn.disabled = false; _submitBtn.textContent = _submitBtn.dataset._origText || '📄 계약서 생성'; _submitBtn.style.opacity = ''; _submitBtn.style.cursor = ''; } }, 3000);
     // [v247/v346] 시트 입력용 TSV — 클립보드 복사 + Apps Script 자동 입력 시도
     var tsv = '';
     try { tsv = cG_buildTsvForSheet(d); } catch(e){ console.warn('[v346] TSV 빌드 실패:', e); }
@@ -9202,25 +9302,19 @@ function cG_submit(contractNo){
     if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
     win.document.write(html);
     win.document.close();
-    // (2) Apps Script 자동 입력 시도 — URL 설정된 경우만
-    var autoInputPromise = (function(){
-      if (typeof CG_TSV_API_URL === 'undefined' || !CG_TSV_API_URL || !tsv) return Promise.resolve(null);
-      var payload = { action: 'appendTsv', token: CG_TSV_API_TOKEN, contractNo: d.contractNo || '', tsv: tsv };
-      // text/plain content-type 사용 → CORS preflight 회피
-      return fetch(CG_TSV_API_URL, {
-        method: 'POST',
-        mode: 'cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
-      }).then(function(r){ return r.json(); }).catch(function(e){ console.warn('[v346] 자동 입력 fetch 실패:', e); return null; });
-    })();
+    // (2) [v346/v348] Apps Script 자동 입력 시도 — URL 설정된 경우만 (upsertContract action)
+    var autoInputPromise = (typeof CG_TSV_API_URL !== 'undefined' && CG_TSV_API_URL)
+      ? cG_postUpsert(cG_buildAutoFields(d))
+      : Promise.resolve(null);
     setTimeout(function(){
       autoInputPromise.then(function(resp){
         if (resp && resp.status === 'ok') {
-          alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📥 시트 자동 입력 완료: ' + (resp.sheet||'?') + ' 시트 ' + (resp.row||'?') + '행\n계약번호: ' + (resp.contractNo||d.contractNo||''));
+          var modeLabel = { update:'기존 행 수정', append:'새 행 추가', noop:'변경 없음(동일)' }[resp.mode] || resp.mode;
+          var dryMark = resp.dryRun ? ' [DRY_RUN]' : '';
+          alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📥 시트 자동 입력' + dryMark + ': ' + modeLabel + '\n· 시트: ' + (resp.sheet||'?') + ' / 행: ' + (resp.row||'?') + '\n· 매칭: ' + (resp.matchedReason||'-') + (resp.warnings && resp.warnings.length ? '\n\n⚠ 경고: ' + resp.warnings.join('; ') : ''));
         } else {
           var failMsg = (resp && resp.message) ? ('\n\n⚠ 자동 입력 실패: ' + resp.message + ' → 클립보드로 폴백') : '';
-          alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 시트 입력용 TSV가 클립보드에 복사되었습니다.\n운영 시트의 적절한 행에 Cmd+V로 붙여넣을 수 있습니다.\n\n[순서] 주소호실 | 전차인(이름·연락처·주소·주민번호) | 긴급연락처·관계,이름 | 공동전차인(이름·연락처·주소·주민번호) | 긴급연락처·관계,이름' + failMsg);
+          alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 시트 입력용 TSV가 클립보드에 복사되었습니다.\n운영 시트의 적절한 행에 Cmd+V로 붙여넣을 수 있습니다.' + failMsg);
         }
       });
     }, 500);

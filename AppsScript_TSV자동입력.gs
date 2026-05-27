@@ -100,6 +100,18 @@ function doGet() {
 }
 
 function upsertContract(data) {
+  // [v348-1] LockService — 동시 요청 직렬화 (race condition 방지)
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(20000); }
+  catch(e) { return jsonResp({ status: 'error', message: 'lock timeout (20s) — 다른 요청 처리 중. 잠시 후 재시도' }); }
+  try {
+    return upsertContractInner(data);
+  } finally {
+    try { lock.releaseLock(); } catch(_){}
+  }
+}
+
+function upsertContractInner(data) {
   var fields = data.fields || {};
   var tenantName = String(fields.tenantName || '').trim();
   var tenantPhone = digitsOnly(fields.tenantPhone || '');
@@ -147,21 +159,19 @@ function upsertContract(data) {
     }
   });
 
-  // 기존 행 매칭
+  // 기존 행 매칭 — [v348-2] 전화 미입력 시 update 거부 → 동명이인 잘못 덮어쓰기 방지
   var lastRow = sheet.getLastRow();
   var matchedRow = 0;
   var matchedReason = '';
-  if (lastRow >= 2) {
+  if (!tenantPhone) {
+    // 전화 미입력 → 강제 append (동명이인 위험 회피)
+    matchedReason = '전화번호 미입력 → append 강제 (동명이인 보호)';
+  } else if (lastRow >= 2) {
     var maxColForMatch = Math.max(nameColIdx, phoneColIdxList.length ? Math.max.apply(null, phoneColIdxList) : nameColIdx);
     var rows = sheet.getRange(2, 1, lastRow - 1, maxColForMatch).getValues();
     for (var r = 0; r < rows.length; r++) {
       var rowName = String(rows[r][nameColIdx - 1] || '').trim();
       if (rowName !== tenantName) continue;
-      if (!tenantPhone) {
-        matchedRow = r + 2;
-        matchedReason = '이름만 일치 (전화 미입력)';
-        break;
-      }
       var phoneMatch = false;
       for (var p = 0; p < phoneColIdxList.length; p++) {
         var rowPhone = digitsOnly(rows[r][phoneColIdxList[p] - 1] || '');
@@ -219,6 +229,37 @@ function upsertContract(data) {
     return jsonResp({ status: 'error', message: '쓸 데이터 없음', warnings: warnings });
   }
 
+  // [v348-4] No-op 감지 — update 모드에서 기존 값과 동일한 셀은 skip
+  // (시트 데이터 불필요한 변경 차단 + 변경 이력 깔끔)
+  var unchanged = [];
+  if (mode === 'update' && targetRow > 0 && lastRow >= targetRow) {
+    var maxColForRead = Math.max.apply(null, writes.map(function(w){ return w.col; }));
+    var existingRow = sheet.getRange(targetRow, 1, 1, maxColForRead).getValues()[0];
+    writes = writes.filter(function(w){
+      var existing = String(existingRow[w.col - 1] == null ? '' : existingRow[w.col - 1]).trim();
+      var incoming = String(w.value == null ? '' : w.value).trim();
+      if (existing === incoming) {
+        unchanged.push({ col: w.letter, field: w.field, value: existing });
+        return false;
+      }
+      w.previousValue = existing; // [v348] 변경 추적
+      return true;
+    });
+    if (writes.length === 0) {
+      return jsonResp({
+        status: 'ok',
+        dryRun: CFG_DRY_RUN,
+        mode: 'noop',
+        row: targetRow,
+        sheet: sheet.getName(),
+        matchedReason: matchedReason,
+        message: '이미 시트의 데이터와 100% 동일 — 변경 없음 (no-op)',
+        unchanged: unchanged,
+        warnings: warnings
+      });
+    }
+  }
+
   // 응답 빌더 (공통)
   var resp = {
     status: 'ok',
@@ -232,10 +273,12 @@ function upsertContract(data) {
         col: w.letter,
         field: w.field,
         value: w.value,
+        previousValue: w.previousValue || null,
         usedFallback: w.usedFallback,
         matchedHeader: w.matchedHeader
       };
     }),
+    unchanged: unchanged,
     warnings: warnings
   };
 
