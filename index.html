@@ -4633,7 +4633,34 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-info-title">임대 정보</div>
         <div class="cr-field"><span class="cr-field-label">계약기간</span><span class="cr-field-val">${fmt(c['시작일'])} ~ ${fmt(c['종료일'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">건물주소</span><span class="cr-field-val">${fmt(c['계약지주소'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">건물명/호수</span><span class="cr-field-val">${fmt(c['건물명'])} ${fmt(c['호수'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">건물명/호수</span><span class="cr-field-val">${fmt(c['건물명'])} ${fmt(c['호수'])}${(() => {
+          // [v345] 현관비밀번호 — 1순위: 본 계약 F열(doorPwd), 2순위: 동일 주소(T+U)의 다른 계약 F열
+          try {
+            var pwd = String((__vacRow && __vacRow.doorPwd) || '').trim();
+            if (!pwd || pwd === '-') {
+              // 폴백: 동일 건물주소(T) + 건물명(U) 매칭으로 다른 계약 검색
+              var myT = String((__vacRow && __vacRow.propAddr) || c['계약지주소'] || '').replace(/\s+/g,'').trim();
+              var myU = String((__vacRow && __vacRow.propBuilding) || c['건물명'] || '').replace(/\s+/g,'').trim();
+              if ((myT || myU) && Array.isArray(vacancyRawData)) {
+                var found = vacancyRawData.find(function(v){
+                  if (!v || !v.doorPwd) return false;
+                  var p = String(v.doorPwd).trim();
+                  if (!p || p === '-') return false;
+                  var vT = String(v.propAddr||'').replace(/\s+/g,'').trim();
+                  var vU = String(v.propBuilding||'').replace(/\s+/g,'').trim();
+                  // 주소 & 건물명 둘 다 일치 (정확)
+                  if (myT && myU && vT === myT && vU === myU) return true;
+                  // 건물명만 일치 (보조)
+                  if (myU && vU && vU === myU) return true;
+                  return false;
+                });
+                if (found) pwd = String(found.doorPwd).trim();
+              }
+            }
+            if (!pwd || pwd === '-') return '';
+            return ' <span style="margin-left:6px;font-size:11px;font-weight:700;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:4px;border:1px solid #FCD34D;font-family:monospace" title="현관비밀번호 (gid=1953907648 F열)">🔑 ' + pwd + '</span>';
+          } catch(_e) { return ''; }
+        })()}</span></div>
         <div class="cr-field"><span class="cr-field-label">계약형태</span><span class="cr-field-val">${fmt(c['계약형태'])} / ${fmt(c['계약구분'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">납기일</span><span class="cr-field-val">매월 ${fmt(c['납기일'])}일${(__vacRow.payMethod||c['월세납입형태']||c['납부방법']) ? ' <span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:4px;background:'+(/후불/.test(String(__vacRow.payMethod||c['월세납입형태']||c['납부방법']||''))?'#FEF3C7;color:#92400E':'#DBEAFE;color:#1E40AF')+'">'+(__vacRow.payMethod||c['월세납입형태']||c['납부방법'])+'</span>' : ''}</span></div>
       </div>
