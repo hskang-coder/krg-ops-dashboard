@@ -13433,6 +13433,8 @@ window._cmgPeriod = window._cmgPeriod || 'month'; // [v76] (deprecated, v82)
 window._cmgPartnerPeriod = window._cmgPartnerPeriod || 'month';
 // [v93] 정산 입금완료 — localStorage 영구 저장
 const CMG_PAID_KEY = 'krg.cmgPaidMap.v1';
+// [v342] 미동기화 키 추적 (체크는 했지만 시트에 push되지 않은 항목)
+const CMG_UNSYNCED_KEY = 'krg.cmgUnsyncedKeys.v1';
 // [v169] 정산_입금완료 시트 (gid=1365484721) — 모든 사용자가 같은 데이터 공유
 const CMG_PAID_SHEET_GID = '1365484721';
 const CMG_PAID_SHEET_URL = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/edit?gid=' + CMG_PAID_SHEET_GID + '#gid=' + CMG_PAID_SHEET_GID;
@@ -13451,6 +13453,21 @@ function cmgSavePaidMap(){
     localStorage.setItem(CMG_PAID_KEY, JSON.stringify(window._cmgPaidMap || {}));
   } catch(e) { console.warn('paidMap save fail', e); }
 }
+// [v342] 미동기화 키 (시트에 아직 push 안 된 사용자 체크)
+function cmgLoadUnsyncedKeys(){
+  try {
+    var raw = localStorage.getItem(CMG_UNSYNCED_KEY);
+    if (!raw) return {};
+    var obj = JSON.parse(raw);
+    return (obj && typeof obj === 'object') ? obj : {};
+  } catch(e) { return {}; }
+}
+function cmgSaveUnsyncedKeys(){
+  try {
+    localStorage.setItem(CMG_UNSYNCED_KEY, JSON.stringify(window._cmgUnsyncedKeys || {}));
+  } catch(e) {}
+}
+window._cmgUnsyncedKeys = window._cmgUnsyncedKeys || cmgLoadUnsyncedKeys();
 function cmgClearPaidMap(){
   if (!confirm('모든 입금완료 체크를 초기화합니다. 계속하시겠습니까?')) return;
   window._cmgPaidMap = {};
@@ -13480,9 +13497,22 @@ async function cmgFetchPaidFromSheet(){
       var paidBool = (paid === true || String(paid).toUpperCase() === 'TRUE' || String(paid).toUpperCase() === 'O');
       if (paidBool) sheetMap[key] = true;
     });
-    // 시트가 진실 — 시트 데이터로 _cmgPaidMap 덮어씀
-    window._cmgPaidMap = sheetMap;
+    // [v342] 병합 모드 — 시트 데이터에 미동기화 localStorage 항목 보존
+    // (이전: window._cmgPaidMap = sheetMap → 사용자가 체크했지만 시트에 push 안 한 항목이 다음날 사라지는 버그)
+    var mergedMap = {};
+    Object.keys(sheetMap).forEach(function(k){ mergedMap[k] = sheetMap[k]; });
+    var unsynced = window._cmgUnsyncedKeys || cmgLoadUnsyncedKeys();
+    var preservedCount = 0;
+    Object.keys(unsynced).forEach(function(k){
+      if (unsynced[k] && !mergedMap[k]) { mergedMap[k] = true; preservedCount++; }
+      // 시트에도 있으면 동기화 완료된 것 → unsynced에서 제거
+      if (mergedMap[k] && sheetMap[k]) delete unsynced[k];
+    });
+    window._cmgPaidMap = mergedMap;
+    window._cmgUnsyncedKeys = unsynced;
     cmgSavePaidMap();
+    cmgSaveUnsyncedKeys();
+    if (preservedCount > 0) console.warn('[v342] 미동기화 입금완료 ' + preservedCount + '건 보존 (시트 push 필요)');
     var t = new Date();
     window._cmgPaidSyncedAt = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
     return true;
@@ -13502,7 +13532,9 @@ async function cmgExportPaidToSheet(){
     var tsv = keys.map(function(k){ return [k, 'TRUE', tsStr, who].join('\t'); }).join('\n');
     try {
       await navigator.clipboard.writeText(tsv);
-      alert('✅ 클립보드에 복사 완료 ('+keys.length+'건)\n\n[다음 단계]\n1) "정산_입금완료" 시트가 새 탭으로 열립니다\n2) A2 셀 클릭 → Cmd+V (붙여넣기)\n3) 저장 후 다른 직원이 새로고침하면 동일하게 보임\n\n※ 헤더(A1~D1: 키/입금완료/체크일시/체크자) 가 비어있으면 한 번만 직접 입력해주세요.');
+      alert('✅ 클립보드에 복사 완료 ('+keys.length+'건)\n\n[다음 단계]\n1) "정산_입금완료" 시트가 새 탭으로 열립니다\n2) A2 셀 클릭 → Cmd+V (붙여넣기)\n3) 저장 후 다른 직원이 새로고침하면 동일하게 보임\n\n※ 헤더(A1~D1: 키/입금완료/체크일시/체크자) 가 비어있으면 한 번만 직접 입력해주세요.\n\n💡 시트에 붙여넣기 완료하면 노란 ⚠ 미동기화 표시가 사라집니다.');
+      // [v342] export 성공 시 — 시트에 push되었다고 간주하고 다음 fetch에서 시트 데이터로 정상 병합됨
+      // 단, 즉시 unsynced 비우진 않음 (사용자가 실제 시트 붙여넣기를 안 할 수도 있어서 fetch 시점에 자동 정리)
     } catch(e) {
       alert('클립보드 복사 실패. 수동 복사하세요:\n\n' + tsv);
     }
@@ -14568,12 +14600,19 @@ function cmgRenderRegionCard(){
 function cmgPaidKey(partnerName, ym){ return partnerName + '|' + ym; }
 function cmgTogglePaid(pn, ym, cb){
   var key = cmgPaidKey(pn, ym);
+  var newVal;
   if (cb && cb.checked !== undefined) {
-    window._cmgPaidMap[key] = cb.checked;
+    newVal = cb.checked;
   } else {
-    window._cmgPaidMap[key] = !window._cmgPaidMap[key];
+    newVal = !window._cmgPaidMap[key];
   }
-  cmgSavePaidMap(); // [v93] localStorage 저장
+  window._cmgPaidMap[key] = newVal;
+  // [v342] 미동기화 마킹 — 시트에 push되기 전까지 유지
+  window._cmgUnsyncedKeys = window._cmgUnsyncedKeys || {};
+  if (newVal) window._cmgUnsyncedKeys[key] = true;
+  else delete window._cmgUnsyncedKeys[key];
+  cmgSavePaidMap();
+  cmgSaveUnsyncedKeys();
   renderContractMgmtView();
 }
 
@@ -14668,7 +14707,7 @@ function cmgRenderSettlementCard(){
         + '<td class="cmg-num cmg-money" style="color:#6B7280">' + cmgFmtMoney(vat) + '</td>'
         + '<td class="cmg-num cmg-money"><b>' + cmgFmtMoney(vatIncl) + '</b></td>'
         + '<td><input type="checkbox" class="cmg-paid-cb" ' + (paid ? 'checked' : '') + ' onchange="cmgTogglePaid(\'' + pnEsc + '\',\'' + r.ym + '\',this)"></td>'
-        + '<td>' + (paid ? '<span class="cmg-paid-true">✓ 지급완료</span>' : '<span class="cmg-paid-false">미지급</span>') + '</td>'
+        + '<td>' + (paid ? ('<span class="cmg-paid-true">✓ 지급완료</span>' + ((window._cmgUnsyncedKeys && window._cmgUnsyncedKeys[cmgPaidKey(r.partnerName, r.ym)]) ? ' <span title="시트에 push되지 않은 체크 — 마스터 내보내기 클릭 필요" style="background:#FEF3C7;color:#92400E;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px;border:1px solid #F59E0B">⚠ 미동기화</span>' : '')) : '<span class="cmg-paid-false">미지급</span>') + '</td>'
         + '</tr>';
     }).join('');
     html += '</tbody></table>';
