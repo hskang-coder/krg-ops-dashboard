@@ -1348,6 +1348,10 @@ let srStatusFilter   = '전체';  // 계약상태 필터 현재값
 let currentPeriod    = 'daily';
 // ── 공유 체크리스트 API (Google Apps Script Web App URL) ──
 const CK_API_URL = 'https://script.google.com/macros/s/AKfycby7414_o1bxespzyDZrWwwCo-dpAjxp-nOZWy86MWToIRuX9X2YjFd_KMFI_Y7RGqHVaQ/exec'; // [v218] 통합본 (체크리스트 + KPI 로그 + 미러 동기화)
+// [v346] 계약서 발행 TSV 자동 입력 API — 운영팀이 배포 후 URL 교체 + 토큰 일치 필요
+// 빈 문자열이면 기존 클립보드 방식 사용 (자동 비활성화)
+const CG_TSV_API_URL = ''; // 예: 'https://script.google.com/macros/s/AKfycb..../exec'
+const CG_TSV_API_TOKEN = 'KRG-OPS-2026-CHANGE-ME'; // AppsScript_TSV자동입력.gs의 CFG_API_TOKEN 과 일치
 
 let ckSharedState  = {};   // 서버에서 로드한 전체 상태 캐시
 let ckStateLoaded  = false;
@@ -9185,12 +9189,12 @@ function cG_submit(contractNo){
     // 데이터 수집 완료 후 모달 제거
     var modal = document.getElementById('cG_modal');
     if (modal) modal.remove();
-    // [v247] 시트 입력용 TSV 클립보드 복사 — 컬럼 순서 사용자 지정
+    // [v247/v346] 시트 입력용 TSV — 클립보드 복사 + Apps Script 자동 입력 시도
+    var tsv = '';
+    try { tsv = cG_buildTsvForSheet(d); } catch(e){ console.warn('[v346] TSV 빌드 실패:', e); }
+    // (1) 클립보드 복사 (실패해도 무시) — 폴백용
     try {
-      var tsv = cG_buildTsvForSheet(d);
-      navigator.clipboard.writeText(tsv).then(function(){
-        console.log('[v247] TSV 복사 완료');
-      }).catch(function(){});
+      if (tsv) navigator.clipboard.writeText(tsv).then(function(){ console.log('[v247] TSV 복사 완료'); }).catch(function(){});
     } catch(e){}
     // PDF 생성 — 기존 빌더 재사용 (특약: 자동조항 + 사용자 입력 / extras: 기타 공동계약자)
     var html = buildGuaranteezContractHtml(d, specialNotes, extras);
@@ -9198,8 +9202,27 @@ function cG_submit(contractNo){
     if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
     win.document.write(html);
     win.document.close();
+    // (2) Apps Script 자동 입력 시도 — URL 설정된 경우만
+    var autoInputPromise = (function(){
+      if (typeof CG_TSV_API_URL === 'undefined' || !CG_TSV_API_URL || !tsv) return Promise.resolve(null);
+      var payload = { action: 'appendTsv', token: CG_TSV_API_TOKEN, contractNo: d.contractNo || '', tsv: tsv };
+      // text/plain content-type 사용 → CORS preflight 회피
+      return fetch(CG_TSV_API_URL, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      }).then(function(r){ return r.json(); }).catch(function(e){ console.warn('[v346] 자동 입력 fetch 실패:', e); return null; });
+    })();
     setTimeout(function(){
-      alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 시트 입력용 TSV가 클립보드에 복사되었습니다.\n운영 시트의 적절한 행에 Cmd+V로 붙여넣을 수 있습니다.\n\n[순서] 주소호실 | 전차인(이름·연락처·주소·주민번호) | 긴급연락처·관계,이름 | 공동전차인(이름·연락처·주소·주민번호) | 긴급연락처·관계,이름');
+      autoInputPromise.then(function(resp){
+        if (resp && resp.status === 'ok') {
+          alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📥 시트 자동 입력 완료: ' + (resp.sheet||'?') + ' 시트 ' + (resp.row||'?') + '행\n계약번호: ' + (resp.contractNo||d.contractNo||''));
+        } else {
+          var failMsg = (resp && resp.message) ? ('\n\n⚠ 자동 입력 실패: ' + resp.message + ' → 클립보드로 폴백') : '';
+          alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 시트 입력용 TSV가 클립보드에 복사되었습니다.\n운영 시트의 적절한 행에 Cmd+V로 붙여넣을 수 있습니다.\n\n[순서] 주소호실 | 전차인(이름·연락처·주소·주민번호) | 긴급연락처·관계,이름 | 공동전차인(이름·연락처·주소·주민번호) | 긴급연락처·관계,이름' + failMsg);
+        }
+      });
     }, 500);
   } else {
     // 검색 모드 — 기존 함수
