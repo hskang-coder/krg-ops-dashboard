@@ -1348,10 +1348,6 @@ let srStatusFilter   = '전체';  // 계약상태 필터 현재값
 let currentPeriod    = 'daily';
 // ── 공유 체크리스트 API (Google Apps Script Web App URL) ──
 const CK_API_URL = 'https://script.google.com/macros/s/AKfycby7414_o1bxespzyDZrWwwCo-dpAjxp-nOZWy86MWToIRuX9X2YjFd_KMFI_Y7RGqHVaQ/exec'; // [v218] 통합본 (체크리스트 + KPI 로그 + 미러 동기화)
-// [v346/v349] 계약서 발행 TSV 자동 입력 API — 운영팀 Apps Script 배포 완료 (v349 활성화)
-// Apps Script 측은 CFG_DRY_RUN = true 상태 — 실제 시트 변경 0, 안전 검증 단계
-const CG_TSV_API_URL = 'https://script.google.com/macros/s/AKfycbz7nHnZE3rEQlK0vpea0DEMD5wELY8QKaD-gjHprsqgnU88kWcFP6S889iEBTMokRB-/exec';
-const CG_TSV_API_TOKEN = 'KRG-OPS-2026-CHANGE-ME-hskang';
 
 let ckSharedState  = {};   // 서버에서 로드한 전체 상태 캐시
 let ckStateLoaded  = false;
@@ -4476,13 +4472,7 @@ function renderContractRecord(c, payments, responses = []) {
     .filter(function(p){ return isDelinqStatus(p) && isPastDue(p); })
     .reduce(function(acc, p){ return acc + _unpaidAmt(p); }, 0);
   const delinqTotal   = delinqAllSum;
-  // [v341] 정합성 보강 — 마스터 시트(gid=418937767 AW/AZ/BC/BF) 연체 마킹도 확인
-  // paymentRawData 합계가 0이어도 마스터에 연체 표시가 있으면 hasDelinq=true (입금내역 미반영 케이스 보호)
-  const _cnoStr_v341 = String(c['계약번호']||'').trim();
-  const masterDlqMark = (window._delinqMarkMap && window._delinqMarkMap[_cnoStr_v341]) || null;
-  const hasMasterDelinq = !!(masterDlqMark && masterDlqMark.types && masterDlqMark.types.length);
-  const hasDelinq     = delinqTotal > 0 || hasMasterDelinq;
-  const masterDelinqOnly = hasMasterDelinq && delinqTotal === 0; // 마스터만 연체 표시
+  const hasDelinq     = delinqTotal > 0;
 
   // 현재 연체중 항목의 최장 연체일
   // ① 납부상태가 '연체중'/'연체' 포함 OR ② 미납금액 > 0 인 항목 모두 검사
@@ -4637,34 +4627,7 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-info-title">임대 정보</div>
         <div class="cr-field"><span class="cr-field-label">계약기간</span><span class="cr-field-val">${fmt(c['시작일'])} ~ ${fmt(c['종료일'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">건물주소</span><span class="cr-field-val">${fmt(c['계약지주소'])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">건물명/호수</span><span class="cr-field-val">${fmt(c['건물명'])} ${fmt(c['호수'])}${(() => {
-          // [v345] 현관비밀번호 — 1순위: 본 계약 F열(doorPwd), 2순위: 동일 주소(T+U)의 다른 계약 F열
-          try {
-            var pwd = String((__vacRow && __vacRow.doorPwd) || '').trim();
-            if (!pwd || pwd === '-') {
-              // 폴백: 동일 건물주소(T) + 건물명(U) 매칭으로 다른 계약 검색
-              var myT = String((__vacRow && __vacRow.propAddr) || c['계약지주소'] || '').replace(/\s+/g,'').trim();
-              var myU = String((__vacRow && __vacRow.propBuilding) || c['건물명'] || '').replace(/\s+/g,'').trim();
-              if ((myT || myU) && Array.isArray(vacancyRawData)) {
-                var found = vacancyRawData.find(function(v){
-                  if (!v || !v.doorPwd) return false;
-                  var p = String(v.doorPwd).trim();
-                  if (!p || p === '-') return false;
-                  var vT = String(v.propAddr||'').replace(/\s+/g,'').trim();
-                  var vU = String(v.propBuilding||'').replace(/\s+/g,'').trim();
-                  // 주소 & 건물명 둘 다 일치 (정확)
-                  if (myT && myU && vT === myT && vU === myU) return true;
-                  // 건물명만 일치 (보조)
-                  if (myU && vU && vU === myU) return true;
-                  return false;
-                });
-                if (found) pwd = String(found.doorPwd).trim();
-              }
-            }
-            if (!pwd || pwd === '-') return '';
-            return ' <span style="margin-left:6px;font-size:11px;font-weight:700;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:4px;border:1px solid #FCD34D;font-family:monospace" title="현관비밀번호 (gid=1953907648 F열)">🔑 ' + pwd + '</span>';
-          } catch(_e) { return ''; }
-        })()}</span></div>
+        <div class="cr-field"><span class="cr-field-label">건물명/호수</span><span class="cr-field-val">${fmt(c['건물명'])} ${fmt(c['호수'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">계약형태</span><span class="cr-field-val">${fmt(c['계약형태'])} / ${fmt(c['계약구분'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">납기일</span><span class="cr-field-val">매월 ${fmt(c['납기일'])}일${(__vacRow.payMethod||c['월세납입형태']||c['납부방법']) ? ' <span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:4px;background:'+(/후불/.test(String(__vacRow.payMethod||c['월세납입형태']||c['납부방법']||''))?'#FEF3C7;color:#92400E':'#DBEAFE;color:#1E40AF')+'">'+(__vacRow.payMethod||c['월세납입형태']||c['납부방법'])+'</span>' : ''}</span></div>
       </div>
@@ -4746,9 +4709,9 @@ function renderContractRecord(c, payments, responses = []) {
         return '';
       })()}
       <div class="cr-delinq-card ${hasDelinq?'':'safe'}">
-        <div class="cr-delinq-title ${hasDelinq?'':'safe'}">${hasDelinq?'연체 총액':'연체 없음'}${masterDelinqOnly?` <span style="background:#DC2626;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:5px;letter-spacing:0.3px" title="마스터 시트(gid=418937767)에 연체 마킹이 있으나 입금내역(paymentRawData)에는 연체 행 미발견 — 시트 동기화 확인 필요. 연체관리 탭에 노출됨.">⚠ 마스터 연체 감지</span>`:''}</div>
+        <div class="cr-delinq-title ${hasDelinq?'':'safe'}">${hasDelinq?'연체 총액':'연체 없음'}</div>
         <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
-          <div class="cr-delinq-amount ${hasDelinq?'':'safe'}">${masterDelinqOnly?'<span style="color:#DC2626">확인 필요</span>':fmtMoney(delinqTotal)}</div>
+          <div class="cr-delinq-amount ${hasDelinq?'':'safe'}">${fmtMoney(delinqTotal)}</div>
           ${longestCurrentDelinq>0 && hasDelinq?`<div style="display:flex;align-items:baseline;gap:3px">
             <span style="font-size:26px;font-weight:900;color:#DC2626">${longestCurrentDelinq}</span>
             <span style="font-size:13px;font-weight:700;color:#DC2626">일 연체</span>
@@ -4766,7 +4729,6 @@ function renderContractRecord(c, payments, responses = []) {
             var etcAll = Math.max(0, (delinqTotal||0) - (delinqRent||0) - (delinqFee||0));
             return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">기타 (퇴실정산·기타계약금·계약보증금)</span><span class="cr-delinq-row-val ' + (etcAll>0?'red':'') + '">' + fmtMoney(etcAll) + '</span></div>';
           })()}
-          ${masterDelinqOnly?`<div class="cr-delinq-row" style="margin-top:4px;padding:6px 8px;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:4px;font-size:10.5px;color:#991B1B;line-height:1.45"><b>⚠ 마스터 연체 마킹:</b> ${masterDlqMark.types.join(' · ')}<br><span style="font-size:9.5px;color:#7F1D1D">입금내역(paymentRawData)에는 연체 행이 없습니다. 시트 동기화 시점 차이 또는 미반영 가능성 — 연체관리 탭에서 노출됩니다.</span></div>`:''}
           ${window._cr_penalty>0?`<div class="cr-delinq-row" style="margin-top:auto;padding-top:5px;border-top:1px dashed #FCA5A5"><span class="cr-delinq-row-label">위약금<span style="font-size:10px;color:#9CA3AF;margin-left:5px;font-weight:500">임대료×4개월</span></span><span class="cr-delinq-row-val red">${fmtMoney(window._cr_penalty)}</span></div>`:''}
         </div>
       </div>
@@ -5440,16 +5402,6 @@ function parseDelinqV3(resp) {
   });
   // [v274] 검색 상세 화면에서 사용 가능하도록 글로벌 노출
   window._delinqAmtMap = amtMap;
-  // [v341] 연체 정합성 — 입주관리 카드에서 paymentRawData와 교차 검증
-  window._delinqMarkMap = {};
-  totalSet.forEach(function(cno){
-    var types = [];
-    if (imdaSet.has(cno)) types.push('임대료');
-    if (byunSet.has(cno)) types.push('변동관리비');
-    if (etcSet.has(cno)) types.push('기타계약금');
-    if (depSet.has(cno)) types.push('계약보증금');
-    window._delinqMarkMap[cno] = { types: types, amt: amtMap[cno] || null };
-  });
   return {
     dlqCnoSet:    totalSet,
     imdaDlqSet:   imdaSet,
@@ -7633,8 +7585,7 @@ function openContractPdfModal(contractNo) {
     +   cG_buildManualForm()
     + '</div>'
 
-    + '<div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:14px">'
-    + '<button id="cG_dryRunBtn" type="button" onclick="cG_runDryRunTest()" title="시트 자동 입력 사전 검증 (실제 쓰지 않음)" style="margin-right:auto;padding:8px 14px;background:#fff;border:1.5px solid #10B981;color:#065F46;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700">🔍 DRY_RUN 테스트</button>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:14px">'
     + '<button onclick="document.getElementById(\'cG_modal\').remove()" style="padding:9px 18px;border:1.5px solid #d1d5db;background:#fff;border-radius:8px;cursor:pointer;font-size:13px">취소</button>'
     + '<button id="cG_submitBtn" onclick="cG_submit(\'' + (contractNo||'') + '\')" style="padding:9px 22px;background:#1B3976;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">📄 계약서 생성</button>'
     + '</div></div>';
@@ -9130,105 +9081,6 @@ function cG_buildContractInfoText(d){
 }
 
 // [v172] 발행 버튼 — 모드별 분기
-// [v348/v350] 시트 자동 입력용 fields 빌더 — d 객체에서 추출
-// [v350] 수정: d.emergPhone/d.emergInfo 사용 (v349까지 d.emgPhone/d.emgRel 잘못 참조)
-// [v350] 추가: coEmgPhone, coEmgRelName (공동전차인 긴급연락처) — Apps Script BE/BF로
-function cG_buildAutoFields(d){
-  d = d || {};
-  var trim = function(v){ return v != null ? String(v).trim() : ''; };
-  // d.emergInfo 는 "관계,이름" 형식 (cG_collectManualData에서 emgRel+','+emgName 으로 합성됨)
-  var emgRelName   = trim(d.emergInfo || '');
-  var coEmgRelName = trim(d.coEmergInfo || '');
-  return {
-    tenantName:    trim(d.tenantName),
-    tenantPhone:   trim(d.tenantPhone),
-    tenantIdNo:    trim(d.tenantIdNo),
-    tenantAddr:    trim(d.tenantAddr),
-    doorPwd:       trim(d.doorPwd || ''), // 현재 폼에 없음 — 추후 추가 예정. 빈값이면 시트 미수정
-    emgPhone:      trim(d.emergPhone),
-    emgRelName:    emgRelName,
-    coName:        trim(d.coName),
-    coPhone:       trim(d.coPhone),
-    coIdNo:        trim(d.coIdNo),
-    coAddr:        trim(d.coAddr),
-    coEmgPhone:    trim(d.coEmergPhone),  // [v350] BE 시트 (두번째 긴급연락처)
-    coEmgRelName:  coEmgRelName            // [v350] BF 시트 (두번째 관계,이름)
-  };
-}
-
-// [v348] Apps Script POST 호출 (action=upsertContract)
-function cG_postUpsert(fields){
-  if (typeof CG_TSV_API_URL === 'undefined' || !CG_TSV_API_URL) {
-    return Promise.resolve({ status: 'error', message: 'CG_TSV_API_URL 미설정 — 운영팀 배포 후 활성화' });
-  }
-  return fetch(CG_TSV_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: 'upsertContract', token: CG_TSV_API_TOKEN, fields: fields })
-  }).then(function(r){ return r.json(); }).catch(function(e){ return { status: 'error', message: 'fetch 실패: ' + (e.message||e) }; });
-}
-
-// [v348] DRY_RUN 테스트 버튼 핸들러
-function cG_runDryRunTest(){
-  var btn = document.getElementById('cG_dryRunBtn');
-  var nameEl = document.getElementById('cG_m_tenantName');
-  if (!nameEl || !(nameEl.value||'').trim()) { alert('⚠ 임차인명을 먼저 입력해주세요'); return; }
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 테스트 중...'; }
-  var d = (typeof cG_collectManualData === 'function') ? cG_collectManualData() : {};
-  var fields = cG_buildAutoFields(d);
-  cG_postUpsert(fields).then(function(resp){
-    if (btn) { btn.disabled = false; btn.textContent = '🔍 DRY_RUN 테스트'; }
-    cG_showDryRunResult(resp, fields);
-  });
-}
-
-// [v348] 결과 모달 표시
-function cG_showDryRunResult(resp, fields){
-  var existing = document.getElementById('cG_dryRunModal');
-  if (existing) existing.remove();
-  var esc = function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-  var isOk = resp && resp.status === 'ok';
-  var isDry = !!(resp && resp.dryRun);
-  var titleColor = isOk ? (isDry ? '#7C3AED' : '#059669') : '#DC2626';
-  var titleText = !isOk ? '❌ 오류' : (isDry ? '🔍 DRY_RUN 결과 (실제 안 씀)' : '✅ 실제 입력 결과');
-  var plannedRows = (resp && resp.planned) ? resp.planned : [];
-  var writtenRows = (resp && resp.written) ? resp.written : [];
-  var unchangedRows = (resp && resp.unchanged) ? resp.unchanged : [];
-  var warnings = (resp && resp.warnings) || [];
-  var html = ''
-    + '<div style="background:#fff;border-radius:12px;padding:22px 26px;width:680px;max-width:94vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.3)">'
-    +   '<div style="font-size:16px;font-weight:800;color:'+titleColor+';margin-bottom:6px">' + titleText + '</div>'
-    +   '<div style="font-size:12px;color:#6B7280;margin-bottom:14px">' + esc((resp && resp.message) || '') + '</div>'
-    +   (isOk ? (
-        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">'
-      +   '<div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#075985;font-weight:700">모드</div><div style="font-size:14px;font-weight:800;color:#0C4A6E">' + esc(resp.mode||'-') + '</div></div>'
-      +   '<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#166534;font-weight:700">대상 행</div><div style="font-size:14px;font-weight:800;color:#14532D">' + esc(resp.row||'-') + '행</div></div>'
-      +   '<div style="background:#FAF5FF;border:1px solid #DDD6FE;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5B21B6;font-weight:700">매칭</div><div style="font-size:11px;font-weight:600;color:#5B21B6;line-height:1.3">' + esc(resp.matchedReason||'-') + '</div></div>'
-      + '</div>'
-      ) : '')
-    +   (warnings.length ? '<div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11.5px;color:#92400E">⚠ <b>경고:</b><br>' + warnings.map(function(w){ return '· ' + esc(w); }).join('<br>') + '</div>' : '')
-    +   (plannedRows.length ? '<div style="margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:5px">📝 쓰기 예정 (' + plannedRows.length + '건)</div>'
-      + '<table style="width:100%;border-collapse:collapse;font-size:11.5px">'
-      + '<thead><tr style="background:#F9FAFB;font-weight:700;color:#374151"><th style="border:1px solid #E5E7EB;padding:4px 7px;width:40px">컬럼</th><th style="border:1px solid #E5E7EB;padding:4px 7px">필드</th><th style="border:1px solid #E5E7EB;padding:4px 7px">기존값</th><th style="border:1px solid #E5E7EB;padding:4px 7px">새 값</th></tr></thead><tbody>'
-      + plannedRows.map(function(p){
-          var fbMark = p.usedFallback ? ' <span style="color:#DC2626;font-size:9px">⚠FB</span>' : '';
-          return '<tr><td style="border:1px solid #E5E7EB;padding:3px 7px;text-align:center;font-weight:700;color:#1B3976">' + esc(p.col) + fbMark + '</td><td style="border:1px solid #E5E7EB;padding:3px 7px;color:#6B7280">' + esc(p.field) + '</td><td style="border:1px solid #E5E7EB;padding:3px 7px;color:#9CA3AF">' + esc(p.previousValue||'') + '</td><td style="border:1px solid #E5E7EB;padding:3px 7px;color:#059669;font-weight:600">' + esc(p.value) + '</td></tr>';
-        }).join('')
-      + '</tbody></table></div>' : '')
-    +   (writtenRows.length ? '<div style="background:#ECFDF5;border:1px solid #10B981;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11.5px;color:#065F46">✅ <b>실제 입력 완료:</b> ' + writtenRows.length + '개 컬럼 — ' + writtenRows.map(function(w){ return w.col+'('+w.field+')'; }).join(', ') + '</div>' : '')
-    +   (unchangedRows.length ? '<div style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:10.5px;color:#6B7280">⏸ <b>변경 없음 (No-op):</b> ' + unchangedRows.length + '개 — ' + unchangedRows.map(function(u){ return u.col; }).join(', ') + '</div>' : '')
-    +   (!isOk ? '<pre style="background:#FEE2E2;border:1px solid #DC2626;border-radius:5px;padding:8px;font-size:11px;color:#991B1B;white-space:pre-wrap;word-break:break-word">' + esc(JSON.stringify(resp, null, 2)) + '</pre>' : '')
-    +   '<div style="display:flex;justify-content:flex-end;margin-top:14px">'
-    +     '<button onclick="document.getElementById(\'cG_dryRunModal\').remove()" style="padding:8px 18px;background:#1B3976;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">닫기</button>'
-    +   '</div>'
-    + '</div>';
-  var m = document.createElement('div');
-  m.id = 'cG_dryRunModal';
-  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10005;display:flex;align-items:center;justify-content:center;padding:20px';
-  m.innerHTML = html;
-  document.body.appendChild(m);
-}
-
 function cG_submit(contractNo){
   var mode = window._cG_mode || (contractNo ? 'search' : 'manual');
   if (mode === 'manual') {
@@ -9289,16 +9141,12 @@ function cG_submit(contractNo){
     // 데이터 수집 완료 후 모달 제거
     var modal = document.getElementById('cG_modal');
     if (modal) modal.remove();
-    // [v348] 발행 버튼 disable + "처리 중..." (더블클릭/race condition 방지)
-    var _submitBtn = document.getElementById('cG_submitBtn');
-    if (_submitBtn) { _submitBtn.disabled = true; _submitBtn.dataset._origText = _submitBtn.textContent; _submitBtn.textContent = '⏳ 처리 중...'; _submitBtn.style.opacity = '0.6'; _submitBtn.style.cursor = 'not-allowed'; }
-    setTimeout(function(){ if (_submitBtn) { _submitBtn.disabled = false; _submitBtn.textContent = _submitBtn.dataset._origText || '📄 계약서 생성'; _submitBtn.style.opacity = ''; _submitBtn.style.cursor = ''; } }, 3000);
-    // [v247/v346] 시트 입력용 TSV — 클립보드 복사 + Apps Script 자동 입력 시도
-    var tsv = '';
-    try { tsv = cG_buildTsvForSheet(d); } catch(e){ console.warn('[v346] TSV 빌드 실패:', e); }
-    // (1) 클립보드 복사 (실패해도 무시) — 폴백용
+    // [v247] 시트 입력용 TSV 클립보드 복사 — 컬럼 순서 사용자 지정
     try {
-      if (tsv) navigator.clipboard.writeText(tsv).then(function(){ console.log('[v247] TSV 복사 완료'); }).catch(function(){});
+      var tsv = cG_buildTsvForSheet(d);
+      navigator.clipboard.writeText(tsv).then(function(){
+        console.log('[v247] TSV 복사 완료');
+      }).catch(function(){});
     } catch(e){}
     // PDF 생성 — 기존 빌더 재사용 (특약: 자동조항 + 사용자 입력 / extras: 기타 공동계약자)
     var html = buildGuaranteezContractHtml(d, specialNotes, extras);
@@ -9306,21 +9154,8 @@ function cG_submit(contractNo){
     if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
     win.document.write(html);
     win.document.close();
-    // (2) [v346/v348] Apps Script 자동 입력 시도 — URL 설정된 경우만 (upsertContract action)
-    var autoInputPromise = (typeof CG_TSV_API_URL !== 'undefined' && CG_TSV_API_URL)
-      ? cG_postUpsert(cG_buildAutoFields(d))
-      : Promise.resolve(null);
     setTimeout(function(){
-      autoInputPromise.then(function(resp){
-        if (resp && resp.status === 'ok') {
-          var modeLabel = { update:'기존 행 수정', append:'새 행 추가', noop:'변경 없음(동일)' }[resp.mode] || resp.mode;
-          var dryMark = resp.dryRun ? ' [DRY_RUN]' : '';
-          alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📥 시트 자동 입력' + dryMark + ': ' + modeLabel + '\n· 시트: ' + (resp.sheet||'?') + ' / 행: ' + (resp.row||'?') + '\n· 매칭: ' + (resp.matchedReason||'-') + (resp.warnings && resp.warnings.length ? '\n\n⚠ 경고: ' + resp.warnings.join('; ') : ''));
-        } else {
-          var failMsg = (resp && resp.message) ? ('\n\n⚠ 자동 입력 실패: ' + resp.message + ' → 클립보드로 폴백') : '';
-          alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 시트 입력용 TSV가 클립보드에 복사되었습니다.\n운영 시트의 적절한 행에 Cmd+V로 붙여넣을 수 있습니다.' + failMsg);
-        }
-      });
+      alert('✅ 계약서 PDF가 새 창에서 열렸습니다.\n\n📋 시트 입력용 TSV가 클립보드에 복사되었습니다.\n운영 시트의 적절한 행에 Cmd+V로 붙여넣을 수 있습니다.\n\n[순서] 주소호실 | 전차인(이름·연락처·주소·주민번호) | 긴급연락처·관계,이름 | 공동전차인(이름·연락처·주소·주민번호) | 긴급연락처·관계,이름');
     }, 500);
   } else {
     // 검색 모드 — 기존 함수
@@ -10901,15 +10736,6 @@ function openIncomeReceiptModal(contractNo) {
     +           '<label style="display:flex;align-items:center;gap:5px;padding:5px 7px;background:#fff;border:1px solid #FECACA;border-radius:4px;cursor:pointer"><input type="checkbox" id="crIncRcptOptKeyReturn" style="accent-color:#DC2626"> 열쇠/명도 반환 완료</label>'
     +         '</div>'
     +       '</div>'
-    +       '<div style="margin-top:10px">'
-    +         '<label style="font-size:11.5px;font-weight:600;color:#991B1B;display:block;margin-bottom:5px">📝 추가 기재 사항 <span style="color:#9CA3AF;font-weight:500;font-size:10.5px">(선택 — 증명서 본문에 삽입됨 · 자유 편집 가능)</span></label>'
-    +         '<div style="display:flex;gap:5px;margin-bottom:5px">'
-    +           '<button type="button" onclick="cG_setExtraNoteTemplate(\'tenant\')" style="flex:1;background:#fff;border:1px solid #FCA5A5;color:#991B1B;padding:5px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600">📥 임차인 요청용</button>'
-    +           '<button type="button" onclick="cG_setExtraNoteTemplate(\'landlord\')" style="flex:1;background:#fff;border:1px solid #FCA5A5;color:#991B1B;padding:5px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600">📤 임대인 발송용</button>'
-    +           '<button type="button" onclick="cG_setExtraNoteTemplate(\'\')" style="background:#fff;border:1px solid #CBD5E1;color:#64748B;padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600">비우기</button>'
-    +         '</div>'
-    +         '<textarea id="crIncRcptExtraNote" rows="4" placeholder="자유 입력 또는 위 버튼으로 템플릿 채우기" style="width:100%;padding:8px 10px;border:1px solid #FCA5A5;border-radius:5px;font-size:12px;background:#fff;resize:vertical;line-height:1.55;font-family:inherit">본 증명서는 임(전)차인의 요청에 따라 발행되었으며, 임대차 계약 관련 정산 내역 확인 및 향후 분쟁 발생 시 증빙 자료로 활용하기 위한 목적입니다.</textarea>'
-    +       '</div>'
     +     '</div>'
     +     '<div style="font-size:10.5px;color:#94A3B8">※ 납기일 기준 기간 내 납부 완료된 건만 발행됩니다 (납부상태: 정상납부, 연체납부)</div>'
     +   '</div>'
@@ -10919,18 +10745,6 @@ function openIncomeReceiptModal(contractNo) {
     +   '</div>'
     + '</div>';
   document.body.appendChild(overlay);
-}
-
-// [v344] 추가 기재 사항 템플릿 — 임차인 요청용 / 임대인 발송용 / 비우기
-function cG_setExtraNoteTemplate(type){
-  var el = document.getElementById('crIncRcptExtraNote');
-  if (!el) return;
-  var templates = {
-    tenant: '본 증명서는 임(전)차인의 요청에 따라 발행되었으며, 임대차 계약 관련 정산 내역 확인 및 향후 분쟁 발생 시 증빙 자료로 활용하기 위한 목적입니다.',
-    landlord: '본 증명서는 임대인 측 정산 처리 및 관계 기관 제출용으로 발행되었으며, 임차인의 임대료·관리비 등 납부 내역과 계약 종결 상태를 객관적으로 증명합니다. 향후 임대차 계약 종결에 따른 정산 협의 시 본 문서를 기준 자료로 활용 가능합니다.'
-  };
-  el.value = templates[type] || '';
-  try { el.focus(); el.scrollTop = 0; } catch(_){}
 }
 
 // [v277] 발행 용도 변경 시 추가 옵션 토글 + 버튼 라벨 + 라디오 라벨 활성/비활성 스타일
@@ -10980,8 +10794,6 @@ function generateIncomeReceipt(contractNo){
   };
   // [v277] 사용자 수동 입력 종료일 (계약해지증명서 전용)
   var manualExitDate = (document.getElementById('crIncRcptExitDate')||{}).value || '';
-  // [v343] 추가 기재 사항 (자유 입력)
-  var extraNote = (document.getElementById('crIncRcptExtraNote')||{}).value || '';
 
   var contract = (contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim() === String(contractNo); });
   if (!contract) { alert('계약 데이터 없음'); return; }
@@ -11176,15 +10988,8 @@ function generateIncomeReceipt(contractNo){
     settleItems.push('<li><b>원상회복</b>: ' + (closeOpts.restore ? '합의 완료' : '별도 합의 / 미해당') + '</li>');
     settleItems.push('<li><b>위약금/정산금 처리</b>: ' + (closeOpts.penalty ? '완료' : '별도 합의 / 미해당') + '</li>');
     settleItems.push('<li><b>열쇠 반환·명도</b>: ' + (closeOpts.keyReturn ? '완료' : '별도 합의 / 미해당') + '</li>');
-    // [v343] 추가 기재 사항 HTML — 줄바꿈 보존
-    var extraNoteHtml = '';
-    if (extraNote && extraNote.trim()) {
-      var escNote = extraNote.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-      extraNoteHtml = '<div style="margin:10px 0 10px;padding:9px 12px;background:#FFFBEB;border-left:4px solid #F59E0B;border-radius:0 5px 5px 0;font-size:13px;color:#78350F;line-height:1.7"><b style="color:#92400E;margin-right:5px">📝</b>' + escNote + '</div>';
-    }
     declarationHtml = ''
       + '본 증명서는 위 계약(<b>#' + contractNo + '</b>)이 다음 사항을 모두 충족하여 <b>정상적으로 해지·종결되었음</b>을 증명합니다.'
-      + extraNoteHtml
       + '<ul style="margin:10px 0 8px 22px;padding:0;line-height:1.85">' + settleItems.join('') + '</ul>'
       + '이로써 <b>임(전)차인 ' + tenant + '</b>과(와) <b>임대인 ' + landlord + '</b> 및 대리인 <b>케이알지그룹주식회사</b> 사이의 본 계약과 관련한 일체의 채권·채무 관계는 종결되었으며, '
       + '본 증명서 발행일 이후 추가 납부 의무는 존재하지 않음을 확인합니다.';
@@ -13611,8 +13416,6 @@ window._cmgPeriod = window._cmgPeriod || 'month'; // [v76] (deprecated, v82)
 window._cmgPartnerPeriod = window._cmgPartnerPeriod || 'month';
 // [v93] 정산 입금완료 — localStorage 영구 저장
 const CMG_PAID_KEY = 'krg.cmgPaidMap.v1';
-// [v342] 미동기화 키 추적 (체크는 했지만 시트에 push되지 않은 항목)
-const CMG_UNSYNCED_KEY = 'krg.cmgUnsyncedKeys.v1';
 // [v169] 정산_입금완료 시트 (gid=1365484721) — 모든 사용자가 같은 데이터 공유
 const CMG_PAID_SHEET_GID = '1365484721';
 const CMG_PAID_SHEET_URL = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/edit?gid=' + CMG_PAID_SHEET_GID + '#gid=' + CMG_PAID_SHEET_GID;
@@ -13631,21 +13434,6 @@ function cmgSavePaidMap(){
     localStorage.setItem(CMG_PAID_KEY, JSON.stringify(window._cmgPaidMap || {}));
   } catch(e) { console.warn('paidMap save fail', e); }
 }
-// [v342] 미동기화 키 (시트에 아직 push 안 된 사용자 체크)
-function cmgLoadUnsyncedKeys(){
-  try {
-    var raw = localStorage.getItem(CMG_UNSYNCED_KEY);
-    if (!raw) return {};
-    var obj = JSON.parse(raw);
-    return (obj && typeof obj === 'object') ? obj : {};
-  } catch(e) { return {}; }
-}
-function cmgSaveUnsyncedKeys(){
-  try {
-    localStorage.setItem(CMG_UNSYNCED_KEY, JSON.stringify(window._cmgUnsyncedKeys || {}));
-  } catch(e) {}
-}
-window._cmgUnsyncedKeys = window._cmgUnsyncedKeys || cmgLoadUnsyncedKeys();
 function cmgClearPaidMap(){
   if (!confirm('모든 입금완료 체크를 초기화합니다. 계속하시겠습니까?')) return;
   window._cmgPaidMap = {};
@@ -13675,22 +13463,9 @@ async function cmgFetchPaidFromSheet(){
       var paidBool = (paid === true || String(paid).toUpperCase() === 'TRUE' || String(paid).toUpperCase() === 'O');
       if (paidBool) sheetMap[key] = true;
     });
-    // [v342] 병합 모드 — 시트 데이터에 미동기화 localStorage 항목 보존
-    // (이전: window._cmgPaidMap = sheetMap → 사용자가 체크했지만 시트에 push 안 한 항목이 다음날 사라지는 버그)
-    var mergedMap = {};
-    Object.keys(sheetMap).forEach(function(k){ mergedMap[k] = sheetMap[k]; });
-    var unsynced = window._cmgUnsyncedKeys || cmgLoadUnsyncedKeys();
-    var preservedCount = 0;
-    Object.keys(unsynced).forEach(function(k){
-      if (unsynced[k] && !mergedMap[k]) { mergedMap[k] = true; preservedCount++; }
-      // 시트에도 있으면 동기화 완료된 것 → unsynced에서 제거
-      if (mergedMap[k] && sheetMap[k]) delete unsynced[k];
-    });
-    window._cmgPaidMap = mergedMap;
-    window._cmgUnsyncedKeys = unsynced;
+    // 시트가 진실 — 시트 데이터로 _cmgPaidMap 덮어씀
+    window._cmgPaidMap = sheetMap;
     cmgSavePaidMap();
-    cmgSaveUnsyncedKeys();
-    if (preservedCount > 0) console.warn('[v342] 미동기화 입금완료 ' + preservedCount + '건 보존 (시트 push 필요)');
     var t = new Date();
     window._cmgPaidSyncedAt = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
     return true;
@@ -13710,9 +13485,7 @@ async function cmgExportPaidToSheet(){
     var tsv = keys.map(function(k){ return [k, 'TRUE', tsStr, who].join('\t'); }).join('\n');
     try {
       await navigator.clipboard.writeText(tsv);
-      alert('✅ 클립보드에 복사 완료 ('+keys.length+'건)\n\n[다음 단계]\n1) "정산_입금완료" 시트가 새 탭으로 열립니다\n2) A2 셀 클릭 → Cmd+V (붙여넣기)\n3) 저장 후 다른 직원이 새로고침하면 동일하게 보임\n\n※ 헤더(A1~D1: 키/입금완료/체크일시/체크자) 가 비어있으면 한 번만 직접 입력해주세요.\n\n💡 시트에 붙여넣기 완료하면 노란 ⚠ 미동기화 표시가 사라집니다.');
-      // [v342] export 성공 시 — 시트에 push되었다고 간주하고 다음 fetch에서 시트 데이터로 정상 병합됨
-      // 단, 즉시 unsynced 비우진 않음 (사용자가 실제 시트 붙여넣기를 안 할 수도 있어서 fetch 시점에 자동 정리)
+      alert('✅ 클립보드에 복사 완료 ('+keys.length+'건)\n\n[다음 단계]\n1) "정산_입금완료" 시트가 새 탭으로 열립니다\n2) A2 셀 클릭 → Cmd+V (붙여넣기)\n3) 저장 후 다른 직원이 새로고침하면 동일하게 보임\n\n※ 헤더(A1~D1: 키/입금완료/체크일시/체크자) 가 비어있으면 한 번만 직접 입력해주세요.');
     } catch(e) {
       alert('클립보드 복사 실패. 수동 복사하세요:\n\n' + tsv);
     }
@@ -14778,19 +14551,12 @@ function cmgRenderRegionCard(){
 function cmgPaidKey(partnerName, ym){ return partnerName + '|' + ym; }
 function cmgTogglePaid(pn, ym, cb){
   var key = cmgPaidKey(pn, ym);
-  var newVal;
   if (cb && cb.checked !== undefined) {
-    newVal = cb.checked;
+    window._cmgPaidMap[key] = cb.checked;
   } else {
-    newVal = !window._cmgPaidMap[key];
+    window._cmgPaidMap[key] = !window._cmgPaidMap[key];
   }
-  window._cmgPaidMap[key] = newVal;
-  // [v342] 미동기화 마킹 — 시트에 push되기 전까지 유지
-  window._cmgUnsyncedKeys = window._cmgUnsyncedKeys || {};
-  if (newVal) window._cmgUnsyncedKeys[key] = true;
-  else delete window._cmgUnsyncedKeys[key];
-  cmgSavePaidMap();
-  cmgSaveUnsyncedKeys();
+  cmgSavePaidMap(); // [v93] localStorage 저장
   renderContractMgmtView();
 }
 
@@ -14885,7 +14651,7 @@ function cmgRenderSettlementCard(){
         + '<td class="cmg-num cmg-money" style="color:#6B7280">' + cmgFmtMoney(vat) + '</td>'
         + '<td class="cmg-num cmg-money"><b>' + cmgFmtMoney(vatIncl) + '</b></td>'
         + '<td><input type="checkbox" class="cmg-paid-cb" ' + (paid ? 'checked' : '') + ' onchange="cmgTogglePaid(\'' + pnEsc + '\',\'' + r.ym + '\',this)"></td>'
-        + '<td>' + (paid ? ('<span class="cmg-paid-true">✓ 지급완료</span>' + ((window._cmgUnsyncedKeys && window._cmgUnsyncedKeys[cmgPaidKey(r.partnerName, r.ym)]) ? ' <span title="시트에 push되지 않은 체크 — 마스터 내보내기 클릭 필요" style="background:#FEF3C7;color:#92400E;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px;border:1px solid #F59E0B">⚠ 미동기화</span>' : '')) : '<span class="cmg-paid-false">미지급</span>') + '</td>'
+        + '<td>' + (paid ? '<span class="cmg-paid-true">✓ 지급완료</span>' : '<span class="cmg-paid-false">미지급</span>') + '</td>'
         + '</tr>';
     }).join('');
     html += '</tbody></table>';

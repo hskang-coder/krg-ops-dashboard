@@ -1,17 +1,24 @@
 /**
  * 개런티즈 계약서 — 마스터 시트 자동 입력 Apps Script Web App
- * v347 (안전 강화: 헤더 기반 매칭 + 5중 검증 + DRY_RUN 디폴트)
+ * v350 (헤더 중복 대응 + 단독/공동계약 분기 + nth-occurrence 매칭)
  *
  * 역할:
  *   대시보드 [수동 입력 모드]에서 계약서 생성 시
  *   미리 작성된 시트 행을 임차인명+전화번호로 찾아 update,
  *   못 찾으면 마지막 행에 append.
  *
+ * v350 핵심 변경 (DRY_RUN으로 매핑 오류 발견 후 안전 수정):
+ *   ★ 헤더 중복 대응: "주민번호"(AW/BC), "긴급연락처"(AY/BE), "관계,이름"(AZ/BF), "이름"
+ *     → findColumn에 nth 파라미터 추가, N번째 occurrence 반환
+ *   ★ 단독계약(공동전차인 없음)이면 BA-BF 전체 SKIP — 사용자 정책
+ *   ★ BE/BF 매핑 정정: BE=공동전차인 긴급연락처, BF=공동전차인 관계,이름
+ *     (v349까지 BE=tenantPhone, BF=tenantName 로 잘못 매핑되어 있었음 — DRY_RUN으로 발견)
+ *   ★ 매칭 키 변경: 임차인명 fallback AU, 임차인 전화 fallback AV
+ *
  * 핵심 안전 설계:
- *   ★ 컬럼 추적은 "헤더 이름" 기준 (예: "현관번호" 라벨이 있는 컬럼)
+ *   ★ 컬럼 추적은 "헤더 이름" 기준 + 중복 헤더는 nth occurrence
  *   ★ 시트 컬럼이 추가/삭제/이동되어도 헤더만 유지되면 자동 추적
  *   ★ 헤더 못 찾으면 fallback letter 사용 + 응답에 경고 표시
- *   ★ 헤더도 없고 fallback도 의심스러우면 해당 필드 쓰기 SKIP (안전 우선)
  *
  * 안전 장치 (5중):
  *   1. 토큰 검증
@@ -23,46 +30,48 @@
  * 배포 단계 (운영팀):
  *   1. Apps Script 편집기에서 본 코드 붙여넣기
  *   2. CFG_API_TOKEN 변경 (임의 문자열)
- *   3. 배포 → 새 배포 → 웹 앱 (액세스: "모든 사용자")
- *   4. URL 운영책임자에게 전달 → 대시보드 CG_TSV_API_URL 설정
- *   5. **DRY_RUN 검증** — 시범 발행 1~2건 → 응답의 "planned" 확인
- *   6. 검증 완료 후 CFG_DRY_RUN = false 변경 + 재배포 → 실제 입력 시작
+ *   3. 배포 → 배포 관리 → 새 버전 → 배포 (URL 유지)
+ *   4. **DRY_RUN 검증** — 시범 발행 1~2건 → 응답의 "planned" 확인
+ *   5. 검증 완료 후 CFG_DRY_RUN = false 변경 + 재배포 → 실제 입력 시작
  */
 
 // ========== CONFIG ==========
 const CFG_SPREADSHEET_ID = '1Z3w9ZhKwiLfL4JJhs-gfcU27QLKgZAWycyGFCK4iiMc'; // 마스터
 const CFG_SHEET_GID = 1931755549;
 const CFG_SHEET_NAME = ''; // GID 폴백
-const CFG_API_TOKEN = 'KRG-OPS-2026-CHANGE-ME-PLEASE'; // 반드시 변경
+const CFG_API_TOKEN = 'KRG-OPS-2026-CHANGE-ME-hskang'; // 운영팀이 변경한 값
 const CFG_DRY_RUN = true; // 검증 완료 후 false 로 변경
 
 // 헤더 검증 — 시트 잘못 지정 방지
 const CFG_REQUIRED_HEADER_KEYWORDS = ['계약번호', '임차인명'];
 
 // 매칭에 사용할 컬럼 — 헤더 이름 우선, 못 찾으면 fallback letter
+// [v350] 매칭 키 정정: 임차인명=AU, 임차인 전화=AV
 const CFG_MATCH_NAME = {
-  headers: ['임차인명', '임차인 명', '전차인명', '전차인 이름'],
-  fallbackCol: 'C'
+  headers: ['임차인명', '임차인 명', '임차인', '전차인명', '전차인 이름'],
+  fallbackCol: 'AU'
 };
 const CFG_MATCH_PHONES = [
-  { headers: ['전차인 연락처', '전차인연락처', '임차인 연락처', '임차인연락처'], fallbackCol: 'BE' },
-  { headers: ['긴급연락처', '긴급 연락처'], fallbackCol: 'AY' }
+  { headers: ['임차인휴대폰', '임차인 휴대폰', '임차인 연락처', '임차인연락처', '전차인 연락처', '전차인연락처'], fallbackCol: 'AV' }
 ];
 
 // 쓰기 컬럼 매핑 — 헤더 우선, 못 찾으면 fallbackCol 사용
-// 컬럼 추가/삭제/이동에 자동 대응 (헤더가 유지되는 한)
+// [v350] 헤더 중복 대응: nth=0 (첫번째), nth=1 (두번째) 명시
+// [v350] onlyIfCoName: true → 공동전차인 미입력시 SKIP (단독계약 보호)
 const CFG_FIELDS_MAP = [
-  { field: 'doorPwd',     headers: ['현관번호', '현관 비밀번호', '현관비번', '현관'],                    fallbackCol: 'F'  },
-  { field: 'tenantIdNo',  headers: ['전차인 주민번호', '전차인주민번호', '임차인 주민번호', '주민번호'],  fallbackCol: 'AW' },
-  { field: 'tenantAddr',  headers: ['전차인 주소', '전차인주소', '임차인 주소'],                          fallbackCol: 'AX' },
-  { field: 'emgPhone',    headers: ['긴급연락처', '긴급 연락처'],                                          fallbackCol: 'AY' },
-  { field: 'emgRelName',  headers: ['관계,이름', '관계, 이름', '관계/이름', '관계이름'],                  fallbackCol: 'AZ' },
-  { field: 'coName',      headers: ['공동계약자', '공동전차인 이름', '공동전차인이름', '공동 계약자'],     fallbackCol: 'BA' },
-  { field: 'coPhone',     headers: ['공동계약자 연락처', '공동전차인 연락처', '공동전차인연락처'],         fallbackCol: 'BB' },
-  { field: 'coIdNo',      headers: ['공동계약자 주민번호', '공동전차인 주민번호', '공동전차인주민번호'],   fallbackCol: 'BC' },
-  { field: 'coAddr',      headers: ['공동계약자 주소', '공동전차인 주소', '공동전차인주소'],               fallbackCol: 'BD' },
-  { field: 'tenantPhone', headers: ['전차인 연락처', '전차인연락처'],                                       fallbackCol: 'BE' },
-  { field: 'tenantName',  headers: ['전차인 이름', '전차인이름'],                                            fallbackCol: 'BF' }
+  // ── 항상 쓰는 컬럼 (단독/공동 무관) ──
+  { field: 'doorPwd',     headers: ['현관번호', '현관 비밀번호', '현관비번', '현관'],     fallbackCol: 'F',  nth: 0 },
+  { field: 'tenantIdNo',  headers: ['주민번호'],                                            fallbackCol: 'AW', nth: 0 }, // AW (첫번째 주민번호)
+  { field: 'tenantAddr',  headers: ['주소임차인', '임차인 주소', '전차인 주소'],            fallbackCol: 'AX', nth: 0 },
+  { field: 'emgPhone',    headers: ['긴급연락처', '긴급 연락처'],                            fallbackCol: 'AY', nth: 0 }, // AY (첫번째 긴급연락처)
+  { field: 'emgRelName',  headers: ['관계,이름', '관계, 이름', '관계/이름', '관계이름'],   fallbackCol: 'AZ', nth: 0 }, // AZ (첫번째 관계,이름)
+  // ── 공동전차인 입력시만 쓰는 컬럼 (단독계약시 전체 SKIP) ──
+  { field: 'coName',        headers: ['이름'],          fallbackCol: 'BA', nth: 0, onlyIfCoName: true },
+  { field: 'coPhone',       headers: ['연락처'],        fallbackCol: 'BB', nth: 0, onlyIfCoName: true },
+  { field: 'coIdNo',        headers: ['주민번호'],      fallbackCol: 'BC', nth: 1, onlyIfCoName: true }, // BC (두번째 주민번호)
+  { field: 'coAddr',        headers: ['주소'],          fallbackCol: 'BD', nth: 0, onlyIfCoName: true }, // 주소 (첫번째, 주소임차인과 구분)
+  { field: 'coEmgPhone',    headers: ['긴급연락처'],    fallbackCol: 'BE', nth: 1, onlyIfCoName: true }, // BE (두번째 긴급연락처)
+  { field: 'coEmgRelName',  headers: ['관계,이름'],     fallbackCol: 'BF', nth: 1, onlyIfCoName: true }  // BF (두번째 관계,이름)
 ];
 
 // fallback 사용 정책 — 헤더 매칭 실패 시 동작
@@ -96,7 +105,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return jsonResp({ status: 'ok', message: 'API ready', dryRun: CFG_DRY_RUN });
+  return jsonResp({ status: 'ok', message: 'API ready', dryRun: CFG_DRY_RUN, version: 'v350' });
 }
 
 function upsertContract(data) {
@@ -115,6 +124,9 @@ function upsertContractInner(data) {
   var fields = data.fields || {};
   var tenantName = String(fields.tenantName || '').trim();
   var tenantPhone = digitsOnly(fields.tenantPhone || '');
+  // [v350] 공동전차인 입력 여부 — coName이 비어있으면 단독계약
+  var coName = String(fields.coName || '').trim();
+  var hasCoTenant = !!coName;
 
   if (!tenantName) return jsonResp({ status: 'error', message: '임차인명(tenantName) 누락 — 매칭 불가' });
 
@@ -146,13 +158,13 @@ function upsertContractInner(data) {
   }
 
   // 매칭 컬럼 찾기 (헤더 이름 우선)
-  var nameColResult = findColumn(headers, CFG_MATCH_NAME.headers, CFG_MATCH_NAME.fallbackCol);
+  var nameColResult = findColumn(headers, CFG_MATCH_NAME.headers, CFG_MATCH_NAME.fallbackCol, 0);
   var nameColIdx = nameColResult.col;
 
   var phoneColIdxList = [];
   var phoneColWarns = [];
   CFG_MATCH_PHONES.forEach(function(spec){
-    var r = findColumn(headers, spec.headers, spec.fallbackCol);
+    var r = findColumn(headers, spec.headers, spec.fallbackCol, 0);
     if (r.col > 0) {
       phoneColIdxList.push(r.col);
       if (r.usedFallback) phoneColWarns.push('phone-' + spec.fallbackCol + ' 헤더 미발견 (fallback)');
@@ -188,14 +200,21 @@ function upsertContractInner(data) {
   var targetRow = matchedRow > 0 ? matchedRow : (sheet.getLastRow() + 1);
   var mode = matchedRow > 0 ? 'update' : 'append';
 
-  // 쓰기 컬럼 결정 — 헤더 매칭 + fallback 정책
+  // 쓰기 컬럼 결정 — 헤더 매칭 + fallback 정책 + [v350] 공동전차인 분기
   var writes = [];
   var warnings = [];
+  var skippedCoFields = []; // [v350] 단독계약 SKIP 추적
   CFG_FIELDS_MAP.forEach(function(spec){
+    // [v350] 단독계약 보호 — onlyIfCoName 필드는 공동전차인 없으면 SKIP
+    if (spec.onlyIfCoName && !hasCoTenant) {
+      skippedCoFields.push(spec.field);
+      return;
+    }
     var val = fields[spec.field];
     if (val == null) return; // 빈값은 건너뜀
     val = String(val);
-    var found = findColumn(headers, spec.headers, spec.fallbackCol);
+    // [v350] nth 파라미터 전달 (헤더 중복 대응)
+    var found = findColumn(headers, spec.headers, spec.fallbackCol, spec.nth || 0);
     if (!found.col) {
       warnings.push(spec.field + ': 컬럼 못 찾음 (헤더 + fallback 모두 실패) — SKIP');
       return;
@@ -206,7 +225,6 @@ function upsertContractInner(data) {
         return;
       }
       if (CFG_FALLBACK_POLICY === 'reject') {
-        // 한 필드라도 fallback이면 전체 거부
         warnings.push(spec.field + ': 헤더 미발견 (fallback ' + spec.fallbackCol + ') — REJECT');
       }
       warnings.push(spec.field + ': 헤더 미발견 → fallback ' + spec.fallbackCol + ' 사용');
@@ -217,7 +235,8 @@ function upsertContractInner(data) {
       field: spec.field,
       value: val,
       usedFallback: !!found.usedFallback,
-      matchedHeader: found.matchedHeader || null
+      matchedHeader: found.matchedHeader || null,
+      nth: spec.nth || 0
     });
   });
 
@@ -226,11 +245,10 @@ function upsertContractInner(data) {
   }
 
   if (writes.length === 0) {
-    return jsonResp({ status: 'error', message: '쓸 데이터 없음', warnings: warnings });
+    return jsonResp({ status: 'error', message: '쓸 데이터 없음', warnings: warnings, skippedCoFields: skippedCoFields, hasCoTenant: hasCoTenant });
   }
 
   // [v348-4] No-op 감지 — update 모드에서 기존 값과 동일한 셀은 skip
-  // (시트 데이터 불필요한 변경 차단 + 변경 이력 깔끔)
   var unchanged = [];
   if (mode === 'update' && targetRow > 0 && lastRow >= targetRow) {
     var maxColForRead = Math.max.apply(null, writes.map(function(w){ return w.col; }));
@@ -242,7 +260,7 @@ function upsertContractInner(data) {
         unchanged.push({ col: w.letter, field: w.field, value: existing });
         return false;
       }
-      w.previousValue = existing; // [v348] 변경 추적
+      w.previousValue = existing;
       return true;
     });
     if (writes.length === 0) {
@@ -255,7 +273,9 @@ function upsertContractInner(data) {
         matchedReason: matchedReason,
         message: '이미 시트의 데이터와 100% 동일 — 변경 없음 (no-op)',
         unchanged: unchanged,
-        warnings: warnings
+        warnings: warnings,
+        skippedCoFields: skippedCoFields,
+        hasCoTenant: hasCoTenant
       });
     }
   }
@@ -268,6 +288,8 @@ function upsertContractInner(data) {
     row: targetRow,
     sheet: sheet.getName(),
     matchedReason: matchedReason,
+    hasCoTenant: hasCoTenant,
+    skippedCoFields: skippedCoFields,
     planned: writes.map(function(w){
       return {
         col: w.letter,
@@ -275,7 +297,8 @@ function upsertContractInner(data) {
         value: w.value,
         previousValue: w.previousValue || null,
         usedFallback: w.usedFallback,
-        matchedHeader: w.matchedHeader
+        matchedHeader: w.matchedHeader,
+        nth: w.nth
       };
     }),
     unchanged: unchanged,
@@ -323,32 +346,45 @@ function normalize(s) {
 }
 
 /**
- * 헤더 배열에서 컬럼 찾기 (1-based 컬럼 번호 반환)
- *   1. 정확 매칭 (정규화: 공백 제거 + 소문자)
- *   2. 부분 일치 (헤더 라벨이 keyword를 포함)
+ * [v350] 헤더 배열에서 컬럼 찾기 (1-based 컬럼 번호 반환) — nth occurrence 지원
+ *   1. 정확 매칭 (정규화: 공백 제거 + 소문자) — N번째 occurrence
+ *   2. 부분 일치 — N번째 occurrence
  *   3. fallback letter → letter to number
+ *
+ * @param headers       시트 1행 헤더 배열
+ * @param keywords      검색할 헤더 이름 후보 (정확/부분 매칭에 모두 사용)
+ * @param fallbackLetter 헤더 못 찾을 때 사용할 컬럼 letter
+ * @param nth           몇 번째 occurrence? 0=첫번째, 1=두번째, ...
+ *
  * 반환: { col, usedFallback, matchedHeader }
  */
-function findColumn(headers, keywords, fallbackLetter) {
+function findColumn(headers, keywords, fallbackLetter, nth) {
+  nth = nth || 0;
   var normHeaders = headers.map(normalize);
-  // 1) 정확 매칭
+  // 1) 정확 매칭 — 각 키워드별로 모든 occurrence 수집 후 nth 선택
   for (var i = 0; i < keywords.length; i++) {
     var k = normalize(keywords[i]);
     if (!k) continue;
+    var hits = [];
     for (var j = 0; j < normHeaders.length; j++) {
-      if (normHeaders[j] === k) {
-        return { col: j + 1, usedFallback: false, matchedHeader: String(headers[j]) };
-      }
+      if (normHeaders[j] === k) hits.push(j);
+    }
+    if (hits.length > nth) {
+      var idx = hits[nth];
+      return { col: idx + 1, usedFallback: false, matchedHeader: String(headers[idx]) };
     }
   }
-  // 2) 부분 일치
+  // 2) 부분 일치 — 각 키워드별로 모든 occurrence 수집 후 nth 선택
   for (var i = 0; i < keywords.length; i++) {
     var k = normalize(keywords[i]);
     if (!k) continue;
+    var hits = [];
     for (var j = 0; j < normHeaders.length; j++) {
-      if (normHeaders[j] && normHeaders[j].indexOf(k) >= 0) {
-        return { col: j + 1, usedFallback: false, matchedHeader: String(headers[j]) };
-      }
+      if (normHeaders[j] && normHeaders[j].indexOf(k) >= 0) hits.push(j);
+    }
+    if (hits.length > nth) {
+      var idx = hits[nth];
+      return { col: idx + 1, usedFallback: false, matchedHeader: String(headers[idx]) };
     }
   }
   // 3) fallback
