@@ -10753,6 +10753,11 @@ function openIncomeReceiptModal(contractNo) {
     +           '<label style="display:flex;align-items:center;gap:5px;padding:5px 7px;background:#fff;border:1px solid #FECACA;border-radius:4px;cursor:pointer"><input type="checkbox" id="crIncRcptOptKeyReturn" style="accent-color:#DC2626"> 열쇠/명도 반환 완료</label>'
     +         '</div>'
     +       '</div>'
+    +       /* [v343] 추가 텍스트 입력란 (선언문 아래 본문에 삽입) */
+    +       '<div style="margin-top:10px">'
+    +         '<label style="font-size:11.5px;font-weight:600;color:#991B1B;display:block;margin-bottom:5px">📝 추가 기재 사항 <span style="color:#9CA3AF;font-weight:500;font-size:10.5px">(선택 — 증명서 본문에 삽입됨)</span></label>'
+    +         '<textarea id="crIncRcptExtraNote" rows="3" placeholder="예: 임차인의 요청에 따라 본 증명서를 발행하며, 향후 분쟁 발생 시 본 문서를 증빙으로 활용할 수 있다." style="width:100%;padding:8px 10px;border:1px solid #FCA5A5;border-radius:5px;font-size:12px;background:#fff;resize:vertical;line-height:1.5;font-family:inherit"></textarea>'
+    +       '</div>'
     +     '</div>'
     +     '<div style="font-size:10.5px;color:#94A3B8">※ 납기일 기준 기간 내 납부 완료된 건만 발행됩니다 (납부상태: 정상납부, 연체납부)</div>'
     +   '</div>'
@@ -10811,6 +10816,8 @@ function generateIncomeReceipt(contractNo){
   };
   // [v277] 사용자 수동 입력 종료일 (계약해지증명서 전용)
   var manualExitDate = (document.getElementById('crIncRcptExitDate')||{}).value || '';
+  // [v343] 추가 기재 사항 (자유 입력)
+  var extraNote = (document.getElementById('crIncRcptExtraNote')||{}).value || '';
 
   var contract = (contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim() === String(contractNo); });
   if (!contract) { alert('계약 데이터 없음'); return; }
@@ -11005,8 +11012,15 @@ function generateIncomeReceipt(contractNo){
     settleItems.push('<li><b>원상회복</b>: ' + (closeOpts.restore ? '합의 완료' : '별도 합의 / 미해당') + '</li>');
     settleItems.push('<li><b>위약금/정산금 처리</b>: ' + (closeOpts.penalty ? '완료' : '별도 합의 / 미해당') + '</li>');
     settleItems.push('<li><b>열쇠 반환·명도</b>: ' + (closeOpts.keyReturn ? '완료' : '별도 합의 / 미해당') + '</li>');
+    // [v343] 추가 기재 사항 HTML — 줄바꿈 보존
+    var extraNoteHtml = '';
+    if (extraNote && extraNote.trim()) {
+      var escNote = extraNote.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+      extraNoteHtml = '<div style="margin:10px 0 10px;padding:9px 12px;background:#FFFBEB;border-left:4px solid #F59E0B;border-radius:0 5px 5px 0;font-size:13px;color:#78350F;line-height:1.7"><b style="color:#92400E;margin-right:5px">📝</b>' + escNote + '</div>';
+    }
     declarationHtml = ''
       + '본 증명서는 위 계약(<b>#' + contractNo + '</b>)이 다음 사항을 모두 충족하여 <b>정상적으로 해지·종결되었음</b>을 증명합니다.'
+      + extraNoteHtml
       + '<ul style="margin:10px 0 8px 22px;padding:0;line-height:1.85">' + settleItems.join('') + '</ul>'
       + '이로써 <b>임(전)차인 ' + tenant + '</b>과(와) <b>임대인 ' + landlord + '</b> 및 대리인 <b>케이알지그룹주식회사</b> 사이의 본 계약과 관련한 일체의 채권·채무 관계는 종결되었으며, '
       + '본 증명서 발행일 이후 추가 납부 의무는 존재하지 않음을 확인합니다.';
