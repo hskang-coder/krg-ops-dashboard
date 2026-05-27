@@ -7890,10 +7890,14 @@ function cG_buildManualForm(){
           cell('국적', inp('nationality', '대한민국'))
         )
       // [긴급연락처] 비상연락망 — 관계 / 이름 / 연락처
+      // [v354] 단독계약시 필수 — 라벨 hint + 입력시 빨강 테두리 자동 해제
       + row('c3',
-          cell('긴급연락처 관계 ' + H.opt, inp('emgRel', '예: 부, 모, 배우자')),
-          cell('긴급연락처 이름 ' + H.opt, inp('emgName', '예: 홍길동')),
-          cell('긴급연락처 ' + H.opt, inp('emgPhone', '010-0000-0000'))
+          cell('긴급연락처 관계 <span id="cG_emgReqHint_rel" class="cG-hint req">필수</span>',
+            '<input type="text" id="cG_m_emgRel" placeholder="예: 부, 모, 배우자" oninput="cG_updateEmgRequired()" class="cG-fld">'),
+          cell('긴급연락처 이름 <span id="cG_emgReqHint_name" class="cG-hint req">필수</span>',
+            '<input type="text" id="cG_m_emgName" placeholder="예: 홍길동" oninput="cG_updateEmgRequired()" class="cG-fld">'),
+          cell('긴급연락처 <span id="cG_emgReqHint_phone" class="cG-hint req">필수</span>',
+            '<input type="text" id="cG_m_emgPhone" placeholder="010-0000-0000" oninput="cG_updateEmgRequired()" class="cG-fld">')
         )
       )
     // ⑤ 공동임(전)차인 (선택)
@@ -8005,6 +8009,31 @@ function cG_autoToggleContractInfo(){
   if (ciEl.dataset.userEdit === 'true') return; // 사용자 수정 시 덮어쓰지 않음
   var hasCo = !!(coNameEl.value && coNameEl.value.trim());
   ciEl.value = hasCo ? '공동전차인' : '단독계약';
+  // [v354] 단독/공동에 따라 임차인 긴급연락처 라벨 토글 (필수 ↔ 선택)
+  if (typeof cG_updateEmgRequired === 'function') cG_updateEmgRequired();
+}
+
+// [v354] 단독계약 시 임차인 긴급연락처 3필드를 "필수"로, 공동계약이면 "선택"으로 토글
+// 라벨 hint + 빨강 테두리 시각화
+function cG_updateEmgRequired(){
+  var coNameEl = document.getElementById('cG_m_coName');
+  var isAlone = !(coNameEl && String(coNameEl.value||'').trim());
+  var hintMap = { rel:'cG_emgReqHint_rel', name:'cG_emgReqHint_name', phone:'cG_emgReqHint_phone' };
+  var inputMap = { rel:'cG_m_emgRel', name:'cG_m_emgName', phone:'cG_m_emgPhone' };
+  Object.keys(hintMap).forEach(function(k){
+    var hint = document.getElementById(hintMap[k]);
+    var input = document.getElementById(inputMap[k]);
+    if (hint) {
+      hint.className = isAlone ? 'cG-hint req' : 'cG-hint opt';
+      hint.textContent = isAlone ? '필수' : '선택';
+    }
+    if (input) {
+      var empty = !(input.value||'').trim();
+      // 단독 + 빈값 → 빨강 테두리 시각 표시
+      input.style.borderColor = (isAlone && empty) ? '#DC2626' : '';
+      input.style.background  = (isAlone && empty) ? '#FEF2F2' : '';
+    }
+  });
 }
 
 // [v188] 계약유형 변경 시 월세 라벨에 (부가세 포함) 표시 추가/제거
@@ -8274,6 +8303,8 @@ function cG_attachInvalidClearOnInput(el){
 
 // [v189/v191] 필수 9개 + 권장 필드 누락 검증 + 주민번호 형식 검증
 function cG_validateAllFields(){
+  // [v354] 단독/공동에 따라 임차인 긴급연락처 라벨/음영 토글
+  if (typeof cG_updateEmgRequired === 'function') cG_updateEmgRequired();
   // 발행 차단 필수 9개 (cG_submit과 동일)
   var required = [
     {id:'cG_m_useType',      label:'계약유형'},
@@ -9214,11 +9245,32 @@ function cG_postUpsert(fields){
   }).then(function(r){ return r.json(); }).catch(function(e){ return { status: 'error', message: 'fetch 실패: ' + (e.message||e) }; });
 }
 
-// [v348] DRY_RUN 테스트 버튼 핸들러
+// [v348/v354] DRY_RUN 테스트 버튼 핸들러 + 단독계약 긴급연락처 검증
 function cG_runDryRunTest(){
   var btn = document.getElementById('cG_dryRunBtn');
   var nameEl = document.getElementById('cG_m_tenantName');
   if (!nameEl || !(nameEl.value||'').trim()) { alert('⚠ 임차인명을 먼저 입력해주세요'); return; }
+  // [v354] 단독계약 시 긴급연락처 3필드 필수 — cG_submit과 동일 정책
+  var coNameEl = document.getElementById('cG_m_coName');
+  var hasCo = coNameEl && String(coNameEl.value||'').trim();
+  if (!hasCo) {
+    var emgMissing = [];
+    [
+      {id:'cG_m_emgPhone', label:'전화번호'},
+      {id:'cG_m_emgRel',   label:'관계'},
+      {id:'cG_m_emgName',  label:'이름'}
+    ].forEach(function(f){
+      var el = document.getElementById(f.id);
+      if (!el || !(el.value||'').trim()) {
+        emgMissing.push(f.label);
+        if (typeof cG_markInvalid === 'function' && el) cG_markInvalid(el, '단독계약 — 긴급연락처 ' + f.label + ' 필수');
+      }
+    });
+    if (emgMissing.length > 0) {
+      alert('⚠ 단독계약 — 긴급연락처 필수 입력\n\n공동전차인이 없을 경우, 임(전)차인의 긴급연락처는 필수입니다.\n\n다음 항목을 입력해주세요:\n\n• 긴급연락처 ' + emgMissing.join('\n• 긴급연락처 '));
+      return;
+    }
+  }
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 테스트 중...'; }
   var d = (typeof cG_collectManualData === 'function') ? cG_collectManualData() : {};
   var fields = cG_buildAutoFields(d);
