@@ -7827,9 +7827,10 @@ function cG_buildManualForm(){
             '<input type="date" id="cG_m_startDate" oninput="cG_recalcPayDay()" class="cG-fld">'),
           cell('임대차 종료일 ' + H.req, inp('endDate', '', 'date'))
         )
-      // 3행: 주소
-      + row('c1',
-          cell('주소 + 호실 ' + H.req, inp('address', '예: 동두천시 지행동 676 제402호'))
+      // 3행: 주소 + 현관 비밀번호 (v352)
+      + row('c2',
+          cell('주소 + 호실 ' + H.req, inp('address', '예: 동두천시 지행동 676 제402호')),
+          cell('현관 비밀번호 ' + H.auto, inp('doorPwd', '주소 입력 시 자동 조회 (수동 입력도 가능)'))
         )
       )
     // ② 임대료
@@ -8969,6 +8970,28 @@ function cG_collectManualData(){
     tenantPhone:  v('tenantPhone'),
     tenantIdNo:   rrn('tenantIdNo'),
     tenantAddr:   v('tenantAddr'),
+    // [v352] 현관 비밀번호 — 수동 입력 우선, 비어있으면 주소 매칭으로 vacancyRawData에서 자동 조회
+    doorPwd:      (function(){
+                    var manual = v('doorPwd');
+                    if (manual) return manual;
+                    try {
+                      var addr = v('address');
+                      if (!addr || !Array.isArray(vacancyRawData)) return '';
+                      var addrNorm = String(addr).replace(/\s+/g,'').trim();
+                      var found = vacancyRawData.find(function(vr){
+                        if (!vr || !vr.doorPwd) return false;
+                        var p = String(vr.doorPwd).trim();
+                        if (!p || p === '-') return false;
+                        var vT = String(vr.propAddr||'').replace(/\s+/g,'').trim();
+                        var vU = String(vr.propBuilding||'').replace(/\s+/g,'').trim();
+                        // 입력 주소가 vacancy의 건물주소/건물명 중 하나라도 포함하면 매칭
+                        if (vT && vT.length >= 6 && addrNorm.indexOf(vT) >= 0) return true;
+                        if (vU && vU.length >= 4 && addrNorm.indexOf(vU) >= 0) return true;
+                        return false;
+                      });
+                      return found ? String(found.doorPwd).trim() : '';
+                    } catch(_) { return ''; }
+                  })(),
     // [긴급연락처] 수동 입력 폼의 emgPhone/emgRel/emgName → 계약서 템플릿 변수로 매핑
     emergPhone:   v('emgPhone'),
     emergInfo:    (function(){ var r = v('emgRel'), n = v('emgName'); if (!r && !n) return ''; return r + ',' + n; })(),
@@ -9084,7 +9107,7 @@ function cG_buildContractInfoText(d){
   L.push('0. 퇴실청소비 : (변경 시 알려주세요)');
   L.push('1. 계약 체결일(날일 예정일) : ' + trim(d.contractDate));
   L.push('');
-  L.push('2. 건물 공동현관 비번 : ');
+  L.push('2. 건물 공동현관 비번 : ' + trim(d.doorPwd || '')); // [v352] 현관 비밀번호 출력
   L.push('');
   L.push('3. 주소, 호실정보: ' + addr);
   L.push('');
@@ -9145,7 +9168,7 @@ function cG_buildAutoFields(d){
     tenantPhone:   trim(d.tenantPhone),
     tenantIdNo:    trim(d.tenantIdNo),
     tenantAddr:    trim(d.tenantAddr),
-    doorPwd:       trim(d.doorPwd || ''), // 현재 폼에 없음 — 추후 추가 예정. 빈값이면 시트 미수정
+    doorPwd:       (trim(d.doorPwd) || null), // [v352] 폼/자동매칭 결과. 빈값이면 null → Apps Script가 SKIP (기존 시트 값 보호)
     emgPhone:      trim(d.emergPhone),
     emgRelName:    emgRelName,
     coName:        trim(d.coName),
