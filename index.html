@@ -2597,6 +2597,7 @@ function crSearchDownloadExcel() {
     '임차인명': c['임차인명'] || c['임차인'] || '',
     '건물명': c['건물명'] || '',
     '호수': c['호수'] || '',
+    '주소': c['계약지주소'] || '',  // [v359] 계약지주소 추가
     '부동산': c['부동산명'] || '',
     '계약담당자': c['계약담당자'] || '',
     '시작일': c['시작일'] || '',
@@ -2611,7 +2612,8 @@ function crSearchDownloadExcel() {
     '보증금': c['보증금'] || ''
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [{wch:10},{wch:14},{wch:18},{wch:10},{wch:14},{wch:20},{wch:12},{wch:12},{wch:10},{wch:8},{wch:14},{wch:12},{wch:14},{wch:11},{wch:11},{wch:13}];
+  // [v359] 주소 컬럼(5번째) 추가 — wch:34 (긴 주소 대응)
+  ws['!cols'] = [{wch:10},{wch:14},{wch:18},{wch:10},{wch:34},{wch:14},{wch:20},{wch:12},{wch:12},{wch:10},{wch:8},{wch:14},{wch:12},{wch:14},{wch:11},{wch:11},{wch:13}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '계약검색결과');
   const today = (function(){ var d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
@@ -7670,6 +7672,10 @@ function openContractPdfModal(contractNo) {
       // [v198] focus는 하되 — focus가 모달을 스크롤시키는 것을 막기 위해 preventScroll 적용
       try { el.focus({ preventScroll: true }); } catch(_) { el.focus(); }
     }
+    // [v358] 수동 모드 폼 빌드 직후 즉시 필수값 검증 — 계약번호/긴급연락처 등 빈값 빨강 음영 시각화
+    if (initMode === 'manual' && typeof cG_validateAllFields === 'function') {
+      try { cG_validateAllFields(); } catch(_) {}
+    }
   }, 100);
 }
 
@@ -7795,10 +7801,11 @@ function cG_buildManualForm(){
       )
     // ① 계약 기본
     + section('① 계약 기본',
-        // [v357] 계약번호 — 시트 매칭 키 (A열). 기존 계약 발행 시 필수.
+        // [v357/v358] 계약번호 — 시트 매칭 키 (A열). 기존 계약 발행 시 필수.
+        // [v358] 계약유형과 동일한 노란 음영 (cG-warn) — 필수값 시각 통일
         row('c1',
           cell('계약번호 ' + H.req + ' <span style="font-size:10px;font-weight:600;color:#6B7280;margin-left:6px">마스터 시트 A열 — 기존 행 업데이트</span>',
-            inp('contractNo', '예: 58221'))
+            inp('contractNo', '예: 58221', 'text', 'cG-warn'))
         )
         // [v195/v196] 1행: 계약유형 / 계약정보구분 / 계약조건
       + row('c3',
