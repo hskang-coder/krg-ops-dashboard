@@ -1992,6 +1992,8 @@ function parseVacancySheet(resp) {
   const statusIdx      = findColIdxLast(labels, ['공실상태'],      66);  // BO (마지막 occurrence)
   const exitDateIdx    = findColIdx(labels, ['실제퇴실일'],        67);  // BP
   const billCountIdx   = findColIdx(labels, ['청구수','청구횟수'], 71);  // BT
+  // [v361] BS열 연체외주 — gid=1953907648 vacancy 시트
+  const outsourceIdx   = findColIdx(labels, ['연체외주','연체 외주'], 70);  // BS
   // [v74] 입주 전 진척 5개 (TRUE/FALSE)
   const homeBtnIdx   = findColIdx(labels, ['홈버튼등록'],          81);  // CD
   const eContractIdx = findColIdx(labels, ['전자계약'],            82);  // CE
@@ -2033,7 +2035,8 @@ function parseVacancySheet(resp) {
       mgmtFee:      cell(mgmtFeeIdx),     // AJ열: 관리비
       doorPwd:      cell(doorPwdIdx),     // F열: 현관 비밀번호 (v293)
       livingMonths: cell(livingMonthsIdx), // AB열: 실제 거주개월 (v301)
-      billCount:    cell(billCountIdx),  // BS열: 청구횟수
+      billCount:    cell(billCountIdx),  // BT열: 청구횟수
+      outsource:    cell(outsourceIdx),  // [v361] BS열: 연체외주
       endDate:      cell(endDateIdx),     // X열: 만기일 [v44]
       tenantRrn:    cell(tenantRrnIdx), // AV열: 계약자1 생년월일/주민번호 [v65]
       coRrn:        cell(coRrnIdx),     // BB열: 계약자2/연대보증인 생년월일/주민번호 [v65]
@@ -2493,12 +2496,12 @@ function searchContract() {
       String(r['긴급연락처']||'').replace(/[^0-9]/g,'').includes(kw)
     );
   } else if (crMode === 'addr') {
+    // [v360] 주소 검색 — 계약지주소(임대 물건) + 건물명만 매칭
+    //        임대인주소/주소임차인(개인 거주지)은 검색에서 제외 — "강서구" 검색 시 임대인이 강서구 거주하는 다른 계약이 잘못 매칭되던 문제 수정
     const kw = q.toLowerCase();
     matches = contractRawData.filter(r =>
       String(r['계약지주소']||'').toLowerCase().includes(kw) ||
-      String(r['건물명']||'').toLowerCase().includes(kw) ||
-      String(r['임대인주소']||'').toLowerCase().includes(kw) ||
-      String(r['주소임차인']||'').toLowerCase().includes(kw)
+      String(r['건물명']||'').toLowerCase().includes(kw)
     );
   }
 
@@ -2595,9 +2598,9 @@ function crSearchDownloadExcel() {
   const rows = data.map(c => ({
     '계약번호': c['계약번호'] || '',
     '임차인명': c['임차인명'] || c['임차인'] || '',
+    '주소': c['계약지주소'] || '',  // [v360] 주소를 건물명 왼쪽으로 이동
     '건물명': c['건물명'] || '',
     '호수': c['호수'] || '',
-    '주소': c['계약지주소'] || '',  // [v359] 계약지주소 추가
     '부동산': c['부동산명'] || '',
     '계약담당자': c['계약담당자'] || '',
     '시작일': c['시작일'] || '',
@@ -2612,8 +2615,8 @@ function crSearchDownloadExcel() {
     '보증금': c['보증금'] || ''
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
-  // [v359] 주소 컬럼(5번째) 추가 — wch:34 (긴 주소 대응)
-  ws['!cols'] = [{wch:10},{wch:14},{wch:18},{wch:10},{wch:34},{wch:14},{wch:20},{wch:12},{wch:12},{wch:10},{wch:8},{wch:14},{wch:12},{wch:14},{wch:11},{wch:11},{wch:13}];
+  // [v360] 주소 컬럼(3번째) 위치 이동 — 계약번호/임차인명 다음
+  ws['!cols'] = [{wch:10},{wch:14},{wch:34},{wch:18},{wch:10},{wch:14},{wch:20},{wch:12},{wch:12},{wch:10},{wch:8},{wch:14},{wch:12},{wch:14},{wch:11},{wch:11},{wch:13}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '계약검색결과');
   const today = (function(){ var d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
@@ -4757,6 +4760,14 @@ function renderContractRecord(c, payments, responses = []) {
             <span style="font-size:13px;font-weight:700;color:#DC2626">일 연체</span>
             ${window._cr_penalty>0?`<span style="font-size:11px;font-weight:600;color:#9CA3AF;margin-left:3px">(위약금 별도)</span>`:''}
           </div>`:''}
+          ${(function(){
+            // [v361] BS열 연체외주 표시 — gid=1953907648
+            try {
+              var os = (__vacRow && __vacRow.outsource) ? String(__vacRow.outsource).trim() : '';
+              if (!os || os === '-') return '';
+              return '<div style="display:inline-flex;align-items:center;gap:5px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700" title="gid=1953907648 BS열 — 연체외주">🏷️ 연체외주 · ' + os + '</div>';
+            } catch(_) { return ''; }
+          })()}
         </div>
         <div class="cr-delinq-breakdown">
           <div class="cr-delinq-row"><span class="cr-delinq-row-label">임대료 연체</span><span class="cr-delinq-row-val ${delinqRent>0?'red':''}">${fmtMoney(delinqRent)}</span></div>
@@ -6454,7 +6465,7 @@ function dlqRenderTableRows() {
     <table class="dlq-tbl">
       <thead><tr>
         <th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>
-        <th>계약번호</th><th>그룹</th><th>계약정보</th>
+        <th>계약번호</th><th title="gid=1953907648 BS열 — 연체외주">연체외주</th><th>그룹</th><th>계약정보</th>
         <th>연체일수</th><th>납부구분</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th>
         <th>연락처</th><th>연체금액</th><th title="시작일 25.6.1 이후 계약자: 임대료 × 4개월 (gid=1953907648 W열 ≥ 2025-06-01, AK열 × 4)">위약금</th><th>대응일</th><th>입금예정일</th><th>최근 대응 내용</th>
       </tr></thead>
@@ -6496,6 +6507,14 @@ function dlqRenderTableRows() {
               <input type="checkbox" class="dlq-cb dlq-row-cb" value="${r.cno}" onchange="dlqToggleSelect('${r.cno}',this.checked)">
             </td>
             <td><span class="dlq-tbl-cno">${r.cno}</span></td>
+            <td style="font-size:11px;text-align:center;color:#475569">${(function(){
+              try {
+                if (!Array.isArray(vacancyRawData)) return '-';
+                var vr = vacancyRawData.find(v => String(v.no||'').trim() === String(r.cno||'').trim());
+                var os = (vr && vr.outsource) ? String(vr.outsource).trim() : '';
+                return os || '-';
+              } catch(_) { return '-'; }
+            })()}</td>
             <td><span class="dlq-tbl-group">${r.group||'-'}</span></td>
             <td><span class="dlq-tbl-info">${r.info||'-'}</span></td>
             <td><span class="dlq-days-badge dlq-days-${dc}">${r.days||0}일</span></td>
@@ -7839,10 +7858,12 @@ function cG_buildManualForm(){
             '<input type="date" id="cG_m_startDate" oninput="cG_recalcPayDay()" class="cG-fld">'),
           cell('임대차 종료일 ' + H.req, inp('endDate', '', 'date'))
         )
-      // 3행: 주소 + 현관 비밀번호 (v352)
-      + row('c2',
+      // 3행: 주소 + 현관 비밀번호 (v352) + 퇴실청소비 (v362)
+      + row('c3',
           cell('주소 + 호실 ' + H.req, inp('address', '예: 동두천시 지행동 676 제402호')),
-          cell('현관 비밀번호 ' + H.auto, inp('doorPwd', '주소 입력 시 자동 조회 (수동 입력도 가능)'))
+          cell('현관 비밀번호 ' + H.auto, inp('doorPwd', '주소 입력 시 자동 조회')),
+          cell('퇴실청소비 ' + H.auto + ' <span style="font-size:10px;font-weight:600;color:#6B7280;margin-left:4px">AM열</span>',
+            inp('cleaningFee', '예: 12만원 / 120,000원'))
         )
       )
     // ② 임대료
@@ -8448,8 +8469,8 @@ function cG_parsePdfText(text){
   // [DOCX 보강] Word/DOCX는 한 줄에 여러 라벨이 붙어 추출됨 → 라벨 앞에 강제 줄바꿈
   // (a) 알려진 필드 라벨 (X 텍스트... 라벨: 값 ... 다음라벨: 값 형식 분리)
   //     주의: '호실'은 '주소 + 호실' 같은 복합 라벨에서 깨지지 않도록 제외
-  // [v353] 현관/비밀번호/비번 라벨 추가 — 현관 비밀번호 추출 강화
-  var FIELD_LABELS = '이름|주소|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|긴급연락처|비상연락(?:망|처)|관계|월세|보증금|관리비|(?:건물\\s*공동)?\\s*현관(?:\\s*비밀\\s*번호|\\s*비번)?|비밀\\s*번호|비번';
+  // [v353/v362] 현관/비밀번호/비번/퇴실청소비 라벨 추가
+  var FIELD_LABELS = '이름|주소|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|긴급연락처|비상연락(?:망|처)|관계|월세|보증금|관리비|(?:건물\\s*공동)?\\s*현관(?:\\s*비밀\\s*번호|\\s*비번)?|비밀\\s*번호|비번|퇴실\\s*청소비|청소비|청소';
   var fieldBreakRe = new RegExp('([^\\n])\\s+(' + FIELD_LABELS + ')\\s*(?:\\([^)]*\\))?\\s*(?=[:：])', 'g');
   text = text.replace(fieldBreakRe, '$1\n$2');
   // (b) 섹션 헤더 (10. 임(전)차인 정보 / 9. 계좌 정보 등 — 숫자.섹션 앞에 줄바꿈)
@@ -8497,8 +8518,8 @@ function cG_parsePdfText(text){
   };
   // [v186/v195] 라벨 + 콜론 뒤 값 추출 — "예금주(임대인명) : 이경훈" 같은 괄호 주석 무시
   // 빈 필드의 경우 다음 라벨까지 캡처되는 버그 방지
-  // [v353] 현관/비밀번호/비번 추가 — 캡처 침범 방지
-  var LABEL_KEYWORDS = /^(?:이름|주소|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|긴급연락처|비상연락망|비상연락처|관계|월세|보증금|관리비|호실|호실정보|건물|건물공동현관비번|현관|현관비밀번호|현관비번|공동현관|공동현관비번|비밀번호|비번)\s*(?:\([^)]*\))?\s*[:：]/;
+  // [v353/v362] 현관/비밀번호/비번/퇴실청소비 추가 — 캡처 침범 방지
+  var LABEL_KEYWORDS = /^(?:이름|주소|연락처|주민(?:등록)?번호|국적|은행명|계좌번호|예금주|긴급연락처|비상연락망|비상연락처|관계|월세|보증금|관리비|호실|호실정보|건물|건물공동현관비번|현관|현관비밀번호|현관비번|공동현관|공동현관비번|비밀번호|비번|퇴실청소비|청소비|청소)\s*(?:\([^)]*\))?\s*[:：]/;
   var pickField = function(secText, label){
     if (!secText) return '';
     var re = new RegExp(label + '\\s*(?:\\([^)]*\\))?\\s*[:：]\\s*([^\\n]+)');
@@ -8587,6 +8608,32 @@ function cG_parsePdfText(text){
   // [v188] 계약유형 자동 추출 — '상업용' 키워드 우선, 없으면 '주거용'(디폴트)
   if (/상업\s*용/.test(text)) data.useType = '상업용';
   else if (/주거\s*용/.test(text)) data.useType = '주거용';
+
+  // [v362] 퇴실청소비 추출 — "퇴실청소비" → "청소비" → "청소" 순서로 매칭
+  // 값 예시: "12만원", "120,000원", "120,000", "120000원 (변경 시 필히 알려주세요)" 등
+  (function(){
+    var cv = '';
+    // 1순위: "퇴실청소비"
+    var m1 = text.match(/(?:^|\n)[^\n:：]*퇴실\s*청소비[^\n:：]*[:：]\s*([^\n]+)/);
+    if (m1) cv = m1[1].trim();
+    // 2순위: "청소비"
+    if (!cv) {
+      var m2 = text.match(/(?:^|\n)[^\n:：]*청소비[^\n:：]*[:：]\s*([^\n]+)/);
+      if (m2) cv = m2[1].trim();
+    }
+    // 3순위: "청소" (단독 라벨 — "청소"가 들어간 라벨이 다른 곳에 있을 수 있으니 마지막에)
+    if (!cv) {
+      var m3 = text.match(/(?:^|\n)[^\n:：]*청소[^\n:：]*[:：]\s*([^\n]+)/);
+      if (m3) cv = m3[1].trim();
+    }
+    // 괄호 안 부가설명 제거 — "12만원 (변경 시 필히 알려주셔야 됩니다.)" → "12만원"
+    if (cv) cv = cv.replace(/\s*\([^)]*\)\s*/g, '').trim();
+    // 라벨 침범 방지
+    if (cv && LABEL_KEYWORDS.test(cv)) cv = '';
+    // 너무 긴 텍스트 폐기 (40자 초과)
+    if (cv && cv.length > 40) cv = '';
+    if (cv) data.cleaningFee = cv;
+  })();
 
   // [v353] 현관 비밀번호 추출 — "현관"이 들어간 라벨 우선, "비밀번호"/"비번" 폴백
   // 매칭 라벨 예: "건물 공동현관 비번", "현관비밀번호", "공동현관 비번", "비밀번호", "비번"
@@ -8789,6 +8836,7 @@ function cG_applyParsedData(data){
   setVal('tenantPhone', data.tenantPhone);
   setVal('tenantAddr', data.tenantAddr);
   setVal('doorPwd', data.doorPwd); // [v353] 현관 비밀번호 자동 채움 (PDF/DOCX에서 추출)
+  setVal('cleaningFee', data.cleaningFee); // [v362] 퇴실청소비 자동 채움
   cG_setMaskedRrn('cG_m_tenantIdNo', data.tenantIdNo);
   setVal('nationality', data.nationality);
   setVal('coName', data.coName);
@@ -9061,6 +9109,7 @@ function cG_collectManualData(){
                       return found ? String(found.doorPwd).trim() : '';
                     } catch(_) { return ''; }
                   })(),
+    cleaningFee:  v('cleaningFee'),  // [v362] 퇴실청소비 (AM열) — 폼 입력 우선, PDF 추출 자동 채움
     // [긴급연락처] 수동 입력 폼의 emgPhone/emgRel/emgName → 계약서 템플릿 변수로 매핑
     emergPhone:   v('emgPhone'),
     emergInfo:    (function(){ var r = v('emgRel'), n = v('emgName'); if (!r && !n) return ''; return r + ',' + n; })(),
@@ -9173,7 +9222,8 @@ function cG_buildContractInfoText(d){
   var L = [];
   L.push('[계약필수정보] / 뉴개런티즈');
   L.push('0. 구분 : ' + category);
-  L.push('0. 퇴실청소비 : (변경 시 알려주세요)');
+  // [v362] 퇴실청소비 출력 — 값 있으면 값, 없으면 안내 텍스트
+  L.push('0. 퇴실청소비 : ' + (trim(d.cleaningFee) || '(변경 시 알려주세요)'));
   L.push('1. 계약 체결일(날일 예정일) : ' + trim(d.contractDate));
   L.push('');
   L.push('2. 건물 공동현관 비번 : ' + trim(d.doorPwd || '')); // [v352] 현관 비밀번호 출력
@@ -9240,6 +9290,7 @@ function cG_buildAutoFields(d){
     tenantIdNo:    trim(d.tenantIdNo),
     tenantAddr:    trim(d.tenantAddr),
     doorPwd:       (trim(d.doorPwd) || null), // [v352] 폼/자동매칭 결과. 빈값이면 null → Apps Script가 SKIP (기존 시트 값 보호)
+    cleaningFee:   (trim(d.cleaningFee) || null), // [v362] 퇴실청소비 (AM열). 빈값이면 null → Apps Script SKIP
     emgPhone:      trim(d.emergPhone),
     emgRelName:    emgRelName,
     coName:        trim(d.coName),
