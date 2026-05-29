@@ -14443,6 +14443,121 @@ function cmgMonthsBetween(start, end){
 }
 
 // [v82/v87] PDF 출력 — 부동산(파트너) 단위, 계약담당자별 그룹화
+// [v377] 부동산별 엑셀 다운로드 — PDF와 동일 데이터 + 종료 행 표시
+//   mode: 'all' (부동산 전체) / 'selected' (체크박스 선택만)
+function cmgExportExcelFor(partnerName, mode){
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 시도해주세요.'); return; }
+  var stats = cmgBuildPartnerStats();
+  var partner = stats.find(function(p){ return p.partnerName === partnerName; });
+  if (!partner) { alert('파트너 데이터를 찾을 수 없습니다.'); return; }
+  var info = cmgFindPartner(partnerName);
+  var rows;
+  if (mode === 'all') {
+    rows = partner.contracts.slice();
+  } else {
+    var checkboxes = document.querySelectorAll('.cmg-pdf-cb[data-pn="' + partnerName + '"]:checked');
+    if (checkboxes.length === 0) {
+      alert('선택된 계약이 없습니다. 체크박스 선택 후 [선택 항목 엑셀] 또는 [부동산 전체 엑셀] 사용해주세요.');
+      return;
+    }
+    var selectedCnos = Array.from(checkboxes).map(function(cb){ return cb.value; });
+    rows = partner.contracts.filter(function(ct){ return selectedCnos.indexOf(ct.cno) >= 0; });
+  }
+  // 계약담당자별 그룹화 + 종료 표시 + 행 변환
+  var byPerson = {};
+  rows.forEach(function(ct){
+    var key = (ct.person || '(담당자 미지정)');
+    if (!byPerson[key]) byPerson[key] = { person: key, contracts: [] };
+    byPerson[key].contracts.push(ct);
+  });
+  var personGroups = Object.values(byPerson).sort(function(a, b){
+    return b.contracts.length - a.contracts.length || a.person.localeCompare(b.person);
+  });
+  // 엑셀 데이터 — 담당자별 그룹 + 그 안 정렬(시작일 내림차순)
+  var data = [];
+  var rowIdx = 0;
+  var grandRent=0, grandSupply=0, grandVat=0, grandBrk=0, grandTermCnt=0, grandTermBrk=0;
+  personGroups.forEach(function(g){
+    g.contracts.sort(function(a,b){ return (b.startDate||0) - (a.startDate||0); });
+    var gRent=0, gSupply=0, gVat=0, gBrk=0;
+    g.contracts.forEach(function(ct){
+      rowIdx++;
+      var supply = Math.round(ct.brokerage || 0);
+      var vat = Math.round((ct.brokerage || 0) * 0.1);
+      var total = supply + vat;
+      var endDate = ct.endDate ? cmgParseStartDate(ct.endDate) : null;
+      var months = cmgMonthsBetween(ct.startDate, endDate);
+      var isTerm = String(ct.contractKind||'').indexOf('종료') >= 0;
+      var kind = (ct.contractKind || '') + (ct.contractKind && ct.housingType ? '/' : '') + (ct.housingType || '');
+      data.push({
+        'No': rowIdx,
+        '계약담당자': g.person,
+        '계약번호': ct.cno || '',
+        '계약자': ct.tenant || '',
+        '계약종류': kind || '',
+        '종료여부': isTerm ? '⊗ 종료' : '',
+        '입주일': ct.startDate ? cmgFmtDate(ct.startDate) : '',
+        '계약기간(월)': months > 0 ? months : '',
+        '월세': ct.rent || 0,
+        '공급가액': supply,
+        '부가세': vat,
+        '중개보수료(VAT포함)': total,
+        '주소': ct.address || ''
+      });
+      gRent += (ct.rent||0); gSupply += supply; gVat += vat; gBrk += total;
+      if (isTerm) { grandTermCnt++; grandTermBrk += total; }
+    });
+    // 담당자 소계 행
+    data.push({
+      'No': '',
+      '계약담당자': '└ ' + g.person + ' 소계',
+      '계약번호': '',
+      '계약자': '(' + g.contracts.length + '건)',
+      '계약종류': '',
+      '종료여부': '',
+      '입주일': '',
+      '계약기간(월)': '',
+      '월세': gRent,
+      '공급가액': gSupply,
+      '부가세': gVat,
+      '중개보수료(VAT포함)': gBrk,
+      '주소': ''
+    });
+    grandRent += gRent; grandSupply += gSupply; grandVat += gVat; grandBrk += gBrk;
+  });
+  // 부동산 합계 행
+  data.push({
+    'No': '',
+    '계약담당자': '🏢 ' + partnerName + ' 부동산 합계',
+    '계약번호': '',
+    '계약자': '(' + rows.length + '건)',
+    '계약종류': '',
+    '종료여부': grandTermCnt > 0 ? '⊗ 종료 ' + grandTermCnt + '건 (₩' + grandTermBrk.toLocaleString() + ' 포함)' : '',
+    '입주일': '',
+    '계약기간(월)': '',
+    '월세': grandRent,
+    '공급가액': grandSupply,
+    '부가세': grandVat,
+    '중개보수료(VAT포함)': grandBrk,
+    '주소': ''
+  });
+
+  var ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [
+    {wch:5},{wch:18},{wch:11},{wch:18},{wch:14},{wch:12},
+    {wch:11},{wch:9},{wch:11},{wch:12},{wch:11},{wch:14},{wch:42}
+  ];
+  // [v377] 종료 행 — 빨강 텍스트 + 취소선 (엑셀 셀 스타일 — xlsx-js-style 또는 SheetJS pro 필요. 무료 SheetJS는 스타일 제한적)
+  //   → 무료 SheetJS는 셀 스타일 미지원이라 "종료여부" 컬럼 텍스트로 시각 구분만 적용 (⊗ 종료 표시)
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, partnerName.slice(0, 31)); // 시트명 31자 제한
+  var today = new Date();
+  var todayStr = today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
+  var modeLabel = (mode === 'all') ? '전체' : '선택';
+  var fname = '중개보수료_' + partnerName + '_' + modeLabel + '_' + todayStr + '.xlsx';
+  XLSX.writeFile(wb, fname);
+}
+
 function cmgExportPdfFor(partnerName, mode){
   var stats = cmgBuildPartnerStats();
   var partner = stats.find(function(p){ return p.partnerName === partnerName; });
@@ -14696,7 +14811,9 @@ function cmgRenderPartnerStats(){
               +   '<button onclick="event.stopPropagation();var cbs=document.querySelectorAll(\'.cmg-pdf-cb[data-pn=&quot;' + p.partnerName.replace(/"/g,'&quot;').replace(/\\/g,'\\\\') + '&quot;]\');var checked=Array.from(cbs).every(function(c){return c.checked;});cbs.forEach(function(c){c.checked=!checked;});" class="cmg-v171-btn outline">전체 선택/해제</button>'
               +   '<button onclick="event.stopPropagation();cmgExportPdfFor(\'' + pnEsc2 + '\',\'selected\')" class="cmg-v171-btn primary">📄 선택 항목 PDF</button>'
               +   '<button onclick="event.stopPropagation();cmgExportPdfFor(\'' + pnEsc2 + '\',\'all\')" class="cmg-v171-btn outline-blue">📑 부동산 전체 PDF</button>'
-              +   '<span class="cmg-v171-actions-info">계약담당자별 그룹화하여 PDF 생성</span>'
+              +   '<button onclick="event.stopPropagation();cmgExportExcelFor(\'' + pnEsc2 + '\',\'selected\')" class="cmg-v171-btn" style="background:#16A34A;color:#fff;border-color:#16A34A">⬇️ 선택 항목 엑셀</button>'
+              +   '<button onclick="event.stopPropagation();cmgExportExcelFor(\'' + pnEsc2 + '\',\'all\')" class="cmg-v171-btn" style="background:#15803D;color:#fff;border-color:#15803D">⬇️ 부동산 전체 엑셀</button>'
+              +   '<span class="cmg-v171-actions-info">계약담당자별 그룹화하여 PDF/엑셀 생성</span>'
               + '</div>'
               + '<table class="cmg-expand-tbl"><thead><tr>'
               + '<th style="text-align:center;width:30px"><input type="checkbox" onclick="event.stopPropagation();var cbs=document.querySelectorAll(\'.cmg-pdf-cb[data-pn=&quot;' + p.partnerName.replace(/"/g,'&quot;').replace(/\\/g,'\\\\') + '&quot;]\');cbs.forEach(function(c){c.checked=event.target.checked;});"></th>'
