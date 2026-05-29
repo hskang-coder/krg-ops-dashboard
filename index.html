@@ -14263,15 +14263,19 @@ function parsePartnerSheet(resp) {
 // 거래금액 = 월세 × 100 (보증금 미포함)
 // 한도 미적용. 6억 이상은 표준 0.6% 적용.
 // 반환값은 "공급가액(VAT 미포함)" — 부가세는 ×0.1, VAT포함은 ×1.1로 별도 계산.
+// [v379] 개런티즈 계약은 모두 주거용으로 책정 — 시트 수식과 일치
+//   J16*100 = tradeAmt (월세 × 100)
+//   IF(<5천만, J16*70*0.005, IF(<1억, J16*100*0.004, IF(<3억, J16*100*0.003, IF(<6억, J16*100*0.004, J16*100*0.005))))
+//   → 6억 이상 구간 0.006 → 0.005로 정정 (월세 600만원 이상 계약 영향)
 function calcBrokerage(deposit, monthlyRent, housingType){
   const mr = parseFloat(String(monthlyRent||0).replace(/[^0-9.-]/g,'')) || 0;
   const tradeAmt = mr * 100;
   let result;
-  if (tradeAmt < 5e7)       result = mr * 70 * 0.005;     // 5천만 미만: 월세×70×0.5%
-  else if (tradeAmt < 1e8)  result = tradeAmt * 0.004;     // 1억 미만: 0.4%
-  else if (tradeAmt < 3e8)  result = tradeAmt * 0.003;     // 3억 미만: 0.3%
-  else if (tradeAmt < 6e8)  result = tradeAmt * 0.004;     // 6억 미만: 0.4%
-  else                      result = tradeAmt * 0.006;     // 6억 이상: 0.6%
+  if (tradeAmt < 5e7)       result = mr * 70 * 0.005;     // 5천만 미만 (월세 50만↓): 월세×70×0.5%
+  else if (tradeAmt < 1e8)  result = tradeAmt * 0.004;     // 1억 미만 (월세 50~100만): 0.4%
+  else if (tradeAmt < 3e8)  result = tradeAmt * 0.003;     // 3억 미만 (월세 100~300만): 0.3%
+  else if (tradeAmt < 6e8)  result = tradeAmt * 0.004;     // 6억 미만 (월세 300~600만): 0.4%
+  else                      result = tradeAmt * 0.005;     // [v379] 6억 이상 (월세 600만↑): 0.5% (이전 0.6% → 수정)
   return Math.round(result);
 }
 
@@ -14674,7 +14678,7 @@ function cmgExportPdfFor(partnerName, mode){
     + '<th style="border:1px solid #9CA3AF;padding:5px;text-align:right">월세</th>'
     + '<th style="border:1px solid #9CA3AF;padding:5px;text-align:right">공급가액</th>'
     + '<th style="border:1px solid #9CA3AF;padding:5px;text-align:right">부가세</th>'
-    + '<th style="border:1px solid #9CA3AF;padding:5px;text-align:right">중개보수료</th>'
+    + '<th style="border:1px solid #9CA3AF;padding:5px;text-align:right">중개보수료 (VAT 포함)</th>'
     + '<th style="border:1px solid #9CA3AF;padding:5px">주소</th>'
     + '</tr></thead><tbody>'
     + bodyRows
@@ -14748,7 +14752,7 @@ function cmgRenderPartnerStats(){
     + '<div class="cmg-stat-box sb-purple"><div class="sb-label">활성 파트너</div><div class="sb-val">' + stats.length + '<span style="font-size:13px;font-weight:600;color:#7C3AED">개</span></div></div>'
     + '<div class="cmg-stat-box sb-blue"><div class="sb-label">총 계약 건수</div><div class="sb-val">' + totalCnt + '<span style="font-size:13px;font-weight:600;color:#2563EB">건</span></div></div>'
     + '<div class="cmg-stat-box sb-amber"><div class="sb-label">총 거래액</div><div class="sb-val">' + cmgFmtMoneyKor(totalTrade) + '</div></div>'
-    + '<div class="cmg-stat-box sb-green"><div class="sb-label">중개보수 합계</div><div class="sb-val">' + cmgFmtMoney(totalBrk) + '</div></div>'
+    + '<div class="cmg-stat-box sb-green"><div class="sb-label">중개보수 합계 <span style="font-size:10px;color:#059669;font-weight:600">(부가세 포함)</span></div><div class="sb-val">' + cmgFmtMoney(Math.round(totalBrk * 1.1)) + '</div></div>'
     + '</div>';
   var tableHtml;
   if (stats.length === 0) {
@@ -14757,7 +14761,7 @@ function cmgRenderPartnerStats(){
     tableHtml = '<div style="overflow-x:auto"><table class="cmg-tbl">'
       + '<thead><tr>'
       + '<th>No</th><th>파트너</th><th>상호 / 등록번호</th><th class="cmg-num">건수</th>'
-      + '<th class="cmg-num">총 거래액</th><th class="cmg-num">중개보수</th>'
+      + '<th class="cmg-num">총 거래액</th><th class="cmg-num">중개보수 <span style="font-size:9px;color:#059669;font-weight:600">(VAT 포함)</span></th>'
       + '<th>품질</th>'
       + '<th>담당</th><th>연락처</th>'
       + '</tr></thead><tbody>'
@@ -14784,17 +14788,8 @@ function cmgRenderPartnerStats(){
             var summaryHeader = '<div class="cmg-v171-header">'
               + '<div class="cmg-v171-info">'
               +   '<div class="cmg-v171-pname">' + p.partnerName + ' <span class="cmg-rank-badge cmg-rank-' + rankBadge + '">' + rankBadge + '</span></div>'
-              +   '<div class="cmg-v171-sub">'
-              +     (info ? [
-                      info.fullName,
-                      info.bizNo ? '등록번호: ' + info.bizNo : '',
-                      (info.person ? info.person + ' 대표' : ''),
-                      (info.mobile || info.tel || ''),
-                      info.addr ? '· ' + info.addr : '',
-                      info.bank ? '· 정산: ' + info.bank + ' ' + (info.account||'') + ' (' + (info.acctHolder||'') + ')' : ''
-                    ].filter(Boolean).join(' · ') : '')
+              +   // [v378] 부동산 부수 정보(공인중개사사무소·등록번호·주소·정산계좌) — 상단 목록 표에 이미 표시되어 중복 → 삭제
               +   '</div>'
-              + '</div>'
               + '<div class="cmg-v171-stats">'
               +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">계약</div>'
               +     '<div class="cmg-v171-stat-val">' + p.contracts.length + '<span class="unit">건</span></div>'
@@ -14804,9 +14799,9 @@ function cmgRenderPartnerStats(){
               +     '<div class="cmg-v171-stat-val">' + cmgFmtMoneyKor(p.totalTrade) + '</div>'
               +     (_termTrade>0 ? '<div class="cmg-term-sub strike" title="종료 ' + _termCnt + '건 거래액 (합계에 포함됨)">⊗ ' + cmgFmtMoney(_termTrade) + '</div>' : '')
               +   '</div>'
-              +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">중개보수</div>'
-              +     '<div class="cmg-v171-stat-val brk">' + cmgFmtMoney(p.totalBrokerage) + '</div>'
-              +     (_termBrk>0 ? '<div class="cmg-term-sub strike" title="종료 ' + _termCnt + '건 중개보수 (합계에 포함됨)">⊗ ' + cmgFmtMoney(_termBrk) + '</div>' : '')
+              +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">중개보수 <span style="font-size:9px;color:#059669;font-weight:600">(VAT 포함)</span></div>'
+              +     '<div class="cmg-v171-stat-val brk">' + cmgFmtMoney(Math.round(p.totalBrokerage * 1.1)) + '</div>'
+              +     (_termBrk>0 ? '<div class="cmg-term-sub strike" title="종료 ' + _termCnt + '건 중개보수 — VAT 포함 (합계에 포함됨)">⊗ ' + cmgFmtMoney(Math.round(_termBrk * 1.1)) + '</div>' : '')
               +   '</div>'
               + '</div>'
               + (sparkSvg ? '<div class="cmg-v171-spark">' + sparkSvg + '</div>' : '')
@@ -14897,7 +14892,7 @@ function cmgRenderPartnerStats(){
               + '</td>'
             + '<td class="cmg-num"><b>' + p.contracts.length + '</b>건</td>'
             + '<td class="cmg-num">' + cmgFmtMoneyKor(p.totalTrade) + '</td>'
-            + '<td class="cmg-num cmg-money">' + cmgFmtMoney(p.totalBrokerage) + '</td>'
+            + '<td class="cmg-num cmg-money">' + cmgFmtMoney(Math.round(p.totalBrokerage * 1.1)) + '</td>'
             + '<td>' + cmgRenderQuality(cmgGetPartnerQuality(p.partnerName)) + '</td>' // [v79]
             + '<td>' + (per||'—') + '</td>'
             + '<td style="font-size:11px;color:#6B7280">' + (tel||'—') + '</td>'
@@ -15053,7 +15048,7 @@ function cmgRenderPersonStats(){
     tableHtml = '<div style="overflow-x:auto"><table class="cmg-tbl">'
       + '<thead><tr>'
       + '<th>No</th><th>담당자</th><th>소속 파트너</th><th class="cmg-num">건수</th>'
-      + '<th class="cmg-num">총 거래액</th><th class="cmg-num">중개보수</th>'
+      + '<th class="cmg-num">총 거래액</th><th class="cmg-num">중개보수 <span style="font-size:9px;color:#059669;font-weight:600">(VAT 포함)</span></th>'
       + '<th class="cmg-num">건당 평균</th>'
       + '</tr></thead><tbody>'
       + stats.map(function(p, i){
@@ -15064,7 +15059,7 @@ function cmgRenderPersonStats(){
             + '<td style="color:#475569">' + (p.partnerName || '—') + '</td>'
             + '<td class="cmg-num"><b>' + p.count + '</b>건</td>'
             + '<td class="cmg-num">' + cmgFmtMoneyKor(p.totalTrade) + '</td>'
-            + '<td class="cmg-num cmg-money">' + cmgFmtMoney(p.totalBrokerage) + '</td>'
+            + '<td class="cmg-num cmg-money">' + cmgFmtMoney(Math.round(p.totalBrokerage * 1.1)) + '</td>'
             + '<td class="cmg-num">' + cmgFmtMoney(avgBrk) + '</td>'
             + '</tr>';
         }).join('')
