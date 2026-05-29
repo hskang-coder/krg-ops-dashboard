@@ -2735,6 +2735,12 @@ async function loadPaymentTargets() {
     // gid=554798125 로드 (최신 대응일/내용)
     const drResp = await fetchSheetByGid(DAILY_RPT_GID);
     window._ptDailyMap = parseDailyForPt(drResp);
+    // [v369] 같은 응답으로 daeungRawData도 채우기 (점수/법적진행 컬럼에서 사용 — v366/v367)
+    //         이미 채워져 있어도 최신 fetch 결과로 갱신 (jobSub 필드 보장)
+    try {
+      daeungRawData = parseDailyReport(drResp);
+      console.log('[v369] daeungRawData 갱신 완료:', daeungRawData.length, '건 / jobSub:', daeungRawData.filter(d => d.jobSub).length);
+    } catch(e) { console.warn('[v369] parseDailyReport 실패:', e); }
     ptLoaded = true;
     renderPaymentTargets();
   } catch(e) {
