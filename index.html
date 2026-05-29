@@ -13872,6 +13872,14 @@ function rnwRenderCohortChart(cohorts){
 .cmg-v171-sub { font-size:11px; color:#6B7280; margin-top:3px; line-height:1.5; }
 .cmg-v171-stats { display:flex; gap:20px; align-items:flex-start; flex-wrap:nowrap; }
 .cmg-v171-stat { text-align:right; min-width:110px; }
+/* [v376-fix2] 종료 sub 표시 — 통일된 작은 빨강 텍스트 + 옵션 취소선 */
+.cmg-term-sub { font-size:11px; color:#DC2626; font-weight:700; margin-top:4px; line-height:1.2; }
+.cmg-term-sub.strike { text-decoration:line-through; text-decoration-color:#DC2626; text-decoration-thickness:1.2px; }
+/* [v376-fix2] 안내 박스 — 헤더 외부 별도 행, 가로 폭 100% */
+.cmg-term-notice { margin:0 18px 10px; padding:8px 14px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:6px; font-size:11.5px; color:#991B1B; line-height:1.5; }
+.cmg-term-notice .cmg-term-mark { text-decoration:line-through; color:#DC2626; font-weight:700; padding:0 4px; }
+/* [v376-fix2] 헤더 정렬 — sparkline과 stats가 위에서부터 정렬되도록 */
+.cmg-v171-header { align-items:flex-start !important; }
 .cmg-v171-stat-label { font-size:10px; color:#6B7280; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
 .cmg-v171-stat-val { font-size:15px; font-weight:800; color:#1F2937; margin-top:1px; }
 .cmg-v171-stat-val.brk { color:#059669; }
@@ -14790,23 +14798,27 @@ function cmgRenderPartnerStats(){
               + '<div class="cmg-v171-stats">'
               +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">계약</div>'
               +     '<div class="cmg-v171-stat-val">' + p.contracts.length + '<span class="unit">건</span></div>'
-              +     (_termCnt>0 ? '<div style="font-size:11px;color:#DC2626;font-weight:700;margin-top:3px">⊗ 종료 ' + _termCnt + '건</div>' : '')
+              +     (_termCnt>0 ? '<div class="cmg-term-sub">⊗ 종료 ' + _termCnt + '건</div>' : '')
               +   '</div>'
               +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">총 거래액</div>'
               +     '<div class="cmg-v171-stat-val">' + cmgFmtMoneyKor(p.totalTrade) + '</div>'
-              +     (_termTrade>0 ? '<div style="font-size:11px;color:#DC2626;font-weight:700;margin-top:3px;text-decoration:line-through;text-decoration-color:#DC2626" title="종료 ' + _termCnt + '건 거래액 (합계에 포함됨)">⊗ ' + cmgFmtMoney(_termTrade) + '</div>' : '')
+              +     (_termTrade>0 ? '<div class="cmg-term-sub strike" title="종료 ' + _termCnt + '건 거래액 (합계에 포함됨)">⊗ ' + cmgFmtMoney(_termTrade) + '</div>' : '')
               +   '</div>'
               +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">중개보수</div>'
               +     '<div class="cmg-v171-stat-val brk">' + cmgFmtMoney(p.totalBrokerage) + '</div>'
-              +     (_termBrk>0 ? '<div style="font-size:11px;color:#DC2626;font-weight:700;margin-top:3px;text-decoration:line-through;text-decoration-color:#DC2626" title="종료 ' + _termCnt + '건 중개보수 (합계에 포함됨)">⊗ ' + cmgFmtMoney(_termBrk) + '</div>' : '')
+              +     (_termBrk>0 ? '<div class="cmg-term-sub strike" title="종료 ' + _termCnt + '건 중개보수 (합계에 포함됨)">⊗ ' + cmgFmtMoney(_termBrk) + '</div>' : '')
               +   '</div>'
               + '</div>'
-              + (_termCnt>0 ? '<div style="margin:8px 0 0;padding:7px 12px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:6px;font-size:11.5px;color:#991B1B;line-height:1.5">⚠ <b>종료 ' + _termCnt + '건</b> (거래액 <b>' + cmgFmtMoney(_termTrade) + '</b> / 중개보수 <b>' + cmgFmtMoney(_termBrk) + '</b>) — 합계에 포함되어 있으며, 해당 행은 <span style="text-decoration:line-through;color:#DC2626;font-weight:700;background:#FEF2F2;padding:0 4px">붉은 취소선</span>으로 표시됩니다.</div>' : '')
               + (sparkSvg ? '<div class="cmg-v171-spark">' + sparkSvg + '</div>' : '')
               + '</div>';
+            // [v376-fix2] 안내 박스 — 헤더 밖 별도 행으로 분리 (가로 폭 충분히 확보, 한 줄 컴팩트)
+            var termNotice = (_termCnt>0)
+              ? '<div class="cmg-term-notice">⚠ <b>종료 ' + _termCnt + '건</b> · 거래액 <b>' + cmgFmtMoney(_termTrade) + '</b> · 중개보수 <b>' + cmgFmtMoney(_termBrk) + '</b> — 합계에 포함되어 있으며, 해당 행은 <span class="cmg-term-mark">붉은 취소선</span>으로 표시됩니다.</div>'
+              : '';
 
             rowsExpand = '<tr class="cmg-expand-row"><td colspan="9"><div class="cmg-expand-inner cmg-v171-inner">'
               + summaryHeader
+              + termNotice
               + '<div class="cmg-v171-actions">'
               +   '<button onclick="event.stopPropagation();var cbs=document.querySelectorAll(\'.cmg-pdf-cb[data-pn=&quot;' + p.partnerName.replace(/"/g,'&quot;').replace(/\\/g,'\\\\') + '&quot;]\');var checked=Array.from(cbs).every(function(c){return c.checked;});cbs.forEach(function(c){c.checked=!checked;});" class="cmg-v171-btn outline">전체 선택/해제</button>'
               +   '<button onclick="event.stopPropagation();cmgExportPdfFor(\'' + pnEsc2 + '\',\'selected\')" class="cmg-v171-btn primary">📄 선택 항목 PDF</button>'
