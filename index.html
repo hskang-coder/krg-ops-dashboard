@@ -13866,7 +13866,11 @@ function rnwRenderCohortChart(cohorts){
 .cmg-expand-inner { padding:12px 18px 14px; }
 /* [v171] expand 패널 가독성 개선 */
 .cmg-v171-inner { padding:0 !important; background:#fff; }
-.cmg-v171-header { display:grid; grid-template-columns:1fr auto auto; gap:18px; align-items:center; padding:14px 18px; background:linear-gradient(135deg,#F9FAFB,#FFFFFF); border-bottom:1px solid #E5E7EB; }
+/* [v378-fix] info(min-width 보장) + stats + sparkline 균형 정렬 */
+.cmg-v171-header { display:flex; flex-wrap:wrap; gap:18px; align-items:flex-start; padding:14px 18px; background:linear-gradient(135deg,#F9FAFB,#FFFFFF); border-bottom:1px solid #E5E7EB; }
+.cmg-v171-info { flex:1 1 220px; min-width:180px; }
+.cmg-v171-stats { margin-left:auto; }
+.cmg-v171-spark { flex-shrink:0; }
 .cmg-v171-info { min-width:0; }
 .cmg-v171-pname { font-size:16px; font-weight:800; color:#1B3976; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .cmg-v171-sub { font-size:11px; color:#6B7280; margin-top:3px; line-height:1.5; }
@@ -14433,10 +14437,14 @@ function cmgBuildPartnerStats(){
       address: addr, // [v81]
       contractStatus: c ? (c['계약상태']||'') : ''
     });
-    byPartner[pn].totalDeposit += dep;
-    byPartner[pn].totalRent    += rent;
-    byPartner[pn].totalTrade   += trade;
-    byPartner[pn].totalBrokerage += brk;
+    // [v381] 종료 행은 합계에서 제외 (시각 취소선만 유지) — contracts 배열에는 추가
+    var _isTermAgg = String(v.contractKind||'').indexOf('종료') >= 0;
+    if (!_isTermAgg) {
+      byPartner[pn].totalDeposit += dep;
+      byPartner[pn].totalRent    += rent;
+      byPartner[pn].totalTrade   += trade;
+      byPartner[pn].totalBrokerage += brk;
+    }
   });
   var arr = Object.keys(byPartner).map(function(k){ return byPartner[k]; });
   arr.sort(function(a,b){ return b.contracts.length - a.contracts.length || b.totalBrokerage - a.totalBrokerage; });
@@ -14516,8 +14524,12 @@ function cmgExportExcelFor(partnerName, mode){
         '중개보수료(VAT포함)': total,
         '주소': ct.address || ''
       });
-      gRent += (ct.rent||0); gSupply += supply; gVat += vat; gBrk += total;
-      if (isTerm) { grandTermCnt++; grandTermBrk += total; }
+      // [v381] 종료 행은 합계에서 제외 (별도 grandTerm으로 추적)
+      if (!isTerm) {
+        gRent += (ct.rent||0); gSupply += supply; gVat += vat; gBrk += total;
+      } else {
+        grandTermCnt++; grandTermBrk += total;
+      }
     });
     // 담당자 소계 행
     data.push({
@@ -14589,6 +14601,7 @@ function cmgExportPdfFor(partnerName, mode){
     rows = partner.contracts.filter(function(ct){ return selectedCnos.indexOf(ct.cno) >= 0; });
   }
   // [v87] 계약담당자별 그룹화
+  // [v381] 종료 행은 합계에서 제외 (contracts 배열에는 포함 — 표시는 함, 합산만 제외)
   var byPerson = {};
   rows.forEach(function(ct){
     var key = (ct.person || '(담당자 미지정)');
@@ -14596,10 +14609,13 @@ function cmgExportPdfFor(partnerName, mode){
     var supply = Math.round(ct.brokerage);
     var vat = Math.round(ct.brokerage * 0.1);
     byPerson[key].contracts.push(ct);
-    byPerson[key].rent   += (ct.rent || 0);
-    byPerson[key].supply += supply;
-    byPerson[key].vat    += vat;
-    byPerson[key].total  += supply + vat;
+    var _isTermPdf = String(ct.contractKind||'').indexOf('종료') >= 0;
+    if (!_isTermPdf) {
+      byPerson[key].rent   += (ct.rent || 0);
+      byPerson[key].supply += supply;
+      byPerson[key].vat    += vat;
+      byPerson[key].total  += supply + vat;
+    }
   });
   // 계약담당자 정렬: 건수 내림차순
   var personGroups = Object.values(byPerson).sort(function(a, b){
@@ -14788,8 +14804,8 @@ function cmgRenderPartnerStats(){
             var summaryHeader = '<div class="cmg-v171-header">'
               + '<div class="cmg-v171-info">'
               +   '<div class="cmg-v171-pname">' + p.partnerName + ' <span class="cmg-rank-badge cmg-rank-' + rankBadge + '">' + rankBadge + '</span></div>'
-              +   // [v378] 부동산 부수 정보(공인중개사사무소·등록번호·주소·정산계좌) — 상단 목록 표에 이미 표시되어 중복 → 삭제
-              +   '</div>'
+              +   '' /* [v378] 부동산 부수 정보 삭제 (상단 목록 표 중복) */
+              + '</div>'
               + '<div class="cmg-v171-stats">'
               +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">계약</div>'
               +     '<div class="cmg-v171-stat-val">' + p.contracts.length + '<span class="unit">건</span></div>'
@@ -14797,18 +14813,18 @@ function cmgRenderPartnerStats(){
               +   '</div>'
               +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">총 거래액</div>'
               +     '<div class="cmg-v171-stat-val">' + cmgFmtMoneyKor(p.totalTrade) + '</div>'
-              +     (_termTrade>0 ? '<div class="cmg-term-sub strike" title="종료 ' + _termCnt + '건 거래액 (합계에 포함됨)">⊗ ' + cmgFmtMoney(_termTrade) + '</div>' : '')
+              +     (_termTrade>0 ? '<div class="cmg-term-sub strike" title="종료 ' + _termCnt + '건 거래액 (합계에서 제외됨)">⊗ ' + cmgFmtMoney(_termTrade) + '</div>' : '')
               +   '</div>'
               +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">중개보수 <span style="font-size:9px;color:#059669;font-weight:600">(VAT 포함)</span></div>'
               +     '<div class="cmg-v171-stat-val brk">' + cmgFmtMoney(Math.round(p.totalBrokerage * 1.1)) + '</div>'
-              +     (_termBrk>0 ? '<div class="cmg-term-sub strike" title="종료 ' + _termCnt + '건 중개보수 — VAT 포함 (합계에 포함됨)">⊗ ' + cmgFmtMoney(Math.round(_termBrk * 1.1)) + '</div>' : '')
+              +     (_termBrk>0 ? '<div class="cmg-term-sub strike" title="종료 ' + _termCnt + '건 중개보수 (VAT 포함) — 합계에서 제외됨">⊗ ' + cmgFmtMoney(Math.round(_termBrk * 1.1)) + '</div>' : '')
               +   '</div>'
               + '</div>'
               + (sparkSvg ? '<div class="cmg-v171-spark">' + sparkSvg + '</div>' : '')
               + '</div>';
-            // [v376-fix2] 안내 박스 — 헤더 밖 별도 행으로 분리 (가로 폭 충분히 확보, 한 줄 컴팩트)
+            // [v376-fix2/v381] 안내 박스 — 헤더 밖 별도 행 (종료 행은 합계 제외 + 시각 취소선)
             var termNotice = (_termCnt>0)
-              ? '<div class="cmg-term-notice">⚠ <b>종료 ' + _termCnt + '건</b> · 거래액 <b>' + cmgFmtMoney(_termTrade) + '</b> · 중개보수 <b>' + cmgFmtMoney(_termBrk) + '</b> — 합계에 포함되어 있으며, 해당 행은 <span class="cmg-term-mark">붉은 취소선</span>으로 표시됩니다.</div>'
+              ? '<div class="cmg-term-notice">⊗ <b>종료 ' + _termCnt + '건</b> · 거래액 <b>' + cmgFmtMoney(_termTrade) + '</b> · 중개보수 (VAT포함) <b>' + cmgFmtMoney(Math.round(_termBrk*1.1)) + '</b> — 위 합계에서 <b>제외됨</b>. 해당 행은 <span class="cmg-term-mark">붉은 취소선</span>으로 표시됩니다.</div>'
               : '';
 
             rowsExpand = '<tr class="cmg-expand-row"><td colspan="9"><div class="cmg-expand-inner cmg-v171-inner">'
