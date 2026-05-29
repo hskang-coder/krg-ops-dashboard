@@ -1843,6 +1843,9 @@ function parseDailyReport(resp) {
   const noIdx      = findColIdx(labels, ['계약번호','계약'],              1);  // B열
   const payDateIdx = findColIdx(labels, ['입금예정','납기일','납부예정'],   3);  // D열
   const jobTypeIdx = findColIdx(labels, ['업무구분','업무 구분','구분'],   4);  // E열 (신규)
+  // [v364] F열 업무하위 (2차 카테고리) — "법적조치 검토" / "내용증명 발송" / "지급명령 진행" / "기타집행" 등
+  //        시트가 구버전이면 fallback 위치(5)에 대응상세가 들어있을 수 있어 jobSub은 -1 fallback (헤더 못 찾으면 빈값)
+  const jobSubIdx  = findColIdx(labels, ['업무하위','업무 하위','하위구분','2차구분','2차 구분'], -1);
   const contentIdx = findColIdx(labels, ['대응 상세','대응상세','대응내용','상세내용','내용'], 5);  // F열 (E→F로 이동)
   const billIdx    = findColIdx(labels, ['청구서명','청구'],            -1);
   const stepIdx    = findColIdx(labels, ['단계','step'],                -1);
@@ -1863,6 +1866,7 @@ function parseDailyReport(resp) {
       no:      no,
       payDate: cell(payDateIdx),
       jobType: cell(jobTypeIdx),  // E열: 업무구분 (연체관리 / 중도퇴실관리 등)
+      jobSub:  cell(jobSubIdx),   // [v364] F열: 업무하위 (법적조치 검토 / 내용증명 발송 / 지급명령 진행 / 기타집행 등)
       bill:    cell(billIdx),
       content: cell(contentIdx),
       step:    cell(stepIdx),
@@ -5692,6 +5696,14 @@ function parseDailyForPayDate(resp, delinqRows) {
   // [v214] E열(업무구분) — 수납관리·연체관리 행만 사용 (중도퇴실관리 등 제외)
   const jobTypeIdx_ = findColIdx(_labels, ['업무구분','업무 구분','구분'], 4);
   const ALLOWED_JOB = new Set(['수납관리', '연체관리']);
+  // [v365] F열(업무하위) — "법적조치 검토" / "내용증명 발송" / "지급명령 진행" 행은 제외
+  //        이 3개 카테고리는 별도 점수/법적진행 컬럼에서 표시되므로 대응일/입금예정일/최근대응내용에서는 미표시
+  const jobSubIdx_ = findColIdx(_labels, ['업무하위','업무 하위','하위구분','2차구분','2차 구분'], 5);
+  const EXCLUDED_SUB = new Set([
+    '법적조치 검토', '법적조치검토',
+    '내용증명 발송', '내용증명발송',
+    '지급명령 진행', '지급명령진행'
+  ]);
 
   // 연체 계약번호 set 구성
   const delinqSet = new Set((delinqRows || []).map(r => String(r.cno).replace(/\.0$/,'').trim()));
@@ -5712,6 +5724,9 @@ function parseDailyForPayDate(resp, delinqRows) {
     // [v214] 업무구분 필터 — 수납관리/연체관리만 통과 (중도퇴실관리 등 제외)
     const jobType = (jobTypeIdx_ >= 0 && c[jobTypeIdx_]) ? String(c[jobTypeIdx_].f ?? c[jobTypeIdx_].v ?? '').trim() : '';
     if (!ALLOWED_JOB.has(jobType)) return;
+    // [v365] 2차 카테고리 필터 — 법적/내용증명/지급명령 행은 별도 컬럼에서 표시되므로 여기서는 제외
+    const jobSub = (jobSubIdx_ >= 0 && c[jobSubIdx_]) ? String(c[jobSubIdx_].f ?? c[jobSubIdx_].v ?? '').trim() : '';
+    if (jobSub && EXCLUDED_SUB.has(jobSub)) return;
 
     // [v278] 대응일 파싱 — 통합 파서 사용 (모든 형식 지원)
     const aCell = dateIdx_ >= 0 ? c[dateIdx_] : null;
@@ -9273,6 +9288,30 @@ function cG_buildContractInfoText(d){
 }
 
 // [v172] 발행 버튼 — 모드별 분기
+// [v363] 청소비 정규화 — "12만원" / "1.5만원" / "120,000원" / "120000" → "120,000"
+// 시트 등록 시 일관된 천단위 콤마 형식 유지 (PDF는 원본 표기 유지)
+function cG_normalizeCleaningFee(input) {
+  if (input == null) return null;
+  var str = String(input).trim();
+  if (!str) return null;
+  // 1) 만원 단위 감지: "12만원", "1.5만원", "150만", "12 만 원"
+  var manMatch = str.match(/(\d+(?:[.,]\d+)?)\s*만\s*원?/);
+  if (manMatch) {
+    var manNum = parseFloat(manMatch[1].replace(/,/g, ''));
+    if (!isNaN(manNum) && manNum > 0) {
+      return Math.round(manNum * 10000).toLocaleString('en-US');
+    }
+  }
+  // 2) 일반 숫자: "120,000원", "120,000", "120000", "120000원"
+  var clean = str.replace(/[원\s,]/g, '');
+  var num = parseFloat(clean);
+  if (!isNaN(num) && num > 0) {
+    return Math.round(num).toLocaleString('en-US');
+  }
+  // 3) 변환 실패 시 원본 그대로 (잘못된 입력 보존)
+  return str;
+}
+
 // [v348/v350] 시트 자동 입력용 fields 빌더 — d 객체에서 추출
 // [v350] 수정: d.emergPhone/d.emergInfo 사용 (v349까지 d.emgPhone/d.emgRel 잘못 참조)
 // [v350] 추가: coEmgPhone, coEmgRelName (공동전차인 긴급연락처) — Apps Script BE/BF로
@@ -9290,7 +9329,7 @@ function cG_buildAutoFields(d){
     tenantIdNo:    trim(d.tenantIdNo),
     tenantAddr:    trim(d.tenantAddr),
     doorPwd:       (trim(d.doorPwd) || null), // [v352] 폼/자동매칭 결과. 빈값이면 null → Apps Script가 SKIP (기존 시트 값 보호)
-    cleaningFee:   (trim(d.cleaningFee) || null), // [v362] 퇴실청소비 (AM열). 빈값이면 null → Apps Script SKIP
+    cleaningFee:   cG_normalizeCleaningFee(d.cleaningFee), // [v362/v363] 퇴실청소비 (AM열). "12만원"→"120,000" 정규화. 빈값이면 null → SKIP
     emgPhone:      trim(d.emergPhone),
     emgRelName:    emgRelName,
     coName:        trim(d.coName),
