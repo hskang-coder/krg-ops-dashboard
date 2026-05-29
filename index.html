@@ -5876,6 +5876,16 @@ async function renderDelinquency() {
   const inner = wrap.querySelector('.dlq-inner');
   if (!inner) return;
 
+  // [v370] 연체관리 탭 진입 시 daeungRawData 자동 로드 (비어있을 때만)
+  //        v366/v367 점수+법적진행 컬럼이 daeungRawData를 사용하므로 필수
+  if (!Array.isArray(daeungRawData) || !daeungRawData.length) {
+    try {
+      const _dResp = await fetchSheetByGid(DAILY_RPT_GID);
+      daeungRawData = parseDailyReport(_dResp);
+      console.log('[v370] daeungRawData 자동 로드:', daeungRawData.length, '/ jobSub:', daeungRawData.filter(d => d.jobSub).length);
+    } catch(e) { console.warn('[v370] daeungRawData fetch 실패:', e); daeungRawData = []; }
+  }
+
   // [v262 → v306] 시트 active filter 영향 차단 캐시 무효화는 유지하되,
   //   _dlqRawCache는 보존 + 메모리에 없으면 sessionStorage에서 복원 (안전 폴백)
   try {
@@ -6572,9 +6582,10 @@ function dlqRenderTableRows() {
                 if (!rows.length) return '<span style="color:#D1D5DB">-</span>';
                 // 가장 최근 행 (_idx 기준 내림차순)
                 rows.sort(function(a,b){ return (b._idx||0) - (a._idx||0); });
-                // content에서 첫 번째 숫자 추출 (정수/소수)
+                // [v371] content에서 "KCB" 키워드 뒤의 숫자 추출 (KCB 신용평가 점수)
+                // "KCB 200 / 직장 ..." → 200 / 다른 숫자(날짜·금액)는 무시
                 for (var i = 0; i < rows.length; i++) {
-                  var m = String(rows[i].content || '').match(/(\d+(?:\.\d+)?)/);
+                  var m = String(rows[i].content || '').match(/KCB\s*(\d+)/i);
                   if (m) return '<span style="color:#DC2626">' + m[1] + '</span>';
                 }
                 return '<span style="color:#D1D5DB">-</span>';
