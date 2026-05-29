@@ -4621,6 +4621,43 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-tl-item"><span class="cr-tl-item-label">현재 프로세스</span><span class="cr-tl-item-val ${curStep>0?'warn':''}">${curStepLabel}</span></div>
         <div class="cr-tl-item"><span class="cr-tl-item-label">첫 연체</span><span class="cr-tl-item-val">${fmt(c['첫 연체'])}</span></div>
         <div class="cr-tl-item"><span class="cr-tl-item-label">계약상태</span><span class="cr-tl-item-val">${fmt(c['계약상태'])}</span></div>
+        <div class="cr-tl-item"><span class="cr-tl-item-label" title="gid=554798125 KCB 뒤 숫자">점수</span><span class="cr-tl-item-val">${(function(){
+          // [v372] 점수 — KCB 뒤 숫자 추출 (연체관리 테이블과 동일 로직)
+          try {
+            if (!Array.isArray(daeungRawData)) return '<span style="color:#D1D5DB">-</span>';
+            var cno = String(c['계약번호']||'').trim();
+            var SCORE_SUBS = ['법적조치 검토','법적조치검토','법적 조치 검토','내용증명 발송','내용증명발송','내용 증명 발송'];
+            var rs = daeungRawData.filter(function(d){
+              if (!d || String(d.no||'').trim() !== cno) return false;
+              var s = String(d.jobSub||'').trim();
+              if (!s) return false;
+              if (SCORE_SUBS.indexOf(s) >= 0) return true;
+              return s.indexOf('법적조치') >= 0 || s.indexOf('법적 조치') >= 0 || s.indexOf('내용증명') >= 0;
+            });
+            if (!rs.length) return '<span style="color:#D1D5DB">-</span>';
+            rs.sort(function(a,b){ return (b._idx||0) - (a._idx||0); });
+            for (var i = 0; i < rs.length; i++) {
+              var m = String(rs[i].content || '').match(/KCB\\s*(\\d+)/i);
+              if (m) return '<span style="color:#DC2626;font-weight:700">' + m[1] + '</span>';
+            }
+            return '<span style="color:#D1D5DB">-</span>';
+          } catch(_) { return '<span style="color:#D1D5DB">-</span>'; }
+        })()}</span></div>
+        <div class="cr-tl-item"><span class="cr-tl-item-label" title="gid=554798125 F열 — 내용증명/지급명령/기타조치">법조치</span><span class="cr-tl-item-val">${(function(){
+          // [v372] 법조치 점등 — 연체관리 테이블과 동일 로직 (내용증명/지급명령/기타조치 또는 기타집행)
+          try {
+            if (!Array.isArray(daeungRawData)) return '<span style="color:#D1D5DB">-</span>';
+            var cno = String(c['계약번호']||'').trim();
+            var rs = daeungRawData.filter(function(d){ return d && String(d.no||'').trim() === cno && d.jobSub; });
+            var hasContent = rs.some(function(d){ return String(d.jobSub).indexOf('내용증명') >= 0; });
+            var hasPayment = rs.some(function(d){ return String(d.jobSub).indexOf('지급명령') >= 0; });
+            var hasEtc     = rs.some(function(d){ var s = String(d.jobSub||''); return s.indexOf('기타집행') >= 0 || s.indexOf('기타조치') >= 0; });
+            var pill = function(label, active) {
+              return '<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;background:' + (active ? '#16A34A' : '#F3F4F6') + ';color:' + (active ? '#fff' : '#9CA3AF') + ';margin-right:2px;letter-spacing:-0.3px" title="' + label + '">' + (active ? '●' : '○') + label + '</span>';
+            };
+            return pill('내용', hasContent) + pill('지급', hasPayment) + pill('기타', hasEtc);
+          } catch(_) { return '<span style="color:#D1D5DB">-</span>'; }
+        })()}</span></div>
       </div>
     </div>
   </div>
@@ -5707,9 +5744,10 @@ function parseDailyForPayDate(resp, delinqRows) {
   //        이 3개 카테고리는 별도 점수/법적진행 컬럼에서 표시되므로 대응일/입금예정일/최근대응내용에서는 미표시
   const jobSubIdx_ = findColIdx(_labels, ['업무하위','업무 하위','하위구분','2차구분','2차 구분'], 5);
   const EXCLUDED_SUB = new Set([
-    '법적조치 검토', '법적조치검토',
+    '법적조치 검토', '법적조치검토', '법적 조치 검토',
     '내용증명 발송', '내용증명발송',
-    '지급명령 진행', '지급명령진행'
+    '지급명령 진행', '지급명령진행',
+    '기타조치', '기타 조치', '기타집행', '기타 집행'  // [v372] 기타조치/기타집행도 제외
   ]);
 
   // 연체 계약번호 set 구성
@@ -6584,10 +6622,12 @@ function dlqRenderTableRows() {
                 rows.sort(function(a,b){ return (b._idx||0) - (a._idx||0); });
                 // [v371] content에서 "KCB" 키워드 뒤의 숫자 추출 (KCB 신용평가 점수)
                 // "KCB 200 / 직장 ..." → 200 / 다른 숫자(날짜·금액)는 무시
+                // 우선순위 1: KCB 뒤 숫자 (가장 정확)
                 for (var i = 0; i < rows.length; i++) {
                   var m = String(rows[i].content || '').match(/KCB\s*(\d+)/i);
                   if (m) return '<span style="color:#DC2626">' + m[1] + '</span>';
                 }
+                // [v371-fix] 우선순위 2: KCB 없으면 표시 안 함 (정확도 우선)
                 return '<span style="color:#D1D5DB">-</span>';
               } catch(_) { return '<span style="color:#D1D5DB">-</span>'; }
             })()}</td>
@@ -6599,7 +6639,8 @@ function dlqRenderTableRows() {
                 var rows = daeungRawData.filter(function(d){ return d && String(d.no||'').trim() === cno && d.jobSub; });
                 var hasContent = rows.some(function(d){ return String(d.jobSub).indexOf('내용증명') >= 0; });
                 var hasPayment = rows.some(function(d){ return String(d.jobSub).indexOf('지급명령') >= 0; });
-                var hasEtc     = rows.some(function(d){ return String(d.jobSub).indexOf('기타집행') >= 0; });
+                // [v372] "기타집행" + "기타조치" 둘 다 매칭 — 폼 옵션에 "기타조치" 추가됨
+                var hasEtc     = rows.some(function(d){ var s = String(d.jobSub||''); return s.indexOf('기타집행') >= 0 || s.indexOf('기타조치') >= 0; });
                 var pill = function(label, active) {
                   return '<span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;background:' + (active ? '#16A34A' : '#F3F4F6') + ';color:' + (active ? '#fff' : '#9CA3AF') + ';margin-right:1px;letter-spacing:-0.3px" title="' + label + '">' + (active ? '●' : '○') + label + '</span>';
                 };
@@ -17825,7 +17866,7 @@ window._okpiCat = {
   '계약(입주)관리':['전화응대(임(전)차인)','전화응대(부동산)','전화응대(임대인)','계약정보 입수','전자서명 발행','수수료 입금','중요사항 설명','날인 계약서 입수','임대차신고 보관','부동산 계약전 검토','퇴실청소비 청구','발행','종료','기타'],
   '수납관리':    ['임대료 수납 처리','연체자 전화 대응','납부일 확정 받음','연락불가자 방문','납부 완료','분납 완료','분납 진행중','전화응대(임(전)차인)','기타'],
   '갱신관리':    ['갱신 희망 확인','갱신 협의','갱신심사 거절 안내','갱신대상 홈버튼 등록','만기 퇴실 확정','전화응대','기타'],
-  '연체관리':    ['내용증명 발송','지급명령 진행','중도퇴실 처리','계약 종료자 대응','법적 조치 검토','전화응대','기타'],
+  '연체관리':    ['내용증명 발송','지급명령 진행','기타조치','중도퇴실 처리','계약 종료자 대응','법적 조치 검토','전화응대','기타'],
   '중도퇴실관리':['중도퇴실 신청 접수','정산서 발행','후임 세입자 모색','정산 협의','퇴실 확정','보증금 반환','전화응대','기타']
 };
 
