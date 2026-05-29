@@ -13892,6 +13892,9 @@ function rnwRenderCohortChart(cohorts){
 .cmg-expand-tbl th { padding:5px 8px; background:#F1F5F9; color:#475569; font-weight:700; text-align:left; border-bottom:1px solid #E2E8F0; white-space:nowrap; }
 .cmg-expand-tbl td { padding:5px 8px; border-bottom:1px solid #E5E7EB; }
 .cmg-expand-tbl tr:hover td { background:#FFF7ED; }
+/* [v375-fix] 종료 행 — tr에 text-decoration은 미작동, td에 직접 적용 */
+.cmg-expand-tbl tr.cmg-terminated td { text-decoration: line-through; text-decoration-color: #DC2626; text-decoration-thickness: 1.5px; color: #9CA3AF !important; background: #FEF2F2; }
+.cmg-expand-tbl tr.cmg-terminated:hover td { background: #FEE2E2; }
 .cmg-partner-info { display:flex; flex-wrap:wrap; gap:8px 18px; margin-bottom:8px; font-size:11.5px; color:#475569; }
 .cmg-partner-info b { color:#1F2937; }
 .cmg-rank-badge { display:inline-block; padding:2px 7px; font-size:10px; font-weight:700; border-radius:10px; margin-left:6px; vertical-align:middle; }
@@ -14498,11 +14501,14 @@ function cmgExportPdfFor(partnerName, mode){
       var total = supply + vat;
       var endDate = ct.endDate ? cmgParseStartDate(ct.endDate) : null;
       var months = cmgMonthsBetween(ct.startDate, endDate);
-      bodyRows += '<tr>'
+      // [v375] 계약종류에 '종료' 포함된 행은 붉은 취소선 시각 표시 (합계는 변경 없음)
+      var _isTerm = String(ct.contractKind||'').indexOf('종료') >= 0;
+      var _trStyle = _isTerm ? ' style="text-decoration:line-through;text-decoration-color:#DC2626;text-decoration-thickness:1.5px;color:#9CA3AF"' : '';
+      bodyRows += '<tr' + _trStyle + '>'
         + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:center">' + rowIdx + '</td>'
         + '<td style="border:1px solid #9CA3AF;padding:4px">' + ct.cno + '</td>'
         + '<td style="border:1px solid #9CA3AF;padding:4px">' + (ct.tenant||'-') + '</td>'
-        + '<td style="border:1px solid #9CA3AF;padding:4px">' + ((ct.contractKind||'') + (ct.contractKind && ct.housingType ? '/' : '') + (ct.housingType||'') || '-') + '</td>'
+        + '<td style="border:1px solid #9CA3AF;padding:4px' + (_isTerm ? ';color:#DC2626;font-weight:700' : '') + '">' + ((ct.contractKind||'') + (ct.contractKind && ct.housingType ? '/' : '') + (ct.housingType||'') || '-') + '</td>'
         + '<td style="border:1px solid #9CA3AF;padding:4px">' + cmgFmtDate(ct.startDate) + '</td>'
         + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:center">' + (months > 0 ? months + '개월' : '-') + '</td>'
         + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:right">' + cmgFmtMoney(ct.rent) + '</td>'
@@ -14647,6 +14653,11 @@ function cmgRenderPartnerStats(){
             // [v171] 헤더 카드 — 파트너 정보 + 통계 KPI + sparkline
             var sparkSvg = cmgRenderSparkline(cmgBuildSparkline(p.partnerName), {compact:true});
             var rankBadge = cmgPartnerRank(p.partnerName);
+            // [v376] 종료 행 통계 — 합계는 그대로 두되, 그 중 종료가 차지하는 금액 별도 표시
+            var _termList = (p.contracts||[]).filter(function(ct){ return String(ct.contractKind||'').indexOf('종료') >= 0; });
+            var _termCnt = _termList.length;
+            var _termTrade = _termList.reduce(function(s,ct){ return s + (ct.trade || 0); }, 0);
+            var _termBrk = _termList.reduce(function(s,ct){ return s + (ct.brokerage || 0); }, 0);
             var summaryHeader = '<div class="cmg-v171-header">'
               + '<div class="cmg-v171-info">'
               +   '<div class="cmg-v171-pname">' + p.partnerName + ' <span class="cmg-rank-badge cmg-rank-' + rankBadge + '">' + rankBadge + '</span></div>'
@@ -14662,10 +14673,11 @@ function cmgRenderPartnerStats(){
               +   '</div>'
               + '</div>'
               + '<div class="cmg-v171-stats">'
-              +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">계약</div><div class="cmg-v171-stat-val">' + p.contracts.length + '<span class="unit">건</span></div></div>'
-              +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">총 거래액</div><div class="cmg-v171-stat-val">' + cmgFmtMoneyKor(p.totalTrade) + '</div></div>'
-              +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">중개보수</div><div class="cmg-v171-stat-val brk">' + cmgFmtMoney(p.totalBrokerage) + '</div></div>'
+              +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">계약</div><div class="cmg-v171-stat-val">' + p.contracts.length + '<span class="unit">건</span>' + (_termCnt>0 ? ' <span style="font-size:11px;color:#DC2626;font-weight:700">(종료 ' + _termCnt + '건)</span>' : '') + '</div></div>'
+              +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">총 거래액</div><div class="cmg-v171-stat-val">' + cmgFmtMoneyKor(p.totalTrade) + (_termTrade>0 ? ' <span style="font-size:11px;color:#DC2626;font-weight:700;text-decoration:line-through;text-decoration-color:#DC2626" title="종료 ' + _termCnt + '건 거래액">⊗ ' + cmgFmtMoney(_termTrade) + '</span>' : '') + '</div></div>'
+              +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">중개보수</div><div class="cmg-v171-stat-val brk">' + cmgFmtMoney(p.totalBrokerage) + (_termBrk>0 ? ' <span style="font-size:11px;color:#DC2626;font-weight:700;text-decoration:line-through;text-decoration-color:#DC2626" title="종료 ' + _termCnt + '건 중개보수 (합계에 포함됨)">⊗ ' + cmgFmtMoney(_termBrk) + '</span>' : '') + '</div></div>'
               + '</div>'
+              + (_termCnt>0 ? '<div style="margin-top:6px;padding:6px 10px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:6px;font-size:11px;color:#991B1B">⚠ 종료 ' + _termCnt + '건 (거래액 ' + cmgFmtMoney(_termTrade) + ' / 중개보수 ' + cmgFmtMoney(_termBrk) + ')이 위 합계에 포함되어 있습니다. 행은 <span style="text-decoration:line-through;color:#DC2626;font-weight:700">붉은 취소선</span>으로 표시됩니다.</div>' : '')
               + (sparkSvg ? '<div class="cmg-v171-spark">' + sparkSvg + '</div>' : '')
               + '</div>';
 
@@ -14708,7 +14720,11 @@ function cmgRenderPartnerStats(){
                   var monthsText = months > 0 ? (months + '개월' + (isShort ? ' ⚠' : '')) : '—';
                   // 중개보수 0원이면 회색
                   var brkMuted = isShort ? 'color:#9CA3AF;text-decoration:line-through' : '';
-                  return '<tr style="cursor:pointer">'
+                  // [v375/v375-fix] 계약종류에 '종료' 포함된 행은 붉은 취소선 시각 표시
+                  //   tr에 text-decoration 인라인은 미작동 → CSS class .cmg-terminated 적용 (td에 적용됨)
+                  var _isTerm = String(ct.contractKind||'').indexOf('종료') >= 0;
+                  var _trClass = _isTerm ? ' class="cmg-terminated"' : '';
+                  return '<tr style="cursor:pointer"' + _trClass + '>'
                     + '<td style="text-align:center" onclick="event.stopPropagation()"><input type="checkbox" class="cmg-pdf-cb" data-pn="' + p.partnerName.replace(/"/g,'&quot;') + '" value="' + ct.cno + '"' + (isShort ? ' disabled title="12개월 미만 — 중개보수 제외"' : '') + '></td>'
                     + '<td style="text-align:center;color:#8A9AB5;font-size:11px" onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')">' + (idx+1) + '</td>'
                     + '<td style="text-align:center" onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')">' + origMark + '</td>'
