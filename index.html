@@ -1843,9 +1843,10 @@ function parseDailyReport(resp) {
   const noIdx      = findColIdx(labels, ['계약번호','계약'],              1);  // B열
   const payDateIdx = findColIdx(labels, ['입금예정','납기일','납부예정'],   3);  // D열
   const jobTypeIdx = findColIdx(labels, ['업무구분','업무 구분','구분'],   4);  // E열 (신규)
-  // [v364] F열 업무하위 (2차 카테고리) — "법적조치 검토" / "내용증명 발송" / "지급명령 진행" / "기타집행" 등
-  //        시트가 구버전이면 fallback 위치(5)에 대응상세가 들어있을 수 있어 jobSub은 -1 fallback (헤더 못 찾으면 빈값)
-  const jobSubIdx  = findColIdx(labels, ['업무하위','업무 하위','하위구분','2차구분','2차 구분'], -1);
+  // [v364/v368] F열 업무하위 (2차 카테고리) — "법적조치 검토" / "내용증명 발송" / "지급명령 진행" / "기타집행" 등
+  //        v368: fallback을 5(F열)로 변경 — 헤더가 변형되어 매칭 실패해도 F열에서 가져옴
+  //        parseDailyForPayDate와 동일 정책 (v365에서 검증됨)
+  const jobSubIdx  = findColIdx(labels, ['업무하위','업무 하위','하위구분','2차구분','2차 구분'], 5);
   const contentIdx = findColIdx(labels, ['대응 상세','대응상세','대응내용','상세내용','내용'], 5);  // F열 (E→F로 이동)
   const billIdx    = findColIdx(labels, ['청구서명','청구'],            -1);
   const stepIdx    = findColIdx(labels, ['단계','step'],                -1);
@@ -6545,21 +6546,32 @@ function dlqRenderTableRows() {
             <td style="white-space:nowrap;font-size:11px;color:#374151">${r.actionDateStr&&r.actionDateStr!=='-'?r.actionDateStr:'—'}</td>
             <td>${r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-'}</td>
             <td style="text-align:center;font-size:12px;font-weight:700">${(function(){
-              // [v366] 점수 — F열='법적조치 검토' 행의 H열(content)에서 숫자 추출
+              // [v366/v367] 점수 — F열='법적조치 검토' OR '내용증명 발송' 행의 H열에서 숫자 추출
+              //              띄어쓰기 변형 모두 허용 ("법적 조치 검토", "법적조치검토" 등)
               try {
                 if (!Array.isArray(daeungRawData)) return '<span style="color:#D1D5DB">-</span>';
                 var cno = String(r.cno||'').trim();
+                var SCORE_SUBS = [
+                  '법적조치 검토', '법적조치검토', '법적 조치 검토', '법적 조치검토',
+                  '내용증명 발송', '내용증명발송', '내용증명발송 ', '내용 증명 발송'
+                ];
                 var rows = daeungRawData.filter(function(d){
                   if (!d || String(d.no||'').trim() !== cno) return false;
                   var s = String(d.jobSub||'').trim();
-                  return s === '법적조치 검토' || s === '법적조치검토';
+                  if (!s) return false;
+                  // 정확/부분 매칭 둘 다 허용
+                  if (SCORE_SUBS.indexOf(s) >= 0) return true;
+                  return s.indexOf('법적조치') >= 0 || s.indexOf('법적 조치') >= 0 || s.indexOf('내용증명') >= 0;
                 });
                 if (!rows.length) return '<span style="color:#D1D5DB">-</span>';
-                // 가장 최근 행 (배열 끝쪽이 최신이라 가정 — 또는 _idx 기준)
+                // 가장 최근 행 (_idx 기준 내림차순)
                 rows.sort(function(a,b){ return (b._idx||0) - (a._idx||0); });
-                var m = String(rows[0].content || '').match(/(\d+(?:\.\d+)?)/);
-                if (!m) return '<span style="color:#D1D5DB">-</span>';
-                return '<span style="color:#DC2626">' + m[1] + '</span>';
+                // content에서 첫 번째 숫자 추출 (정수/소수)
+                for (var i = 0; i < rows.length; i++) {
+                  var m = String(rows[i].content || '').match(/(\d+(?:\.\d+)?)/);
+                  if (m) return '<span style="color:#DC2626">' + m[1] + '</span>';
+                }
+                return '<span style="color:#D1D5DB">-</span>';
               } catch(_) { return '<span style="color:#D1D5DB">-</span>'; }
             })()}</td>
             <td style="white-space:nowrap;text-align:center">${(function(){
