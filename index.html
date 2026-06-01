@@ -11673,6 +11673,8 @@ function openFeeCalcModal(contractNo){
   var mgmtNum = parseAmt(mgmtRaw);
   var dayRentNum = parseAmt(monthRentRaw) || (rentNum - mgmtNum > 0 ? rentNum - mgmtNum : rentNum); // 일할 계산용 월세 단독
   var fcRentOnly = ['일시납','비용포함','수수료포함','단기일시납'].indexOf(String(contract?(contract['납부조건']||''):'').trim())>=0;
+  var vatNum = parseAmt(contract ? (contract['부가세']||'') : '');
+  var wolseNum = parseAmt(contract ? (contract['월세']||'') : '') || (rentNum - vatNum > 0 ? rentNum - vatNum : rentNum);
   var billAuto = rentNum + (fcRentOnly ? 0 : feeNum);
 
   closeFeeCalcModal();
@@ -11714,7 +11716,7 @@ function openFeeCalcModal(contractNo){
     +       '<div>'
     +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">청구금액(임대료 + 수수료 (분할만, 일시납, 비용포함은 제외))</label>'
     +         '<input id="fcBillAmt" type="text" value="'+(billAuto>0?billAuto.toLocaleString():'')+'" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcFee()">'
-    +         '<div style="font-size:10.5px;color:#6B7280;margin-top:4px" id="fcBillHint">' + (billAuto>0 ? ('임대료 ₩'+rentNum.toLocaleString()+' + 수수료 ₩'+feeNum.toLocaleString()) : '검색 결과 없음 — 직접 입력') + '</div>'
+    +         '<div style="font-size:10.5px;color:#6B7280;margin-top:4px" id="fcBillHint">' + (billAuto>0 ? ('임대료 ₩'+rentNum.toLocaleString()+'(월세 ₩'+wolseNum.toLocaleString()+', 부가세 ₩'+vatNum.toLocaleString()+'), 서비스수수료 ₩'+feeNum.toLocaleString()) : '검색 결과 없음 — 직접 입력') + '</div>'
     +       '</div>'
     +       '<div>'
     +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">분할 개월수 (1~12)</label>'
@@ -11750,7 +11752,7 @@ function openFeeCalcModal(contractNo){
     +     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
     +       '<div>'
     +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">월세 (월)</label>'
-    +         '<input id="fcDayRent" type="text" value="'+(dayRentNum>0?dayRentNum.toLocaleString():'')+'" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcDay()">'
+    +         '<input id="fcDayRent" type="text" value="'+(dayRentNum>0?dayRentNum.toLocaleString():'')+'" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcDay()">' + '<div style="font-size:10.5px;color:#6B7280;margin-top:4px">'+(rentNum>0?('임대료 ₩'+rentNum.toLocaleString()+'(월세 ₩'+wolseNum.toLocaleString()+', 부가세 ₩'+vatNum.toLocaleString()+'), 서비스수수료 ₩'+feeNum.toLocaleString()):'')+'</div>'
     +       '</div>'
     +       '<div>'
     +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">고정관리비 (월)</label>'
