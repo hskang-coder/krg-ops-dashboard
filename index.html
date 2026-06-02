@@ -17606,6 +17606,7 @@ function okpi_calcAll(){
     });
     var renewDone = renewTargets.filter(function(v){ return v.homeBtn; }).length;
     // 갱신 거절/조건부 (메모 키워드)
+    var allCnt = countBy('이지희');
     var rejection = countBy('이지희', function(r){
       var jt = String(r.jobType||'').trim();
       return jt === '갱신관리';
@@ -17614,7 +17615,7 @@ function okpi_calcAll(){
     var allLj = daeRaw.filter(function(r){ return okpi_inRange(r, range) && String(r.person||'').trim() === '이지희'; });
     var contacts = allLj.length; // 전체 대응건수 (unique X)
     var closed = allLj.filter(function(r){ return String(r.content||'').indexOf('종료') >= 0; }).length;
-    return { phone:phone, renewDone:renewDone, renewTotal:renewTargets.length, rejection:rejection, contacts:contacts, closed:closed };
+    return { phone:phone, allCnt:allCnt, renewDone:renewDone, renewTotal:renewTargets.length, rejection:rejection, contacts:contacts, closed:closed };
   })();
 
   // 김영철 KPI
@@ -17887,8 +17888,9 @@ function okpi_renderPersonCards(k){
     + '<div class="okpi-person-card c2">'
     +   '<div class="okpi-person-hd"><div class="okpi-avatar c2">이</div><div><div class="okpi-person-name">이지희 <span class="okpi-person-total">' + tLj + '건</span></div><div class="okpi-person-role">계약관리 · 스텝2 (계약·갱신·종료)</div></div></div>'
     +   '<div class="okpi-list">'
+    +     okpi_rowCount('대응 건수', src.kw, '담당=이지희 전체 (기간내)', lj.allCnt, ljCntMax, 'c2')
     +     okpi_rowRatio('D-30 갱신 홈버튼 등록',       src.combo, '만기 D-30 대상 / CC=TRUE 비율',     lj.renewDone, lj.renewTotal, 90, 70)
-    +     okpi_rowCount('갱신 거절/조건부 대응',       src.kw, '담당=이지희 + 1차=갱신 + "거절/조건부"', lj.rejection, ljCntMax, 'c2')
+    +     okpi_rowCount('갱신관리 대응',       src.kw, '담당=이지희 + 1차=갱신 + "거절/조건부"', lj.rejection, ljCntMax, 'c2')
     +   '</div>'
     + '</div>'
     // 김영철
