@@ -17608,7 +17608,7 @@ function okpi_calcAll(){
     // 갱신 거절/조건부 (메모 키워드)
     var rejection = countBy('이지희', function(r){
       var jt = String(r.jobType||'').trim();
-      return jt.indexOf('갱신') >= 0 && hasKw(r.content, ['거절','조건부']);
+      return jt === '갱신관리';
     });
     // [차트용] 이지희 — 대응건수: 전체 row 카운트 / 종료: 메모에 "종료" 포함
     var allLj = daeRaw.filter(function(r){ return okpi_inRange(r, range) && String(r.person||'').trim() === '이지희'; });
@@ -17667,7 +17667,7 @@ function okpi_calcAll(){
       var jt = String(r.jobType||'').trim();
       return jt.indexOf('수납') >= 0 || jt.indexOf('연체') >= 0;
     };
-    var legal = countBy('오진선', function(r){ return hasKw(r.content, ['내용증명','지급명령','법조치']); });
+    var legal = countBy('오진선', function(r){ return ['법적조치검토','내용증명발송','지급명령 진행','기타집행'].indexOf(String(r.jobSub||'').trim()) >= 0; });
     var endDue = countBy('오진선', function(r){
       return r.payDate && String(r.payDate).trim() !== '' && hasKw(r.content, ['종료','퇴실']);
     });
@@ -17887,7 +17887,6 @@ function okpi_renderPersonCards(k){
     + '<div class="okpi-person-card c2">'
     +   '<div class="okpi-person-hd"><div class="okpi-avatar c2">이</div><div><div class="okpi-person-name">이지희 <span class="okpi-person-total">' + tLj + '건</span></div><div class="okpi-person-role">계약관리 · 스텝2 (계약·갱신·종료)</div></div></div>'
     +   '<div class="okpi-list">'
-    +     okpi_rowCount('전화 종료 처리',              src.kw, '담당=이지희 + 메모 "진행/위임/종료"', lj.phone, ljCntMax, 'c2')
     +     okpi_rowRatio('D-30 갱신 홈버튼 등록',       src.combo, '만기 D-30 대상 / CC=TRUE 비율',     lj.renewDone, lj.renewTotal, 90, 70)
     +     okpi_rowCount('갱신 거절/조건부 대응',       src.kw, '담당=이지희 + 1차=갱신 + "거절/조건부"', lj.rejection, ljCntMax, 'c2')
     +   '</div>'
