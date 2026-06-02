@@ -17669,11 +17669,11 @@ function okpi_calcAll(){
       var jt = String(r.jobType||'').trim();
       return jt.indexOf('수납') >= 0 || jt.indexOf('연체') >= 0;
     };
-    var legal = countBy('오진선', function(r){ return ['법적조치검토','내용증명발송','지급명령 진행','기타집행'].indexOf(String(r.jobSub||'').trim()) >= 0; });
-    var ohJobLegal = countBy('오진선', function(r){ return String(r.jobSub||'').trim() === '법적조치검토'; });
-    var ohJobNotice = countBy('오진선', function(r){ return String(r.jobSub||'').trim() === '내용증명발송'; });
-    var ohJobOrder = countBy('오진선', function(r){ return String(r.jobSub||'').trim() === '지급명령 진행'; });
-    var ohJobEtc = countBy('오진선', function(r){ return String(r.jobSub||'').trim() === '기타집행'; });
+    var legal = countBy('오진선', function(r){ return ['법적조치검토','내용증명발송','지급명령진행','기타집행'].indexOf(String(r.jobSub||'').replace(/\s/g,'')) >= 0; });
+    var ohJobLegal = countBy('오진선', function(r){ return String(r.jobSub||'').replace(/\s/g,'') === '법적조치검토'; });
+    var ohJobNotice = countBy('오진선', function(r){ return String(r.jobSub||'').replace(/\s/g,'') === '내용증명발송'; });
+    var ohJobOrder = countBy('오진선', function(r){ return String(r.jobSub||'').replace(/\s/g,'') === '지급명령진행'; });
+    var ohJobEtc = countBy('오진선', function(r){ return String(r.jobSub||'').replace(/\s/g,'') === '기타집행'; });
     var endDue = countBy('오진선', function(r){ return String(r.jobType||'').trim() === '수납관리' && String(r.colH||'').indexOf('첫납부안내') >= 0; });
     var endPaid = countBy('오진선', function(r){ return String(r.jobType||'').trim() === '수납관리' && String(r.colH||'').indexOf('입금안내') >= 0; });
     // [차트용] 오진선 unique 계약번호
