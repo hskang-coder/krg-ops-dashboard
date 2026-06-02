@@ -4189,7 +4189,7 @@ function renderPaymentTargets() {
         if (x.cat === '첫납부')   return '첫납부자';
         return '—';
       })()}</td>
-      <td style="white-space:nowrap">${r.dueDate||'—'}</td>
+      <td style="text-align:center">${(()=>{ if(x.cat!=='전월연체')return '—'; var now=new Date(); var pY=now.getMonth()===0?now.getFullYear()-1:now.getFullYear(); var pM=now.getMonth()===0?12:now.getMonth(); var days=0; (x.payments||[]).forEach(function(p){ if(!String(p['청구서명']||p['납부종류']||'').includes('임대료'))return; var pp=String(p['납기일']||'').split('/'); if(!(parseInt(pp[0])===pY&&parseInt(pp[1])===pM))return; var od=parseInt(p['연체일수'])||0; if(od>days)days=od; }); return days>0?days+'일':'—'; })()}</td><td style="white-space:nowrap">${r.dueDate||'—'}</td>
       ${(()=>{
         const dm = (window._ptDailyMap||{})[r.no] || {};
         const dateStr = dm.latestDateStr || '—';
@@ -4200,7 +4200,7 @@ function renderPaymentTargets() {
       })()}
       <td>${tagHtml(x)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="11" style="text-align:center;color:#B0BDCE;padding:24px">해당 조건의 수납 대상이 없습니다.</td></tr>';
+  }).join('') || '<tr><td colspan="12" style="text-align:center;color:#B0BDCE;padding:24px">해당 조건의 수납 대상이 없습니다.</td></tr>';
 
   window._ptDisplayRows = display.map(x => {
     const { r, vacancy } = x;
@@ -4286,7 +4286,7 @@ function renderPaymentTargets() {
         <thead><tr>
           <th>계약번호</th><th>임(전)차인명</th><th>연락처</th><th>청구횟수</th>
           <th>공실상태</th>
-          <th>당월납부상태</th><th>수납대상여부</th>
+          <th>당월납부상태</th><th>수납대상여부</th><th>전월 연체일수</th>
           <th>납기일</th><th>최근 대응일</th><th>최근 대응내용</th><th>수납 대상</th>
         </tr></thead>
         <tbody>${rows}</tbody>
