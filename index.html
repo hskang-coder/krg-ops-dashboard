@@ -1873,6 +1873,7 @@ function parseDailyReport(resp) {
       step:    cell(stepIdx),
       person:  cell(personIdx),         // [v67] F열: 담당자
       renewalStatus: cell(renewalIdx), // [v44] G열
+      colH: cell(7),
       progress: cell(progressIdx)      // [v221] I열: 진척사항
     };
   }).filter(Boolean);
@@ -17669,12 +17670,8 @@ function okpi_calcAll(){
       return jt.indexOf('수납') >= 0 || jt.indexOf('연체') >= 0;
     };
     var legal = countBy('오진선', function(r){ return ['법적조치검토','내용증명발송','지급명령 진행','기타집행'].indexOf(String(r.jobSub||'').trim()) >= 0; });
-    var endDue = countBy('오진선', function(r){
-      return r.payDate && String(r.payDate).trim() !== '' && hasKw(r.content, ['종료','퇴실']);
-    });
-    var endPaid = countBy('오진선', function(r){
-      return hasKw(r.content, ['완납','분납']);
-    });
+    var endDue = countBy('오진선', function(r){ return String(r.jobType||'').trim() === '수납관리' && String(r.colH||'').indexOf('첫납부안내') >= 0; });
+    var endPaid = countBy('오진선', function(r){ return String(r.jobType||'').trim() === '수납관리' && String(r.colH||'').indexOf('입금안내') >= 0; });
     // [차트용] 오진선 unique 계약번호
     var allOh = daeRaw.filter(function(r){ return okpi_inRange(r, range) && String(r.person||'').trim() === '오진선'; });
     var ohSet = {};
@@ -17907,8 +17904,8 @@ function okpi_renderPersonCards(k){
     +   '<div class="okpi-person-hd"><div class="okpi-avatar del">오</div><div><div class="okpi-person-name">오진선 <span class="okpi-person-total">' + tOh + '건</span></div><div class="okpi-person-role">연체관리 (법진행·종료대응)</div></div></div>'
     +   '<div class="okpi-list">'
     +     okpi_rowCount('법조치 대응',                 src.kw, '담당=오진선 + 메모 "내용증명/지급명령/법조치"', oh.legal, ohCntMax, 'del')
-    +     okpi_rowCount('종료자 입금예정 확정',         src.combo, '담당=오진선 + D열 + 메모 "종료/퇴실"', oh.endDue, ohCntMax, 'del')
-    +     okpi_rowCount('종료자 완납/분납',            src.kw, '담당=오진선 + 메모 "완납/분납"',      oh.endPaid, ohCntMax, 'del')
+    +     okpi_rowCount('수납관리 대응(첫 납부자)',         src.combo, '담당=오진선 + D열 + 메모 "종료/퇴실"', oh.endDue, ohCntMax, 'del')
+    +     okpi_rowCount('수납관리 대응(전월 연체자)',            src.kw, '담당=오진선 + 메모 "완납/분납"',      oh.endPaid, ohCntMax, 'del')
     +   '</div>'
     + '</div>'
     + '</div>';
