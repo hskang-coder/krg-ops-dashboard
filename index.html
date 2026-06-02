@@ -4221,6 +4221,7 @@ function renderPaymentTargets() {
       '공실상태': vacancy.status || '—',
       '당월납부상태': r.payStatus || '—',
       '수납대상여부': catLabel,
+      '전월 연체일수': (()=>{ if(x.cat!=='전월연체')return '—'; var now=new Date(); var pY=now.getMonth()===0?now.getFullYear()-1:now.getFullYear(); var pM=now.getMonth()===0?12:now.getMonth(); var days=0; (x.payments||[]).forEach(function(p){ if(!String(p['청구서명']||p['납부종류']||'').includes('임대료'))return; var pp=String(p['납기일']||'').split('/'); if(!(parseInt(pp[0])===pY&&parseInt(pp[1])===pM))return; var od=parseInt(p['연체일수'])||0; if(od>days)days=od; }); return days>0?days+'일':'—'; })(),
       '납기일': r.dueDate || '—',
       '최근 대응일': dm.latestDateStr || '—',
       '최근 대응내용': dm.latestContent || '—',
