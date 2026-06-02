@@ -17670,6 +17670,10 @@ function okpi_calcAll(){
       return jt.indexOf('수납') >= 0 || jt.indexOf('연체') >= 0;
     };
     var legal = countBy('오진선', function(r){ return ['법적조치검토','내용증명발송','지급명령 진행','기타집행'].indexOf(String(r.jobSub||'').trim()) >= 0; });
+    var ohJobLegal = countBy('오진선', function(r){ return String(r.jobSub||'').trim() === '법적조치검토'; });
+    var ohJobNotice = countBy('오진선', function(r){ return String(r.jobSub||'').trim() === '내용증명발송'; });
+    var ohJobOrder = countBy('오진선', function(r){ return String(r.jobSub||'').trim() === '지급명령 진행'; });
+    var ohJobEtc = countBy('오진선', function(r){ return String(r.jobSub||'').trim() === '기타집행'; });
     var endDue = countBy('오진선', function(r){ return String(r.jobType||'').trim() === '수납관리' && String(r.colH||'').indexOf('첫납부안내') >= 0; });
     var endPaid = countBy('오진선', function(r){ return String(r.jobType||'').trim() === '수납관리' && String(r.colH||'').indexOf('입금안내') >= 0; });
     // [차트용] 오진선 unique 계약번호
@@ -17691,7 +17695,7 @@ function okpi_calcAll(){
     // [차트용] 메모 시작 "완납"/"분납"
     var ohPaid = allOh.filter(function(r){ return String(r.content||'').trim().indexOf('완납') === 0; }).length;
     var ohPartial = allOh.filter(function(r){ return String(r.content||'').trim().indexOf('분납') === 0; }).length;
-    return { legal:legal, endDue:endDue, endPaid:endPaid, contacts:contacts, ohDueSet:ohDueSet, ohPaid:ohPaid, ohPartial:ohPartial };
+    return { legal:legal, endDue:endDue, endPaid:endPaid, contacts:contacts, ohDueSet:ohDueSet, ohPaid:ohPaid, ohPartial:ohPartial, ohJobLegal:ohJobLegal, ohJobNotice:ohJobNotice, ohJobOrder:ohJobOrder, ohJobEtc:ohJobEtc };
   })();
 
   return {
@@ -17835,9 +17839,10 @@ function okpi_renderChart(k){
     ]);
     // ── 4. 오진선 — 단일 누적 막대 (김영철과 동일 3개 항목)
     var ohChart = renderStack('수납연체관리 KPI(오진선)', 'del', oh.contacts, [
-      { label:'입금예정일확정', value: oh.ohDueSet, color:'#3B82F6' },
-      { label:'완납', value: oh.ohPaid, color:'#10B981' },
-      { label:'분납', value: oh.ohPartial, color:'#F59E0B' }
+      { label:'법적조치검토', value: oh.ohJobLegal, color:'#3B82F6' },
+      { label:'내용증명발송', value: oh.ohJobNotice, color:'#10B981' },
+      { label:'지급명령 진행', value: oh.ohJobOrder, color:'#F59E0B' },
+      { label:'기타집행', value: oh.ohJobEtc, color:'#7C3AED' }
     ]);
 
     return '<div class="okpi-chart-card">'
