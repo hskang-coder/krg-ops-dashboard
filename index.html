@@ -19684,5 +19684,73 @@ async function okpi_render(){
 })();
 
 </script>
+<script>
+/* [연체관리 보강] 수금내역 T19=연체중/분납중 기준 납부종류별 연체 감지. 기존 파이프라인 무수정, 실패 시 기존 동작 유지 */
+(function(){
+  if (window.__dlqIncomeSupHooked) return; window.__dlqIncomeSupHooked = true;
+  function strip(s){ return String(s==null?"":s).replace(/\s/g,""); }
+  function cnum(s){ var n=parseFloat(String(s==null?"":s).replace(/[^0-9.\-]/g,"")); return isNaN(n)?0:n; }
+  function cval(c,i){ return c&&c[i]?(c[i].v!=null?c[i].v:(c[i].f!=null?c[i].f:"")):""; }
+  var INC_MAP=null, INC_FETCHED=false;
+  function buildIncomeMap(){
+    return fetchSheetByName("수금내역(Raw DATA)").then(function(resp){
+      var rows=(resp&&resp.table&&resp.table.rows)||[];
+      if(rows.length<50) return null;
+      var m={};
+      rows.forEach(function(row){
+        var c=row.c||[]; var st=strip(cval(c,19));
+        if(st!=="연체중"&&st!=="분납중") return;
+        var cno=String(cval(c,4)).replace(/[^0-9]/g,""); if(!cno) return;
+        var type=String(cval(c,5)).trim(); var amt=cnum(cval(c,27));
+        if(!m[cno]) m[cno]={types:{},amt:0};
+        if(type) m[cno].types[type]=true; m[cno].amt+=amt;
+      });
+      return m;
+    }).catch(function(){ return null; });
+  }
+  function recount(){
+    try{
+      var sel=document.getElementById("dlqDelinqTypeSel"); if(!sel) return;
+      var seen={}, list=[];
+      (window._dlqTableRows||[]).forEach(function(r){
+        if(String(r.contractStatus||"").indexOf("종료")>=0) return;
+        var dt=String(r.delinqType||""); if(!dt||dt==="-") return;
+        var k=String(r.cno); if(seen[k]) return; seen[k]=1; list.push(r);
+      });
+      function cnt(t){ return list.filter(function(r){ return t==="all"||String(r.delinqType||"").indexOf(t)>=0; }).length; }
+      var mp={"all":"전체","임대료":"임대료","변동관리비":"변동관리비","기타계약금":"기타계약금","계약보증금":"계약보증금"};
+      Array.prototype.forEach.call(sel.options, function(o){ if(mp[o.value]!=null) o.textContent=mp[o.value]+" "+cnt(o.value); });
+    }catch(e){}
+  }
+  function applySupplement(m){
+    try{
+      if(!m||!Array.isArray(window._dlqTableRows)) return;
+      var existing={}; window._dlqTableRows.forEach(function(r){ existing[String(r.cno).replace(/[^0-9]/g,"")]=r; });
+      var contracts=Array.isArray(window.contractRawData)?window.contractRawData:[];
+      Object.keys(m).forEach(function(cno){
+        var types=Object.keys(m[cno].types); if(!types.length) return;
+        var r=existing[cno];
+        if(r){
+          var cur=String(r.delinqType||"").split("+").map(function(s){return s.trim();}).filter(function(s){return s&&s!=="-";});
+          types.forEach(function(t){ if(cur.indexOf(t)<0) cur.push(t); });
+          r.delinqType=cur.length?cur.join("+"):"-";
+        }else{
+          var cd=contracts.find(function(x){ return String(x["계약번호"]||"").replace(/[^0-9]/g,"")===cno; });
+          var cs=cd?String(cd["계약상태"]||"계약중").trim():"계약중";
+          window._dlqTableRows.push({ cno:cno, nm:cd?(cd["임차인명"]||cd["계약자명"]||"-"):"-", grade:"", amt:m[cno].amt, bs:"", info:"-", tel:cd?(cd["임차인휴대폰"]||"-"):"-", delinqType:types.join("+"), group:"-", "연체구분":"연체중", days:"", dateStr:"-", payStatus:"", content:"", actionDateStr:"-", contractStatus:cs||"계약중", vacancyStatus:"-", assignee:"", actionStep:"" });
+          existing[cno]=window._dlqTableRows[window._dlqTableRows.length-1];
+        }
+      });
+      recount();
+      if(typeof dlqRenderTableRows==="function") dlqRenderTableRows();
+    }catch(e){}
+  }
+  function run(){ try{ if(INC_FETCHED){ if(INC_MAP) applySupplement(INC_MAP); return; } INC_FETCHED=true; buildIncomeMap().then(function(m){ INC_MAP=m; if(m) applySupplement(m); }).catch(function(){}); }catch(e){} }
+  var _origBuild=window.buildDlqUI;
+  if(typeof _origBuild==="function"){ window.buildDlqUI=function(){ var ret=_origBuild.apply(this,arguments); Promise.resolve().then(run); return ret; }; }
+  if(Array.isArray(window._dlqTableRows)&&window._dlqTableRows.length){ Promise.resolve().then(run); }
+})();
+</script>
+
 </body>
 </html>
