@@ -16918,10 +16918,59 @@ function sumBuildSection3(){
   var recoveryAvg = recoveryTotal > 0 ? Math.round(recoverySum / recoveryTotal * 10) / 10 : 0;
   var fastRecoveryRate = recoveryTotal > 0 ? Math.round((recoveryDays['0'] + recoveryDays['1']) / recoveryTotal * 1000) / 10 : 0;
 
+// ===== [발행월·청구서(건) 기준 전환] 전 지표 재계산 =====
+  var _pbLo = s3From || s3Cutoff || null;
+  var _pbHi = s3To || (s3Cutoff ? today : null) || null;
+  var _pbStart = {};
+  if (Array.isArray(vacancyRawData)) vacancyRawData.forEach(function(v){
+    var _d = (typeof cmgParseStartDate === 'function') ? cmgParseStartDate(v.startDate) : parseAnyDate(v.startDate);
+    if (_d) _pbStart[String(v.no||'').trim()] = _d;
+  });
+  function _pbPd(s){ var m = String(s||'').match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/); return m ? new Date(+m[1], +m[2]-1, +m[3]) : null; }
+  function _pbIsD(st){ return st==='연체중' || st==='연체납부' || st==='분납중'; }
+  function _pbBk(m){ if(m<=1)return 0; if(m<=3)return 1; if(m<=6)return 2; if(m<=12)return 3; return 4; }
+  var _pbEarliest = {};
+  if (Array.isArray(paymentRawData)) paymentRawData.forEach(function(p){
+    if (!s3PayMatch(p)) return;
+    var st = String(p['납부상태']||'').trim(); if (!_pbIsD(st)) return;
+    var _d = _pbPd(p['납기일']); if(!_d) return;
+    var _c = String(p['계약번호']||'').trim();
+    var _ym = _d.getFullYear()*12 + _d.getMonth();
+    if (_pbEarliest[_c]==null || _ym < _pbEarliest[_c]) _pbEarliest[_c] = _ym;
+  });
+  var _pbIss=0,_pbN=0,_pbR=0,_pbO=0,_pbInst=0;
+  var _pbDelB={0:0,1:0,2:0,3:0,4:0};
+  var _pbRd={'0':0,'1':0,'2':0,'3':0,'4':0}, _pbRt=0,_pbRs=0,_pbR7=0;
+  var _pbAge={'30':0,'60':0,'90':0};
+  var _pbOt=0,_pbDue=0; var pbNewDelq=0;
+  if (Array.isArray(paymentRawData)) paymentRawData.forEach(function(p){
+    if (!s3PayMatch(p)) return;
+    var _d = _pbPd(p['납기일']); if(!_d) return;
+    if (_pbLo && _d < _pbLo) return; if (_pbHi && _d > _pbHi) return;
+    var st = String(p['납부상태']||'').trim();
+    _pbIss++;
+    if(st==='정상납부')_pbN++; else if(st==='연체납부')_pbR++; else if(st==='연체중')_pbO++; else if(st==='분납중')_pbInst++;
+    var _c = String(p['계약번호']||'').trim();
+    var _s = _pbStart[_c];
+    if (_s){ var _m=(_d.getFullYear()-_s.getFullYear())*12+(_d.getMonth()-_s.getMonth()); if(_pbIsD(st))_pbDelB[_pbBk(_m)]++; }
+    if (st && st!=='납부예정'){ _pbDue++; if(st==='정상납부')_pbOt++; }
+    if (st==='연체납부'){ var dd=parseInt(String(p['연체일수']).replace(/[^0-9-]/g,'')); if(!isNaN(dd)){_pbRt++;_pbRs+=dd; if(dd<=7)_pbR7++; if(dd<=3)_pbRd['0']++;else if(dd<=7)_pbRd['1']++;else if(dd<=14)_pbRd['2']++;else if(dd<=30)_pbRd['3']++;else _pbRd['4']++;} }
+    if (st==='연체중'){ var ad=Math.floor((today-_d)/86400000); if(ad>90)_pbAge['90']++;else if(ad>60)_pbAge['60']++;else if(ad>30)_pbAge['30']++; }
+    if (_pbIsD(st)){ var _ym=_d.getFullYear()*12+_d.getMonth(); if(_pbEarliest[_c]===_ym)pbNewDelq++; }
+  });
+  earlyCnt = _pbIss; earlyDelqCnt = _pbDelB[0]+_pbDelB[1];
+  firstDelqByMonth = _pbDelB;
+  unpaidByAge = _pbAge;
+  recoveryDays = _pbRd; recoveryTotal = _pbRt; recoverySum = _pbRs;
+  recoveryAvg = _pbRt ? Math.round(_pbRs/_pbRt*10)/10 : 0;
+  fastRecoveryRate = _pbRt ? Math.round(_pbR7/_pbRt*1000)/10 : 0;
+  onTimeCnt = _pbOt; s3DueBillCnt = _pbDue; onTimeRate = _pbDue ? Math.round(_pbOt/_pbDue*1000)/10 : 0;
+  issuedCnt = _pbIss; issuedNormal = _pbN; issuedRecovered = _pbR; issuedOverdue = _pbO; issuedInstall = _pbInst;
+
   return {
     earlyDelqRate: earlyCnt > 0 ? Math.round((earlyDelqCnt / earlyCnt) * 1000) / 10 : 0,
     earlyCnt: earlyCnt, earlyDelqCnt: earlyDelqCnt,
-    newDelqCnt: Object.keys(earliestDelqByCno).filter(function(c){ return earliestDelqByCno[c] === thisYM; }).length,
+    newDelqCnt: pbNewDelq,
     newDelqList: newDelqList,
     over90Cnt: unpaidByAge['90'],
     onTimeCnt: onTimeCnt, s3DueBillCnt: s3DueBillCnt, onTimeRate: onTimeRate,
@@ -16969,7 +17018,7 @@ function sumRenderSection3Card(){
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px">'
     +   '<div>'
     +     '<div class="sum-sub-title" style="display:flex;justify-content:space-between;align-items:center;gap:6px">'
-    +       '<span>📍 입주 후 N개월차 첫 연체 분포</span>'
+    +       '<span>📍 입주 후 N개월차 연체 분포</span>'
     +       '<span style="font-size:10.5px;color:#6B7280;font-weight:500">대상 ' + s.earlyCnt.toLocaleString() + '건</span>'
     +     '</div>'
     +     '<div style="position:relative;height:200px"><canvas id="sumS3_firstDelq"></canvas></div>'
@@ -16982,24 +17031,7 @@ function sumRenderSection3Card(){
     +     '<div style="position:relative;height:200px"><canvas id="sumS3_recovery"></canvas></div>'
     +   '</div>'
     + '</div>'
-    + '<div class="sum-mini-insight" style="background:#FEF2F2;color:#991B1B;margin-top:10px">⚠️ 입주 1~3개월 연체는 품질 위험 신호 — 즉시 대응 필요</div>'
-    + (function(){
-        var _arr = s.trendData || [];
-        var _mx = Math.max.apply(null, _arr.map(function(d){return d.rate;}).concat([1]));
-        var _bars = _arr.map(function(d){
-          var _h = Math.max(2, Math.round(d.rate / _mx * 90));
-          var _c = d.rate >= 25 ? '#DC2626' : (d.rate >= 15 ? '#F59E0B' : '#10B981');
-          return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;">'
-            + '<div style="font-size:9px;color:#374151;font-weight:600;margin-bottom:2px;">' + d.rate + '</div>'
-            + '<div title="' + d.month + ' 연체 ' + d.delinq + '/' + d.due + '" style="width:64%;height:' + _h + 'px;background:' + _c + ';border-radius:3px 3px 0 0;"></div>'
-            + '<div style="font-size:9px;color:#9CA3AF;margin-top:3px;">' + d.month + '</div>'
-          + '</div>';
-        }).join('');
-        return '<div style="margin-top:12px;border-top:1px solid #F3F4F6;padding-top:10px;">'
-          + '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:2px;">📈 월별 연체율 추이(%) <span style="font-weight:500;color:#9CA3AF;font-size:11px;">· 발행월 기준 · 최근 12개월 · 납부종류 반영</span></div>'
-          + '<div style="display:flex;align-items:flex-end;gap:5px;height:110px;padding:6px 4px 0;">' + _bars + '</div>'
-        + '</div>';
-      })();
+    + '<div class="sum-mini-insight" style="background:#FEF2F2;color:#991B1B;margin-top:10px">⚠️ 입주 1~3개월 연체는 품질 위험 신호 — 즉시 대응 필요</div>';
 }
 
 // [v119] Section ③ 기간 선택 UI + 핸들러
