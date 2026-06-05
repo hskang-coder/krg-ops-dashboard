@@ -4052,6 +4052,7 @@ function renderPaymentTargets() {
   // 계약번호 기준 중복 제거 (납기일 최신 1건만 유지)
   const seenNos = new Map();
   list.forEach(r => {
+    if (!String(r.contractType||'').includes('임대료')) return; // 수납 대표 납기일은 임대료 청구서 기준
     const d = parseKorDate(r.dueDate);
     if (!seenNos.has(r.no) || d > parseKorDate(seenNos.get(r.no).dueDate)) {
       seenNos.set(r.no, r);
