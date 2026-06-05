@@ -16996,12 +16996,13 @@ function sumRenderSection3Card(){
       }).join('');
   return ''
     + '<div class="sum-card-title"><span class="dot" style="background:#DC2626"></span>③ 초기 연체자 신속 대응 <span class="badge sum-badge-risk">EARLY DETECTION</span></div>'
-    + '<div class="sum-stat-row" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;align-items:stretch;">'
+    + '<div class="sum-stat-row" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;align-items:stretch;">'
     +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">조기 연체율 (1~3m)</div><div class="sb-val">' + s.earlyDelqRate + '<span class="sb-unit">%</span></div></div>'
     +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">신규 연체 (이번달)</div><div class="sb-val">' + s.newDelqCnt + '<span class="sb-unit">건</span></div></div>'
-    +   '<div class="sum-stat-box sum-stat-amber"><div class="sb-label">31~60일 미수</div><div class="sb-val">' + s.unpaidByAge['60'] + '<span class="sb-unit">건</span></div></div>'
-    +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">90일+ 미수</div><div class="sb-val">' + s.over90Cnt + '<span class="sb-unit">건</span></div></div>'
     +   '<div class="sum-stat-box sum-stat-green"><div class="sb-label">정상납부 (만기도래)</div><div class="sb-val">' + s.onTimeRate + '<span class="sb-unit">%</span></div><div style="font-size:11px;color:#16a34a;font-weight:600;margin-top:2px;">' + s.onTimeCnt + ' / ' + s.s3DueBillCnt + '건</div></div>'
+    +   '<div class="sum-stat-box sum-stat-amber"><div class="sb-label">연체납부</div><div class="sb-val">' + (s.s3DueBillCnt ? Math.round(s.issuedRecovered/s.s3DueBillCnt*1000)/10 : 0) + '<span class="sb-unit">%</span></div><div style="font-size:11px;color:#EA580C;font-weight:600;margin-top:2px;">' + s.issuedRecovered + ' / ' + s.s3DueBillCnt + '건</div></div>'
+    +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">연체중</div><div class="sb-val">' + (s.s3DueBillCnt ? Math.round(s.issuedOverdue/s.s3DueBillCnt*1000)/10 : 0) + '<span class="sb-unit">%</span></div><div style="font-size:11px;color:#DC2626;font-weight:600;margin-top:2px;">' + s.issuedOverdue + ' / ' + s.s3DueBillCnt + '건</div></div>'
+    +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">분납중</div><div class="sb-val">' + (s.s3DueBillCnt ? Math.round(s.issuedInstall/s.s3DueBillCnt*1000)/10 : 0) + '<span class="sb-unit">%</span></div><div style="font-size:11px;color:#7C3AED;font-weight:600;margin-top:2px;">' + s.issuedInstall + ' / ' + s.s3DueBillCnt + '건</div></div>'
     + '</div>'
     // [v119] 기간 선택 + 2-차트 균형 (Top 5 제거)
     + sumS3PeriodHtml()
