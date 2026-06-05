@@ -16823,6 +16823,18 @@ function sumBuildSection3(){
       s3PeriodSet[String(v.no||'').trim()] = 1;
     });
   }
+  var onTimeCnt = 0, s3DueBillCnt = 0;
+  if (Array.isArray(paymentRawData)) {
+    paymentRawData.forEach(function(p){
+      if (!s3PayMatch(p)) return;
+      if (s3PeriodSet && !s3PeriodSet[String(p['계약번호']||'').trim()]) return;
+      var _st = String(p['납부상태']||'').trim();
+      if (!_st || _st === '납부예정') return;
+      s3DueBillCnt++;
+      if (_st === '정상납부') onTimeCnt++;
+    });
+  }
+  var onTimeRate = s3DueBillCnt ? Math.round(onTimeCnt / s3DueBillCnt * 1000) / 10 : 0;
   var recoveryTotal = 0, recoverySum = 0; // 평균용
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
@@ -16868,6 +16880,7 @@ function sumBuildSection3(){
     newDelqCnt: Object.keys(earliestDelqByCno).filter(function(c){ return earliestDelqByCno[c] === thisYM; }).length,
     newDelqList: newDelqList,
     over90Cnt: unpaidByAge['90'],
+    onTimeCnt: onTimeCnt, s3DueBillCnt: s3DueBillCnt, onTimeRate: onTimeRate,
     firstDelqByMonth: firstDelqByMonth,
     unpaidByAge: unpaidByAge,
     recoveryDays: recoveryDays,
@@ -16895,6 +16908,7 @@ function sumRenderSection3Card(){
     +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">신규 연체 (이번달)</div><div class="sb-val">' + s.newDelqCnt + '<span class="sb-unit">건</span></div></div>'
     +   '<div class="sum-stat-box sum-stat-amber"><div class="sb-label">31~60일 미수</div><div class="sb-val">' + s.unpaidByAge['60'] + '<span class="sb-unit">건</span></div></div>'
     +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">90일+ 미수</div><div class="sb-val">' + s.over90Cnt + '<span class="sb-unit">건</span></div></div>'
+    +   '<div class="sum-stat-box sum-stat-green"><div class="sb-label">정상납부 (만기도래)</div><div class="sb-val">' + s.onTimeCnt + '<span class="sb-unit">건</span></div><div style="font-size:12px;color:#16a34a;font-weight:700;margin-top:2px;">' + s.onTimeRate + '%</div></div>'
     + '</div>'
     // [v119] 기간 선택 + 2-차트 균형 (Top 5 제거)
     + sumS3PeriodHtml()
