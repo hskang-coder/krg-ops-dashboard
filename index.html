@@ -16676,6 +16676,11 @@ function sumBuildSection3(){
   var s3CutoffMonths = ({ '3m':3, '6m':6, '1y':12, '2y':24 })[window._sumS3Period] || null;
   var s3Cutoff = null;
   if (s3CutoffMonths) { s3Cutoff = new Date(today); s3Cutoff.setMonth(s3Cutoff.getMonth() - s3CutoffMonths); s3Cutoff.setHours(0,0,0,0); }
+  var s3From = null, s3To = null;
+  if (window._sumS3Period === 'custom') {
+    if (window._sumS3From) { var _sf = new Date(window._sumS3From + 'T00:00:00'); if (!isNaN(_sf)) s3From = _sf; }
+    if (window._sumS3To) { var _st = new Date(window._sumS3To + 'T23:59:59'); if (!isNaN(_st)) s3To = _st; }
+  }
   var parseAnyDate = function(s){
     if (!s) return null;
     var t = String(s).match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
@@ -16725,10 +16730,13 @@ function sumBuildSection3(){
   }
 
   vacancyRawData.forEach(function(v){
-    if (s3Cutoff) {
+    if (s3Cutoff || s3From || s3To) {
       // [v120] cmgParseStartDate (검증된 헬퍼) 사용 — parseAnyDate 파싱 실패 fix
       var sdF = (typeof cmgParseStartDate === 'function') ? cmgParseStartDate(v.startDate) : parseAnyDate(v.startDate);
-      if (!sdF || sdF < s3Cutoff) return;
+      if (!sdF) return;
+      if (s3Cutoff && sdF < s3Cutoff) return;
+      if (s3From && sdF < s3From) return;
+      if (s3To && sdF > s3To) return;
     }
     var months = sumCalcResidence(v);
     if (months == null) return;
@@ -16896,6 +16904,7 @@ function sumS3PeriodHtml(){
   var opts = [['all','전체'],['3m','3개월'],['6m','6개월'],['1y','1년'],['2y','2년']];
   var html = '<div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:8px;font-size:11px">'
     + '<span style="color:#6B7280;font-weight:600">기간:</span>';
+  html += '<input type="date" id="sumS3From" value="' + (window._sumS3From||'') + '" style="font-size:11px;padding:1px 3px;border:1px solid #d1d5db;border-radius:4px;color:#374151;">' + '<span style="color:#9ca3af;margin:0 2px;">~</span>' + '<input type="date" id="sumS3To" value="' + (window._sumS3To||'') + '" style="font-size:11px;padding:1px 3px;border:1px solid #d1d5db;border-radius:4px;color:#374151;">' + '<button class="sum-s3-period-btn" data-act="' + (current==='custom'?'true':'false') + '" onclick="sumApplyS3Custom()" style="margin-right:8px;">적용</button>';
   for (var i = 0; i < opts.length; i++) {
     var p = opts[i][0], lbl = opts[i][1];
     var act = (current === p) ? 'true' : 'false';
@@ -16903,6 +16912,14 @@ function sumS3PeriodHtml(){
   }
   html += '</div>';
   return html;
+}
+function sumApplyS3Custom(){
+  var f = document.getElementById('sumS3From');
+  var t = document.getElementById('sumS3To');
+  window._sumS3From = f ? f.value : '';
+  window._sumS3To = t ? t.value : '';
+  if (!window._sumS3From && !window._sumS3To) { return; }
+  sumSetS3Period('custom');
 }
 function sumSetS3Period(p){
   window._sumS3Period = p;
