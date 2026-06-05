@@ -4421,6 +4421,7 @@ function fmtPhone(s) {
   if (d.length === 9 && d.startsWith('02')) return '02-' + d.slice(2,5) + '-' + d.slice(5);
   return raw;
 }
+function _cumLateDays(v){var s=String(v==null?'':v).trim();if(!s)return 0;var n=parseFloat(s.replace(/[^0-9.]/g,''));if(isNaN(n))return 0;if(s.indexOf('%')>=0)n=n/100;return Math.round(n);}
 function renderContractRecord(c, payments, responses = []) {
   // vacancyRawData에서 매칭 행 찾기 (없으면 빈 객체)
   const __vacRow = (Array.isArray(vacancyRawData) ? vacancyRawData.find(v => String(v.no).trim() === String(c['계약번호']||'').trim()) : null) || {};
@@ -4606,7 +4607,7 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-stat"><div class="cr-stat-label">청구횟수</div><div class="cr-stat-val">${stripU(c['청구수'])}회</div></div>
         <div class="cr-stat"><div class="cr-stat-label">최장연체</div><div class="cr-stat-val ${parseInt(c['연체최장일'])>0?'warn':''}">${stripU(c['연체최장일'])}일</div></div>
         <div class="cr-stat"><div class="cr-stat-label">연체횟수</div><div class="cr-stat-val ${parseInt(c['연체횟수'])>0?'warn':''}">${stripU(c['연체횟수'])}회</div></div>
-        <div class="cr-stat"><div class="cr-stat-label">누적일수</div><div class="cr-stat-val ${parseInt(c['연체누적일'])>0?'warn':''}">${stripU(c['연체누적일'])}일</div></div>
+        <div class="cr-stat"><div class="cr-stat-label">누적일수</div><div class="cr-stat-val ${_cumLateDays(c['연체누적일'])>0?'warn':''}">${_cumLateDays(c['연체누적일'])}일</div></div>
         <div class="cr-stat"><div class="cr-stat-label">연체율</div><div class="cr-stat-val ${parseFloat(c['연체비율'])>0?'warn':''}">${fmt(c['연체비율'])}</div></div>
       </div>
     </div>
@@ -10784,7 +10785,7 @@ function generateTenantDelqReport(contractNo){
   // ── 통계 ──
   var lateRate = parseFloat(String(c['연체비율']||'0').replace(/[^0-9.]/g,''))||0;
   var maxLateDays = parseInt(c['연체최장일']||0)||0;
-  var totalLateDays = parseInt(c['연체누적일']||0)||0;
+  var totalLateDays = _cumLateDays(c['연체누적일']);
   var lateCount = parseInt(c['연체횟수']||0)||0;
   var billCount = parseInt(c['청구수']||0)||0;
   // 현재 미납·현재 연체일
