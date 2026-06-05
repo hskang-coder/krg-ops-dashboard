@@ -16811,6 +16811,18 @@ function sumBuildSection3(){
 
   // [v117] 납기 후 회수 일수 분포 — 연체납부(완납) 건들의 연체일수 버킷
   var recoveryDays = { '0': 0, '1': 0, '2': 0, '3': 0, '4': 0 }; // 0~3 / 4~7 / 8~14 / 15~30 / 31+
+  var s3PeriodSet = null;
+  if ((s3Cutoff || s3From || s3To) && Array.isArray(vacancyRawData)) {
+    s3PeriodSet = {};
+    vacancyRawData.forEach(function(v){
+      var _sd = (typeof cmgParseStartDate === 'function') ? cmgParseStartDate(v.startDate) : parseAnyDate(v.startDate);
+      if (!_sd) return;
+      if (s3Cutoff && _sd < s3Cutoff) return;
+      if (s3From && _sd < s3From) return;
+      if (s3To && _sd > s3To) return;
+      s3PeriodSet[String(v.no||'').trim()] = 1;
+    });
+  }
   var recoveryTotal = 0, recoverySum = 0; // 평균용
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
@@ -16818,6 +16830,7 @@ function sumBuildSection3(){
       // 연체 후 회수된 케이스만 (납부상태='연체납부')
       if (st !== '연체납부') return;
       if (!s3PayMatch(p)) return;
+      if (s3PeriodSet && !s3PeriodSet[String(p['계약번호']||'').trim()]) return;
       // [v119/v120] 납부일 기간 필터 — cmgParseStartDate 우선
       if (s3Cutoff) {
         var pDateF = (typeof cmgParseStartDate === 'function') ? cmgParseStartDate(p['납부일']) : parseAnyDate(p['납부일']);
