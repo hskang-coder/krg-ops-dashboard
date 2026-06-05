@@ -16673,6 +16673,9 @@ function sumBuildSection3(){
   var today = new Date(); today.setHours(0,0,0,0);
   // [v119] 기간 필터
   window._sumS3Period = window._sumS3Period || 'all';
+  window._sumS3PayType = window._sumS3PayType || '임대료';
+  var s3PayType = window._sumS3PayType;
+  var s3PayMatch = function(p){ return String(p['납부종류']||'').trim() === s3PayType; };
   var s3CutoffMonths = ({ '3m':3, '6m':6, '1y':12, '2y':24 })[window._sumS3Period] || null;
   var s3Cutoff = null;
   if (s3CutoffMonths) { s3Cutoff = new Date(today); s3Cutoff.setMonth(s3Cutoff.getMonth() - s3CutoffMonths); s3Cutoff.setHours(0,0,0,0); }
@@ -16721,6 +16724,7 @@ function sumBuildSection3(){
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
       if (!isDelq(p)) return;
+      if (!s3PayMatch(p)) return;
       var cno = String(p['계약번호']||'').trim();
       if (!cno) return;
       var ym = extractYM(p);
@@ -16765,6 +16769,7 @@ function sumBuildSection3(){
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
       if (!isDelq(p)) return;
+      if (!s3PayMatch(p)) return;
       var ym = extractYM(p);
       // [v112] 실제 컬럼: '미납(연체)금액(원)' → '청구원금' → 최종 청구금액 fallback
       var amt = parseAmt(p['미납(연체)금액(원)']) || parseAmt(p['미수금']) || parseAmt(p['미수액']);
@@ -16774,7 +16779,7 @@ function sumBuildSection3(){
         amt = Math.max(0, charged - paid);
       }
       // [v114] 신규 연체 (이번달 청구분) — paymentRawData '계약자명' 우선
-      if (ym === thisYM) {
+      if (ym === thisYM && earliestDelqByCno[String(p['계약번호']||'').trim()] === thisYM) {
         var cno = String(p['계약번호']||'').trim();
         var vc = vacancyRawData.find(function(x){ return String(x.no||'').trim() === cno; });
         // 우선순위: payment.계약자명 → vacancy.tenant1Name (C열) → vacancy.tenantName → contract.임(전)차인명
@@ -16790,8 +16795,8 @@ function sumBuildSection3(){
         if (!nm) nm = cno;
         if (newDelqList.length < 5) newDelqList.push({ cno: cno, name: nm, amt: amt });
       }
-      // 연체 경과 일수
-      if (ym) {
+      // 연체 경과 일수 (연체중만 — 분납 제외)
+      if (ym && String(p['납부상태']||'').trim() === '연체중') {
         var ymM = ym.match(/(\d{4})-(\d{2})/);
         if (ymM) {
           var billDate = new Date(+ymM[1], +ymM[2]-1, 1);
@@ -16812,6 +16817,7 @@ function sumBuildSection3(){
       var st = String(p['납부상태']||'').trim();
       // 연체 후 회수된 케이스만 (납부상태='연체납부')
       if (st !== '연체납부') return;
+      if (!s3PayMatch(p)) return;
       // [v119/v120] 납부일 기간 필터 — cmgParseStartDate 우선
       if (s3Cutoff) {
         var pDateF = (typeof cmgParseStartDate === 'function') ? cmgParseStartDate(p['납부일']) : parseAnyDate(p['납부일']);
@@ -16846,7 +16852,7 @@ function sumBuildSection3(){
   return {
     earlyDelqRate: earlyCnt > 0 ? Math.round((earlyDelqCnt / earlyCnt) * 1000) / 10 : 0,
     earlyCnt: earlyCnt, earlyDelqCnt: earlyDelqCnt,
-    newDelqCnt: newDelqList.length,
+    newDelqCnt: Object.keys(earliestDelqByCno).filter(function(c){ return earliestDelqByCno[c] === thisYM; }).length,
     newDelqList: newDelqList,
     over90Cnt: unpaidByAge['90'],
     firstDelqByMonth: firstDelqByMonth,
@@ -16904,6 +16910,10 @@ function sumS3PeriodHtml(){
   var opts = [['all','전체'],['3m','3개월'],['6m','6개월'],['1y','1년'],['2y','2년']];
   var html = '<div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:8px;font-size:11px">'
     + '<span style="color:#6B7280;font-weight:600">기간:</span>';
+  html += '<span style="color:#6b7280;margin-left:6px;">납부:</span>';
+  var s3pt = window._sumS3PayType || '임대료';
+  ['임대료','변동관리비','기타계약금'].forEach(function(t){ html += '<button class="sum-s3-period-btn" data-act="' + (s3pt===t?'true':'false') + '" onclick="sumSetS3PayType(\'' + t + '\')">' + t + '</button>'; });
+  html += '<span style="display:inline-block;width:10px;"></span>';
   html += '<input type="date" id="sumS3From" value="' + (window._sumS3From||'') + '" style="font-size:11px;padding:1px 3px;border:1px solid #d1d5db;border-radius:4px;color:#374151;">' + '<span style="color:#9ca3af;margin:0 2px;">~</span>' + '<input type="date" id="sumS3To" value="' + (window._sumS3To||'') + '" style="font-size:11px;padding:1px 3px;border:1px solid #d1d5db;border-radius:4px;color:#374151;">' + '<button class="sum-s3-period-btn" data-act="' + (current==='custom'?'true':'false') + '" onclick="sumApplyS3Custom()" style="margin-right:8px;">적용</button>';
   for (var i = 0; i < opts.length; i++) {
     var p = opts[i][0], lbl = opts[i][1];
@@ -16912,6 +16922,12 @@ function sumS3PeriodHtml(){
   }
   html += '</div>';
   return html;
+}
+function sumSetS3PayType(t){
+  window._sumS3PayType = t;
+  var card = document.querySelector('#summaryView .sum-section-3');
+  if (card) card.innerHTML = sumRenderSection3Card();
+  setTimeout(function(){ if (typeof sumDrawSection3 === 'function') sumDrawSection3(); }, 30);
 }
 function sumApplyS3Custom(){
   var f = document.getElementById('sumS3From');
