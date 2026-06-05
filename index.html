@@ -4634,7 +4634,7 @@ function renderContractRecord(c, payments, responses = []) {
               var s = String(d.jobSub||'').trim();
               if (!s) return false;
               if (SCORE_SUBS.indexOf(s) >= 0) return true;
-              return s.indexOf('법적조치') >= 0 || s.indexOf('법적 조치') >= 0 || s.indexOf('내용증명') >= 0;
+              return s.indexOf('법적조치') >= 0 || s.indexOf('법적 조치') >= 0 || s.replace(/\s/g,'').indexOf('내용증명발송') >= 0;
             });
             if (!rs.length) return '<span style="color:#D1D5DB">-</span>';
             rs.sort(function(a,b){ return (b._idx||0) - (a._idx||0); });
@@ -4651,7 +4651,7 @@ function renderContractRecord(c, payments, responses = []) {
             if (!Array.isArray(daeungRawData)) return '<span style="color:#D1D5DB">-</span>';
             var cno = String(c['계약번호']||'').trim();
             var rs = daeungRawData.filter(function(d){ return d && String(d.no||'').trim() === cno && d.jobSub; });
-            var hasContent = rs.some(function(d){ return String(d.jobSub).indexOf('내용증명') >= 0; });
+            var hasContent = rs.some(function(d){ return String(d.jobSub).replace(/\s/g,'').indexOf('내용증명발송') >= 0; });
             var hasPayment = rs.some(function(d){ return String(d.jobSub).indexOf('지급명령') >= 0; });
             var hasEtc     = rs.some(function(d){ var s = String(d.jobSub||''); return s.indexOf('기타집행') >= 0 || s.indexOf('기타조치') >= 0; });
             var pill = function(label, active) {
@@ -6643,7 +6643,7 @@ function dlqRenderTableRows() {
                   if (!s) return false;
                   // 정확/부분 매칭 둘 다 허용
                   if (SCORE_SUBS.indexOf(s) >= 0) return true;
-                  return s.indexOf('법적조치') >= 0 || s.indexOf('법적 조치') >= 0 || s.indexOf('내용증명') >= 0;
+                  return s.indexOf('법적조치') >= 0 || s.indexOf('법적 조치') >= 0 || s.replace(/\s/g,'').indexOf('내용증명발송') >= 0;
                 });
                 if (!rows.length) return '<span style="color:#D1D5DB">-</span>';
                 // 가장 최근 행 (_idx 기준 내림차순)
