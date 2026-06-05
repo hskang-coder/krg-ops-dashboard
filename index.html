@@ -16835,6 +16835,26 @@ function sumBuildSection3(){
     });
   }
   var onTimeRate = s3DueBillCnt ? Math.round(onTimeCnt / s3DueBillCnt * 1000) / 10 : 0;
+  // [발행월 기준] 검색기간 중 발행된 청구서(납기일 기준) 납부상태 집계
+  var issuedCnt = 0, issuedNormal = 0, issuedRecovered = 0, issuedOverdue = 0, issuedInstall = 0;
+  var _billLo = s3From || s3Cutoff || null;
+  var _billHi = s3To || (s3Cutoff ? today : null) || null;
+  if (Array.isArray(paymentRawData)) {
+    paymentRawData.forEach(function(p){
+      if (!s3PayMatch(p)) return;
+      var _bm = String(p['납기일']||'').match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+      if (!_bm) return;
+      var _bd = new Date(+_bm[1], +_bm[2]-1, +_bm[3]); _bd.setHours(0,0,0,0);
+      if (_billLo && _bd < _billLo) return;
+      if (_billHi && _bd > _billHi) return;
+      issuedCnt++;
+      var _is = String(p['납부상태']||'').trim();
+      if (_is === '정상납부') issuedNormal++;
+      else if (_is === '연체납부') issuedRecovered++;
+      else if (_is === '연체중') issuedOverdue++;
+      else if (_is === '분납중') issuedInstall++;
+    });
+  }
   var recoveryTotal = 0, recoverySum = 0; // 평균용
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
@@ -16881,6 +16901,7 @@ function sumBuildSection3(){
     newDelqList: newDelqList,
     over90Cnt: unpaidByAge['90'],
     onTimeCnt: onTimeCnt, s3DueBillCnt: s3DueBillCnt, onTimeRate: onTimeRate,
+    issuedCnt: issuedCnt, issuedNormal: issuedNormal, issuedRecovered: issuedRecovered, issuedOverdue: issuedOverdue, issuedInstall: issuedInstall,
     firstDelqByMonth: firstDelqByMonth,
     unpaidByAge: unpaidByAge,
     recoveryDays: recoveryDays,
@@ -16912,6 +16933,14 @@ function sumRenderSection3Card(){
     + '</div>'
     // [v119] 기간 선택 + 2-차트 균형 (Top 5 제거)
     + sumS3PeriodHtml()
+    + '<div style="display:flex;justify-content:center;align-items:center;gap:16px;flex-wrap:wrap;margin:8px 0 4px;padding:7px 12px;background:#F9FAFB;border:1px solid #EAEEF3;border-radius:7px;font-size:12px;color:#374151;">'
+    +   '<span style="color:#9CA3AF;font-size:11px;">발행 청구서 (발행월 기준)</span>'
+    +   '<span>발행 <b style="color:#1F2937;">' + s.issuedCnt + '</b>건</span>'
+    +   '<span style="color:#16A34A;">정상납부 <b>' + s.issuedNormal + '</b></span>'
+    +   '<span style="color:#EA580C;">연체납부 <b>' + s.issuedRecovered + '</b></span>'
+    +   '<span style="color:#DC2626;">연체중 <b>' + s.issuedOverdue + '</b></span>'
+    +   '<span style="color:#7C3AED;">분납중 <b>' + s.issuedInstall + '</b></span>'
+    + '</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px">'
     +   '<div>'
     +     '<div class="sum-sub-title" style="display:flex;justify-content:space-between;align-items:center;gap:6px">'
