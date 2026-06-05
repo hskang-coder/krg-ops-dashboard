@@ -16855,6 +16855,30 @@ function sumBuildSection3(){
       else if (_is === '분납중') issuedInstall++;
     });
   }
+  // [발행월 기준] 월별 연체율 추이 (최근 12개월, 납부종류 반영, 기간필터 미적용)
+  var trendMonths = [], trendMap = {};
+  for (var _ti = 11; _ti >= 0; _ti--) {
+    var _ttd = new Date(today.getFullYear(), today.getMonth() - _ti, 1);
+    var _tk = _ttd.getFullYear() + '-' + String(_ttd.getMonth()+1).padStart(2,'0');
+    trendMonths.push(_tk); trendMap[_tk] = { due:0, delinq:0 };
+  }
+  if (Array.isArray(paymentRawData)) {
+    paymentRawData.forEach(function(p){
+      if (!s3PayMatch(p)) return;
+      var _ttm = String(p['납기일']||'').match(/(\d{4})[\/\-.](\d{1,2})/);
+      if (!_ttm) return;
+      var _tkey = _ttm[1] + '-' + String(+_ttm[2]).padStart(2,'0');
+      if (!trendMap[_tkey]) return;
+      var _tts = String(p['납부상태']||'').trim();
+      if (!_tts || _tts === '납부예정') return;
+      trendMap[_tkey].due++;
+      if (_tts === '연체중' || _tts === '연체납부' || _tts === '분납중') trendMap[_tkey].delinq++;
+    });
+  }
+  var trendData = trendMonths.map(function(k){
+    var _m = trendMap[k];
+    return { month: k.slice(2), due: _m.due, delinq: _m.delinq, rate: _m.due ? Math.round(_m.delinq/_m.due*1000)/10 : 0 };
+  });
   var recoveryTotal = 0, recoverySum = 0; // 평균용
   if (Array.isArray(paymentRawData)) {
     paymentRawData.forEach(function(p){
@@ -16902,6 +16926,7 @@ function sumBuildSection3(){
     over90Cnt: unpaidByAge['90'],
     onTimeCnt: onTimeCnt, s3DueBillCnt: s3DueBillCnt, onTimeRate: onTimeRate,
     issuedCnt: issuedCnt, issuedNormal: issuedNormal, issuedRecovered: issuedRecovered, issuedOverdue: issuedOverdue, issuedInstall: issuedInstall,
+    trendData: trendData,
     firstDelqByMonth: firstDelqByMonth,
     unpaidByAge: unpaidByAge,
     recoveryDays: recoveryDays,
@@ -16957,7 +16982,24 @@ function sumRenderSection3Card(){
     +     '<div style="position:relative;height:200px"><canvas id="sumS3_recovery"></canvas></div>'
     +   '</div>'
     + '</div>'
-    + '<div class="sum-mini-insight" style="background:#FEF2F2;color:#991B1B;margin-top:10px">⚠️ 입주 1~3개월 연체는 품질 위험 신호 — 즉시 대응 필요</div>';
+    + '<div class="sum-mini-insight" style="background:#FEF2F2;color:#991B1B;margin-top:10px">⚠️ 입주 1~3개월 연체는 품질 위험 신호 — 즉시 대응 필요</div>'
+    + (function(){
+        var _arr = s.trendData || [];
+        var _mx = Math.max.apply(null, _arr.map(function(d){return d.rate;}).concat([1]));
+        var _bars = _arr.map(function(d){
+          var _h = Math.max(2, Math.round(d.rate / _mx * 90));
+          var _c = d.rate >= 25 ? '#DC2626' : (d.rate >= 15 ? '#F59E0B' : '#10B981');
+          return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;">'
+            + '<div style="font-size:9px;color:#374151;font-weight:600;margin-bottom:2px;">' + d.rate + '</div>'
+            + '<div title="' + d.month + ' 연체 ' + d.delinq + '/' + d.due + '" style="width:64%;height:' + _h + 'px;background:' + _c + ';border-radius:3px 3px 0 0;"></div>'
+            + '<div style="font-size:9px;color:#9CA3AF;margin-top:3px;">' + d.month + '</div>'
+          + '</div>';
+        }).join('');
+        return '<div style="margin-top:12px;border-top:1px solid #F3F4F6;padding-top:10px;">'
+          + '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:2px;">📈 월별 연체율 추이(%) <span style="font-weight:500;color:#9CA3AF;font-size:11px;">· 발행월 기준 · 최근 12개월 · 납부종류 반영</span></div>'
+          + '<div style="display:flex;align-items:flex-end;gap:5px;height:110px;padding:6px 4px 0;">' + _bars + '</div>'
+        + '</div>';
+      })();
 }
 
 // [v119] Section ③ 기간 선택 UI + 핸들러
