@@ -19897,12 +19897,13 @@ async function okpi_render(){
     var cb=window._dpCB(cno);
     var sev=(grade==='D'||grade==='E'||grade==='F'), mild=(grade==='S'||grade==='A'||grade==='B');
     var p,why=[];
-    if(ended){p='E';why.push('계약 종료/공실(퇴실상태) → 종결·회수 트랙');}
-    else if(inst){p='D';why.push('분납중 → D 우선(분납 약속 불이행 시 승급)');}
-    else if(days>60&&(grade==='E'||grade==='F')){p='E';why.push('연체 '+days+'일 & 등급 '+grade+' → 강제퇴실 검토');}
-    else if(days>30&&sev){p='C';why.push('장기('+days+'일) & 고위험 등급 '+grade+' → 법 진행');}
-    else if(mild&&days<=7){p='A';why.push('경증 등급 '+grade+' & 단기 '+days+'일 → 수납관리 수준'+(cb!=null?(cb>=600?' (CB '+cb+' 양호)':' (CB '+cb+')'):''));}
-    else {p='B';why.push('중간 → 약속일 확답(무응답 시 C 승급)');}
+    var order=['A','B','C','D','E'];
+    var base=days<=7?'A':(days<=15?'B':(days<=30?'C':(days<=60?'D':'E')));
+    var bandTxt={A:'1~7일',B:'8~15일',C:'16~30일',D:'31~60일',E:'60일 초과'}[base];
+    why.push('연체 '+days+'일 → '+base+'구간('+bandTxt+')');
+    var _ix=order.indexOf(base);
+    if(cb!=null&&!isNaN(cb)&&Number(cb)>=600&&_ix>0){_ix--;why.push('CB '+cb+'점(우수) → 한 단계 완화');}
+    p=order[_ix];
     return {pattern:p,nm:String(d.nm||''),days:days,amt:amt,grade:grade||'-',inst:inst,ended:ended,cb:cb,why:why,delinqType:String(d.delinqType||''),group:String(d.group||'')};
   };
   window._dpPatternReportBlock=function(cno){
