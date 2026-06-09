@@ -19849,5 +19849,35 @@ async function okpi_render(){
 
 </script>
 
+<script>
+/* [연령표기] 계약서 폼 주민번호 -> 미성년자/만60세이상 자동 표기 */
+(function(){
+  if (window.__cgRrnHooked) return; window.__cgRrnHooked = true;
+  function rrnAge(v){
+    var s = String(v||'').replace(/[^0-9]/g,'');
+    if (s.length < 7) return null;
+    var yy = parseInt(s.substr(0,2),10), mm = parseInt(s.substr(2,2),10), dd = parseInt(s.substr(4,2),10), g = s.charAt(6);
+    var c; if('1256'.indexOf(g)>=0)c=1900; else if('3478'.indexOf(g)>=0)c=2000; else if('90'.indexOf(g)>=0)c=1800; else return null;
+    var y=c+yy; if(mm<1||mm>12||dd<1||dd>31)return null;
+    var t=new Date(); var age=t.getFullYear()-y; if(((t.getMonth()+1)*100+t.getDate()) < (mm*100+dd)) age--;
+    if(age<0||age>130)return null; return age;
+  }
+  function check(inp){
+    var age = rrnAge(inp.value);
+    var state = age==null?'':(age<19?'minor:'+age:(age>=60?'senior:'+age:'ok'));
+    if (inp.getAttribute('data-cgstate') === state) return;
+    inp.setAttribute('data-cgstate', state);
+    var warn = inp.parentNode && inp.parentNode.querySelector('.cg-rrn-warn');
+    if (!warn && inp.parentNode){ warn=document.createElement('div'); warn.className='cg-rrn-warn'; warn.style.cssText='font-size:11px;font-weight:700;margin-top:3px;line-height:1.3;'; inp.parentNode.appendChild(warn); }
+    if (state.indexOf('minor')===0){ inp.style.background='#FEE2E2'; inp.style.borderColor='#DC2626'; if(warn){warn.style.display='';warn.style.color='#DC2626';warn.textContent='⚠️ 미성년자 (만 '+age+'세) · 법정대리인 동의 필요';} }
+    else if (state.indexOf('senior')===0){ inp.style.background='#FFF7ED'; inp.style.borderColor='#EA580C'; if(warn){warn.style.display='';warn.style.color='#EA580C';warn.textContent='ℹ️ 만 60세 이상 (만 '+age+'세)';} }
+    else { inp.style.background=''; inp.style.borderColor=''; if(warn){warn.textContent='';warn.style.display='none';} }
+  }
+  window.cG_checkRrn = check;
+  function isRrn(el){ return el && el.tagName==='INPUT' && el.getAttribute && el.getAttribute('placeholder')==='000000-0000000'; }
+  document.addEventListener('input', function(e){ if(isRrn(e.target)) check(e.target); }, true);
+  setInterval(function(){ var q=document.querySelectorAll('input[placeholder="000000-0000000"]'); for(var i=0;i<q.length;i++) check(q[i]); }, 700);
+})();
+</script>
 </body>
 </html>
