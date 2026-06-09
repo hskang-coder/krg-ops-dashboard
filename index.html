@@ -1998,8 +1998,8 @@ function parseVacancySheet(resp) {
   const statusIdx      = findColIdxLast(labels, ['공실상태'],      66);  // BO (마지막 occurrence)
   const exitDateIdx    = findColIdx(labels, ['실제퇴실일'],        67);  // BP
   const billCountIdx   = findColIdx(labels, ['청구수','청구횟수'], 71);  // BT
-  // [v361] BS열 연체외주 — gid=1953907648 vacancy 시트
-  const outsourceIdx   = findColIdx(labels, ['연체외주','연체 외주'], 70);  // BS
+  // [v361] BT열 연체외주 — gid=1953907648 vacancy 시트
+  const outsourceIdx   = findColIdx(labels, ['연체외주','연체 외주'], 71);  // BT
   // [v74] 입주 전 진척 5개 (TRUE/FALSE)
   const homeBtnIdx   = findColIdx(labels, ['홈버튼등록'],          81);  // CD
   const eContractIdx = findColIdx(labels, ['전자계약'],            82);  // CE
@@ -2042,7 +2042,7 @@ function parseVacancySheet(resp) {
       doorPwd:      cell(doorPwdIdx),     // F열: 현관 비밀번호 (v293)
       livingMonths: cell(livingMonthsIdx), // AB열: 실제 거주개월 (v301)
       billCount:    cell(billCountIdx),  // BT열: 청구횟수
-      outsource:    cell(outsourceIdx),  // [v361] BS열: 연체외주
+      outsource:    cell(outsourceIdx),  // [v361] BT열: 연체외주
       endDate:      cell(endDateIdx),     // X열: 만기일 [v44]
       tenantRrn:    cell(tenantRrnIdx), // AV열: 계약자1 생년월일/주민번호 [v65]
       coRrn:        cell(coRrnIdx),     // BB열: 계약자2/연대보증인 생년월일/주민번호 [v65]
@@ -4814,11 +4814,11 @@ function renderContractRecord(c, payments, responses = []) {
             ${window._cr_penalty>0?`<span style="font-size:11px;font-weight:600;color:#9CA3AF;margin-left:3px">(위약금 별도)</span>`:''}
           </div>`:''}
           ${(function(){
-            // [v361] BS열 연체외주 표시 — gid=1953907648
+            // [v361] BT열 연체외주 표시 — gid=1953907648
             try {
               var os = (__vacRow && __vacRow.outsource) ? String(__vacRow.outsource).trim() : '';
               if (!os || os === '-') return '';
-              return '<div style="display:inline-flex;align-items:center;gap:5px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700" title="gid=1953907648 BS열 — 연체외주">🏷️ 연체외주 · ' + os + '</div>';
+              return '<div style="display:inline-flex;align-items:center;gap:5px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700" title="gid=1953907648 BT열 — 연체외주">🏷️ 연체외주 · ' + os + '</div>';
             } catch(_) { return ''; }
           })()}
         </div>
@@ -6566,7 +6566,7 @@ function dlqRenderTableRows() {
     <table class="dlq-tbl">
       <thead><tr>
         <th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>
-        <th>계약번호</th><th title="gid=1953907648 BS열 — 연체외주">연체외주</th><th>그룹</th><th>계약정보</th>
+        <th>계약번호</th><th title="gid=1953907648 BT열 — 연체외주">연체외주</th><th>그룹</th><th>계약정보</th>
         <th>연체일수</th><th>납부구분</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th>
         <th>연락처</th><th>연체금액</th><th title="시작일 25.6.1 이후 계약자: 임대료 × 4개월 (gid=1953907648 W열 ≥ 2025-06-01, AK열 × 4)">위약금</th><th>대응일</th><th>입금예정일</th><th title="gid=554798125 F열='법적조치 검토' 행의 H열 점수 (숫자)">점수</th><th title="gid=554798125 F열 기재 유무 (내용증명/지급명령/기타집행)">법적진행</th><th>최근 대응 내용</th>
       </tr></thead>
