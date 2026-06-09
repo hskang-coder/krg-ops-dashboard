@@ -19931,6 +19931,22 @@ async function okpi_render(){
     var cpy=ov.querySelector('#dpCopyBtn'); if(cpy)cpy.addEventListener('click',function(){try{navigator.clipboard.writeText(document.getElementById('dpMsg').value);this.textContent='복사됨';}catch(e){}});
     var cls=ov.querySelector('#dpCloseBtn'); if(cls)cls.addEventListener('click',function(){ov.remove();});
   };
+  window._dpSort={col:-1,dir:1};
+  window._dpSortBy=function(col,th){
+    var dv=document.getElementById('delinquencyView'); if(!dv)return; var table=dv.querySelector('table'); if(!table)return;
+    var dir=(window._dpSort.col===col)?-window._dpSort.dir:1; window._dpSort={col:col,dir:dir};
+    var tbody=table.querySelector('tbody')||table;
+    var rows=[].slice.call(table.querySelectorAll('tr.dlq-tbl-row'));
+    function txt(tr){var c=tr.children[col]; return c?c.textContent.trim():'';}
+    function pnum(t){ if(!/[0-9]/.test(t))return null; var n=t.replace(/[^0-9.-]/g,''); if(n===''||n==='-')return null; var f=parseFloat(n); return isNaN(f)?null:f; }
+    var ne=rows.map(txt).filter(function(t){return t!=='';});
+    var numeric=ne.length>0 && ne.filter(function(t){return pnum(t)!=null;}).length/ne.length>=0.6;
+    rows.sort(function(a,b){var ta=txt(a),tb=txt(b); if(numeric){var na=pnum(ta),nb=pnum(tb);na=na==null?-Infinity:na;nb=nb==null?-Infinity:nb;return (na-nb)*dir;} return ta.localeCompare(tb,'ko')*dir;});
+    rows.forEach(function(tr){tbody.appendChild(tr);});
+    var hr=table.querySelector('thead tr')||table.querySelector('tr');
+    [].forEach.call(hr.children,function(h){var e=h.querySelector('.dp-sind'); if(e)e.remove();});
+    if(th){var s=document.createElement('span');s.className='dp-sind';s.textContent=dir>0?' ▲':' ▼';s.style.fontSize='9px';th.appendChild(s);}
+  };
   window._dpInject=function(){
     var dv=document.getElementById('delinquencyView'); if(!dv)return;
     var table=dv.querySelector('table'); if(!table)return;
@@ -19944,6 +19960,7 @@ async function okpi_render(){
       base.insertAdjacentElement('afterend', mk('대응패턴'));
       base.insertAdjacentElement('afterend', mk('리포트'));
     }
+    if(headRow){ for(var hi=0;hi<headRow.children.length;hi++){ (function(th,col){ if(th.__dpSB)return; th.__dpSB=true; th.style.cursor='pointer'; th.style.userSelect='none'; th.addEventListener('click',function(){ window._dpSortBy(col,th); }); })(headRow.children[hi],hi); } }
     var rows=table.querySelectorAll('tr.dlq-tbl-row');
     for(var k=0;k<rows.length;k++){ var tr=rows[k];
       if(tr.querySelector('.dp-c'))continue;
