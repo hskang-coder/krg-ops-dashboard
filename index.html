@@ -2563,7 +2563,7 @@ function _renderSrTable() {
 
   // 테이블 rows
   const rows = filtered.map(c => {
-    const g = String(c['연체등급']||'').replace(/등급$/,'').trim();
+    const g = String((c['S등급']||c['연체등급'])||'').replace(/등급$/,'').trim();
     const s = String(c['계약상태']||'').trim();
     // [v138] 계약부동산 + 계약담당자
     const broker = c['부동산명'] || '—';
@@ -2613,7 +2613,7 @@ function crSearchDownloadExcel() {
     '시작일': c['시작일'] || '',
     '종료일': c['종료일'] || '',
     '계약상태': c['계약상태'] || '',
-    '등급': String(c['연체등급']||'').replace(/등급$/,'').trim() || '',
+    '등급': String((c['S등급']||c['연체등급'])||'').replace(/등급$/,'').trim() || '',
     '임차인휴대폰': c['임차인휴대폰'] || '',
     '임대인명': c['임대인명'] || '',
     '임대인연락처': c['임대인휴대폰'] || c['임대인연락처'] || '',
@@ -2641,7 +2641,7 @@ function renderContractListTable(filter) {
   document.getElementById('crListCount').textContent = `총 ${filtered.length}건`;
   const gradeColor = g => ({A:'#16A34A',B:'#2563A8',C:'#D97706',D:'#DC2626',E:'#7C3AED',F:'#DC2626'}[g]||'#8A9AB5');
   const rows = filtered.slice(0,200).map(c => {
-    const g = String(c['연체등급']||'').replace(/등급$/,'').trim();
+    const g = String((c['S등급']||c['연체등급'])||'').replace(/등급$/,'').trim();
     return `<tr onclick="selectContractRow('${String(c['계약번호']).trim()}')">
       <td><b>${c['계약번호']}</b></td>
       <td>${c['임차인명']||c['임차인']||'—'}</td>
@@ -4427,7 +4427,7 @@ function _cumLateDays(v){var s=String(v==null?'':v).trim();if(!s)return 0;var n=
 function renderContractRecord(c, payments, responses = []) {
   // vacancyRawData에서 매칭 행 찾기 (없으면 빈 객체)
   const __vacRow = (Array.isArray(vacancyRawData) ? vacancyRawData.find(v => String(v.no).trim() === String(c['계약번호']||'').trim()) : null) || {};
-  const gradeRaw  = String(c['연체등급']||'').trim();
+  const gradeRaw  = String((c['S등급']||c['연체등급'])||'').trim();
   const grade     = gradeRaw.replace(/등급$/,'').trim() || '—';
   const gradeClass= {A:'cr-grade-A',B:'cr-grade-B',C:'cr-grade-C',D:'cr-grade-D',E:'cr-grade-E',F:'cr-grade-D'}[grade] || 'cr-grade-D';
   const stripU    = v => String(v||'').replace(/[회일월년%]$/, '').trim();
@@ -10996,7 +10996,7 @@ function generateTenantDelqReport(contractNo){
   // ── HTML 빌드 + 새 창 ──
   var d = {
     c: c, name: c['임차인명']||c['임차인']||'-', building: c['건물명']||'-', room: c['호수']||'-',
-    grade: String(c['연체등급']||'-').replace(/등급$/,''),
+    grade: String((c['S등급']||c['연체등급'])||'-').replace(/등급$/,''),
     contractNo: c['계약번호']||'', status: c['계약상태']||'-', startDate: c['시작일']||'-', endDate: c['종료일']||'-', dday: ddayStr,
     dStep: dStep, dLabel: dLabel,
     lateRate: lateRate, lateCount: lateCount, billCount: billCount, maxLateDays: maxLateDays, totalLateDays: totalLateDays,
