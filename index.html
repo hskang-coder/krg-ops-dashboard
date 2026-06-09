@@ -5548,7 +5548,7 @@ function parseContractMgmt(resp) {
   const telIdx      = findColIdx(labels, ['임차인휴대폰','임차인 연락처','임차인연락처'], 47); // AV
   const bpIdx       = findColIdx(labels, ['임대료연체'],        68);  // BQ
   const bsIdx       = findColIdx(labels, ['기타관리비'],        71);  // BT
-  const byGIdx      = findColIdx(labels, ['연체등급','첫 연체'], 77); // BZ
+  const byGIdx      = findColIdx(labels, ['S등급','연체등급','첫 연체'], 78); // CA
   const amtIdx      = findColIdx(labels, ['연체금액'],          78);  // CA
   let totalContracts = 0, delinqCount = 0;
   const gradeMap = {};
@@ -5562,7 +5562,7 @@ function parseContractMgmt(resp) {
     const cellNum = i => (i < 0 || !c[i]) ? 0 : Number(c[i].v ?? 0);
     const k    = cellStr(kIdx);
     const bp   = cellStr(bpIdx);
-    const byG  = cellStr(byGIdx);
+    const byG  = cellStr(byGIdx).replace(/등급/g,'').trim();
     const bs   = cellStr(bsIdx);
     const amt  = cellNum(amtIdx);
     const cno  = cellStr(noIdx);
@@ -20006,14 +20006,14 @@ async function okpi_render(){
     var btns=document.querySelectorAll('.dp-rbtn');
     for(var k=0;k<btns.length;k++){
       var rb=btns[k], tr=rb.closest('tr'); if(!tr) continue;
-      var cell=tr.children[0]; if(!cell) continue;
+      var cell=rb.parentNode; if(!cell) continue;
       if(cell.querySelector('.dp-fullbtn')) continue;
       var cno=rb.getAttribute('data-cno'); if(!cno) continue;
       var b=document.createElement('button');
       b.className='dp-fullbtn'; b.setAttribute('data-cno',cno);
       b.title='연체 대응 종합 REPORT'; b.textContent='종합';
-      b.style.cssText='display:block;margin:3px auto 0;cursor:pointer;border:1px solid #C9A227;background:#FFF7E0;color:#8a6d1a;border-radius:5px;font-size:10px;padding:1px 5px;line-height:1.3;white-space:nowrap;';
-      cell.appendChild(b);
+      b.style.cssText='display:inline-block;margin-right:4px;vertical-align:middle;cursor:pointer;border:1px solid #C9A227;background:#FFF7E0;color:#8a6d1a;border-radius:5px;font-size:10px;padding:1px 5px;line-height:1.3;white-space:nowrap;';
+      cell.insertBefore(b, rb);
     }
   }
   document.addEventListener('click',function(e){
