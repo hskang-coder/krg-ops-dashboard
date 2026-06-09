@@ -2065,7 +2065,7 @@ function parseVacancySheet(resp) {
       origDelivered: (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[origDeliveredIdx] && (c[origDeliveredIdx].v != null ? c[origDeliveredIdx].v : c[origDeliveredIdx].f)),
       // [v85] 시작일 (W열) — 진척/통계의 출력 기준
       startDate:     cell(startDateIdx),
-      // [v86/v201] 가계약일 (BI열)
+      // [v86/v201] 가계약일 (BJ열)
       tentativeDate: cell(tentativeDateIdx),
       // [v102] 실제 퇴실일 (Z열) — 거주기간/갱신차수 계산
       actualExitDate: cell(actualExitDateIdx),
@@ -15530,7 +15530,7 @@ function cmgBuildProgress(){
       addr: addr,                                                                    // [v235] 주소 (계약지주소+건물명+호수)
       contractInfo: v.contractInfo || (c && c['계약형태']) || '',                   // [v86] O열 계약정보
       startDate: startDate,
-      tentativeDate: v.tentativeDate || '',                                          // [v86/v201] BI열 가계약일
+      tentativeDate: v.tentativeDate || '',                                          // [v86/v201] BJ열 가계약일
       partnerName: v.partnerName || (c && c['부동산명']) || '',                     // [v88/v235] BM열 부동산 + fallback
       partnerPerson: v.partnerPerson || (c && c['계약담당자']) || '',                // [v88/v235] BN열 계약담당자 + fallback
       contractStatus: c ? (c['계약상태']||'') : '',
@@ -16084,7 +16084,7 @@ function sumCalcKpi(){
   };
   kpi.activeContracts = vacancyRawData.filter(isActiveStatus).length;
 
-  // 신규 가계약 (이번달 — BI열 tentativeDate가 이번달)
+  // 신규 가계약 (이번달 — BJ열 tentativeDate가 이번달)
   var today = new Date();
   var thisYM = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0');
   kpi.newTentative = vacancyRawData.filter(function(v){
@@ -16167,7 +16167,7 @@ function sumKpiBar(kpi){
     + '<div class="sum-kpi-card priority"><div class="sum-kpi-label">평균 거주기간</div><div class="sum-kpi-value">' + kpi.avgResidence + '<span class="sum-kpi-unit">개월</span></div><div class="sum-kpi-trend up">LTV 핵심 지표</div></div>'
     + '<div class="sum-kpi-card priority"><div class="sum-kpi-label">조기 연체율 (1~3개월)</div><div class="sum-kpi-value" style="color:#DC2626">' + kpi.earlyDelqRate + '<span class="sum-kpi-unit">%</span></div><div class="sum-kpi-trend down">위험 조기 식별</div></div>'
     + '<div class="sum-kpi-card priority"><div class="sum-kpi-label">연체 금액</div><div class="sum-kpi-value" style="color:#DC2626">' + fmtKor(kpi.delqAmount) + '</div><div class="sum-kpi-trend down">즉시 회수 대상</div></div>'
-    + '<div class="sum-kpi-card"><div class="sum-kpi-label">신규 가계약 (이번달)</div><div class="sum-kpi-value">' + kpi.newTentative + '<span class="sum-kpi-unit">건</span></div><div class="sum-kpi-trend neutral">BI열 기준</div></div>'
+    + '<div class="sum-kpi-card"><div class="sum-kpi-label">신규 가계약 (이번달)</div><div class="sum-kpi-value">' + kpi.newTentative + '<span class="sum-kpi-unit">건</span></div><div class="sum-kpi-trend neutral">BJ열 기준</div></div>'
     + '<div class="sum-kpi-card"><div class="sum-kpi-label">분할 약정 활성</div><div class="sum-kpi-value" style="color:#F59E0B">' + kpi.installmentDue + '<span class="sum-kpi-unit">건</span></div><div class="sum-kpi-trend neutral">수익 파이프라인</div></div>'
     + '<div class="sum-kpi-card"><div class="sum-kpi-label">활성 계약</div><div class="sum-kpi-value">' + kpi.activeContracts + '<span class="sum-kpi-unit">건</span></div><div class="sum-kpi-trend neutral">현재 진행중</div></div>'
     + '</div>';
@@ -16307,7 +16307,7 @@ function sumBuildMonthlyData(){
 // [v105/v106] Section ① 카드 HTML — 컨트롤 + 막대+라인 차트
 function sumRenderDailyCard(){
   var cfg = window._sumChartCfg;
-  var basisLabel = cfg.basis === 'startDate' ? '입주일 (W열)' : '가계약일 (BI열)';
+  var basisLabel = cfg.basis === 'startDate' ? '입주일 (W열)' : '가계약일 (BJ열)';
   var titleVerb = cfg.basis === 'startDate' ? '입주' : '가계약';
   var today = new Date();
   var todayDay = today.getDate();
