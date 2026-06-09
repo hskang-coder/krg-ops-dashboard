@@ -19918,7 +19918,7 @@ async function okpi_render(){
       +'</div></div></div>';
   };
   window._dpReport=function(cno){
-    if(typeof generateTenantDelqReport==='function'){ try{ generateTenantDelqReport(cno); return; }catch(e){} }
+    
     var i=window._dpPattern(cno), m=window._dpMeta[i.pattern];
     var old=document.getElementById('dpModal'); if(old)old.remove();
     var ov=document.createElement('div'); ov.id='dpModal';
@@ -19932,7 +19932,7 @@ async function okpi_render(){
         +'<div style="text-align:right;"><div style="font-size:34px;font-weight:900;line-height:1;">'+i.pattern+'</div><div style="font-size:12px;">'+m.n+'</div></div></div>'
       +'<div style="padding:16px 18px;">'
         +'<div style="background:#F9FAFB;border:1px solid #EAEEF3;border-radius:8px;padding:10px 12px;margin-bottom:12px;">'
-          +row('연체일수',i.days+'일')+row('연체등급',i.grade)+row('연체금액','₩'+i.amt.toLocaleString())+row('연체종류',i.delinqType||'-')+row('상태',(i.inst?'분납중':'연체중')+(i.ended?' · 퇴실/공실':''))+row('CB점수',i.cb!=null?(i.cb+(i.cb>=600?' (양호)':' (주의)')):'미보유')+'</div>'
+          +row('연체일수',i.days+'일')+row('연체등급',i.grade)+row('연체금액','₩'+i.amt.toLocaleString())+row('연체종류',i.delinqType||'-')+row('상태',(i.inst?'분납중':'연체중')+(i.ended?' · 퇴실/공실':''))+row('CB점수',i.cb!=null?(i.cb+(i.cb>=600?' (양호)':' (주의)')):'미보유')+row('정시 납부율',(function(){var P=[];try{P=paymentRawData||[];}catch(_e){try{P=window.paymentRawData||[];}catch(_e2){}}var C=String(cno),due=0,ok=0;for(var x=0;x<P.length;x++){if(String(P[x]['계약번호']||'').trim()!==C)continue;var st=String(P[x]['납부상태']||'').trim();if(st===''||st==='납부예정')continue;due++;if(st==='정상납부')ok++;}return due>0?(Math.round(ok/due*1000)/10+'% <span style="color:#9ca3af;font-size:11px;font-weight:400;">('+ok+'/'+due+'건)</span>'):'<span style="color:#9ca3af;">데이터 없음</span>';})())+'</div>'
         +'<div style="font-size:13px;margin-bottom:4px;"><b style="color:'+m.c+';">목표(Goal)</b> · '+m.goal+'</div>'
         +'<div style="font-size:13px;margin-bottom:4px;"><b style="color:'+m.c+';">권장 액션</b> · '+m.act+'</div>'
         +'<div style="font-size:12px;color:#6b7280;margin:6px 0 4px;"><b>배정 근거</b> · '+i.why.join(' / ')+'</div>'
@@ -19995,6 +19995,32 @@ async function okpi_render(){
   };
   document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.dp-rbtn');if(b){e.stopPropagation();e.preventDefault();window._dpReport(b.getAttribute('data-cno'));}},true);
   setInterval(function(){try{ if(document.getElementById('delinquencyView')) window._dpInject(); }catch(e){}},800);
+})();
+</script>
+
+<script>
+(function(){
+  if(window.__dpFullHooked) return; window.__dpFullHooked=true;
+  window._dpFullReport=function(cno){ if(typeof generateTenantDelqReport==='function'){ try{ generateTenantDelqReport(cno); return; }catch(e){ alert('종합 리포트를 불러오지 못했습니다.'); } } };
+  function inject(){
+    var btns=document.querySelectorAll('.dp-rbtn');
+    for(var k=0;k<btns.length;k++){
+      var rb=btns[k], tr=rb.closest('tr'); if(!tr) continue;
+      var cell=tr.children[0]; if(!cell) continue;
+      if(cell.querySelector('.dp-fullbtn')) continue;
+      var cno=rb.getAttribute('data-cno'); if(!cno) continue;
+      var b=document.createElement('button');
+      b.className='dp-fullbtn'; b.setAttribute('data-cno',cno);
+      b.title='연체 대응 종합 REPORT'; b.textContent='종합';
+      b.style.cssText='display:block;margin:3px auto 0;cursor:pointer;border:1px solid #C9A227;background:#FFF7E0;color:#8a6d1a;border-radius:5px;font-size:10px;padding:1px 5px;line-height:1.3;white-space:nowrap;';
+      cell.appendChild(b);
+    }
+  }
+  document.addEventListener('click',function(e){
+    var t=e.target&&e.target.closest?e.target.closest('.dp-fullbtn'):null;
+    if(t){ e.preventDefault(); e.stopPropagation(); var c=t.getAttribute('data-cno'); if(c&&window._dpFullReport) window._dpFullReport(c); }
+  }, true);
+  setInterval(inject, 800); if(document.readyState!=='loading') inject();
 })();
 </script>
 </body>
