@@ -19880,5 +19880,91 @@ async function okpi_render(){
   setInterval(function(){ var q=document.querySelectorAll('input[placeholder="000000-0000000"]'); for(var i=0;i<q.length;i++) check(q[i]); }, 700);
 })();
 </script>
+<script>
+/* [연체 대응 패턴 A~E + 리포트] v0.1 — 컬럼: 체크박스 ㅣ 계약번호 ㅣ 리포트 ㅣ 대응패턴 ㅣ ... (연체관리 표 렌더 비침습 주입) */
+(function(){
+  if(window.__dpHooked) return; window.__dpHooked=true;
+  function num(v){var n=parseInt(String(v==null?'':v).replace(/[^0-9-]/g,''));return isNaN(n)?0:n;}
+  window._dpCB=function(cno){var b=null;(window.daeungRawData||[]).forEach(function(x){if(!x||String(x.no||'').trim()!==cno)return;var s=String(x.jobSub||'').replace(/\s/g,'');if(s.indexOf('법적조치검토')<0&&s.indexOf('내용증명발송')<0)return;var h=String(x.colH||'');var m=h.match(/(\d{3,4})/);if(m){var sc=parseInt(m[1]);if(sc>=200&&sc<=1000&&(b==null||sc>b))b=sc;}});return b;};
+  window._dpMeta={A:{n:'연체 사실 확인 고지',c:'#2E7D32',goal:'연체 인지→자발적 납부 유도(수납관리 수준)',act:'안내 문자/전화 1회, 납부 링크·계좌 안내',msg:'[성명]님, [호수] 임대료 [금액]원이 미납입니다. 확인 후 납부 부탁드립니다.'},B:{n:'약속일 확답',c:'#2E75B6',goal:'납부 약속일 확정·기록',act:'통화로 약속일 확답·기록, 1차 독촉',msg:'[성명]님, 미납 임대료 납부 가능 날짜를 회신 부탁드립니다. 확인되는 대로 기록하겠습니다.'},C:{n:'패널티+법 진행 안내',c:'#E67E22',goal:'법적 압박을 통한 회수',act:'내용증명→지급명령→채무불이행자명부등재 단계 진행',msg:'[성명]님, 임대료 [금액]원 미납 지속으로 내용증명 발송 및 지급명령 등 법적 절차를 안내드립니다. 기한 내 납부 바랍니다.'},D:{n:'분납 의무 진행',c:'#7030A0',goal:'분납 합의 이행 관리',act:'분납 스케줄 확정, 회차별 이행 점검',msg:'[성명]님, 합의하신 분납 일정에 따라 납부 부탁드립니다. 미이행 시 잔액 일시청구 및 법적 절차가 진행될 수 있습니다.'},E:{n:'강제퇴실 진행',c:'#C0392B',goal:'계약 종료·점유 회수',act:'명도/강제퇴실 절차, 보증금 정산, 명부등재',msg:'[성명]님, 장기 미납으로 계약 해지 및 명도(강제퇴실) 절차를 진행합니다. 보증금에서 미납액 정산, 잔여 채무는 별도 회수됩니다.'}};
+  window._dpPattern=function(cno){
+    cno=String(cno).trim();
+    var d=(window._dlqTableRows||[]).find(function(r){return String(r.cno).trim()===cno;})||{};
+    var days=num(d.days), amt=num(d.amt), grade=String(d.grade||'').replace(/등급/,'').trim();
+    var inst=/분납/.test(String(d['연체구분']||''));
+    var ended=/퇴실|공실/.test(String(d.vacancyStatus||''))||/종료/.test(String(d.contractStatus||''));
+    var cb=window._dpCB(cno);
+    var sev=(grade==='D'||grade==='E'||grade==='F'), mild=(grade==='S'||grade==='A'||grade==='B');
+    var p,why=[];
+    if(ended){p='E';why.push('계약 종료/공실(퇴실상태) → 종결·회수 트랙');}
+    else if(inst){p='D';why.push('분납중 → D 우선(분납 약속 불이행 시 승급)');}
+    else if(days>60&&(grade==='E'||grade==='F')){p='E';why.push('연체 '+days+'일 & 등급 '+grade+' → 강제퇴실 검토');}
+    else if(days>30&&sev){p='C';why.push('장기('+days+'일) & 고위험 등급 '+grade+' → 법 진행');}
+    else if(mild&&days<=7){p='A';why.push('경증 등급 '+grade+' & 단기 '+days+'일 → 수납관리 수준'+(cb!=null?(cb>=600?' (CB '+cb+' 양호)':' (CB '+cb+')'):''));}
+    else {p='B';why.push('중간 → 약속일 확답(무응답 시 C 승급)');}
+    return {pattern:p,nm:String(d.nm||''),days:days,amt:amt,grade:grade||'-',inst:inst,ended:ended,cb:cb,why:why,delinqType:String(d.delinqType||''),group:String(d.group||'')};
+  };
+  window._dpReport=function(cno){
+    var i=window._dpPattern(cno), m=window._dpMeta[i.pattern];
+    var old=document.getElementById('dpModal'); if(old)old.remove();
+    var ov=document.createElement('div'); ov.id='dpModal';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;';
+    ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+    function row(k,v){return '<div style="display:flex;gap:8px;font-size:13px;margin:3px 0;"><div style="width:88px;color:#6b7280;flex:none;">'+k+'</div><div style="color:#111827;font-weight:600;">'+v+'</div></div>';}
+    var msg=m.msg.replace('[성명]',i.nm||'고객').replace('[금액]',i.amt.toLocaleString());
+    ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:520px;width:92%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:inherit;">'
+      +'<div style="background:'+m.c+';color:#fff;padding:14px 18px;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:space-between;">'
+        +'<div><div style="font-size:12px;opacity:.85;">연체 대응 리포트 · '+cno+'</div><div style="font-size:18px;font-weight:800;">'+(i.nm||'')+' <span style="font-size:13px;font-weight:600;opacity:.9;">('+i.group+')</span></div></div>'
+        +'<div style="text-align:right;"><div style="font-size:34px;font-weight:900;line-height:1;">'+i.pattern+'</div><div style="font-size:12px;">'+m.n+'</div></div></div>'
+      +'<div style="padding:16px 18px;">'
+        +'<div style="background:#F9FAFB;border:1px solid #EAEEF3;border-radius:8px;padding:10px 12px;margin-bottom:12px;">'
+          +row('연체일수',i.days+'일')+row('연체등급',i.grade)+row('연체금액','₩'+i.amt.toLocaleString())+row('연체종류',i.delinqType||'-')+row('상태',(i.inst?'분납중':'연체중')+(i.ended?' · 퇴실/공실':''))+row('CB점수',i.cb!=null?(i.cb+(i.cb>=600?' (양호)':' (주의)')):'미보유')+'</div>'
+        +'<div style="font-size:13px;margin-bottom:4px;"><b style="color:'+m.c+';">목표(Goal)</b> · '+m.goal+'</div>'
+        +'<div style="font-size:13px;margin-bottom:4px;"><b style="color:'+m.c+';">권장 액션</b> · '+m.act+'</div>'
+        +'<div style="font-size:12px;color:#6b7280;margin:6px 0 4px;"><b>배정 근거</b> · '+i.why.join(' / ')+'</div>'
+        +'<div style="font-size:12px;color:#374151;margin-top:8px;font-weight:700;">📝 권장 문구 (수정 후 사용)</div>'
+        +'<textarea id="dpMsg" style="width:100%;height:72px;margin-top:4px;font-size:12px;padding:8px;border:1px solid #d1d5db;border-radius:6px;resize:vertical;box-sizing:border-box;">'+msg+'</textarea>'
+        +'<div style="text-align:right;margin-top:8px;"><button id="dpCopyBtn" style="background:'+m.c+';color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">문구 복사</button> <button id="dpCloseBtn" style="background:#E5E7EB;border:none;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;">닫기</button></div>'
+        +'<div style="font-size:10px;color:#9CA3AF;margin-top:8px;">※ 패턴 v0.1 — 연체등급·연체일수·분납·퇴실 기준 자동 배정. 경계값은 추후 조정.</div>'
+      +'</div></div>';
+    document.body.appendChild(ov);
+    var cpy=ov.querySelector('#dpCopyBtn'); if(cpy)cpy.addEventListener('click',function(){try{navigator.clipboard.writeText(document.getElementById('dpMsg').value);this.textContent='복사됨';}catch(e){}});
+    var cls=ov.querySelector('#dpCloseBtn'); if(cls)cls.addEventListener('click',function(){ov.remove();});
+  };
+  window._dpInject=function(){
+    var dv=document.getElementById('delinquencyView'); if(!dv)return;
+    var table=dv.querySelector('table'); if(!table)return;
+    var headRow=table.querySelector('thead tr')||table.querySelector('tr');
+    if(headRow && !headRow.querySelector('.dp-h')){
+      var ths=headRow.children, idx=-1;
+      for(var i=0;i<ths.length;i++){ if(/계약번호/.test(ths[i].textContent)){idx=i;break;} }
+      if(idx<0)idx=1;
+      var base=ths[idx];
+      var mk=function(t){var th=document.createElement(base.tagName);th.className='dp-h';th.textContent=t;th.style.cssText=base.style.cssText;th.style.textAlign='center';return th;};
+      base.insertAdjacentElement('afterend', mk('대응패턴'));
+      base.insertAdjacentElement('afterend', mk('리포트'));
+    }
+    var rows=table.querySelectorAll('tr.dlq-tbl-row');
+    for(var k=0;k<rows.length;k++){ var tr=rows[k];
+      if(tr.querySelector('.dp-c'))continue;
+      var cb=tr.querySelector('input.dlq-row-cb'); if(!cb)continue;
+      var cno=cb.value, tds=tr.children, ix=-1;
+      for(var j=0;j<tds.length;j++){ if(tds[j].textContent.trim()===String(cno)){ix=j;break;} }
+      if(ix<0)ix=1;
+      var info=null; try{info=window._dpPattern(cno);}catch(e){}
+      var tdR=document.createElement('td'); tdR.className='dp-c'; tdR.style.textAlign='center';
+      tdR.innerHTML='<button class="dp-rbtn" data-cno="'+cno+'" title="연체 리포트" style="background:#fff;border:1px solid #d1d5db;border-radius:6px;padding:2px 7px;cursor:pointer;font-size:13px;">📋</button>';
+      var tdP=document.createElement('td'); tdP.className='dp-c'; tdP.style.textAlign='center';
+      if(info){var mt=window._dpMeta[info.pattern];tdP.innerHTML='<span title="'+mt.n+'" style="display:inline-block;min-width:20px;background:'+mt.c+';color:#fff;font-weight:800;font-size:12px;border-radius:5px;padding:2px 7px;">'+info.pattern+'</span>';}
+      else tdP.textContent='-';
+      var b=tds[ix];
+      b.insertAdjacentElement('afterend', tdP);
+      b.insertAdjacentElement('afterend', tdR);
+    }
+  };
+  document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.dp-rbtn');if(b){e.stopPropagation();e.preventDefault();window._dpReport(b.getAttribute('data-cno'));}},true);
+  setInterval(function(){try{ if(document.getElementById('delinquencyView')) window._dpInject(); }catch(e){}},800);
+})();
+</script>
 </body>
 </html>
