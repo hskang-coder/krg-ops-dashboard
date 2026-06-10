@@ -5548,7 +5548,8 @@ function parseContractMgmt(resp) {
   const telIdx      = findColIdx(labels, ['임차인휴대폰','임차인 연락처','임차인연락처'], 47); // AV
   const bpIdx       = findColIdx(labels, ['임대료연체'],        68);  // BQ
   const bsIdx       = findColIdx(labels, ['기타관리비'],        71);  // BT
-  const byGIdx      = findColIdx(labels, ['S등급','연체등급','첫 연체'], 78); // CA
+  let byGIdx = findColIdx(labels, ['S등급','등급','연체등급','책 연체'], 78);
+  byGIdx = (function(w){function gr(x){var tt=0,h=0;for(var i=0;i<rows.length&&tt<240;i++){var cc=(rows[i].c||[])[x];var vv=cc?String(cc.f!=null?cc.f:(cc.v!=null?cc.v:'')).trim():'';if(!vv)continue;tt++;if(/^[SABCDEF](등급)?$/.test(vv))h++;}return tt?h/tt:0;}if(w>=0&&gr(w)>=0.3)return w;var best=w,bs=0.5;for(var c2=0;c2<labels.length;c2++){var s=gr(c2);if(s>bs){bs=s;best=c2;}}return best;})(byGIdx); // CA
   const amtIdx      = findColIdx(labels, ['연체금액'],          78);  // CA
   let totalContracts = 0, delinqCount = 0;
   const gradeMap = {};
