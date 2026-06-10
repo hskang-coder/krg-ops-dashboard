@@ -5585,8 +5585,8 @@ function parseContractMgmt(resp) {
       }
     } else if (bp === '연체' && cno) {
       // 종료 계약자 중 연체 상태 (퇴실일)
-      const exitDateStr = cellStr(exitIdx);
-      terminatedDelinqRows.push({ cno, nm, grade: byG, amt, bs, info, tel, exitDateStr });
+      const exitDateStr = cellStr(exitIdx); var actualExitDateStr = cellStr(findColIdx(labels, ['실제퇴실'], -1));
+      terminatedDelinqRows.push({ cno, nm, grade: byG, amt, bs, info, tel, exitDateStr, actualExitDateStr });
     }
   });
   return { totalContracts, delinqCount, gradeMap, totalDelinqAmt, delinqRows, bsMap, terminatedDelinqRows };
@@ -6433,9 +6433,9 @@ function buildDlqUI(d1, d2, d3, d4) {
     const pay = (d3.payDateMap || {})[cno] || { dateStr:'-', payStatus:null, content:'-' };
     // 퇴실일 기준 3개월(90일) 이내 여부
     let contractStatus = '종료';
-    if (r.exitDateStr) {
+    if (r.actualExitDateStr || r.exitDateStr) {
       try {
-        const ex = parseKorDate(r.exitDateStr);
+        const ex = parseKorDate(r.actualExitDateStr || r.exitDateStr);
         if (ex) {
           ex.setHours(0,0,0,0);
           const diffDays = (_today90 - ex) / 86400000;
