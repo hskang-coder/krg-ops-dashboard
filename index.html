@@ -20027,5 +20027,27 @@ async function okpi_render(){
   setInterval(inject, 800); if(document.readyState!=='loading') inject();
 })();
 </script>
+
+<script>
+(function(){
+  if(window.__rnwGroupColorHooked) return; window.__rnwGroupColorHooked=true;
+  var JUK='주거용', SANG='상업용';
+  function run(){
+    var tb=document.querySelector('table.rnw-tbl'); if(!tb) return;
+    var tds=tb.querySelectorAll('td');
+    for(var i=0;i<tds.length;i++){
+      var td=tds[i]; if(td.getAttribute('data-grpc')) continue;
+      var t=td.textContent.trim();
+      if(t!==JUK && t!==SANG) continue;
+      if(td.children.length) continue;
+      var juk=(t===JUK);
+      var bg=juk?'#E7F0FF':'#FFEDD9', fg=juk?'#1856C4':'#C2410C';
+      td.setAttribute('data-grpc','1');
+      td.innerHTML='<span style="display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;background:'+bg+';color:'+fg+';">'+t+'</span>';
+    }
+  }
+  setInterval(run, 800); if(document.readyState!=='loading') run();
+})();
+</script>
 </body>
 </html>
