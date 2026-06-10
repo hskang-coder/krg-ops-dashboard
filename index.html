@@ -1991,7 +1991,8 @@ function parseVacancySheet(resp) {
   const coPhoneIdx     = findColIdx(labels, ['연락처'],            53);  // BB
   const coRrnIdx       = findColIdx(labels, ['주민번호.1'],        54);  // BC
   const inspectTypeIdx = findColIdx(labels, ['심사구분'],          58);  // BG
-  const tentativeDateIdx= findColIdx(labels, ['가계약일'],         61);  // BJ
+let tentativeDateIdx = findColIdx(labels, ['가계약일'], 61);
+  tentativeDateIdx = (function(w){function dt(x){var tt=0,h=0;for(var i=0;i<rows.length&&tt<240;i++){var cc=(rows[i].c||[])[x];var vv=cc?String(cc.f!=null?cc.f:(cc.v!=null?cc.v:'')).trim():'';if(!vv)continue;tt++;if(/\d{4}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2}/.test(vv)||/^Date\(/.test(vv))h++;}return tt?h/tt:0;}return (w>=0&&dt(w)>=0.3)?w:61;})(tentativeDateIdx);  // BJ
   const partnerNameIdx = findColIdx(labels, ['부동산명'],          64);  // BM
   const partnerPersonIdx= findColIdx(labels, ['계약담당자'],       65);  // BN
   // [v241] '공실상태' 라벨이 F열·BO열 양쪽에 존재할 가능성 — 마지막(BO) 우선 매칭으로 F열 작업 영향 차단
@@ -1999,7 +2000,8 @@ function parseVacancySheet(resp) {
   const exitDateIdx    = findColIdx(labels, ['실제퇴실일'],        67);  // BP
   const billCountIdx   = findColIdx(labels, ['청구수','청구횟수'], 71);  // BT
   // [v361] BT열 연체외주 — gid=1953907648 vacancy 시트
-  const outsourceIdx   = findColIdx(labels, ['연체외주','연체 외주'], 71);  // BT
+let outsourceIdx = findColIdx(labels, ['연체외주','연체 외주'], 71);
+  outsourceIdx = (function(w){function st(x){var tt=0,s=0;for(var i=0;i<rows.length&&tt<240;i++){var cc=(rows[i].c||[])[x];var vv=cc?String(cc.f!=null?cc.f:(cc.v!=null?cc.v:'')).trim():'';if(!vv||vv==='-')continue;tt++;if(/^(정상|연체|분납중|납부예정|연체중|미납)$/.test(vv))s++;}return tt?s/tt:0;}return (w>=0&&st(w)<0.5)?w:71;})(outsourceIdx);  // BT
   // [v74] 입주 전 진척 5개 (TRUE/FALSE)
   const homeBtnIdx   = findColIdx(labels, ['홈버튼등록'],          81);  // CD
   const eContractIdx = findColIdx(labels, ['전자계약'],            82);  // CE
