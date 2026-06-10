@@ -1941,6 +1941,7 @@ async function loadLandlordAccounts() {
       const acct = c[111] ? String(c[111].f != null ? c[111].f : c[111].v != null ? c[111].v : '').trim() : '';
       const cv = c[99] ? String(c[99].f != null ? c[99].f : c[99].v != null ? c[99].v : '').trim() : '';
       if (no && acct) map[no] = acct;
+      if (no) { window.__jhDelq = window.__jhDelq || {}; window.__jhDelq[no] = (c[0] ? String(c[0].v != null ? c[0].v : '').trim() : ''); }
       if (no && cv && cv !== '-' && cv !== '--') mxMap[no] = cv;
     });
     landlordAccountMap = map;
@@ -5564,7 +5565,7 @@ function parseContractMgmt(resp) {
     const cellStr = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
     const cellNum = i => (i < 0 || !c[i]) ? 0 : Number(c[i].v ?? 0);
     const k    = cellStr(kIdx);
-    const bp   = cellStr(bpIdx);
+    const bp   = ((window.__jhDelq && window.__jhDelq[cellStr(noIdx)] === '연체') ? '연체' : cellStr(bpIdx));
     const byG  = cellStr(byGIdx).replace(/등급/g,'').trim();
     const bs   = cellStr(bsIdx);
     const amt  = cellNum(amtIdx);
