@@ -20065,8 +20065,8 @@ async function okpi_render(){
     var craw; try { craw = contractRawData; } catch(e){ craw = []; }
     var active = {}; for (var i=0;i<craw.length;i++){ var c=craw[i]; if (String(c['계약상태']==null?'':c['계약상태']).trim()==='정상') active[String(c['계약번호']==null?'':c['계약번호']).trim()]=1; }
     var R = [], all = [];
-    for (var i=0;i<pr.length;i++){ var o=pr[i]; var ty=String(o['납부종류']==null?'':o['납부종류']).trim(); if(!matchType(pt,ty))continue; var cno=String(o['계약번호']==null?'':o['계약번호']).trim(); if(!active[cno])continue; var due=ser(o['납기일']); var st=String(o['납부상태']==null?'':o['납부상태']).trim(); all.push({cno:cno,due:due,st:st}); if(st==='연체중'||st==='분납중') R.push({cno:cno,due:due}); }
-    function delqAsOf(a){ var s={}; for(var i=0;i<R.length;i++){var r=R[i]; if(r.due!=null&&r.due<=a)s[r.cno]=1;} var n=0;for(var k in s)n++;return n; }
+    for (var i=0;i<pr.length;i++){ var o=pr[i]; var ty=String(o['납부종류']==null?'':o['납부종류']).trim(); if(!matchType(pt,ty))continue; var cno=String(o['계약번호']==null?'':o['계약번호']).trim(); if(!active[cno])continue; var due=ser(o['납기일']); var pay=ser(o['납부일']); var st=String(o['납부상태']==null?'':o['납부상태']).trim(); all.push({cno:cno,due:due,st:st}); if(st==='연체중'||st==='분납중'){ R.push({cno:cno,due:due,pay:null}); } else if(st==='연체납부'){ R.push({cno:cno,due:due,pay:pay}); } }
+    function delqAsOf(a){ var s={}; for(var i=0;i<R.length;i++){var r=R[i]; if(r.due==null||r.due>a)continue; if(r.pay!=null){ if(r.pay>a)s[r.cno]=1; } else { s[r.cno]=1; } } var n=0;for(var k in s)n++;return n; }
     function billed(y,mo){ var lo=y*10000+mo*100+1,hi=y*10000+mo*100+31,s={}; for(var i=0;i<all.length;i++){var r=all[i]; if(r.due!=null&&r.due>=lo&&r.due<=hi)s[r.cno]=1;} var n=0;for(var k in s)n++;return n; }
     var today=new Date(),TY=today.getFullYear(),TM=today.getMonth()+1,TD=today.getDate();
     function mb(n){ var d=new Date(TY,TM-1-n,1); return {y:d.getFullYear(),m:d.getMonth()+1}; }
