@@ -20075,7 +20075,7 @@ async function okpi_render(){
       var sd={'정상납부':[],'연체납부':[],'연체중':[],'분납중':[]}; for(var d=1;d<=31;d++){for(var k in sd)sd[k].push(0);}
       for(var i=0;i<all.length;i++){var r=all[i];if(r.due==null)continue;var yy=Math.floor(r.due/10000),mm=Math.floor(r.due/100)%100,dd=r.due%100;if(yy===y&&mm===mo&&sd[r.st]&&dd>=1&&dd<=31&&activeAt(r.cno,r.due))sd[r.st][dd-1]++;}
       return {cnt:cnt,rate:rate,status:sd,label:mlabel(y,mo),billed:b}; }
-    function monthAgg(y,mo){ var ld=lastDay(y,mo),isCur=(y===TY&&mo===TM),asof=isCur?(TY*10000+TM*100+TD):(y*10000+mo*100+ld),b=billed(y,mo)||1,c=delqAsOf(asof);
+    function monthAgg(y,mo){ var ld=lastDay(y,mo),day=Math.min(TD,ld),asof=y*10000+mo*100+day,b=billed(y,mo)||1,c=delqAsOf(asof);
       var sc={'정상납부':0,'연체납부':0,'연체중':0,'분납중':0}; for(var i=0;i<all.length;i++){var r=all[i];if(r.due==null)continue;var yy=Math.floor(r.due/10000),mm=Math.floor(r.due/100)%100;if(yy===y&&mm===mo&&sc[r.st]!=null&&activeAt(r.cno,r.due))sc[r.st]++;}
       return {count:c,rate:+(c/b*100).toFixed(2),label:mlabel(y,mo),billed:b,status:sc}; }
     var res={ today:{count:delqAsOf(TY*10000+TM*100+TD),day:TD}, monthDaily:monthDaily, monthAgg:monthAgg, TY:TY,TM:TM,TD:TD };
@@ -20156,7 +20156,7 @@ async function okpi_render(){
           return;
         }
         var recent=ma[ma.length-1], prev=ma[ma.length-2];
-        lg.innerHTML=sw(COL.mon, '월말 기준 ('+labels[0]+'~'+labels[labels.length-1]+')');
+        lg.innerHTML=sw(COL.mon, '매월 '+S.TD+'일 기준 ('+labels[0]+'~'+labels[labels.length-1]+')');
         if(mode==='count'){ mt.innerHTML=(prev?ml('#A32D2D','전월 대비',pc(recent.count,prev.count)):'')+ml('#185FA5','당월 연체',recent.count+'명')+ml('#6b7280','기간 평균',Math.round(ma.reduce(function(s,x){return s+x.count;},0)/ma.length)+'명'); }
         else { mt.innerHTML=ml('#185FA5','당월 연체율',recent.rate+'%')+(prev?ml('#e8852b','전월',prev.rate+'%'):''); }
         if(mode==='count'){ chart=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{label:'연체 인원',data:ma.map(function(x){return x.count;}),backgroundColor:COL.mon,barPercentage:0.7,categoryPercentage:0.8}]},options:{responsive:true,maintainAspectRatio:false,animation:false,scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'명';}},grid:{color:'rgba(120,120,120,0.1)'}},x:monX},plugins:{legend:{display:false}}}}); }
