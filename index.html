@@ -20051,5 +20051,88 @@ async function okpi_render(){
   setInterval(run, 800); if(document.readyState!=='loading') run();
 })();
 </script>
+<script>
+(function(){
+  if (window.__rnwDelqTrend) return; window.__rnwDelqTrend = true;
+  var CARD_ID = 'rnwDelqTrendCard';
+  function ser(v){ if (v == null || v === '') return null; if (v instanceof Date) return v.getFullYear()*10000 + (v.getMonth()+1)*100 + v.getDate(); var t = String(v); var m = t.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? (+m[1])*10000 + (+m[2])*100 + (+m[3]) : null; }
+  function lastDay(y, mo){ return new Date(y, mo, 0).getDate(); }
+  function compute(){
+    var pr; try { pr = paymentRawData; } catch(e){ pr = null; } if (!pr || !pr.length) return null;
+    var R = [];
+    for (var i=0;i<pr.length;i++){ var o = pr[i]; var ty = String(o['납부종류']==null?'':o['납부종류']); var cs = String(o['계약상태']==null?'':o['계약상태']).trim(); if (ty.indexOf('임대료') < 0 || cs !== '계약중') continue; R.push({ cno:String(o['계약번호']==null?'':o['계약번호']).trim(), due:ser(o['납기일']), pay:ser(o['납부일']), st:String(o['납부상태']==null?'':o['납부상태']).trim() }); }
+    function delqAsOf(asof){ var s={}; for (var i=0;i<R.length;i++){ var r=R[i]; if (r.due!=null && r.due<=asof && (r.pay==null || r.pay>asof) && r.cno) s[r.cno]=1; } var n=0; for (var k in s) n++; return n; }
+    function billed(y, mo){ var lo=y*10000+mo*100+1, hi=y*10000+mo*100+31, s={}; for (var i=0;i<R.length;i++){ var r=R[i]; if (r.due!=null && r.due>=lo && r.due<=hi && r.cno) s[r.cno]=1; } var n=0; for (var k in s) n++; return n; }
+    var today = new Date(); var TY = today.getFullYear(), TM = today.getMonth()+1, TD = today.getDate();
+    function monthsBack(n){ var d = new Date(TY, TM-1-n, 1); return { y:d.getFullYear(), m:d.getMonth()+1 }; }
+    var defs = [ {key:'cur', back:0}, {key:'prev', back:1}, {key:'prev2', back:2} ]; var series = {};
+    defs.forEach(function(def){ var ym = monthsBack(def.back); var y=ym.y, mo=ym.m; var ld = lastDay(y, mo); var isCur = (y===TY && mo===TM); var cap = isCur ? TD : ld; var b = billed(y, mo) || 1; var cnt = [], rate = [];
+      for (var d=1; d<=31; d++){ if (d > ld || d > cap){ cnt.push(null); rate.push(null); } else { var c = delqAsOf(y*10000+mo*100+d); cnt.push(c); rate.push(+(c/b*100).toFixed(2)); } }
+      series[def.key] = { y:y, m:mo, label:(String(y).slice(2)+'.'+('0'+mo).slice(-2)), billed:b, cnt:cnt, rate:rate }; });
+    var cur = series.cur; var sd = { '정상납부':[], '연체납부':[], '연체중':[], '분납중':[] }; for (var d=1; d<=31; d++){ for (var k in sd) sd[k].push(0); }
+    for (var i=0;i<R.length;i++){ var r=R[i]; if (r.due==null) continue; var yy=Math.floor(r.due/10000), mm=Math.floor(r.due/100)%100, dd=r.due%100; if (yy===cur.y && mm===cur.m && sd[r.st] && dd>=1 && dd<=31) sd[r.st][dd-1]++; }
+    series.status = sd; series.today = { count: delqAsOf(TY*10000+TM*100+TD), day: TD }; return series;
+  }
+  function build(anchorCard){
+    if (document.getElementById(CARD_ID)) return; var S = compute(); if (!S) return;
+    var days = []; for (var i=1;i<=31;i++) days.push(i);
+    var COL = { cur:'#2f6fc0', prev:'#e8852b', prev2:'#9ca3af', jeong:'#16a34a', napbu:'#e8852b', jung:'#dc2626', bunnab:'#7c3aed' };
+    var card = document.createElement('div'); card.id = CARD_ID; card.setAttribute('style','background:#fff;border:2px solid #4d8fe0;border-radius:10px;padding:12px 15px;position:relative;margin-bottom:13px;');
+    card.innerHTML =
+      '<div style="position:absolute;top:-11px;left:16px;background:#4d8fe0;color:#fff;font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;">일자별 연체 추이</div>'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:2px 0 8px;">'+
+        '<div style="display:flex;align-items:center;gap:7px;"><span style="font-size:17px;color:#185FA5;">▦</span><span style="font-size:14px;font-weight:600;">계약중 임대료 연체 · 일자별 (당월·전월·전전월)</span></div>'+
+        '<div id="rnwTabs" style="display:inline-flex;gap:6px;">'+
+          '<span data-mode="count" style="font-size:13px;padding:6px 14px;border-radius:8px;background:#185FA5;color:#fff;font-weight:600;cursor:pointer;">연체 인원</span>'+
+          '<span data-mode="rate" style="font-size:13px;padding:6px 14px;border-radius:8px;background:#eef1f6;color:#4b5563;cursor:pointer;">연체율</span>'+
+          '<span data-mode="status" style="font-size:13px;padding:6px 14px;border-radius:8px;background:#eef1f6;color:#4b5563;cursor:pointer;">납부상태</span>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:0 0 10px;">'+
+        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="font-size:11.5px;color:#9aa0a6;">검색기간</span>'+
+          '<input type="date" style="font-size:12px;padding:3px 6px;border:1px solid #cfd6e2;border-radius:6px;color:#374151;"><span style="color:#9aa0a6;">~</span>'+
+          '<input type="date" style="font-size:12px;padding:3px 6px;border:1px solid #cfd6e2;border-radius:6px;color:#374151;">'+
+          '<span style="font-size:12px;padding:4px 13px;border-radius:6px;background:#185FA5;color:#fff;font-weight:600;cursor:pointer;">적용</span></div>'+
+        '<div style="font-size:11.5px;color:#9aa0a6;">오늘('+S.today.day+'일) 계약중 임대료 연체 <b style="color:#dc2626;">'+S.today.count+'명</b></div>'+
+      '</div>'+
+      '<div id="rnwMetrics" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px;"></div>'+
+      '<div id="rnwLegend" style="display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:#6b7280;margin-bottom:4px;"></div>'+
+      '<div style="position:relative;width:100%;height:200px;"><canvas id="rnwCanvas"></canvas></div>'+
+      '<div style="margin-top:8px;font-size:11px;color:#9aa0a6;">계약중 임대료 기준 · 납기 지나 미납이면 카운트(이월 포함) · 계약번호 중복제거 · 당월은 오늘까지 · 연체율·납부상태 로그축</div>';
+    anchorCard.parentNode.insertBefore(card, anchorCard);
+    var sw=function(c,t){ return '<span><i style="display:inline-block;vertical-align:middle;margin-right:5px;width:11px;height:11px;border-radius:2px;background:'+c+'"></i>'+t+'</span>'; };
+    var ml=function(c,k,v){ return '<div style="border-radius:8px;padding:7px 12px;min-width:118px;background:#f4f6fa;"><div style="font-size:11px;color:#6b7280;">'+k+'</div><div style="font-size:19px;font-weight:600;line-height:1.15;color:'+c+'">'+v+'</div></div>'; };
+    function lastVal(a){ for(var i=a.length-1;i>=0;i--) if(a[i]!=null) return a[i]; return 0; }
+    function pc(a,b){ if(!b) return '-'; var v=(a-b)/b*100; return (v>=0?'▲ ':'▼ ')+Math.abs(v).toFixed(1)+'%'; }
+    var curToday=lastVal(S.cur.cnt), prevSame=S.prev.cnt[S.today.day-1]!=null?S.prev.cnt[S.today.day-1]:lastVal(S.prev.cnt), prev2Same=S.prev2.cnt[S.today.day-1]!=null?S.prev2.cnt[S.today.day-1]:lastVal(S.prev2.cnt);
+    var logY = { type:'logarithmic', grid:{ color:'rgba(120,120,120,0.1)' } };
+    var xopt = { ticks:{ font:{size:10}, autoSkip:false, maxRotation:0, callback:function(v,i){ var d=i+1; return (d===1||d%5===0||d===31)?d:''; } }, grid:{ display:false } };
+    var chart=null;
+    function render(mode){
+      var lg=card.querySelector('#rnwLegend'), mt=card.querySelector('#rnwMetrics');
+      if(chart){ chart.destroy(); chart=null; } var ctx=card.querySelector('#rnwCanvas');
+      if(mode==='count'){
+        lg.innerHTML=sw(COL.cur,'당월('+S.cur.label+')')+sw(COL.prev,'전월('+S.prev.label+')')+sw(COL.prev2,'전전월('+S.prev2.label+')');
+        mt.innerHTML=ml('#A32D2D','전월 동일 대비',pc(curToday,prevSame))+ml('#A32D2D','전전월 동일 대비',pc(curToday,prev2Same))+ml('#185FA5','당월 연체(오늘)',curToday+'명');
+        chart=new Chart(ctx,{ type:'bar', data:{ labels:days, datasets:[{label:'당월',data:S.cur.cnt,backgroundColor:COL.cur,barPercentage:0.95,categoryPercentage:0.72},{label:'전월',data:S.prev.cnt,backgroundColor:COL.prev,barPercentage:0.95,categoryPercentage:0.72},{label:'전전월',data:S.prev2.cnt,backgroundColor:COL.prev2,barPercentage:0.95,categoryPercentage:0.72}]}, options:{ responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false}, scales:{ y:{beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'명';}},grid:{color:'rgba(120,120,120,0.1)'}}, x:xopt }, plugins:{legend:{display:false}} } });
+      } else if(mode==='rate'){
+        lg.innerHTML=sw(COL.cur,'당월')+sw(COL.prev,'전월')+sw(COL.prev2,'전전월');
+        var r0=lastVal(S.cur.rate), r1=S.prev.rate[S.today.day-1]!=null?S.prev.rate[S.today.day-1]:lastVal(S.prev.rate), r2=S.prev2.rate[S.today.day-1]!=null?S.prev2.rate[S.today.day-1]:lastVal(S.prev2.rate);
+        mt.innerHTML=ml('#185FA5','당월 연체율',r0+'%')+ml('#e8852b','전월',r1+'%')+ml('#6b7280','전전월',r2+'%');
+        chart=new Chart(ctx,{ type:'line', data:{ labels:days, datasets:[{label:'당월',data:S.cur.rate,borderColor:COL.cur,backgroundColor:'transparent',tension:0.3,borderWidth:2.5,pointRadius:0,spanGaps:true},{label:'전월',data:S.prev.rate,borderColor:COL.prev,backgroundColor:'transparent',tension:0.3,borderWidth:2,pointRadius:0,spanGaps:true},{label:'전전월',data:S.prev2.rate,borderColor:COL.prev2,backgroundColor:'transparent',borderDash:[5,3],tension:0.3,borderWidth:2,pointRadius:0,spanGaps:true}]}, options:{ responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false}, scales:{ y:Object.assign({},logY,{min:0.1,ticks:{font:{size:10},callback:function(v){return [0.1,0.5,1,2,5,10,20].indexOf(v)>=0?v+'%':'';}}}), x:xopt }, plugins:{legend:{display:false}} } });
+      } else {
+        lg.innerHTML=sw(COL.jeong,'정상납부')+sw(COL.napbu,'연체납부')+sw(COL.jung,'연체중')+sw(COL.bunnab,'분납중');
+        mt.innerHTML='<div style="font-size:11.5px;color:#9aa0a6;align-self:center;">당월('+S.cur.label+') 납기일 일자별 납부상태 (건, 로그축)</div>';
+        var g=function(a){return a.map(function(v){return v>0?v:null;});};
+        chart=new Chart(ctx,{ type:'line', data:{ labels:days, datasets:[{label:'정상납부',data:g(S.status['정상납부']),borderColor:COL.jeong,backgroundColor:'transparent',tension:0.3,borderWidth:2,pointRadius:0,spanGaps:true},{label:'연체납부',data:g(S.status['연체납부']),borderColor:COL.napbu,backgroundColor:'transparent',tension:0.3,borderWidth:2,pointRadius:0,spanGaps:true},{label:'연체중',data:g(S.status['연체중']),borderColor:COL.jung,backgroundColor:'transparent',tension:0.3,borderWidth:2.5,pointRadius:0,spanGaps:true},{label:'분납중',data:g(S.status['분납중']),borderColor:COL.bunnab,backgroundColor:'transparent',tension:0.3,borderWidth:2.5,pointRadius:0,spanGaps:true}]}, options:{ responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false}, scales:{ y:Object.assign({},logY,{min:0.5,ticks:{font:{size:10},callback:function(v){return [1,2,5,10,20,50].indexOf(v)>=0?v+'건':'';}}}), x:xopt }, plugins:{legend:{display:false}} } });
+      }
+    }
+    var tabs=card.querySelectorAll('#rnwTabs span');
+    tabs.forEach(function(t){ t.addEventListener('click',function(){ tabs.forEach(function(x){ x.style.background='#eef1f6'; x.style.color='#4b5563'; x.style.fontWeight='400'; }); t.style.background='#185FA5'; t.style.color='#fff'; t.style.fontWeight='600'; render(t.getAttribute('data-mode')); }); });
+    render('count');
+  }
+  var iv = setInterval(function(){ if (typeof Chart === 'undefined') return; var title = [].slice.call(document.querySelectorAll('.sum-card-title')).filter(function(e){ return /③\s*초기\s*연체자/.test(e.textContent||''); })[0]; if (!title) return; var card = title.closest('.sum-card') || title.parentElement; var view = card.closest('.view-content.active'); if (!view) return; build(card); }, 1000);
+})();
+</script>
 </body>
 </html>
