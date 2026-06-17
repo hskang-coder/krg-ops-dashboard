@@ -9728,6 +9728,12 @@ function addExtraParty(){
     +   '<div style="grid-column:span 2"><label style="font-size:10.5px;font-weight:600;color:#374151;display:block;margin-bottom:3px">이름 / 법인명</label><input type="text" data-field="name" placeholder="홍길동 또는 ㈜개런티즈" style="width:100%;padding:7px 9px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box"></div>'
     + '</div>';
   list.appendChild(card);
+  // [v285] 계약자 추가 시 계약유형을 "공동계약"으로 자동 변경
+  var useTypeEl = document.getElementById('cG_m_useType');
+  if (useTypeEl) {
+    useTypeEl.value = '공동계약';
+    if (typeof cG_onUseTypeChange === 'function') cG_onUseTypeChange();
+  }
 }
 
 // [v156/v181] 모달에서 추가된 계약자 정보 수집 — 활성 모드의 list만 읽음
@@ -12505,33 +12511,10 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
     + '</div>'
     + '</div>';  // cG-page 끝
 
-  // ── Page 2: 을 + 병 + 체크리스트 + 기타 공동계약자 ──────
-  // [v156] 추가 계약자가 있으면 입력 데이터로 채운 블록을, 없으면 빈 양식 1개를 노출
-  var extraBlocksHtml;
-  if (extraParties.length > 0) {
-    extraBlocksHtml = extraParties.map(function(p){ return cG_buildExtraPartyCard(p, '8pt'); }).join('');
-  } else {
-    extraBlocksHtml = ''
-      + '<div style="border:2px solid #4b5563;border-radius:6px;padding:7px 10px;margin-top:8px">'
-      + '<div class="sig-ttl" style="background:#4b5563">공동명의계약인</div>'
-      + '<div style="display:grid;grid-template-columns:1fr 60px;margin-top:4px">'
-      + '<table class="sg-tbl" style="font-size:8pt">'
-      + '<colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>'
-      + '<tr><td class="sg-lbl" style="padding:3px 7px">주소</td><td colspan="3" style="border:1px dashed #c0c0c0;padding:3px 7px;height:20px"></td></tr>'
-      + '<tr><td class="sg-lbl" style="padding:3px 7px">연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td><td class="sg-lbl" style="padding:3px 7px">국적</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">-</td></tr>'
-      + '<tr><td class="sg-lbl" style="padding:3px 7px">주민등록번호</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td><td class="sg-lbl" style="padding:3px 7px">긴급연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
-      + '<tr><td class="sg-lbl" style="padding:3px 7px">이름(법인명)</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td><td class="sg-lbl" style="padding:3px 7px">관계, 이름</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
-      + '</table>'
-      + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:6px;border-left:1px dashed #c0c0c0;margin-left:5px">서명<br>혹은 인</div>'
-      + '</div></div>';
-  }
-
+  // ── Page 2: 을 + 병 + 체크리스트 ──────
   var p_parties = '<div class="cG-page">'
     // 병
     + cG_buildCoParty(hasCoParty, coTitle, d)
-    // 기타 공동계약자
-    + '<div style="margin-top:12px;font-size:11pt;font-weight:700;text-align:center;color:#1B3976">기타 공동계약자</div>'
-    + extraBlocksHtml
     // 체크리스트
     + '<div class="ck-hdr" style="margin-top:14px">'
     + '<div style="display:flex;align-items:center"><span style="font-size:8.5pt;opacity:.8">KRG GROUP · GUARANTEEZ SERVICE</span><span style="margin-left:auto;font-size:8pt;opacity:.8">버전 1.0 / 2026년 기준</span></div>'
@@ -12545,6 +12528,17 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
     + '<div class="ck-item"><div class="ck-num">4</div><div class="ck-chk"></div><div>분할(12개월 무이자) 서비스수수료 선택 시, 중도 퇴실하면 잔여 수수료 전액을 일시납으로 납부해야 합니다.<div class="ck-sub">⚠ 입주일과 무관하게 잔여 기간 전액 일시 납부 적용</div></div></div>'
     + '<div class="ck-item"><div class="ck-num">5</div><div class="ck-chk"></div><div>계약자는 중도퇴실 시, 계약해지가 완료(후임세입자 입주 또는 임대인 합의)까지 임대료 납부 책임이 있으며, 중개보수료·원상회복·공과금 등 퇴실 정산이 완료되지 않을 시 계약해지되지 않습니다.<div class="ck-sub">⚠ 후임 세입자 미확보 시 책임 기간이 연장될 수 있음</div></div></div>'
     + '</div>';
+
+  // ── Page 2-1: 기타 공동계약자 (extraParties가 있으면 별도 페이지) ──────
+  // [v285] 추가 계약자 페이지 분리로 페이지 오버플로우 방지
+  var p_extra_parties = '';
+  if (extraParties.length > 0) {
+    var extraBlocksHtml = extraParties.map(function(p){ return cG_buildExtraPartyCard(p, '8pt'); }).join('');
+    p_extra_parties = '<div class="cG-page">'
+      + '<div style="margin-top:12px;font-size:11pt;font-weight:700;text-align:center;color:#1B3976">기타 공동계약자</div>'
+      + extraBlocksHtml
+      + '</div>';
+  }
 
   // ── Page 2: 개인정보 수집/제공 동의서 ─────────────────
   var p2 = '<div class="cG-page">'
@@ -12635,7 +12629,7 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
     + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">'
     + '<style>' + css + '</style></head><body>'
     + '<button class="print-btn no-print" onclick="window.print()">🖨️ PDF 저장 / 인쇄</button>'
-    + p1 + p_parties + p2 + p3
+    + p1 + p_parties + (p_extra_parties || '') + p2 + p3
     + cG_buildTerms()
     + '</body></html>';
 }
