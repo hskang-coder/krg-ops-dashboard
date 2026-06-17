@@ -12531,16 +12531,16 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
     + '</div>'
     + '</div>';  // cG-page 끝
 
-  // ── Page 2: 기타공동계약자 + 을 + 병 + 체크리스트 ──────
-  // [v362] 기타공동계약자를 마지막 서명 페이지에 통합 표시
+  // ── Page 2: 을 + 기타공동계약자 + 병 + 체크리스트 ──────
+  // [v362-v363] 기타공동계약자를 계약인2 아래, 체크리스트 위에 배치
   var p_parties = '<div class="cG-page">'
-    // 기타공동계약자 (여러 명)
-    + (extraParties.length > 0 ? '<div style="margin-bottom:16px;border-bottom:1px solid #e5e7eb;padding-bottom:12px;page-break-inside:avoid">'
+    // 병 (계약인2)
+    + cG_buildCoParty(hasCoParty, coTitle, d)
+    // 기타공동계약자 (계약인2 바로 아래)
+    + (extraParties.length > 0 ? '<div style="margin-top:16px;margin-bottom:16px;border-top:1px solid #e5e7eb;padding-top:12px;page-break-inside:avoid">'
       + '<div style="font-size:10pt;font-weight:700;margin-bottom:10px;color:#1B3976">기타 공동계약자</div>'
       + extraParties.map(function(p){ return cG_buildExtraPartyCard(p, '7.5pt'); }).join('')
       + '</div>' : '')
-    // 병
-    + cG_buildCoParty(hasCoParty, coTitle, d)
     // 체크리스트
     + '<div class="ck-hdr" style="margin-top:14px">'
     + '<div style="display:flex;align-items:center"><span style="font-size:8.5pt;opacity:.8">KRG GROUP · GUARANTEEZ SERVICE</span><span style="margin-left:auto;font-size:8pt;opacity:.8">버전 1.0 / 2026년 기준</span></div>'
