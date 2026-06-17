@@ -7976,9 +7976,10 @@ function cG_buildManualForm(){
     + section('① 계약 기본',
         // [v357/v358] 계약번호 — 시트 매칭 키 (A열). 기존 계약 발행 시 필수.
         // [v358] 계약유형과 동일한 노란 음영 (cG-warn) — 필수값 시각 통일
+        // [v360] onchange 이벤트로 vacancyRawData에서 계약정보(O열) 자동 조회
         row('c1',
           cell('계약번호 ' + H.req + ' <span style="font-size:10px;font-weight:600;color:#6B7280;margin-left:6px">마스터 시트 A열 — 기존 행 업데이트</span>',
-            inp('contractNo', '예: 58221', 'text', 'cG-warn'))
+            '<input type="text" id="cG_m_contractNo" placeholder="예: 58221" class="cG-fld cG-warn" onchange="cG_onContractNoChange()">')
         )
         // [v195/v196] 1행: 계약유형 / 계약정보구분 / 계약조건
       + row('c3',
@@ -8198,6 +8199,27 @@ function cG_autoToggleContractInfo(){
   ciEl.value = hasCo ? '공동전차인' : '단독계약';
   // [v354] 단독/공동에 따라 임차인 긴급연락처 라벨 토글 (필수 ↔ 선택)
   if (typeof cG_updateEmgRequired === 'function') cG_updateEmgRequired();
+}
+
+// [v360] 계약번호 입력 시 vacancyRawData(gid=1953907648)에서 계약정보(O열) 자동 조회
+function cG_onContractNoChange(){
+  var noEl = document.getElementById('cG_m_contractNo');
+  var ciEl = document.getElementById('cG_m_contractInfo');
+  if (!noEl || !ciEl) return;
+
+  var contractNo = (noEl.value || '').trim();
+  if (!contractNo) return;
+
+  // vacancyRawData에서 계약번호로 행 찾기
+  var vac = (window.vacancyRawData || vacancyRawData || []).find(function(v){
+    return String(v.no || '').trim() === contractNo;
+  });
+
+  // 찾으면 contractInfo(O열) 값으로 계약정보구분 자동 채우기
+  if (vac && vac.contractInfo) {
+    ciEl.value = vac.contractInfo;
+    ciEl.dataset.userEdit = ''; // 자동 입력이므로 userEdit 초기화
+  }
 }
 
 // [v354] 단독계약 시 임차인 긴급연락처 3필드를 "필수"로, 공동계약이면 "선택"으로 토글
@@ -9728,12 +9750,6 @@ function addExtraParty(){
     +   '<div style="grid-column:span 2"><label style="font-size:10.5px;font-weight:600;color:#374151;display:block;margin-bottom:3px">이름 / 법인명</label><input type="text" data-field="name" placeholder="홍길동 또는 ㈜개런티즈" style="width:100%;padding:7px 9px;border:1px solid #D1D5DB;border-radius:5px;font-size:12px;box-sizing:border-box"></div>'
     + '</div>';
   list.appendChild(card);
-  // [v285] 계약자 추가 시 계약유형을 "공동계약"으로 자동 변경
-  var useTypeEl = document.getElementById('cG_m_useType');
-  if (useTypeEl) {
-    useTypeEl.value = '공동계약';
-    if (typeof cG_onUseTypeChange === 'function') cG_onUseTypeChange();
-  }
 }
 
 // [v156/v181] 모달에서 추가된 계약자 정보 수집 — 활성 모드의 list만 읽음
@@ -12295,7 +12311,7 @@ function cG_buildTerms() {
 }
 
 // ── 메인 HTML 빌더 ────────────────────────────────────────
-// [v156] 추가 계약자 카드 1개 HTML — Page 2/4의 빈 양식 영역 대체
+// [v360] 추가 계약자 카드 — 3번째 이상의 서명란이 누락되지 않도록 구조 개선
 function cG_buildExtraPartyCard(party, fontSize) {
   fontSize = fontSize || '8pt';
   var esc = function(s){ return String(s||'').replace(/[<>]/g, function(m){ return m==='<'?'&lt;':'&gt;'; }); };
@@ -12303,15 +12319,19 @@ function cG_buildExtraPartyCard(party, fontSize) {
   var bg = party.type === '연대보증인' ? '#7c3aed' : '#4b5563';
   return '<div style="border:2px solid '+bg+';border-radius:6px;padding:7px 10px;margin-top:8px;break-inside:avoid;page-break-inside:avoid">'
     + '<div class="sig-ttl" style="background:'+bg+'">'+esc(typeLabel)+'</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 60px;margin-top:4px">'
-    + '<table class="sg-tbl" style="font-size:'+fontSize+'">'
+    + '<div style="display:flex;gap:8px;margin-top:4px">'
+    + '<div style="flex:1">'
+    + '<table class="sg-tbl" style="font-size:'+fontSize+';width:100%">'
     + '<colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>'
     + '<tr><td class="sg-lbl" style="padding:3px 7px">주소</td><td colspan="3" style="border:1px dashed #c0c0c0;padding:3px 7px;height:20px">'+esc(party.addr)+'</td></tr>'
     + '<tr><td class="sg-lbl" style="padding:3px 7px">연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">'+esc(party.phone)+'</td><td class="sg-lbl" style="padding:3px 7px">국적</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">-</td></tr>'
     + '<tr><td class="sg-lbl" style="padding:3px 7px">주민번호<br>(사업자번호)</td><td style="border:1px dashed #c0c0c0;padding:3px 7px">'+esc((function(r){ if(!r) return ''; var c = String(r).replace(/\s/g,''); if (/^\d{3}-\d{2}-\d{5}$/.test(c)) return c; return c.length>=8 ? (c.slice(0,8)+'******') : c; })(party.rrn))+'</td><td class="sg-lbl" style="padding:3px 7px">긴급연락처</td><td style="border:1px dashed #c0c0c0;padding:3px 7px"></td></tr>'
     + '<tr><td class="sg-lbl" style="padding:3px 7px">이름(법인명)</td><td colspan="3" style="border:1px dashed #c0c0c0;padding:3px 7px">'+esc(party.name)+'</td></tr>'
     + '</table>'
-    + '<div style="text-align:center;font-size:8pt;color:#6b7280;padding-top:6px;border-left:1px dashed #c0c0c0;margin-left:5px">서명<br>혹은 인</div>'
+    + '</div>'
+    + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-width:60px;padding-top:6px">'
+    + '<div style="text-align:center;font-size:8pt;color:#6b7280;border-left:1px dashed #c0c0c0;padding-left:5px;height:80px;display:flex;align-items:center">서명<br>혹은 인</div>'
+    + '</div>'
     + '</div></div>';
 }
 
