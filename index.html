@@ -1983,7 +1983,9 @@ function parseVacancySheet(resp) {
   const landlordIdx    = findColIdx(labels, ['임대인명'],          39);  // AO  ← AM열 추가시 자동 보정
   const payMethodIdx   = findColIdx(labels, ['월세납입형태','납부방법','납입형태','선후불'], 40); // AO (v311) 선불/후불
   const landlordPhoneIdx= findColIdx(labels, ['임대인연락처','임대인 연락처'], 41); // AP/AQ
-  const tenantIdx      = findColIdx(labels, ['임차인'],            44);  // AT (정확매칭 → '임차인명/임차인휴대폰'과 분리)
+  // [v365] tenantIdx → tenant1NameIdx(C열 임차인명)로 통일 + coNameIdx(BA열 이름)으로 정정
+  // const tenantIdx      = findColIdx(labels, ['임차인'],            44);  // AT (사용 중단)
+  const tenantIdx      = tenant1NameIdx;  // C열 임차인명 = 계약자1(을)
   // [v233] 시트 컬럼 +1 시프트 보정 (AU 이후 모든 컬럼 한 칸씩 우측 이동)
   const tenantPhoneIdx = findColIdx(labels, ['임차인휴대폰','임차인 연락처','임차인연락처'], 47); // AV
   const tenantRrnIdx   = findColIdx(labels, ['주민번호'],          48);  // AW
