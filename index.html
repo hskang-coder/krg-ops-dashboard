@@ -1983,15 +1983,14 @@ function parseVacancySheet(resp) {
   const landlordIdx    = findColIdx(labels, ['임대인명'],          39);  // AO  ← AM열 추가시 자동 보정
   const payMethodIdx   = findColIdx(labels, ['월세납입형태','납부방법','납입형태','선후불'], 40); // AO (v311) 선불/후불
   const landlordPhoneIdx= findColIdx(labels, ['임대인연락처','임대인 연락처'], 41); // AP/AQ
-  // [v365] tenantIdx → tenant1NameIdx(C열 임차인명)로 통일 + coNameIdx(BA열 이름)으로 정정
-  // const tenantIdx      = findColIdx(labels, ['임차인'],            44);  // AT (사용 중단)
-  const tenantIdx      = tenant1NameIdx;  // C열 임차인명 = 계약자1(을)
+  // [v366] C열과 BA열 모두 "이름" 헤더 → 열 번호로 직접 지정 (findColIdx 중복 회피)
+  const tenantIdx      = 2;  // C열 = 계약자1(을) 이름 (직접 지정)
   // [v233] 시트 컬럼 +1 시프트 보정 (AU 이후 모든 컬럼 한 칸씩 우측 이동)
   const tenantPhoneIdx = findColIdx(labels, ['임차인휴대폰','임차인 연락처','임차인연락처'], 47); // AV
   const tenantRrnIdx   = findColIdx(labels, ['주민번호'],          48);  // AW
   const emergPhoneIdx  = findColIdx(labels, ['긴급연락처'],        50);  // AY
   const emergInfoIdx   = findColIdx(labels, ['관계,이름'],         51);  // AZ
-  const coNameIdx      = findColIdx(labels, ['이름'],              52);  // BA (정확매칭 → '관계,이름' 분리)
+  const coNameIdx      = 52;  // BA열 = 계약자2(을) 이름 (직접 지정, C열과 구분)
   const coPhoneIdx     = findColIdx(labels, ['연락처'],            53);  // BB
   const coRrnIdx       = findColIdx(labels, ['주민번호.1'],        54);  // BC
   const inspectTypeIdx = findColIdx(labels, ['심사구분'],          58);  // BG
