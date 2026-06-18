@@ -11274,7 +11274,7 @@ function openIncomeReceiptModal(contractNo) {
     +       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">'
     +         '<label style="display:flex;align-items:center;justify-content:center;gap:4px;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:11px;color:#334155"><input type="checkbox" id="crIncRcptT1" checked value="임대료" style="accent-color:#10B981"> 임대료</label>'
     +         '<label style="display:flex;align-items:center;justify-content:center;gap:4px;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:11px;color:#334155"><input type="checkbox" id="crIncRcptT2" value="변동관리비" style="accent-color:#3B82F6"> 변동관리비</label>'
-    +         '<label style="display:flex;align-items:center;justify-content:center;gap:4px;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:11px;color:#DC2626"><input type="checkbox" id="crIncRcptT3" value="미납금액" style="accent-color:#DC2626"> 미납금액</label>'
+    +         '<label style="display:flex;align-items:center;justify-content:center;gap:4px;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:11px;color:#DC2626"><input type="checkbox" id="crIncRcptT3" value="미납금액" onchange="cG_toggleUnpaidSection()" style="accent-color:#DC2626"> 미납금액</label>'
     +       '</div>'
     +     '</div>'
     /* 미납 항목 */
@@ -11305,8 +11305,9 @@ function openIncomeReceiptModal(contractNo) {
     +       '</div>'
     +       '<div style="margin-top:10px;padding:10px;background:#FEE2E2;border:1px solid #FECACA;border-radius:5px;display:none" id="crIncRcptUnpaidSection">'
     +         '<label style="font-size:11.5px;font-weight:600;color:#991B1B;display:block;margin-bottom:8px">💳 미납 항목 (임차인용에만 표시)</label>'
-    +         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
+    +         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">'
     +           '<button type="button" onclick="cG_addUnpaidRow()" style="background:#fff;border:2px solid #DC2626;color:#991B1B;padding:7px 10px;border-radius:5px;font-size:11.5px;cursor:pointer;font-weight:700">➕ 항목 추가</button>'
+    +           '<button type="button" onclick="cG_autoLoadUnpaidData()" style="background:#fff;border:2px solid #10B981;color:#10B981;padding:7px 10px;border-radius:5px;font-size:11.5px;cursor:pointer;font-weight:700">🔄 자동 조회</button>'
     +           '<button type="button" onclick="cG_clearUnpaidRows()" style="background:#fff;border:1px solid #E5E7EB;color:#6B7280;padding:7px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600">초기화</button>'
     +         '</div>'
     +         '<div id="crIncRcptUnpaidList" style="border:1px solid #FECACA;border-radius:5px;background:#fff;max-height:150px;overflow-y:auto">'
@@ -11410,6 +11411,108 @@ function cG_setExtraNoteTemplate(type){
   };
   el.value = templates[type] || '';
   try { el.focus(); el.scrollTop = 0; } catch(_){}
+}
+
+// [v370] 미납금액 체크박스 - 미납 항목 섹션 토글
+function cG_toggleUnpaidSection(){
+  var chk = document.getElementById('crIncRcptT3');
+  var sec = document.getElementById('crIncRcptUnpaidSection');
+  if (chk && sec) {
+    sec.style.display = chk.checked ? 'block' : 'none';
+  }
+}
+
+// [v370] 자동 조회 - xlsx 파일 선택 후 계약번호 기반 필터링
+function cG_autoLoadUnpaidData(){
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.xlsx,.xls';
+  input.addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(event){
+      try {
+        // 계약번호 추출
+        var contractNoEl = document.getElementById('crIncRcptContractNo');
+        if (!contractNoEl) {
+          alert('계약번호를 찾을 수 없습니다.');
+          return;
+        }
+        var contractNo = (contractNoEl.innerText || contractNoEl.value || '').trim();
+        if (!contractNo) {
+          alert('계약번호를 입력하세요.');
+          return;
+        }
+
+        // xlsx 파싱
+        var data = new Uint8Array(event.target.result);
+        var workbook = XLSX.read(data, {type: 'array'});
+        var sheetName = workbook.SheetNames[0];
+        if (!sheetName) {
+          alert('시트를 찾을 수 없습니다.');
+          return;
+        }
+        var sheet = workbook.Sheets[sheetName];
+        var rows = XLSX.utils.sheet_to_json(sheet);
+
+        if (!rows || rows.length === 0) {
+          alert('데이터가 없습니다.');
+          return;
+        }
+
+        // 필터링: 계약번호 일치 & 미납 상태
+        var unpaidItems = [];
+        for (var i = 0; i < rows.length; i++) {
+          var row = rows[i];
+          // 계약번호 매칭
+          var rowContractNo = (row['계약번호'] || '').toString().trim();
+          if (rowContractNo !== contractNo) continue;
+
+          // 납부상태 확인 (미납만)
+          var payStatus = (row['납부상태'] || '').toString().trim();
+          if (payStatus.indexOf('미납') === -1 && payStatus.indexOf('연체') === -1) continue;
+
+          // 미납 항목 추출
+          var itemName = row['청구서명'] || row['용도'] || '기타';
+          var amount = row['납부금액'] || row['청구금액'] || 0;
+
+          unpaidItems.push({
+            name: itemName.toString(),
+            amount: amount.toString(),
+            status: '연체'
+          });
+        }
+
+        // 미납 항목이 없으면 알림
+        if (unpaidItems.length === 0) {
+          alert('미납 항목이 없습니다.');
+          return;
+        }
+
+        // 미납 항목 섹션에 자동 입력
+        cG_clearUnpaidRows();
+        for (var i = 0; i < unpaidItems.length; i++) {
+          cG_addUnpaidRow();
+          var rows = document.querySelectorAll('.unpaid-row');
+          var lastRow = rows[rows.length - 1];
+          if (lastRow) {
+            var inputs = lastRow.querySelectorAll('input, select');
+            if (inputs[0]) inputs[0].value = unpaidItems[i].name;      // 청구서명
+            if (inputs[1]) inputs[1].value = unpaidItems[i].amount;    // 금액
+            if (inputs[2]) inputs[2].value = unpaidItems[i].status;    // 상태
+          }
+        }
+
+        alert('미납 항목 ' + unpaidItems.length + '개를 조회했습니다.');
+      } catch(err) {
+        console.error('파일 읽기 오류:', err);
+        alert('파일을 읽을 수 없습니다: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+  input.click();
 }
 
 // [v277] 발행 용도 변경 시 추가 옵션 토글 + 버튼 라벨 + 라디오 라벨 활성/비활성 스타일
