@@ -11303,17 +11303,6 @@ function openIncomeReceiptModal(contractNo) {
     +           '<label style="display:flex;align-items:center;gap:5px;padding:5px 7px;background:#fff;border:1px solid #FECACA;border-radius:4px;cursor:pointer"><input type="checkbox" id="crIncRcptOptKeyReturn" style="accent-color:#DC2626"> 열쇠/명도 반환 완료</label>'
     +         '</div>'
     +       '</div>'
-    +       '<div style="margin-top:10px;padding:10px;background:#FEE2E2;border:1px solid #FECACA;border-radius:5px;display:none" id="crIncRcptUnpaidSection">'
-    +         '<label style="font-size:11.5px;font-weight:600;color:#991B1B;display:block;margin-bottom:8px">💳 미납 항목 (임차인용에만 표시)</label>'
-    +         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">'
-    +           '<button type="button" onclick="cG_addUnpaidRow()" style="background:#fff;border:2px solid #DC2626;color:#991B1B;padding:7px 10px;border-radius:5px;font-size:11.5px;cursor:pointer;font-weight:700">➕ 항목 추가</button>'
-    +           '<button type="button" onclick="cG_autoLoadUnpaidData()" style="background:#fff;border:2px solid #10B981;color:#10B981;padding:7px 10px;border-radius:5px;font-size:11.5px;cursor:pointer;font-weight:700">🔄 자동 조회</button>'
-    +           '<button type="button" onclick="cG_clearUnpaidRows()" style="background:#fff;border:1px solid #E5E7EB;color:#6B7280;padding:7px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600">초기화</button>'
-    +         '</div>'
-    +         '<div id="crIncRcptUnpaidList" style="border:1px solid #FECACA;border-radius:5px;background:#fff;max-height:150px;overflow-y:auto">'
-    +           '<div style="padding:12px 10px;font-size:11px;color:#94A3B8;text-align:center">미납 항목이 없습니다</div>'
-    +         '</div>'
-    +       '</div>'
     +       '<div style="margin-top:10px">'
     +         '<label style="font-size:11.5px;font-weight:600;color:#991B1B;display:block;margin-bottom:5px">📝 추가 기재 사항 <span style="color:#9CA3AF;font-weight:500;font-size:10.5px">(선택 — 증명서 본문에 삽입됨 · 자유 편집 가능)</span></label>'
     +         '<div style="display:flex;gap:5px;margin-bottom:5px">'
@@ -11413,13 +11402,92 @@ function cG_setExtraNoteTemplate(type){
   try { el.focus(); el.scrollTop = 0; } catch(_){}
 }
 
-// [v370] 미납금액 체크박스 - 미납 항목 섹션 토글
+// [v371] 미납금액 체크박스 - Google Sheets에서 데이터 조회
 function cG_toggleUnpaidSection(){
   var chk = document.getElementById('crIncRcptT3');
-  var sec = document.getElementById('crIncRcptUnpaidSection');
-  if (chk && sec) {
-    sec.style.display = chk.checked ? 'block' : 'none';
+  if (!chk || !chk.checked) return;
+
+  // 계약번호 추출
+  var contractNoEl = document.getElementById('crIncRcptContractNo');
+  if (!contractNoEl) {
+    alert('계약번호를 찾을 수 없습니다.');
+    return;
   }
+  var contractNo = (contractNoEl.innerText || contractNoEl.value || '').trim();
+  if (!contractNo) {
+    alert('계약번호를 입력하세요.');
+    return;
+  }
+
+  // Google Sheets CSV 데이터 조회
+  cG_fetchUnpaidFromGoogleSheets(contractNo);
+}
+
+// [v371] Google Sheets에서 미납 데이터 조회
+function cG_fetchUnpaidFromGoogleSheets(contractNo){
+  var sheetId = '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
+  var gid = '131074722';
+  var csvUrl = 'https://docs.google.com/spreadsheets/d/' + sheetId + '/export?format=csv&gid=' + gid;
+
+  // CORS 우회를 위해 proxy 사용 (또는 fetch 직접 시도)
+  fetch(csvUrl)
+    .then(function(response){ return response.text(); })
+    .then(function(csv){
+      // CSV 파싱
+      var lines = csv.split('\n');
+      if (lines.length < 2) {
+        alert('데이터를 찾을 수 없습니다.');
+        return;
+      }
+
+      var headers = lines[0].split(',').map(function(h){ return h.trim().replace(/^"|"$/g, ''); });
+      var contractNoIdx = headers.indexOf('계약번호');
+      var itemNameIdx = headers.indexOf('청구서명');
+      var amountIdx = headers.indexOf('납부금액');
+      var statusIdx = headers.indexOf('납부상태'); // T열
+
+      if (contractNoIdx === -1 || statusIdx === -1) {
+        console.error('필수 컬럼을 찾을 수 없습니다:', headers);
+        alert('필수 컬럼을 찾을 수 없습니다.');
+        return;
+      }
+
+      // 데이터 필터링
+      var unpaidItems = [];
+      for (var i = 1; i < lines.length; i++) {
+        var cells = lines[i].split(',').map(function(c){ return c.trim().replace(/^"|"$/g, ''); });
+        if (cells.length < Math.max(contractNoIdx, statusIdx) + 1) continue;
+
+        var rowContractNo = cells[contractNoIdx];
+        var status = cells[statusIdx];
+
+        // 계약번호 매칭 & 미납/연체/분납 상태 확인
+        if (rowContractNo === contractNo && (status.indexOf('납부예정') !== -1 || status.indexOf('연체중') !== -1 || status.indexOf('분납중') !== -1)) {
+          var itemName = itemNameIdx !== -1 ? cells[itemNameIdx] : '기타';
+          var amount = amountIdx !== -1 ? cells[amountIdx] : '0';
+
+          unpaidItems.push({
+            name: itemName,
+            amount: amount,
+            status: status
+          });
+        }
+      }
+
+      if (unpaidItems.length === 0) {
+        alert('미납 항목이 없습니다.');
+        return;
+      }
+
+      // 인포 표시
+      alert('미납 항목 ' + unpaidItems.length + '개를 조회했습니다.');
+      console.log('조회된 미납 항목:', unpaidItems);
+
+    })
+    .catch(function(err){
+      console.error('Google Sheets 조회 오류:', err);
+      alert('데이터를 조회할 수 없습니다. CORS 문제일 수 있습니다.');
+    });
 }
 
 // [v370] 자동 조회 - xlsx 파일 선택 후 계약번호 기반 필터링
