@@ -11440,12 +11440,12 @@ function cG_toggleUnpaidSection(){
     if (status.indexOf('납부예정') === -1 && status.indexOf('연체중') === -1 && status.indexOf('분납중') === -1) continue;
 
     // 미납 항목 추출
-    var itemName = row['청구서명'] || row['용도'] || '기타';
-    var amount = row['납부금액'] || 0;
+    var itemName = row['청구서명'] || '미납항목';
+    var amount = row['미납(정제)금액(원)'] || row['_col_AB'] || row['납부금액'] || '0';
 
     unpaidItems.push({
       name: itemName.toString(),
-      amount: amount.toString(),
+      amount: amount.toString().replace(/[₩\s]/g, ''),
       status: status
     });
   }
