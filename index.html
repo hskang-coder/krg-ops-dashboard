@@ -11238,7 +11238,7 @@ function openIncomeReceiptModal(contractNo) {
   var tenantStr = _safe(contract['임차인명']) || _safe(contract['임차인']) || '-';
 
   overlay.innerHTML = ''
-    + '<div style="background:#fff;border-radius:10px;width:100%;max-width:520px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.15)">'
+    + '<div style="background:#fff;border-radius:10px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.15)">'
     +   '<div style="padding:14px 18px;background:#0F172A;color:#fff;display:flex;align-items:center;gap:10px">'
     +     '<div style="font-size:16px;font-weight:700;flex:1">💰 납부증빙 발행</div>'
     +     '<button onclick="closeIncomeReceiptModal()" style="background:transparent;border:none;width:26px;height:26px;color:#fff;font-size:18px;cursor:pointer;opacity:.7">✕</button>'
@@ -11269,12 +11269,23 @@ function openIncomeReceiptModal(contractNo) {
     +         '<input type="date" id="crIncRcptTo" value="' + endD + '" style="flex:1;padding:7px 9px;border:1px solid #CBD5E1;border-radius:5px;font-size:12.5px">'
     +       '</div>'
     +     '</div>'
-    /* 납부 종류 */
     +     '<div style="margin-bottom:12px">'
     +       '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:6px">납부 종류 (다중선택)</label>'
-    +       '<div style="display:flex;gap:6px">'
-    +         '<label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 10px;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:12.5px;color:#334155"><input type="checkbox" id="crIncRcptT1" checked value="임대료" style="accent-color:#10B981"> 임대료</label>'
-    +         '<label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 10px;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:12.5px;color:#334155"><input type="checkbox" id="crIncRcptT2" value="변동관리비" style="accent-color:#3B82F6"> 변동관리비</label>'
+    +       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">'
+    +         '<label style="display:flex;align-items:center;justify-content:center;gap:4px;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:11px;color:#334155"><input type="checkbox" id="crIncRcptT1" checked value="임대료" style="accent-color:#10B981"> 임대료</label>'
+    +         '<label style="display:flex;align-items:center;justify-content:center;gap:4px;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:11px;color:#334155"><input type="checkbox" id="crIncRcptT2" value="변동관리비" style="accent-color:#3B82F6"> 변동관리비</label>'
+    +         '<label style="display:flex;align-items:center;justify-content:center;gap:4px;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:11px;color:#DC2626"><input type="checkbox" id="crIncRcptT3" value="미납금액" style="accent-color:#DC2626"> 미납금액</label>'
+    +       '</div>'
+    +     '</div>'
+    /* 미납 항목 */
+    +     '<div style="margin-bottom:12px;display:none" id="crIncRcptUnpaidDiv">'
+    +       '<label style="font-size:11.5px;font-weight:600;color:#991B1B;display:block;margin-bottom:6px">💳 미납 항목 (임차인용)</label>'
+    +       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
+    +         '<button type="button" onclick="cG_addUnpaidRow()" style="background:#fff;border:2px solid #DC2626;color:#991B1B;padding:7px 10px;border-radius:5px;font-size:11.5px;cursor:pointer;font-weight:700">➕ 항목 추가</button>'
+    +         '<button type="button" onclick="cG_clearUnpaidRows()" style="background:#fff;border:1px solid #E5E7EB;color:#6B7280;padding:7px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600">초기화</button>'
+    +       '</div>'
+    +       '<div id="crIncRcptUnpaidList" style="border:1px solid #FECACA;border-radius:5px;background:#fff;max-height:120px;overflow-y:auto">'
+    +         '<div style="padding:12px 10px;font-size:11px;color:#94A3B8;text-align:center">미납 항목이 없습니다</div>'
     +       '</div>'
     +     '</div>'
     /* [v277] 계약해지증명서 전용 — 종료일 + 정산 항목 (디폴트 hidden) */
@@ -11290,6 +11301,26 @@ function openIncomeReceiptModal(contractNo) {
     +           '<label style="display:flex;align-items:center;gap:5px;padding:5px 7px;background:#fff;border:1px solid #FECACA;border-radius:4px;cursor:pointer"><input type="checkbox" id="crIncRcptOptRestore" style="accent-color:#DC2626"> 원상회복 합의 완료</label>'
     +           '<label style="display:flex;align-items:center;gap:5px;padding:5px 7px;background:#fff;border:1px solid #FECACA;border-radius:4px;cursor:pointer"><input type="checkbox" id="crIncRcptOptPenalty" style="accent-color:#DC2626"> 위약금/정산금 처리 완료</label>'
     +           '<label style="display:flex;align-items:center;gap:5px;padding:5px 7px;background:#fff;border:1px solid #FECACA;border-radius:4px;cursor:pointer"><input type="checkbox" id="crIncRcptOptKeyReturn" style="accent-color:#DC2626"> 열쇠/명도 반환 완료</label>'
+    +         '</div>'
+    +       '</div>'
+    +       '<div style="margin-top:10px">'
+    +         '<label style="font-size:11.5px;font-weight:600;color:#991B1B;display:block;margin-bottom:6px">💳 미납 항목 (선택 — 임차인용에만 표시)</label>'
+    +         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
+    +           '<button type="button" onclick="cG_addUnpaidRow()" style="background:#fff;border:2px solid #DC2626;color:#991B1B;padding:7px 10px;border-radius:5px;font-size:11.5px;cursor:pointer;font-weight:700">➕ 항목 추가</button>'
+    +           '<button type="button" onclick="cG_clearUnpaidRows()" style="background:#fff;border:1px solid #E5E7EB;color:#6B7280;padding:7px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600">초기화</button>'
+    +         '</div>'
+    +         '<div id="crIncRcptUnpaidList" style="border:1px solid #FECACA;border-radius:5px;background:#fff;max-height:180px;overflow-y:auto">'
+    +           '<div style="padding:14px 10px;font-size:11px;color:#94A3B8;text-align:center">미납 항목이 없습니다</div>'
+    +         '</div>'
+    +       '</div>'
+    +       '<div style="margin-top:10px;padding:10px;background:#FEE2E2;border:1px solid #FECACA;border-radius:5px;display:none" id="crIncRcptUnpaidSection">'
+    +         '<label style="font-size:11.5px;font-weight:600;color:#991B1B;display:block;margin-bottom:8px">💳 미납 항목 (임차인용에만 표시)</label>'
+    +         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
+    +           '<button type="button" onclick="cG_addUnpaidRow()" style="background:#fff;border:2px solid #DC2626;color:#991B1B;padding:7px 10px;border-radius:5px;font-size:11.5px;cursor:pointer;font-weight:700">➕ 항목 추가</button>'
+    +           '<button type="button" onclick="cG_clearUnpaidRows()" style="background:#fff;border:1px solid #E5E7EB;color:#6B7280;padding:7px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600">초기화</button>'
+    +         '</div>'
+    +         '<div id="crIncRcptUnpaidList" style="border:1px solid #FECACA;border-radius:5px;background:#fff;max-height:150px;overflow-y:auto">'
+    +           '<div style="padding:12px 10px;font-size:11px;color:#94A3B8;text-align:center">미납 항목이 없습니다</div>'
     +         '</div>'
     +       '</div>'
     +       '<div style="margin-top:10px">'
@@ -11312,6 +11343,73 @@ function openIncomeReceiptModal(contractNo) {
   document.body.appendChild(overlay);
 }
 
+// [v369] 미납 항목 관리 함수들
+function cG_addUnpaidRow(){
+  var container = document.getElementById('crIncRcptUnpaidList');
+  if (!container) return;
+
+  var rowIdx = container.querySelectorAll('.unpaid-row').length;
+  var rowId = 'unpaidRow_' + rowIdx;
+
+  var rowHtml = '<div class="unpaid-row" id="' + rowId + '" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;border-bottom:1px solid #F5E6E8;align-items:center">'
+    + '<input type="text" placeholder="청구서명" class="unpaid-name" style="padding:6px 8px;border:1px solid #FECACA;border-radius:4px;font-size:11px">'
+    + '<div style="display:flex;gap:4px">'
+      + '<input type="text" placeholder="금액" class="unpaid-amt" style="flex:1;padding:6px 8px;border:1px solid #FECACA;border-radius:4px;font-size:11px">'
+      + '<button onclick="cG_removeUnpaidRow(\'' + rowId + '\')" style="background:#FEE2E2;border:1px solid #FECACA;color:#DC2626;cursor:pointer;font-size:14px;padding:0 6px;border-radius:4px;font-weight:700">✕</button>'
+    + '</div>'
+    + '<select class="unpaid-status" style="grid-column:span 2;padding:6px 8px;border:1px solid #FECACA;border-radius:4px;font-size:11px;background:#fff">'
+    +   '<option value="연체">● 연체</option>'
+    +   '<option value="예정">● 예정</option>'
+    + '</select>'
+    + '</div>';
+
+  // 첫 행이면 헤더 추가 및 내용 초기화
+  if (rowIdx === 0) {
+    container.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;background:#FEE2E2;border-bottom:1px solid #FECACA;font-weight:700;font-size:10.5px;color:#991B1B;align-items:center">'
+      + '<div>청구서명</div>'
+      + '<div>금액(원)</div>'
+      + '</div>';
+  }
+
+  container.innerHTML += rowHtml;
+}
+
+function cG_removeUnpaidRow(rowId){
+  var row = document.getElementById(rowId);
+  if (row) row.remove();
+
+  var container = document.getElementById('crIncRcptUnpaidList');
+  if (!container) return;
+  var rows = container.querySelectorAll('.unpaid-row');
+  if (rows.length === 0) {
+    container.innerHTML = '<div style="padding:8px 10px;font-size:11px;color:#94A3B8;text-align:center">미납 항목이 없습니다</div>';
+  }
+}
+
+function cG_clearUnpaidRows(){
+  var container = document.getElementById('crIncRcptUnpaidList');
+  if (container) {
+    container.innerHTML = '<div style="padding:8px 10px;font-size:11px;color:#94A3B8;text-align:center">미납 항목이 없습니다</div>';
+  }
+}
+
+function cG_getUnpaidData(){
+  var container = document.getElementById('crIncRcptUnpaidList');
+  if (!container) return [];
+
+  var rows = container.querySelectorAll('.unpaid-row');
+  var data = [];
+  rows.forEach(function(row){
+    var name = (row.querySelector('.unpaid-name')||{}).value || '';
+    var amt = (row.querySelector('.unpaid-amt')||{}).value || '';
+    var status = (row.querySelector('.unpaid-status')||{}).value || '연체';
+    if (name && amt) {
+      data.push({ name: name, amt: amt, status: status });
+    }
+  });
+  return data;
+}
+
 // [v344] 추가 기재 사항 템플릿 — 임차인 요청용 / 임대인 발송용 / 비우기
 function cG_setExtraNoteTemplate(type){
   var el = document.getElementById('crIncRcptExtraNote');
@@ -11329,10 +11427,12 @@ function cG_togglePurposeOptions(){
   var p1 = document.getElementById('crIncRcptP1');
   var p2 = document.getElementById('crIncRcptP2');
   var opts = document.getElementById('crIncRcptCloseOpts');
+  var unpaidDiv = document.getElementById('crIncRcptUnpaidDiv');
   var btn = document.getElementById('crIncRcptGenBtn');
   if (!p2 || !opts || !btn) return;
   var isClose = p2.checked;
   opts.style.display = isClose ? 'block' : 'none';
+  if (unpaidDiv) unpaidDiv.style.display = isClose ? 'block' : 'none';
   btn.textContent = isClose ? '📋 계약해지증명서 생성' : '📄 납부확인서 생성';
   btn.style.background = isClose ? '#DC2626' : '#10B981';
   // 라디오 라벨 active 스타일 토글
@@ -11373,6 +11473,8 @@ function generateIncomeReceipt(contractNo){
   var manualExitDate = (document.getElementById('crIncRcptExitDate')||{}).value || '';
   // [v343] 추가 기재 사항 (자유 입력)
   var extraNote = (document.getElementById('crIncRcptExtraNote')||{}).value || '';
+  // [v369] 미납 항목 데이터 수집 (임차인용 계약해지증명서에만 표시)
+  var unpaidData = cG_getUnpaidData();
 
   var contract = (contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim() === String(contractNo); });
   if (!contract) { alert('계약 데이터 없음'); return; }
@@ -11594,6 +11696,43 @@ function generateIncomeReceipt(contractNo){
       + '본 확인서는 납부 사실의 증빙 목적으로 발행되며, 발행일 기준의 시스템 데이터를 기준으로 합니다.';
   }
 
+  // [v369] 미납 항목 표 생성 (계약해지증명서 + 미납 데이터 있을 때만)
+  var unpaidTableHtml = '';
+  if (isClose && unpaidData && unpaidData.length > 0) {
+    var totalUnpaid = 0;
+    var unpaidRowsHtml = unpaidData.map(function(u, i){
+      var amt = parseAmt(u.amt);
+      totalUnpaid += amt;
+      var statusColor = u.status === '연체' ? '#DC2626' : '#F59E0B';
+      var statusLabel = u.status === '연체' ? '●연체' : '●예정';
+      return '<tr>'
+        + '<td style="text-align:center;padding:7px 6px;border:1px solid #D1D5DB">' + (i+1) + '</td>'
+        + '<td style="padding:7px 6px;border:1px solid #D1D5DB">' + (u.name || '-') + '</td>'
+        + '<td style="text-align:right;padding:7px 6px;border:1px solid #D1D5DB;color:#DC2626;font-weight:700">' + fmtMon(amt) + '</td>'
+        + '<td style="text-align:center;padding:7px 6px;border:1px solid #D1D5DB;color:' + statusColor + ';font-weight:700;font-size:11px">' + statusLabel + '</td>'
+        + '</tr>';
+    }).join('');
+
+    unpaidTableHtml = '<div style="margin-bottom:14px">'
+      + '<div style="font-size:13px;font-weight:700;color:#DC2626;margin-bottom:8px">⚠️ 현재 미납 항목</div>'
+      + '<table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:8px">'
+      +   '<thead><tr style="background:#FEE2E2;color:#991B1B">'
+      +     '<th style="width:38px;padding:8px 6px;border:1px solid #FCA5A5;font-weight:700;text-align:center">No</th>'
+      +     '<th style="padding:8px 6px;border:1px solid #FCA5A5;font-weight:700;text-align:left">청구서명</th>'
+      +     '<th style="width:110px;padding:8px 6px;border:1px solid #FCA5A5;font-weight:700;text-align:right">미납금액</th>'
+      +     '<th style="width:70px;padding:8px 6px;border:1px solid #FCA5A5;font-weight:700;text-align:center">상태</th>'
+      +   '</tr></thead>'
+      +   '<tbody>' + unpaidRowsHtml
+      +     '<tr style="background:#FEE2E2">'
+      +       '<td colspan="2" style="padding:8px 6px;border:1px solid #FCA5A5;font-weight:700;text-align:right">미납합계</td>'
+      +       '<td style="padding:8px 6px;border:1px solid #FCA5A5;color:#DC2626;font-weight:900;text-align:right;font-size:12px">' + fmtMon(totalUnpaid) + '</td>'
+      +       '<td style="padding:8px 6px;border:1px solid #FCA5A5"></td>'
+      +     '</tr>'
+      +   '</tbody>'
+      + '</table>'
+      + '</div>';
+  }
+
   var html = ''
     + '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>' + docFileName + '_' + contractNo + '_' + refNo + '</title>'
     + '<style>' + css + '</style>'
@@ -11652,6 +11791,7 @@ function generateIncomeReceipt(contractNo){
     +     '<div><div class="lbl">합계</div><div class="kr">일금 ' + krWon(totalPaid) + '원정</div></div>'
     +     '<div class="amt">' + fmtMon(totalPaid) + '</div>'
     +   '</div>'
+    +   unpaidTableHtml
     +   '<div class="declaration">' + declarationHtml + '</div>'
     +   '<div class="sign-area">'
     +     '<div class="sign-date">' + todayStr + '</div>'
