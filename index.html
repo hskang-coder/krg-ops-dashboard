@@ -11821,12 +11821,20 @@ function generateIncomeReceipt(contractNo){
       var escNote = extraNote.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
       extraNoteHtml = '<div style="margin:10px 0 10px;padding:9px 12px;background:#FFFBEB;border-left:4px solid #F59E0B;border-radius:0 5px 5px 0;font-size:13px;color:#78350F;line-height:1.7"><b style="color:#92400E;margin-right:5px">📝</b>' + escNote + '</div>';
     }
+    // [v374] 미납 항목 유무에 따른 종결 문구 분기 (법적 표현 — 미납 완제를 정지조건으로)
+    var hasUnpaidDecl = !!(unpaidData && unpaidData.length > 0);
+    var totalUnpaidDecl = hasUnpaidDecl ? unpaidData.reduce(function(s, u){ return s + parseAmt(u.amt); }, 0) : 0;
+    var openLineDecl = hasUnpaidDecl
+      ? '본 증명서는 위 계약(<b>#' + contractNo + '</b>)의 해지·정산 진행 내역 및 잔여 미납 채무를 증명합니다.'
+      : '본 증명서는 위 계약(<b>#' + contractNo + '</b>)이 다음 사항을 모두 충족하여 <b>정상적으로 해지·종결되었음</b>을 증명합니다.';
+    var closeLineDecl = hasUnpaidDecl
+      ? '이로써 <b>임(전)차인 ' + tenant + '</b>과(와) <b>임대인 ' + landlord + '</b> 및 대리인 <b>케이알지그룹주식회사</b> 사이의 본 계약과 관련하여, 임(전)차인은 상기 「현재 미납 항목」에 기재된 미납 금액 합계 <b>' + fmtMon(totalUnpaidDecl) + '</b>을(를) 전액 변제(辨濟)하여야 하며, 동 미납 금액의 <b>완제(完濟)를 정지조건으로</b> 본 계약에 관한 일체의 채권·채무 관계가 종결됩니다. 따라서 위 미납 금액이 완납되기 전까지는 해당 납부 의무가 존속하며, 임(전)차인이 위 미납 금액을 전액 납부·완제(完濟)한 때에 비로소 본 계약과 관련한 추가 납부 의무가 소멸함을 확인합니다.'
+      : '이로써 <b>임(전)차인 ' + tenant + '</b>과(와) <b>임대인 ' + landlord + '</b> 및 대리인 <b>케이알지그룹주식회사</b> 사이의 본 계약과 관련한 일체의 채권·채무 관계는 종결되었으며, 본 증명서 발행일 이후 추가 납부 의무는 존재하지 않음을 확인합니다.';
     declarationHtml = ''
-      + '본 증명서는 위 계약(<b>#' + contractNo + '</b>)이 다음 사항을 모두 충족하여 <b>정상적으로 해지·종결되었음</b>을 증명합니다.'
+      + openLineDecl
       + extraNoteHtml
       + '<ul style="margin:10px 0 8px 22px;padding:0;line-height:1.85">' + settleItems.join('') + '</ul>'
-      + '이로써 <b>임(전)차인 ' + tenant + '</b>과(와) <b>임대인 ' + landlord + '</b> 및 대리인 <b>케이알지그룹주식회사</b> 사이의 본 계약과 관련한 일체의 채권·채무 관계는 종결되었으며, '
-      + '본 증명서 발행일 이후 추가 납부 의무는 존재하지 않음을 확인합니다.';
+      + closeLineDecl;
   } else if (isTerminated) {
     // 📜 납부확인서 — 계약 종료 케이스
     declarationHtml = ''
