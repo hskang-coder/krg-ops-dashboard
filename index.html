@@ -20393,7 +20393,7 @@ async function okpi_render(){
     var pr; try { pr = paymentRawData; } catch(e){ pr = null; } if (!pr || !pr.length) return null;
     var craw; try { craw = contractRawData; } catch(e){ craw = []; }
     var stMap={}, exitMap={}; for (var i=0;i<craw.length;i++){ var c=craw[i]; var cn=String(c['계약번호']==null?'':c['계약번호']).trim(); if(!cn)continue; stMap[cn]=String(c['계약상태']==null?'':c['계약상태']).trim(); exitMap[cn]=ser(c['퇴실일']); }
-    function activeAt(cno,X){ var st=stMap[cno]; if(st==='정상')return true; if(st==='종료'){ var e=exitMap[cno]; return e!=null&&e>X; } return false; }
+    function activeAt(cno,X){ var st=stMap[cno]; if(st==='정상'||st==='계약중')return true; if(st==='종료'){ var e=exitMap[cno]; return e!=null&&e>X; } return false; }  // [v377] 활성계약 = 정상+계약중 (마스터 시트 parseDelinqV3와 동일 기준)
     var R=[], all=[];
     for (var i=0;i<pr.length;i++){ var o=pr[i]; var ty=String(o['납부종류']==null?'':o['납부종류']).trim(); if(!matchType(pt,ty))continue; var cno=String(o['계약번호']==null?'':o['계약번호']).trim(); var due=ser(o['납기일']); var pay=ser(o['납부일']); var st=String(o['납부상태']==null?'':o['납부상태']).trim(); all.push({cno:cno,due:due,st:st}); if(st==='연체중'||st==='분납중'){ R.push({cno:cno,due:due,pay:null}); } else if(st==='연체납부'){ R.push({cno:cno,due:due,pay:pay}); } }
     function delqAsOf(a){ var s={}; for(var i=0;i<R.length;i++){var r=R[i]; if(r.due==null||r.due>a)continue; if(r.pay!=null&&!(r.pay>a))continue; if(!activeAt(r.cno,a))continue; s[r.cno]=1; } var n=0;for(var k in s)n++;return n; }
