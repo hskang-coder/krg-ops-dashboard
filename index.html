@@ -1947,7 +1947,9 @@ async function loadLandlordAccounts() {
       const c = row.c || [];
       const gv = i => (i < 0 || !c[i]) ? '' : String(c[i].f != null ? c[i].f : c[i].v != null ? c[i].v : '').trim();
       const no = gv(noIdx);
-      const acct = gv(acctIdx) || gv(acctIdx2);
+      let acct = gv(acctIdx) || gv(acctIdx2);
+      // [v380] 라벨 매칭 실패(헤더 누락 등) 대비 — '은행/계좌번호/예금주' 형식 셀을 직접 탐지 (임대인 정산계좌는 3개 컬럼 분리라 '/' 없어 안 걸림)
+      if (!acct) { for (let k = 0; k < c.length; k++) { const vv = gv(k); if (/^[^\/\s][^\/]*\/\s*[0-9-]{6,}\s*\/[^\/]/.test(vv)) { acct = vv; break; } } }
       const cv = gv(cvIdx);
       if (no && acct) map[no] = acct;
       if (no) { window.__jhDelq = window.__jhDelq || {}; window.__jhDelq[no] = (c[0] ? String(c[0].v != null ? c[0].v : '').trim() : ''); }
