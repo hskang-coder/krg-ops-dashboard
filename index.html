@@ -5610,6 +5610,9 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
   // extDlqCnoSet: 외부에서 넘어온 연체자 Set (gid=418937767 기준)
   if (!resp || !resp.table) return { segs:{}, typeBreakdown:{}, activeDelinqAmt:0, endedDelinqAmt:0, totalContracts:0, dlqCnoSet: new Set(), contractDetails:{} };
   const rows = resp.table.rows || [];
+  // [v381] 라벨 기반 인덱스 (수납시트 gid=131074722 컬럼 이동 대비, 현재 위치를 fallback) — 동작 불변, 미래 대비
+  const _lb = (resp.table.cols || []).map(col => (col.label || col.id || '').trim());
+  const _iTipo=findColIdx(_lb,['구분'],0), _iCno=findColIdx(_lb,['계약번호'],4), _iType=findColIdx(_lb,['납부종류'],5), _iCStat=findColIdx(_lb,['계약상태'],13), _iPayStat=findColIdxLast(_lb,['납부상태'],19), _iAmt=findColIdx(_lb,['미납(연체)금액(원)','미납(연체)금액'],27), _iDays=findColIdx(_lb,['연체일수'],29);
   const activeMap = {}, endedMap = {};
   let totalContracts = 0;
   const allActiveSet = new Set();
@@ -5618,13 +5621,13 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
   const delinqDaysMap = {}; // cno → max ad29 where t19=연체중/분납중
   rows.forEach(row => {
     const c = row.c || [];
-    const tipo  = c[0]  ? String(c[0].v  ?? '') : '';
-    const f5    = c[5]  ? String(c[5].v  ?? '') : '';   // f열: 납부종류
-    const t19   = c[19] ? String(c[19].v ?? '') : '';   // t열: 연체구분
-    const n13   = c[13] ? String(c[13].v ?? '') : '';
-    const ad29  = c[29] ? Number(c[29].v ?? 0) : 0;
-    const cno   = c[4]  ? String(c[4].f  ?? c[4].v ?? '').replace(/\.0$/,'').trim() : '';
-    const amt   = c[27] ? Number(c[27].v ?? 0) : 0;
+    const tipo  = c[_iTipo]  ? String(c[_iTipo].v  ?? '') : '';
+    const f5    = c[_iType]  ? String(c[_iType].v  ?? '') : '';   // 납부종류
+    const t19   = c[_iPayStat] ? String(c[_iPayStat].v ?? '') : '';   // 납부상태(연체구분)
+    const n13   = c[_iCStat] ? String(c[_iCStat].v ?? '') : '';   // 계약상태
+    const ad29  = c[_iDays] ? Number(c[_iDays].v ?? 0) : 0;   // 연체일수
+    const cno   = c[_iCno]  ? String(c[_iCno].f  ?? c[_iCno].v ?? '').replace(/\.0$/,'').trim() : '';
+    const amt   = c[_iAmt] ? Number(c[_iAmt].v ?? 0) : 0;   // 미납(연체)금액
     if (!cno) return;                          // e열(계약번호) 없으면 스킵
     // ab열 금액 누산 (f열 전체, n열 삭제·계약 철회 제외, ad>0인 과거 연체분만)
     if (n13 !== '삭제' && n13 !== '계약 철회' && ad29 > 0) amtSumMap[cno] = (amtSumMap[cno] || 0) + amt;
@@ -6101,11 +6104,13 @@ async function renderDelinquency() {
       const _payDlqUnion = new Set([..._payDlqImda, ..._payDlqByun]);
       const _ad29Set = new Set();
       const r2rows = (r2 && r2.table && r2.table.rows) ? r2.table.rows : [];
+      const _r2lb = (r2 && r2.table && r2.table.cols ? r2.table.cols : []).map(function(col){return (col.label||col.id||'').trim();});  // [v381] 라벨 기반(현재 인덱스 fallback)
+      const _r2Cno=findColIdx(_r2lb,['계약번호'],4), _r2CStat=findColIdx(_r2lb,['계약상태'],13), _r2Days=findColIdx(_r2lb,['연체일수'],29);
       r2rows.forEach(function(row){
         const c = row.c || [];
-        const cno  = c[4]  ? String(c[4].f ?? c[4].v ?? '').replace(/\.0$/,'').trim() : '';
-        const n13  = c[13] ? String(c[13].v ?? '') : '';
-        const ad29 = c[29] ? Number(c[29].v ?? 0) : 0;
+        const cno  = c[_r2Cno]  ? String(c[_r2Cno].f ?? c[_r2Cno].v ?? '').replace(/\.0$/,'').trim() : '';
+        const n13  = c[_r2CStat] ? String(c[_r2CStat].v ?? '') : '';
+        const ad29 = c[_r2Days] ? Number(c[_r2Days].v ?? 0) : 0;
         if (cno && n13 === '계약중' && ad29 > 0) _ad29Set.add(cno);
       });
       console.group('[v259] 전체 연체자 카운트 진단');
@@ -13483,18 +13488,20 @@ function openRenewalReport(cno){
 function rnwCalcLateMetrics(cno, incomeResp){
   if (!incomeResp || !incomeResp.table) return { count:0, sumDays:0, rate:0, total:0 };
   var rows = incomeResp.table.rows || [];
+  var _ilb = (incomeResp.table.cols || []).map(function(col){return (col.label||col.id||'').trim();});  // [v381] 라벨 기반(현재 인덱스 fallback)
+  var _iCno2=findColIdx(_ilb,['계약번호'],4), _iCStat2=findColIdx(_ilb,['계약상태'],13), _iType2=findColIdx(_ilb,['납부종류'],5), _iDays2=findColIdx(_ilb,['연체일수'],29), _iDue2=findColIdx(_ilb,['납기일'],28);
   var matches = [];
   rows.forEach(function(row){
     var c = row.c || [];
-    var rowCno = c[4] ? String(c[4].f ?? c[4].v ?? '').replace(/\.0$/,'').trim() : '';
+    var rowCno = c[_iCno2] ? String(c[_iCno2].f ?? c[_iCno2].v ?? '').replace(/\.0$/,'').trim() : '';
     if (rowCno !== String(cno).replace(/\.0$/,'').trim()) return;
-    var n13 = c[13] ? String(c[13].v ?? '') : '';
-    var f5  = c[5]  ? String(c[5].v  ?? '') : '';
+    var n13 = c[_iCStat2] ? String(c[_iCStat2].v ?? '') : '';
+    var f5  = c[_iType2]  ? String(c[_iType2].v  ?? '') : '';
     if (n13 === '삭제' || n13 === '계약 철회') return;
     if (f5 !== '임대료') return;
-    var ad29 = c[29] ? Number(c[29].v ?? 0) : 0;
+    var ad29 = c[_iDays2] ? Number(c[_iDays2].v ?? 0) : 0;
     var billDate = null;
-    if (c[28] && c[28].v != null) billDate = rnwParseDate(c[28].v) || rnwParseDate(c[28].f);
+    if (c[_iDue2] && c[_iDue2].v != null) billDate = rnwParseDate(c[_iDue2].v) || rnwParseDate(c[_iDue2].f);
     matches.push({ days: ad29, billDate: billDate });
   });
   matches.sort(function(a,b){ return (b.billDate||0) - (a.billDate||0); });
