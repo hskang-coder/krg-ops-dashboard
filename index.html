@@ -1937,15 +1937,17 @@ async function loadLandlordAccounts() {
     const rows = resp.table.rows || [];
     // [v376] 하드코딩 인덱스(c[111]) → 헤더 라벨 매칭 (시트 컬럼 이동 시 정산계좌 자리에 주소가 들어오던 버그 수정)
     const labels = (resp.table.cols || []).map(col => (col.label || col.id || '').trim());
-    const noIdx   = findColIdx(labels, ['계약번호'], 2);
-    const acctIdx = findColIdx(labels, ['수분양자 정산계좌','정산계좌','임대인 정산계좌','정산 계좌','입금계좌','계좌'], -1);
-    const cvIdx   = findColIdx(labels, ['중도퇴실'], 99);
+    const noIdx    = findColIdx(labels, ['임대계약번호','계약번호'], 2);
+    // [v379] 정산계좌 = '수분양자 전대업 지정수익 정산계좌'(없으면 숙박업) — 컬럼 이동으로 기존 인덱스가 '수분양자 주소'를 가리키던 버그 수정. 형식: 은행/계좌/예금주
+    const acctIdx  = findColIdx(labels, ['수분양자 전대업 지정수익 정산계좌','전대업 지정수익 정산계좌','전대업 지정수익'], -1);
+    const acctIdx2 = findColIdx(labels, ['수분양자 숙박업 운영수익 정산계좌','숙박업 운영수익 정산계좌','숙박업 운영수익'], -1);
+    const cvIdx    = findColIdx(labels, ['중도퇴실상태','중도퇴실'], 99);
     const map = {}, mxMap = {};
     rows.forEach(row => {
       const c = row.c || [];
       const gv = i => (i < 0 || !c[i]) ? '' : String(c[i].f != null ? c[i].f : c[i].v != null ? c[i].v : '').trim();
       const no = gv(noIdx);
-      const acct = gv(acctIdx);
+      const acct = gv(acctIdx) || gv(acctIdx2);
       const cv = gv(cvIdx);
       if (no && acct) map[no] = acct;
       if (no) { window.__jhDelq = window.__jhDelq || {}; window.__jhDelq[no] = (c[0] ? String(c[0].v != null ? c[0].v : '').trim() : ''); }
