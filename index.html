@@ -20378,7 +20378,11 @@ async function okpi_render(){
   function matchType(pt, ty){ if (pt === '전체') return true; return ty.indexOf(pt) >= 0; }
   function mlabel(y,mo){ return String(y).slice(2)+'.'+('0'+mo).slice(-2); }
   var cache = {};
+  var _curSig = null, _rerender = null, _lastRenderSig = null;
+  function dataSig(){ var p=0,c=0; try{ p=(paymentRawData||[]).length; }catch(e){} try{ c=(contractRawData||[]).length; }catch(e){} return p+'_'+c; }
   function compute(pt){
+    var _sig = dataSig();
+    if (_curSig !== _sig) { cache = {}; _curSig = _sig; }   // [v375] 데이터 변경 시 캐시 무효화 (덜 로드된 상태로 고정되는 버그 방지)
     if (cache[pt]) return cache[pt];
     var pr; try { pr = paymentRawData; } catch(e){ pr = null; } if (!pr || !pr.length) return null;
     var craw; try { craw = contractRawData; } catch(e){ craw = []; }
@@ -20490,8 +20494,10 @@ async function okpi_render(){
     card.querySelectorAll('#rnwPeriods span').forEach(function(t){ t.addEventListener('click',function(){ state.period=+t.getAttribute('data-period'); state.custom=null; setActive('#rnwPeriods','data-period',state.period); render(curMode); }); });
     card.querySelector('#rnwApply').addEventListener('click',function(){ var f=card.querySelector('#rnwFrom').value, to=card.querySelector('#rnwTo').value; if(!f||!to)return; var fy=+f.slice(0,4),fm=+f.slice(5,7),ty=+to.slice(0,4),tm=+to.slice(5,7); var L=[],y=fy,m=fm,guard=0; while((y<ty||(y===ty&&m<=tm))&&guard<60){ L.push({y:y,m:m}); m++; if(m>12){m=1;y++;} guard++; } if(L.length){ state.custom=L; card.querySelectorAll('#rnwPeriods span').forEach(function(x){ x.style.background='#eef1f6'; x.style.color='#4b5563'; x.style.fontWeight='400'; }); render(curMode); } });
     render('count');
+    _rerender = function(){ try { render(curMode); } catch(e){} };   // [v375] 데이터 갱신 시 재렌더 훅
+    _lastRenderSig = dataSig();
   }
-  var iv = setInterval(function(){ if (typeof Chart === 'undefined') return; var title = [].slice.call(document.querySelectorAll('.sum-card-title')).filter(function(e){ return /③\s*초기\s*연체자/.test(e.textContent||''); })[0]; if (!title) return; var card = title.closest('.sum-card') || title.parentElement; var view = card.closest('.view-content.active'); if (!view) return; build(card); }, 1000);
+  var iv = setInterval(function(){ if (typeof Chart === 'undefined') return; var title = [].slice.call(document.querySelectorAll('.sum-card-title')).filter(function(e){ return /③\s*초기\s*연체자/.test(e.textContent||''); })[0]; if (!title) return; var card = title.closest('.sum-card') || title.parentElement; var view = card.closest('.view-content.active'); if (!view) return; if (!document.getElementById(CARD_ID)) { build(card); return; } var _s = dataSig(); if (_rerender && _s !== _lastRenderSig) { _lastRenderSig = _s; _rerender(); } }, 1000);
 })();</script>
 </body>
 </html>
