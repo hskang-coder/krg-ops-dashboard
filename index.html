@@ -20415,10 +20415,10 @@ async function okpi_render(){
     if (document.getElementById(CARD_ID)) return; if (!compute('임대료')) return;
     var COL={cur:'#2f6fc0',prev:'#e8852b',prev2:'#9ca3af',jeong:'#16a34a',napbu:'#e8852b',jung:'#dc2626',bunnab:'#7c3aed',mon:'#2f6fc0'};
     var types=['임대료','변동관리비','기타계약금','전체'];
-    var periods=[{k:1,t:'1개월'},{k:3,t:'3개월'},{k:6,t:'6개월'},{k:12,t:'12개월'}];
+    var periods=[{k:1,t:'1개월'},{k:2,t:'2개월'},{k:3,t:'3개월'},{k:6,t:'6개월'},{k:12,t:'12개월'}];
     var card=document.createElement('div'); card.id=CARD_ID; card.setAttribute('style','background:#fff;border:2px solid #4d8fe0;border-radius:10px;padding:12px 15px;position:relative;margin-bottom:13px;');
     var typeTabs=types.map(function(t){ return '<span data-type="'+t+'" style="font-size:12px;padding:4px 11px;border-radius:999px;cursor:pointer;background:'+(t==='임대료'?'#185FA5':'#eef1f6')+';color:'+(t==='임대료'?'#fff':'#4b5563')+';font-weight:'+(t==='임대료'?'600':'400')+';">'+t+'</span>'; }).join('');
-    var perTabs=periods.map(function(p){ return '<span data-period="'+p.k+'" style="font-size:12px;padding:4px 11px;border-radius:999px;cursor:pointer;background:'+(p.k===3?'#185FA5':'#eef1f6')+';color:'+(p.k===3?'#fff':'#4b5563')+';font-weight:'+(p.k===3?'600':'400')+';">'+p.t+'</span>'; }).join('');
+    var perTabs=periods.map(function(p){ return '<span data-period="'+p.k+'" style="font-size:12px;padding:4px 11px;border-radius:999px;cursor:pointer;background:'+(p.k===2?'#185FA5':'#eef1f6')+';color:'+(p.k===2?'#fff':'#4b5563')+';font-weight:'+(p.k===2?'600':'400')+';">'+p.t+'</span>'; }).join('');
     card.innerHTML=
       '<div style="position:absolute;top:-11px;left:16px;background:#4d8fe0;color:#fff;font-size:11px;font-weight:600;padding:3px 11px;border-radius:999px;">일자별 연체 추이</div>'+
       '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:2px 0 8px;">'+
@@ -20437,7 +20437,7 @@ async function okpi_render(){
       '<div id="rnwMetrics" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px;"></div>'+
       '<div id="rnwLegend" style="display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:#6b7280;margin-bottom:4px;"></div>'+
       '<div style="position:relative;width:100%;height:200px;"><canvas id="rnwCanvas"></canvas></div>'+
-      '<div style="margin-top:8px;font-size:11px;color:#9aa0a6;">계약중(마스터 정상)·납기 경과·연체중+분납중 · 퇴실일(Z열) 기준 당시 계약중 · 계약번호 중복제거 · 종료 계약 제외 · <b style="color:#185FA5">build v377</b></div>';
+      '<div style="margin-top:8px;font-size:11px;color:#9aa0a6;">계약중(마스터 정상)·납기 경과·연체중+분납중 · 퇴실일(Z열) 기준 당시 계약중 · 계약번호 중복제거 · 종료 계약 제외 · <b style="color:#185FA5">build v378</b></div>';
     anchorCard.parentNode.insertBefore(card, anchorCard);
     var sw=function(c,t){ return '<span><i style="display:inline-block;vertical-align:middle;margin-right:5px;width:11px;height:11px;border-radius:2px;background:'+c+'"></i>'+t+'</span>'; };
     var ml=function(c,k,v){ return '<div style="border-radius:8px;padding:7px 12px;min-width:108px;background:#f4f6fa;"><div style="font-size:11px;color:#6b7280;">'+k+'</div><div style="font-size:19px;font-weight:600;line-height:1.15;color:'+c+'">'+v+'</div></div>'; };
@@ -20447,7 +20447,7 @@ async function okpi_render(){
     var dayX={ticks:{font:{size:10},autoSkip:false,maxRotation:0,callback:function(v,i){var d=i+1;return (d===1||d%5===0||d===31)?d:'';}},grid:{display:false}};
     var monX={ticks:{font:{size:10},maxRotation:0},grid:{display:false}};
     var statusTip={callbacks:{beforeBody:function(items){ if(!items.length)return ''; var idx=items[0].dataIndex,sum=0; items[0].chart.data.datasets.forEach(function(ds){ var v=ds.data[idx]; if(v!=null)sum+=v; }); return '청구인원: '+sum+'명'; },label:function(ctx){ var idx=ctx.dataIndex,sum=0; ctx.chart.data.datasets.forEach(function(ds){ var v=ds.data[idx]; if(v!=null)sum+=v; }); var v=ctx.raw||0,pct=sum>0?Math.round(v/sum*100):0; return ' '+ctx.dataset.label+': '+v+' ('+pct+'%)'; }}};
-    var chart=null, curMode='count', curType='임대료', state={period:3, custom:null};
+    var chart=null, curMode='count', curType='임대료', state={period:2, custom:null};  // [v378] 기본 2개월(당월 vs 전월) — 전전월은 과거 데이터 한계로 참고용
     function mb(S,n){ var d=new Date(S.TY,S.TM-1-n,1); return {y:d.getFullYear(),m:d.getMonth()+1}; }
     function getMonths(S){ if(state.custom) return state.custom; var L=[]; for(var k=state.period-1;k>=0;k--) L.push(mb(S,k)); return L; }
     function render(mode){
