@@ -3993,15 +3993,9 @@ function downloadPtExcel() {
 function rnwDownloadExcel() {
   if (typeof rnwBuildEnriched !== 'function') { alert('데이터 로딩 중입니다.'); return; }
   if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로딩 중입니다.'); return; }
-  var enriched = rnwBuildEnriched();
-  // 현재 필터(승인/조건부/거절) 적용
-  var jf = window._rnwJudgeFilter || 'all';
-  var filtered = (jf === 'all') ? enriched : enriched.filter(function(e){
-    if (jf === 'app') return e.judge === 'approve';
-    if (jf === 'cond') return e.judge === 'conditional';
-    if (jf === 'deny') return e.judge === 'deny';
-    return true;
-  });
+  // [v382] 화면 표와 동일한 필터 결과(날짜·계약상태·심사결과·검색)를 그대로 내보냄
+  var filtered = Array.isArray(window._rnwLastRendered) ? window._rnwLastRendered : null;
+  if (!filtered) { alert('먼저 갱신관리 화면을 불러온 뒤 내보내주세요.'); return; }
   if (!filtered.length) { alert('다운로드할 데이터가 없습니다.'); return; }
   var fmtDate = function(d){
     if (!d) return '';
@@ -4016,7 +4010,7 @@ function rnwDownloadExcel() {
       '그룹': e.group || '',
       '계약상태': e.contractStatus || '',
       '공실상태': e.vacancyStatus || '',
-      '갱신심사결과': ({approve:'승인', conditional:'조건부승인', deny:'거절'})[e.judge] || e.judge || '',
+      '갱신심사결과': ({app:'승인', approve:'승인', cond:'조건부승인', conditional:'조건부승인', deny:'거절'})[e.judge] || e.judge || '',
       '임차인': e.name || '',
       '연락처': e.tel || '',
       '갱신기한': fmtDate(e.deadline),
@@ -13795,6 +13789,7 @@ function renderRenewalView(){
     });
   }
 
+  window._rnwLastRendered = filtered;  // [v382] 엑셀 내보내기가 화면과 동일한 필터 결과(날짜·계약상태·심사결과·검색)를 쓰도록 저장
   var kpi = rnwCountKPI(enriched);
   var cohorts = rnwBuildCohorts();
   // [v163] 모드별 effective range
