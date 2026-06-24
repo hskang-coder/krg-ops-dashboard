@@ -66,7 +66,9 @@ const CFG_FIELDS_MAP = [
   { field: 'emgPhone',    headers: ['긴급연락처', '긴급 연락처'],                            fallbackCol: 'AY', nth: 0 }, // AY (첫번째 긴급연락처)
   { field: 'emgRelName',  headers: ['관계,이름', '관계, 이름', '관계/이름', '관계이름'],   fallbackCol: 'AZ', nth: 0 }, // AZ (첫번째 관계,이름)
   // ── 공동전차인 입력시만 쓰는 컬럼 (단독계약시 전체 SKIP) ──
-  { field: 'coName',        headers: ['이름'],          fallbackCol: 'BA', nth: 0, onlyIfCoName: true },
+  // [v351] C열(심사자이름)·BA열(공동계약자이름) 헤더 분리에 맞춰 고유 헤더로 매칭 — '이름' 중복으로 C에 잘못 쓰이던 버그 해결.
+  //        헤더 못 찾아도 fallback BA(53열)로 안전 폴백 (이름변경 전/후 모두 정상 동작).
+  { field: 'coName',        headers: ['공동계약자이름', '공동계약자 이름', '계약자2이름', '계약자2(을)이름'], fallbackCol: 'BA', nth: 0, onlyIfCoName: true },
   { field: 'coPhone',       headers: ['연락처'],        fallbackCol: 'BB', nth: 0, onlyIfCoName: true },
   { field: 'coIdNo',        headers: ['주민번호'],      fallbackCol: 'BC', nth: 1, onlyIfCoName: true }, // BC (두번째 주민번호)
   { field: 'coAddr',        headers: ['주소'],          fallbackCol: 'BD', nth: 0, onlyIfCoName: true }, // 주소 (첫번째, 주소임차인과 구분)
