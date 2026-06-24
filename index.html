@@ -19823,6 +19823,25 @@ async function okpi_render(){
           + '<td>'+statusTag+'</td>'
           + '</tr>';
       }).join('');
+      // [v383] 엑셀 내보내기용 데이터 적재 (화면 표와 동일 컬럼)
+      window._prpExportData = window._prpExportData || {};
+      window._prpExportData[b] = { addr: firstAddr, rows: arr.map(function(rr){
+        return {
+          '호실': rr.room,
+          '현재 임차인': rr.currentTenant || (rr.lastTenant ? ('공실(직전:'+rr.lastTenant+')') : '공실'),
+          '계약 부동산': rr.partnerName || '',
+          '담당자': rr.staff || '',
+          '담당자 연락처': rr.staffPhone || '',
+          '월세': parseFloat(String(rr.vac.monthRentRaw||'').replace(/[^0-9.-]/g,''))||0,
+          '부가세': parseFloat(String(rr.vac.vatRaw||'').replace(/[^0-9.-]/g,''))||0,
+          '고정관리비': parseFloat(String(rr.vac.mgmtFee||'').replace(/[^0-9.-]/g,''))||0,
+          '평균 거주(월)': rr.avgMonths ? +rr.avgMonths.toFixed(1) : 0,
+          '중도퇴실': rr.midExit || 0,
+          '갱신': rr.renewCount || 0,
+          '매력도': String(rr.grade||'') + ' ' + (rr.score||0),
+          '상태': rr.blackList ? '블랙' : rr.watchList ? '주의' : (!rr.currentTenant ? '공실' : '정상')
+        };
+      }) };
       var isSelected = window._prpFilter.selectedBldg === b;
       return ''
         + '<div class="prp-bldg'+(isSelected?' selected':'')+'">'
@@ -19834,6 +19853,7 @@ async function okpi_render(){
         +     '<div class="prp-stat"><span>⭐ 매력도</span><b style="color:#1B3976">'+ag.avgScore+' <span class="prp-tag '+ag.avgGrade+'" style="font-size:9px">'+ag.avgGrade+'</span></b></div>'
         +     '<div class="prp-stat'+(ag.black>0?' warn':' good')+'"><span>블랙</span><b>'+ag.black+'</b></div>'
         +     '<button class="prp-btn" onclick="prp_openBldgReport(\''+b.replace(/\'/g,"\\\'")+'\');event.stopPropagation()" style="background:#1B3976;color:#fff;border-color:#1B3976">📋 리포트</button>'
+        +     '<button class="prp-btn" onclick="prp_exportBldgExcel(\''+b.replace(/\'/g,"\\\'")+'\');event.stopPropagation()" style="background:#059669;color:#fff;border-color:#059669;margin-left:6px">⬇ 엑셀</button>'
         +   '</div>'
         +   '<div class="prp-mgmt">'
         +     '<div class="prp-mg"><span class="l">🔑 현관 비밀번호</span><span class="v pwdv">'+pwdMasked+'</span></div>'
@@ -19947,6 +19967,25 @@ async function okpi_render(){
           + '<td>'+statusTag+'</td>'
           + '</tr>';
       }).join('');
+      // [v383] 엑셀 내보내기용 데이터 적재 (화면 표와 동일 컬럼)
+      window._prpExportData = window._prpExportData || {};
+      window._prpExportData[b] = { addr: firstAddr, rows: arr.map(function(rr){
+        return {
+          '호실': rr.room,
+          '현재 임차인': rr.currentTenant || (rr.lastTenant ? ('공실(직전:'+rr.lastTenant+')') : '공실'),
+          '계약 부동산': rr.partnerName || '',
+          '담당자': rr.staff || '',
+          '담당자 연락처': rr.staffPhone || '',
+          '월세': parseFloat(String(rr.vac.monthRentRaw||'').replace(/[^0-9.-]/g,''))||0,
+          '부가세': parseFloat(String(rr.vac.vatRaw||'').replace(/[^0-9.-]/g,''))||0,
+          '고정관리비': parseFloat(String(rr.vac.mgmtFee||'').replace(/[^0-9.-]/g,''))||0,
+          '평균 거주(월)': rr.avgMonths ? +rr.avgMonths.toFixed(1) : 0,
+          '중도퇴실': rr.midExit || 0,
+          '갱신': rr.renewCount || 0,
+          '매력도': String(rr.grade||'') + ' ' + (rr.score||0),
+          '상태': rr.blackList ? '블랙' : rr.watchList ? '주의' : (!rr.currentTenant ? '공실' : '정상')
+        };
+      }) };
       var isSelected = window._prpFilter.selectedBldg === b;
       return ''
         + '<div class="prp-bldg'+(isSelected?' selected':'')+'">'
@@ -19958,6 +19997,7 @@ async function okpi_render(){
         +     '<div class="prp-stat"><span>⭐ 매력도</span><b style="color:#1B3976">'+ag.avgScore+' <span class="prp-tag '+ag.avgGrade+'" style="font-size:9px">'+ag.avgGrade+'</span></b></div>'
         +     '<div class="prp-stat'+(ag.black>0?' warn':' good')+'"><span>블랙</span><b>'+ag.black+'</b></div>'
         +     '<button class="prp-btn" onclick="prp_openBldgReport(\''+b.replace(/\'/g,"\\\'")+'\');event.stopPropagation()" style="background:#1B3976;color:#fff;border-color:#1B3976">📋 리포트</button>'
+        +     '<button class="prp-btn" onclick="prp_exportBldgExcel(\''+b.replace(/\'/g,"\\\'")+'\');event.stopPropagation()" style="background:#059669;color:#fff;border-color:#059669;margin-left:6px">⬇ 엑셀</button>'
         +   '</div>'
         +   '<div class="prp-mgmt">'
         +     '<div class="prp-mg"><span class="l">🔑 현관 비밀번호</span><span class="v pwdv">'+pwdMasked+'</span></div>'
@@ -19993,6 +20033,21 @@ async function okpi_render(){
   window.prp_toggleInactive = function(){ window._prpFilter.showInactive = !window._prpFilter.showInactive; renderPropertyView(); };
   window.prp_setMode = function(m){ window._prpFilter.mode = m; renderPropertyView(); setTimeout(function(){ var i = document.getElementById('prpQ'); if (i) i.focus(); }, 30); };
   window.prp_selectBldg = function(b){ window._prpFilter.selectedBldg = b||''; renderPropertyView(); };
+  // [v383] 건물 호실현황 엑셀 다운로드 — 화면 표와 동일한 데이터
+  window.prp_exportBldgExcel = function(b){
+    try {
+      if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 시도해주세요.'); return; }
+      var d = (window._prpExportData||{})[b];
+      if (!d || !d.rows || !d.rows.length) { alert('내보낼 호실 데이터가 없습니다.'); return; }
+      var ws = XLSX.utils.json_to_sheet(d.rows);
+      ws['!cols'] = [{wch:8},{wch:18},{wch:12},{wch:12},{wch:16},{wch:12},{wch:10},{wch:11},{wch:12},{wch:9},{wch:7},{wch:10},{wch:8}];
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '호실현황');
+      var today = (function(){ var t=new Date(); return t.getFullYear()+String(t.getMonth()+1).padStart(2,'0')+String(t.getDate()).padStart(2,'0'); })();
+      var safe = String(b||'건물').replace(/[\\/:*?"<>|]/g,'_');
+      XLSX.writeFile(wb, '호실현황_'+safe+'_'+today+'.xlsx');
+    } catch(e){ alert('엑셀 생성 실패: ' + e.message); }
+  };
   window.prp_drillBldg = function(b){ window._prpFilter.selectedBldg = b||''; renderPropertyView(); };
   // [v302] 호실 클릭 → 입주관리에서 해당 계약 상세 보기
   window.prp_drillToContract = function(no){
