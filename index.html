@@ -18618,11 +18618,16 @@ function okpi_suggestFor(p, m){
     if(!s.length) s.push('갱신 관리 안정적 — 거절/조건부 사유 분류로 재계약 전략 고도화');
   } else if(p==='김영철'){
     var rd=pct(m.dueSet,m.dueTotal);
-    if((+m.paid||0)===0&&(+m.partial||0)===0) s.push('입금예정일 확정'+(rd!=null?(' '+rd+'%'):'')+' 대비 완납·분납 전환 0건 — 약속일 D-1 리마인드 + 실입금 follow-up이 회수율 핵심');
+    var due=+m.dueSet||0, pd=+m.paid||0, pt=+m.partial||0;
+    if(pd===0&&pt===0) s.push('입금예정일 확정 '+due+'건 대비 완납·분납 전환 0건 — 약속일 D-1 리마인드 + 실입금 follow-up이 회수율 핵심');
+    else { var cv=due>0?Math.round((pd+pt)/due*100):null; if(cv!=null) s.push('입금예정일 확정 '+due+'건 → 완납·분납 '+(pd+pt)+'건(전환 '+cv+'%) — 약속 불이행 건 자동 재독촉으로 전환율 개선'); }
     if(rd!=null&&rd<70) s.push('입금예정일 확정률 '+rd+'% — 미확정 건 우선 전화로 약속일 확보');
     if(!s.length) s.push('수납 follow-up 양호 — 약속 불이행 건 자동 재독촉 룰 도입 제안');
   } else if(p==='오진선'){
-    s.push('법조치 대응 '+(+m.legal||0)+'건 집중 — 「검토 → 내용증명 발송 → 지급명령」 전환 SLA(검토 후 N일 내 발송) 설정으로 병목 해소');
+    var rev=+m.ohJobLegal||0, ntc=+m.ohJobNotice||0, ord=+m.ohJobOrder||0;
+    var c1=rev>0?Math.round(ntc/rev*100):null;
+    if(rev>0&&(c1==null||c1<30)) s.push('법적조치 검토 '+rev+'건 → 내용증명 발송 '+ntc+'건(전환 '+(c1||0)+'%) → 지급명령 '+ord+'건 — 검토 단계 적체, 검토 후 N일 내 발송 SLA로 전환율 개선');
+    else s.push('법조치 단계 전환 양호('+rev+'→'+ntc+'→'+ord+') — 지급명령 후 강제집행 전환 모니터링');
     s.push('종료·퇴실 연체는 보증보험 청구 경로 우선 검토로 회수 효율화');
   }
   return s.slice(0,2);
