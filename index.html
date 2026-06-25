@@ -2352,7 +2352,9 @@ function buildResponseTableHTML(responses) {
   const jobFilter = window._respJobFilter || '전체';
   const filtered = (jobFilter === '전체')
     ? responses
-    : responses.filter(r => String(r.jobType||'').trim() === jobFilter);
+    : (jobFilter === '법무관리')
+      ? responses.filter(_respIsLegal)
+      : responses.filter(r => String(r.jobType||'').trim() === jobFilter);
   if (filtered.length === 0)
     return `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">${jobFilter==='전체'?'대응 내역이 없습니다':jobFilter+' 대응 내역이 없습니다'}</div>`;
   // [v225] 컬럼 헤더 — jobFilter에 따라 입금예정일 / 재연락일정 동적 변경
@@ -2399,11 +2401,17 @@ function setRespJobFilter(val) {
   }
 }
 
+// [v388] 법무관리 = 연체관리 + 법적 하위구분(법적조치 검토/내용증명 발송/지급명령 진행/보정명령 대응/기타집행)
+function _respIsLegal(r){
+  if(String(r.jobType||'').trim()!=='연체관리')return false;
+  var n=String(r.jobSub||'').replace(/\s/g,'');
+  return n.indexOf('법적조치검토')>=0||n.indexOf('내용증명발송')>=0||n.indexOf('지급명령')>=0||n.indexOf('보정명령')>=0||n.indexOf('기타집행')>=0||n.indexOf('기타조치')>=0;
+}
 function buildJobFilterBar(responses) {
   const sel = window._respJobFilter || '전체';
   // [v66] 계약(입주)관리 추가
-  const counts = { '전체': responses.length, '연체관리': 0, '중도퇴실관리': 0, '수납관리': 0, '갱신관리': 0, '계약(입주)관리': 0 };
-  responses.forEach(r => { const jt = String(r.jobType||'').trim(); if (counts[jt] !== undefined) counts[jt]++; });
+  const counts = { '전체': responses.length, '연체관리': 0, '중도퇴실관리': 0, '수납관리': 0, '갱신관리': 0, '계약(입주)관리': 0, '법무관리': 0 };
+  responses.forEach(r => { const jt = String(r.jobType||'').trim(); if (counts[jt] !== undefined) counts[jt]++; if (_respIsLegal(r)) counts['법무관리']++; });
   function pill(val) {
     const active = (val === sel);
     // [v64] 업무구분 배지 색상과 매칭 — inactive도 light tone, active는 dark
@@ -2414,11 +2422,12 @@ function buildJobFilterBar(responses) {
     else if (val === '갱신관리') { bg = active ? '#06B6D4' : '#CCFBF1'; fg = active ? '#fff' : '#0F766E'; }
     else if (val === '중도퇴실관리') { bg = active ? '#7C3AED' : '#EDE9FE'; fg = active ? '#fff' : '#7C3AED'; }
     else if (val === '계약(입주)관리') { bg = active ? '#16A34A' : '#DCFCE7'; fg = active ? '#fff' : '#166534'; }  /* [v66] */
+    else if (val === '법무관리') { bg = active ? '#854F0B' : '#FAEEDA'; fg = active ? '#fff' : '#854F0B'; }  /* [v388] */
     else { bg = active ? '#1B3976' : '#F3F4F6'; fg = active ? '#fff' : '#374151'; }
     return `<button onclick="setRespJobFilter('${val}')" style="background:${bg};color:${fg};border:none;padding:4px 12px;border-radius:14px;font-size:11.5px;font-weight:700;cursor:pointer;margin-right:6px">${val} <span style="opacity:.7;font-weight:600">(${counts[val]})</span></button>`;
   }
   // [v66/v70] 순서: 전체 → 수납관리 → 연체관리 → 갱신관리 → 중도퇴실관리 → 계약(입주)관리 (담당자 필터는 v69 별도 컬럼으로 대체)
-  return `<div style="display:flex;align-items:center;gap:4px;padding:0 4px 8px">${pill('전체')}${pill('수납관리')}${pill('연체관리')}${pill('갱신관리')}${pill('중도퇴실관리')}${pill('계약(입주)관리')}</div>`;
+  return `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:0 4px 8px">${pill('전체')}${pill('수납관리')}${pill('연체관리')}${pill('갱신관리')}${pill('중도퇴실관리')}${pill('계약(입주)관리')}${pill('법무관리')}</div>`;
 }
 
 function updateResponseSection(no, responses) {
