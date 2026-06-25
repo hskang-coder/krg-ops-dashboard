@@ -3512,6 +3512,11 @@ function buildDlqNoticeHtml(rows, contractDetails) {
     var cno = String(r.cno);
     var addr = (contractDetails[cno] && contractDetails[cno].addr) || '조회 불가';
     var sDate = startDate(r.days||0);
+    // [v384] 수신 — 계약자 + 공동계약자(연대보증인) 함께 표기
+    var _vac = (window.vacancyRawData||vacancyRawData||[]).find(function(v){ return String(v.no||'').trim() === String(cno).trim(); });
+    var _coNm = _vac && _vac.coName ? String(_vac.coName).trim() : '';
+    var _coLbl = _coNm ? (/연대|보증/.test(String((_vac&&_vac.contractInfo)||'')) ? '연대보증인' : '공동계약자') : '';
+    var _recipient = (r.nm||'') + (_coNm ? (' · ' + _coNm + ' (' + _coLbl + ')') : '');
 
     pages += '<div class="np">'
       // 헤더
@@ -3534,7 +3539,7 @@ function buildDlqNoticeHtml(rows, contractDetails) {
       + '</div>'
       // 정보 테이블
       + '<table class="info-tbl">'
-      + '<tr><td class="info-lbl">수신</td><td class="info-val">' + (r.nm||'') + '</td></tr>'
+      + '<tr><td class="info-lbl">수신</td><td class="info-val">' + _recipient + '</td></tr>'
       + '<tr><td class="info-lbl">주소</td><td class="info-val">' + addr + '</td></tr>'
       + '<tr><td class="info-lbl">연체 시작일</td><td class="info-val red">' + sDate + '</td></tr>'
       + '<tr><td class="info-lbl">연체 일수</td><td class="info-val red">' + (r.days||0) + '일 이상</td></tr>'
