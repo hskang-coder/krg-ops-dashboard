@@ -6756,8 +6756,8 @@ function dlqRenderLegalTableRows(rows, container){
     var cs=r.contractStatus||'계약중';
     var csBg=cs==='계약중'?'#dbeafe':(cs==='종료(3개월이내)'?'#fef3c7':'#f3f4f6'), csFg=cs==='계약중'?'#1d4ed8':(cs==='종료(3개월이내)'?'#d97706':'#6b7280');
     return '<tr class="dlq-tbl-row" onclick="dlqGoToContract(\''+cno+'\')"'+(active?' style="background:#FDF7EC"':'')+'>'
+      +'<td onclick="event.stopPropagation()" style="text-align:center;padding:4px"><input type="checkbox" class="dlq-cb dlq-row-cb" value="'+cno+'" onchange="dlqToggleSelect(\''+cno+'\',this.checked)"></td>'
       +'<td><span class="dlq-tbl-cno">'+cno+'</span></td>'
-      +'<td onclick="event.stopPropagation()" style="text-align:center"><button onclick="openReportChooser(\''+cno+'\')" title="연체 대응 리포트" style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:14px">📊</button></td>'
       +'<td><span class="dlq-tbl-group">'+(r.group||'-')+'</span></td>'
       +'<td><span class="dlq-tbl-info">'+(r.info||'-')+'</span></td>'
       +'<td><span class="dlq-days-badge dlq-days-'+(r.days<=3?'low':r.days<=15?'mid':r.days<=30?'high':'crit')+'">'+(r.days||0)+'일</span></td>'
@@ -6775,7 +6775,8 @@ function dlqRenderLegalTableRows(rows, container){
       +'</tr>';
   }).join('');
   container.innerHTML = '<div style="overflow-x:auto"><table class="dlq-tbl"><thead><tr>'
-    +'<th>계약번호</th><th>리포트</th><th>그룹</th><th>계약정보</th><th>연체일수</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th><th>연락처</th><th>연체금액</th><th>위약금</th>'
+    +'<th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>'
+    +'<th>계약번호</th><th>그룹</th><th>계약정보</th><th>연체일수</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th><th>연락처</th><th>연체금액</th><th>위약금</th>'
     +'<th>내용증명</th><th>지급명령</th><th title="보정명령 대응">보정명령</th><th>기타집행</th><th>진척사항</th>'
     +'</tr></thead><tbody>'+body+'</tbody></table></div>'
     +'<div class="dlq-tbl-count" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+rows.length+'건 · 법무 진척 뷰'
