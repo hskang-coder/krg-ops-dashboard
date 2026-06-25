@@ -18602,42 +18602,40 @@ function okpi_renderPersonCards(k){
 
 // 컨트롤 핸들러
 // [v390] 담당자별 데이터 기반 업무 개선·효율화 제안 (gid=554798125 메트릭 기반)
-function okpi_suggestFor(p, m){
+// [v391] 저장소 없는 자동 PDCA — 목표(P) + 짧은 오늘 할 일(Do) + 자동 현황(Check). 전부 gid=554798125 KPI에서 계산
+function okpi_pdca(p, m){
   m = m || {};
-  var s=[];
   var pct=function(n,d){ d=+d||0; return d>0?Math.round((+n||0)/d*100):null; };
   if(p==='고송미'){
-    var r1=pct(m.done1,m.total1), r2=pct(m.nasDone,m.nasTotal);
-    if(r1!=null&&r1<90) s.push('입주 전 전자계약·수수료 완료 '+r1+'% — 입주 D-3 자동 체크리스트로 미완료 건 사전 점검');
-    if(r2!=null&&r2<90) s.push('입주 후 NAS 등록 '+r2+'% — 입주 완료 트리거 시 NAS 등록 누락 알림 자동화');
-    if(!s.length) s.push('입주 전 처리율 양호 — 신규 계약 증가 대비 체크리스트 자동화 확장 권장');
-  } else if(p==='이지희'){
-    var rr=pct(m.renewDone,m.renewTotal);
-    if(rr!=null&&rr>=95) s.push('D-30 갱신 홈버튼 등록 '+rr+'% 우수 — 갱신 협의·거절 사유를 메모로 표준화해 패턴 분석');
-    if((+m.allCnt||0)<8) s.push('대응 기록 '+(+m.allCnt||0)+'건 — 갱신/종료 협의 과정 메모화로 진행 가시성 확보');
-    if(!s.length) s.push('갱신 관리 안정적 — 거절/조건부 사유 분류로 재계약 전략 고도화');
-  } else if(p==='김영철'){
-    var rd=pct(m.dueSet,m.dueTotal);
-    var due=+m.dueSet||0, pd=+m.paid||0, pt=+m.partial||0;
-    if(pd===0&&pt===0) s.push('입금예정일 확정 '+due+'건 대비 완납·분납 전환 0건 — 약속일 D-1 리마인드 + 실입금 follow-up이 회수율 핵심');
-    else { var cv=due>0?Math.round((pd+pt)/due*100):null; if(cv!=null) s.push('입금예정일 확정 '+due+'건 → 완납·분납 '+(pd+pt)+'건(전환 '+cv+'%) — 약속 불이행 건 자동 재독촉으로 전환율 개선'); }
-    if(rd!=null&&rd<70) s.push('입금예정일 확정률 '+rd+'% — 미확정 건 우선 전화로 약속일 확보');
-    if(!s.length) s.push('수납 follow-up 양호 — 약속 불이행 건 자동 재독촉 룰 도입 제안');
-  } else if(p==='오진선'){
-    var rev=+m.ohJobLegal||0, ntc=+m.ohJobNotice||0, ord=+m.ohJobOrder||0;
-    var c1=rev>0?Math.round(ntc/rev*100):null;
-    if(rev>0&&(c1==null||c1<30)) s.push('법적조치 검토 '+rev+'건 → 내용증명 발송 '+ntc+'건(전환 '+(c1||0)+'%) → 지급명령 '+ord+'건 — 검토 단계 적체, 검토 후 N일 내 발송 SLA로 전환율 개선');
-    else s.push('법조치 단계 전환 양호('+rev+'→'+ntc+'→'+ord+') — 지급명령 후 강제집행 전환 모니터링');
-    s.push('종료·퇴실 연체는 보증보험 청구 경로 우선 검토로 회수 효율화');
+    var r1=pct(m.done1,m.total1), r2=pct(m.nasDone,m.nasTotal), dos=[];
+    if(r1!=null&&r1<90) dos.push('미완료 입주건 전자계약·수수료 마감');
+    if(r2!=null&&r2<90) dos.push('입주 완료건 NAS 등록 확인');
+    if(!dos.length) dos.push('신규 계약 체크리스트 점검');
+    return { goal:'입주 전 처리 '+(r1==null?'-':r1+'%')+' → 90%', dos:dos.slice(0,2), status:'입주전 '+(+m.done1||0)+'/'+(+m.total1||0)+' · NAS '+(+m.nasDone||0)+'/'+(+m.nasTotal||0) };
   }
-  return s.slice(0,2);
+  if(p==='이지희'){
+    var rr=pct(m.renewDone,m.renewTotal);
+    return { goal:'갱신 등록 '+(rr==null?'-':rr+'%')+' 유지 + 협의 메모화', dos:['D-30 갱신 대상 홈버튼 등록 확인','갱신 거절·조건부 사유 메모 기록'], status:'갱신등록 '+(+m.renewDone||0)+'/'+(+m.renewTotal||0)+' · 대응 '+(+m.allCnt||0)+'건' };
+  }
+  if(p==='김영철'){
+    var due=+m.dueSet||0, pd=+m.paid||0, pt=+m.partial||0, dos=['미확정 건 전화로 약속일 확보','약속일 D-1 리마인드 발송'];
+    if(pd+pt===0) dos.push('약속 불이행 건 2차 독촉 이관');
+    return { goal:'완납 전환 '+(due>0?Math.round((pd+pt)/due*100):0)+'% → 50%', dos:dos.slice(0,2), status:'확정 '+due+' · 완납 '+pd+' · 분납 '+pt };
+  }
+  if(p==='오진선'){
+    var rev=+m.ohJobLegal||0, ntc=+m.ohJobNotice||0, ord=+m.ohJobOrder||0, c1=rev>0?Math.round(ntc/rev*100):0;
+    return { goal:'검토→발송 전환 '+c1+'% ↑ · 지급명령 진행', dos:['검토 건 중 발송 대상 선별·내용증명 발송','내용증명 발송 건 지급명령 신청'], status:'검토 '+rev+' · 발송 '+ntc+' · 지급명령 '+ord };
+  }
+  return null;
 }
 function okpi_suggestBox(person, m){
-  var s = okpi_suggestFor(person, m);
-  if(!s.length) return '';
+  var p = okpi_pdca(person, m);
+  if(!p) return '';
   return '<div style="margin-top:10px;padding:9px 11px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px">'
-    +'<div style="font-size:11px;font-weight:800;color:#92400E;margin-bottom:5px">💡 업무 개선 제안</div>'
-    + s.map(function(x){ return '<div style="font-size:11px;line-height:1.55;color:#78350F;margin-bottom:3px">· '+x+'</div>'; }).join('')
+    +'<div style="font-size:11px;font-weight:800;color:#92400E;margin-bottom:5px">🎯 '+p.goal+'</div>'
+    +'<div style="font-size:10.5px;font-weight:700;color:#92400E;margin-bottom:2px">오늘 할 일</div>'
+    + p.dos.map(function(d){ return '<div style="font-size:11px;line-height:1.5;color:#78350F">☐ '+d+'</div>'; }).join('')
+    + (p.status?'<div style="font-size:10.5px;color:#A16207;margin-top:5px;padding-top:5px;border-top:1px dashed #FDE68A">현황 · '+p.status+'</div>':'')
     +'</div>';
 }
 function okpi_setPeriod(p){ window._okpi.period = p; okpi_render(); }
