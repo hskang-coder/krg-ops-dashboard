@@ -6433,6 +6433,7 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-filter-btn active" data-group="legalAction" onclick="dlqApplyFilter('legalAction','all',this)">전체</button>
           <button class="dlq-filter-btn" data-group="legalAction" onclick="dlqApplyFilter('legalAction','content',this)">내용증명</button>
           <button class="dlq-filter-btn" data-group="legalAction" onclick="dlqApplyFilter('legalAction','payment',this)">지급명령</button>
+          <button class="dlq-filter-btn" data-group="legalAction" onclick="dlqApplyFilter('legalAction','amend',this)">보정명령</button>
           <button class="dlq-filter-btn" data-group="legalAction" onclick="dlqApplyFilter('legalAction','etc',this)">기타집행</button>
           <button class="dlq-filter-btn" data-group="legalAction" onclick="dlqApplyFilter('legalAction','none',this)">미진행</button>
         </div>
@@ -6550,10 +6551,12 @@ function dlqRenderTableRows() {
         const hasContent = subRows.some(d => String(d.jobSub).replace(/\s/g,'').indexOf('내용증명발송') >= 0);
         const hasPayment = subRows.some(d => String(d.jobSub).indexOf('지급명령') >= 0);
         const hasEtc     = subRows.some(d => { var s = String(d.jobSub||''); return s.indexOf('기타집행') >= 0 || s.indexOf('기타조치') >= 0; });
+        const hasAmend   = subRows.some(d => String(d.jobSub||'').indexOf('보정명령') >= 0);
         if (legalAction === 'content' && !hasContent) return false;
         if (legalAction === 'payment' && !hasPayment) return false;
+        if (legalAction === 'amend'   && !hasAmend)   return false;
         if (legalAction === 'etc'     && !hasEtc)     return false;
-        if (legalAction === 'none'    && (hasContent || hasPayment || hasEtc)) return false;
+        if (legalAction === 'none'    && (hasContent || hasPayment || hasEtc || hasAmend)) return false;
       } catch(_) { /* 안전 폴백 — 필터 무시 */ }
     }
     // 연체구분 필터 (임대료/변동관리비)
