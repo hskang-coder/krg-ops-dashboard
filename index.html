@@ -6360,6 +6360,7 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-doc-btn" id="dlqDocBtn3" onclick="dlqGenerateDoc('civil_criminal')">📄 내용증명 (민사&형사)</button>
           <button class="dlq-doc-btn" id="dlqDocBtn4" onclick="dlqGenerateDoc('sms')">📄 내용증명 문자 발송</button>
           <button class="dlq-doc-btn" id="dlqVisitBtn" onclick="dlqOpenVisitModal()" style="background:#059669;color:#fff;border-color:#059669">🚗 방문대응</button>
+          <button class="dlq-doc-btn" id="dlqLegalBtn" onclick="dlqToggleLegalView()" title="법무 진척 보기 — 내용증명·지급명령·보정명령·기타집행">⚖️ 법무관리</button>
           <span class="dlq-sel-info" id="dlqSelInfo" style="font-size:11px;color:#6366f1;font-weight:700;white-space:nowrap"></span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -6577,6 +6578,8 @@ function dlqRenderTableRows() {
     return;
   }
 
+  if (window._dlqLegalView) { dlqRenderLegalTableRows(rows, container); return; }  // [v385] 법무 진척 뷰
+
   const gradeClass = g => g.includes('S')?'s':g.includes('A')?'a':g.includes('B')?'b':g.includes('C')?'c':g.includes('D')?'d':g.includes('E')?'e':'f';
   const dayClass   = d => d<=3?'low':d<=15?'mid':d<=30?'high':'crit';
   const 구분색     = t => t==='분납중'?'#f59e0b':t==='연체중'?'#ef4444':t==='연체납부'?'#6b7280':'#9ca3af';
@@ -6706,6 +6709,79 @@ function dlqRenderTableRows() {
   </div>
   <div class="dlq-tbl-count">${rows.length}건 / 전체 ${window._dlqTableRows.length}건</div>
   `;
+}
+
+// [v385] 법무 진척 뷰 — 토글 + 2차 카테고리 최신일자/최신메모 기반 컬럼 전환
+window._dlqLegalView = false;
+function dlqToggleLegalView(){
+  window._dlqLegalView = !window._dlqLegalView;
+  var b = document.getElementById('dlqLegalBtn');
+  if (b){ if(window._dlqLegalView){ b.style.background='#0F6E56'; b.style.color='#fff'; b.style.borderColor='#0F6E56'; } else { b.style.background=''; b.style.color=''; b.style.borderColor=''; } }
+  dlqRenderTableRows();
+}
+function _dlqLegalLatest(cno, matchFn){
+  if (!Array.isArray(daeungRawData)) return null;
+  var rs = daeungRawData.filter(function(d){ return d && String(d.no||'').trim()===String(cno).trim() && d.jobSub && matchFn(String(d.jobSub).replace(/\s/g,'')); });
+  if (!rs.length) return null;
+  rs.sort(function(a,b){ var dd=(typeof cG_dateNum==='function')?(cG_dateNum(b.date)-cG_dateNum(a.date)):0; if(dd!==0)return dd; return (b._idx||0)-(a._idx||0); });
+  return rs[0];
+}
+function _dlqDt(s){ var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(m[1].slice(2)+'.'+('0'+m[2]).slice(-2)+'.'+('0'+m[3]).slice(-2)):''; }
+function _dlqPenalty(cno){
+  try{
+    if(!Array.isArray(vacancyRawData))return null;
+    var vr=vacancyRawData.find(function(v){return String(v.no||'').trim()===String(cno).trim();});
+    if(!vr||!vr.startDate)return null;
+    var s=String(vr.startDate).trim(), dt=null, m=s.match(/(\d{4})[\s.\-\/년]+(\d{1,2})[\s.\-\/월]+(\d{1,2})/);
+    if(m)dt=new Date(+m[1],+m[2]-1,+m[3]); else {var tt=new Date(s); if(!isNaN(tt))dt=tt;}
+    if(!dt||isNaN(dt)||dt<new Date(2025,5,1))return null;
+    var rent=parseFloat(String(vr.rent||'0').replace(/[^0-9.\-]/g,''))||0;
+    return rent>0?rent*4:null;
+  }catch(_){return null;}
+}
+function dlqRenderLegalTableRows(rows, container){
+  var pill=function(rec, amber){ if(!rec)return '<span style="color:#D1D5DB">—</span>'; var bg=amber?'#FAEEDA':'#E6F1FB',fg=amber?'#854F0B':'#0C447C'; return '<span style="display:inline-block;background:'+bg+';color:'+fg+';font-size:11px;padding:2px 7px;border-radius:6px;white-space:nowrap">'+(_dlqDt(rec.date)||'기재')+'</span>'; };
+  var mNae=function(s){return s.indexOf('내용증명발송')>=0;};
+  var mJi =function(s){return s.indexOf('지급명령')>=0;};
+  var mBo =function(s){return s.indexOf('보정명령')>=0;};
+  var mEtc=function(s){return s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0;};
+  var mAll=function(s){return s.indexOf('법적조치검토')>=0||s.indexOf('내용증명발송')>=0||s.indexOf('지급명령')>=0||s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0||s.indexOf('보정명령')>=0;};
+  var esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  var body = rows.map(function(r){
+    var cno=String(r.cno||'').trim();
+    var nae=_dlqLegalLatest(cno,mNae), ji=_dlqLegalLatest(cno,mJi), bo=_dlqLegalLatest(cno,mBo), etc=_dlqLegalLatest(cno,mEtc);
+    var prog=_dlqLegalLatest(cno,mAll);
+    var pen=_dlqPenalty(cno);
+    var active=!!bo;
+    var cs=r.contractStatus||'계약중';
+    var csBg=cs==='계약중'?'#dbeafe':(cs==='종료(3개월이내)'?'#fef3c7':'#f3f4f6'), csFg=cs==='계약중'?'#1d4ed8':(cs==='종료(3개월이내)'?'#d97706':'#6b7280');
+    return '<tr class="dlq-tbl-row" onclick="dlqGoToContract(\''+cno+'\')"'+(active?' style="background:#FDF7EC"':'')+'>'
+      +'<td><span class="dlq-tbl-cno">'+cno+'</span></td>'
+      +'<td onclick="event.stopPropagation()" style="text-align:center"><button onclick="openReportChooser(\''+cno+'\')" title="연체 대응 리포트" style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:14px">📊</button></td>'
+      +'<td><span class="dlq-tbl-group">'+(r.group||'-')+'</span></td>'
+      +'<td><span class="dlq-tbl-info">'+(r.info||'-')+'</span></td>'
+      +'<td><span class="dlq-days-badge dlq-days-'+(r.days<=3?'low':r.days<=15?'mid':r.days<=30?'high':'crit')+'">'+(r.days||0)+'일</span></td>'
+      +'<td><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:'+csBg+';color:'+csFg+'">'+cs+'</span></td>'
+      +'<td><span style="font-size:11px;font-weight:600;color:#475569">'+(r.vacancyStatus||'-')+'</span></td>'
+      +'<td class="dlq-tbl-nm">'+(r.nm||'-')+'</td>'
+      +'<td class="dlq-tbl-tel">'+(r.tel||'-')+'</td>'
+      +'<td class="dlq-tbl-amt">'+(r.amt>0?'₩'+r.amt.toLocaleString():'-')+'</td>'
+      +'<td style="white-space:nowrap;font-size:11px">'+(pen?'<span style="color:#B91C1C;font-weight:700">₩'+pen.toLocaleString()+'</span>':'<span style="color:#D1D5DB">-</span>')+'</td>'
+      +'<td>'+pill(nae,false)+'</td>'
+      +'<td>'+pill(ji,false)+'</td>'
+      +'<td>'+pill(bo,true)+'</td>'
+      +'<td>'+pill(etc,false)+'</td>'
+      +'<td class="dlq-tbl-content" style="color:'+(active?'#854F0B':'#374151')+'">'+(prog?esc(prog.content||prog.progress||'-'):'<span style="color:#D1D5DB">—</span>')+'</td>'
+      +'</tr>';
+  }).join('');
+  container.innerHTML = '<div style="overflow-x:auto"><table class="dlq-tbl"><thead><tr>'
+    +'<th>계약번호</th><th>리포트</th><th>그룹</th><th>계약정보</th><th>연체일수</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th><th>연락처</th><th>연체금액</th><th>위약금</th>'
+    +'<th>내용증명</th><th>지급명령</th><th title="보정명령 대응">보정명령</th><th>기타집행</th><th>진척사항</th>'
+    +'</tr></thead><tbody>'+body+'</tbody></table></div>'
+    +'<div class="dlq-tbl-count" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+rows.length+'건 · 법무 진척 뷰'
+    +'<span style="font-size:11px;color:#6b7280"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#B5D4F4;vertical-align:-1px;margin-right:3px"></span>완료·접수 일자</span>'
+    +'<span style="font-size:11px;color:#6b7280"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#FAC775;vertical-align:-1px;margin-right:3px"></span>보정 요함</span>'
+    +'</div>';
 }
 
 function drawDlqBarChart(segs) {
@@ -18574,7 +18650,7 @@ window._okpiCat = {
   //   그룹1: 일상 대응 (전화/이미지/현장)
   //   그룹2: 법적 절차 (검토 → 발송 → 진행 → 집행)
   //   그룹3: 종료/기타
-  '연체관리':    ['전화응대','내용증명이미지발송','현장방문','---','법적 조치 검토','내용증명 발송','지급명령 진행','기타집행','---','중도퇴실 처리','계약 종료자 대응','기타'],
+  '연체관리':    ['전화응대','내용증명이미지발송','현장방문','---','법적 조치 검토','내용증명 발송','지급명령 진행','보정명령 대응','기타집행','---','중도퇴실 처리','계약 종료자 대응','기타'],
   '중도퇴실관리':['중도퇴실 신청 접수','정산서 발행','후임 세입자 모색','정산 협의','퇴실 확정','보증금 반환','전화응대','기타']
 };
 
