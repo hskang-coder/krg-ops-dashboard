@@ -18565,6 +18565,7 @@ function okpi_renderPersonCards(k){
     +     okpi_rowRatio('입주 후 NAS 등록',           src.auto,  '기간 내 입주 / NAS=TRUE 비율',     go.nasDone, go.nasTotal, 90, 80)
     +     okpi_rowCount('신규 계약 처리',              src.auto,  '가계약일이 기간 내 행수',           go.newC, goCntMax, 'c1')
     +   '</div>'
+    +   okpi_suggestBox('고송미', go)
     + '</div>'
     // 이지희
     + '<div class="okpi-person-card c2">'
@@ -18574,6 +18575,7 @@ function okpi_renderPersonCards(k){
     +     okpi_rowRatio('D-30 갱신 홈버튼 등록',       src.combo, '만기 D-30 대상 / CC=TRUE 비율',     lj.renewDone, lj.renewTotal, 90, 70)
     +     okpi_rowCount('갱신관리 대응',       src.kw, '담당=이지희 + 1차=갱신 + "거절/조건부"', lj.rejection, ljCntMax, 'c2')
     +   '</div>'
+    +   okpi_suggestBox('이지희', lj)
     + '</div>'
     // 김영철
     + '<div class="okpi-person-card col">'
@@ -18583,6 +18585,7 @@ function okpi_renderPersonCards(k){
     +     okpi_rowCount('완납 처리',                   src.kw, '메모 시작 "완납"',           ky.paid, kyCntMax, 'col')
     +     okpi_rowCount('분납 처리',                   src.kw, '메모 시작 "분납"',           ky.partial, kyCntMax, 'col')
     +   '</div>'
+    +   okpi_suggestBox('김영철', ky)
     + '</div>'
     // 오진선
     + '<div class="okpi-person-card del">'
@@ -18592,11 +18595,46 @@ function okpi_renderPersonCards(k){
     +     okpi_rowCount('수납관리 대응(첫 납부자)',         src.combo, '담당=오진선 + D열 + 메모 "종료/퇴실"', oh.endDue, ohCntMax, 'del')
     +     okpi_rowCount('수납관리 대응(전월 연체자)',            src.kw, '담당=오진선 + 메모 "완납/분납"',      oh.endPaid, ohCntMax, 'del')
     +   '</div>'
+    +   okpi_suggestBox('오진선', oh)
     + '</div>'
     + '</div>';
 }
 
 // 컨트롤 핸들러
+// [v390] 담당자별 데이터 기반 업무 개선·효율화 제안 (gid=554798125 메트릭 기반)
+function okpi_suggestFor(p, m){
+  m = m || {};
+  var s=[];
+  var pct=function(n,d){ d=+d||0; return d>0?Math.round((+n||0)/d*100):null; };
+  if(p==='고송미'){
+    var r1=pct(m.done1,m.total1), r2=pct(m.nasDone,m.nasTotal);
+    if(r1!=null&&r1<90) s.push('입주 전 전자계약·수수료 완료 '+r1+'% — 입주 D-3 자동 체크리스트로 미완료 건 사전 점검');
+    if(r2!=null&&r2<90) s.push('입주 후 NAS 등록 '+r2+'% — 입주 완료 트리거 시 NAS 등록 누락 알림 자동화');
+    if(!s.length) s.push('입주 전 처리율 양호 — 신규 계약 증가 대비 체크리스트 자동화 확장 권장');
+  } else if(p==='이지희'){
+    var rr=pct(m.renewDone,m.renewTotal);
+    if(rr!=null&&rr>=95) s.push('D-30 갱신 홈버튼 등록 '+rr+'% 우수 — 갱신 협의·거절 사유를 메모로 표준화해 패턴 분석');
+    if((+m.allCnt||0)<8) s.push('대응 기록 '+(+m.allCnt||0)+'건 — 갱신/종료 협의 과정 메모화로 진행 가시성 확보');
+    if(!s.length) s.push('갱신 관리 안정적 — 거절/조건부 사유 분류로 재계약 전략 고도화');
+  } else if(p==='김영철'){
+    var rd=pct(m.dueSet,m.dueTotal);
+    if((+m.paid||0)===0&&(+m.partial||0)===0) s.push('입금예정일 확정'+(rd!=null?(' '+rd+'%'):'')+' 대비 완납·분납 전환 0건 — 약속일 D-1 리마인드 + 실입금 follow-up이 회수율 핵심');
+    if(rd!=null&&rd<70) s.push('입금예정일 확정률 '+rd+'% — 미확정 건 우선 전화로 약속일 확보');
+    if(!s.length) s.push('수납 follow-up 양호 — 약속 불이행 건 자동 재독촉 룰 도입 제안');
+  } else if(p==='오진선'){
+    s.push('법조치 대응 '+(+m.legal||0)+'건 집중 — 「검토 → 내용증명 발송 → 지급명령」 전환 SLA(검토 후 N일 내 발송) 설정으로 병목 해소');
+    s.push('종료·퇴실 연체는 보증보험 청구 경로 우선 검토로 회수 효율화');
+  }
+  return s.slice(0,2);
+}
+function okpi_suggestBox(person, m){
+  var s = okpi_suggestFor(person, m);
+  if(!s.length) return '';
+  return '<div style="margin-top:10px;padding:9px 11px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px">'
+    +'<div style="font-size:11px;font-weight:800;color:#92400E;margin-bottom:5px">💡 업무 개선 제안</div>'
+    + s.map(function(x){ return '<div style="font-size:11px;line-height:1.55;color:#78350F;margin-bottom:3px">· '+x+'</div>'; }).join('')
+    +'</div>';
+}
 function okpi_setPeriod(p){ window._okpi.period = p; okpi_render(); }
 function okpi_setDate(v){
   if (!v) { window._okpi.date = null; }
