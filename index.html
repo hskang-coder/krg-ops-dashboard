@@ -3936,7 +3936,34 @@ function dlqApplyStrategyFilter(key) {
   }
 }
 
+// [v385] 법무 진척 뷰 엑셀 — 화면 표시 컬럼과 동일
+function downloadDlqLegalExcel(){
+  var rows = window._dlqLegalExportRows || [];
+  if (!rows.length) { alert('다운로드할 데이터가 없습니다.'); return; }
+  if (typeof XLSX === 'undefined') { alert('라이브러리 로딩 중입니다. 잠시 후 다시 시도해 주세요.'); return; }
+  var mNae=function(s){return s.indexOf('내용증명발송')>=0;}, mJi=function(s){return s.indexOf('지급명령')>=0;}, mBo=function(s){return s.indexOf('보정명령')>=0;}, mEtc=function(s){return s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0;}, mAll=function(s){return s.indexOf('법적조치검토')>=0||s.indexOf('내용증명발송')>=0||s.indexOf('지급명령')>=0||s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0||s.indexOf('보정명령')>=0;};
+  var dt=function(rec){return rec?(_dlqDt(rec.date)||'기재'):'';};
+  var data = rows.map(function(r){
+    var cno=String(r.cno||'').trim();
+    var prog=_dlqLegalLatest(cno,mAll);
+    return {
+      '계약번호':cno, '그룹':r.group||'-', '계약정보':r.info||'-',
+      '연체일수':r.days||0, '계약상태':r.contractStatus||'계약중', '공실상태':r.vacancyStatus||'-',
+      '임(전)차인':r.nm||'-', '연락처':r.tel||'-', '연체금액':r.amt||0, '위약금':_dlqPenalty(cno)||0,
+      '내용증명':dt(_dlqLegalLatest(cno,mNae)), '지급명령':dt(_dlqLegalLatest(cno,mJi)),
+      '보정명령':dt(_dlqLegalLatest(cno,mBo)), '기타집행':dt(_dlqLegalLatest(cno,mEtc)),
+      '진척사항':prog?(prog.content||prog.progress||''):''
+    };
+  });
+  var ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[{wch:9},{wch:8},{wch:11},{wch:8},{wch:9},{wch:13},{wch:14},{wch:12},{wch:12},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:40}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '법무진척');
+  var today=(function(){var t=new Date();return t.getFullYear()+String(t.getMonth()+1).padStart(2,'0')+String(t.getDate()).padStart(2,'0');})();
+  XLSX.writeFile(wb, '법무진척_'+today+'.xlsx');
+}
 function downloadDlqExcel() {
+  if (window._dlqLegalView) { return downloadDlqLegalExcel(); }
   const rows = window._dlqTableRows;
   if (!rows || !rows.length) { alert('다운로드할 데이터가 없습니다.'); return; }
   if (typeof XLSX === 'undefined') { alert('라이브러리 로딩 중입니다. 잠시 후 다시 시도해 주세요.'); return; }
@@ -6359,8 +6386,8 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-doc-btn" id="dlqDocBtn2" onclick="dlqGenerateDoc('civil')">📄 내용증명 (민사)</button>
           <button class="dlq-doc-btn" id="dlqDocBtn3" onclick="dlqGenerateDoc('civil_criminal')">📄 내용증명 (민사&형사)</button>
           <button class="dlq-doc-btn" id="dlqDocBtn4" onclick="dlqGenerateDoc('sms')">📄 내용증명 문자 발송</button>
-          <button class="dlq-doc-btn" id="dlqVisitBtn" onclick="dlqOpenVisitModal()" style="background:#059669;color:#fff;border-color:#059669">🚗 방문대응</button>
-          <button class="dlq-doc-btn" id="dlqLegalBtn" onclick="dlqToggleLegalView()" title="법무 진척 보기 — 내용증명·지급명령·보정명령·기타집행">⚖️ 법무관리</button>
+          <button class="dlq-doc-btn" id="dlqVisitBtn" onclick="dlqOpenVisitModal()">🚗 방문대응</button>
+          <button class="dlq-doc-btn" id="dlqLegalBtn" onclick="dlqToggleLegalView()" style="background:#059669;color:#fff;border-color:#059669" title="법무 진척 보기 — 내용증명·지급명령·보정명령·기타집행">⚖️ 법무관리</button>
           <span class="dlq-sel-info" id="dlqSelInfo" style="font-size:11px;color:#6366f1;font-weight:700;white-space:nowrap"></span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -6716,7 +6743,7 @@ window._dlqLegalView = false;
 function dlqToggleLegalView(){
   window._dlqLegalView = !window._dlqLegalView;
   var b = document.getElementById('dlqLegalBtn');
-  if (b){ if(window._dlqLegalView){ b.style.background='#0F6E56'; b.style.color='#fff'; b.style.borderColor='#0F6E56'; } else { b.style.background=''; b.style.color=''; b.style.borderColor=''; } }
+  if (b){ b.innerHTML = window._dlqLegalView ? '↩ 연체관리' : '⚖️ 법무관리'; }
   dlqRenderTableRows();
 }
 function _dlqLegalLatest(cno, matchFn){
@@ -6740,6 +6767,7 @@ function _dlqPenalty(cno){
   }catch(_){return null;}
 }
 function dlqRenderLegalTableRows(rows, container){
+  window._dlqLegalExportRows = rows;
   var pill=function(rec, amber){ if(!rec)return '<span style="color:#D1D5DB">—</span>'; var bg=amber?'#FAEEDA':'#E6F1FB',fg=amber?'#854F0B':'#0C447C'; return '<span style="display:inline-block;background:'+bg+';color:'+fg+';font-size:11px;padding:2px 7px;border-radius:6px;white-space:nowrap">'+(_dlqDt(rec.date)||'기재')+'</span>'; };
   var mNae=function(s){return s.indexOf('내용증명발송')>=0;};
   var mJi =function(s){return s.indexOf('지급명령')>=0;};
