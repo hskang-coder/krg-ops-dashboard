@@ -20534,11 +20534,11 @@ async function okpi_render(){
     if(th){var s=document.createElement('span');s.className='dp-sind';s.textContent=dir>0?' ▲':' ▼';s.style.fontSize='9px';th.appendChild(s);}
   };
   window._dpInject=function(){
-    if(window._dlqLegalView)return;  // [v387] 법무 뷰에서는 리포트·대응패턴 미주입
+    var __legal=window._dlqLegalView;  // [v389] 법무 뷰: 컬럼 주입은 건너뛰되 헤더 정렬은 적용
     var dv=document.getElementById('delinquencyView'); if(!dv)return;
     var table=dv.querySelector('table'); if(!table)return;
     var headRow=table.querySelector('thead tr')||table.querySelector('tr');
-    if(headRow && !headRow.querySelector('.dp-h')){
+    if(!__legal && headRow && !headRow.querySelector('.dp-h')){
       var ths=headRow.children, idx=-1;
       for(var i=0;i<ths.length;i++){ if(/계약번호/.test(ths[i].textContent)){idx=i;break;} }
       if(idx<0)idx=1;
@@ -20548,6 +20548,7 @@ async function okpi_render(){
       base.insertAdjacentElement('afterend', mk('리포트'));
     }
     if(headRow){ for(var hi=0;hi<headRow.children.length;hi++){ (function(th,col){ if(th.__dpSB)return; th.__dpSB=true; th.style.cursor='pointer'; th.style.userSelect='none'; th.addEventListener('click',function(){ window._dpSortBy(col,th); }); })(headRow.children[hi],hi); } }
+    if(__legal)return;  // [v389] 법무 뷰: 리포트·대응패턴 셀은 주입 안 함 (정렬만 적용)
     var rows=table.querySelectorAll('tr.dlq-tbl-row');
     for(var k=0;k<rows.length;k++){ var tr=rows[k];
       if(tr.querySelector('.dp-c'))continue;
