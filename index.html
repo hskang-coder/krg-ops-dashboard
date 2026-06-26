@@ -4124,6 +4124,51 @@ function rnwDownloadExcel() {
   XLSX.writeFile(wb, '갱신관리_' + today + '.xlsx');
 }
 
+// [v393] 수납관리 — 선택 대상 문자(첫납부/전월연체) 생성
+window._ptSelected = new Set();
+function ptToggleSelect(no, checked){ window._ptSelected=window._ptSelected||new Set(); if(checked) window._ptSelected.add(String(no)); else window._ptSelected.delete(String(no)); }
+function ptSelectAll(checked){
+  window._ptSelected=window._ptSelected||new Set();
+  document.querySelectorAll('.pt-row-cb').forEach(function(cb){ cb.checked=checked; if(checked) window._ptSelected.add(String(cb.value)); else window._ptSelected.delete(String(cb.value)); });
+}
+function ptGenSms(kind){
+  var sel = Array.from(window._ptSelected||[]);
+  if(!sel.length){ alert('문자 보낼 대상을 체크박스로 선택해주세요.'); return; }
+  var data = window._ptSmsData||{};
+  var esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  var fmtAmt=function(v){ var n=parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')); return (n>0)?(Math.round(n).toLocaleString()):'[금액]'; };
+  var pages = sel.map(function(no,i){
+    var d=data[no]||{}; var nm=d.name||'[임차인명]'; var due=(d.due&&d.due!=='—')?d.due:'[납기일]'; var amt=fmtAmt(d.amt);
+    var txt;
+    if(kind==='first'){
+      txt='[KRG그룹·개런티즈 수납 안내]\n'+nm+'님, 안녕하세요. 개런티즈입니다.\n이번 달 첫 임대료 납부일은 '+due+', 금액은 '+amt+'원입니다.\n연락이 닿지 않아 문자로 안내드리니, 납기일 전 잔액(자동출금/입금)을 꼭 확인 부탁드립니다.\n\n[안내] 납기일까지 미납 시 연체로 전환되며, 연체료 가산·서비스 수수료 할증·계약 갱신 제한·신용정보 등재 등 불이익이 발생할 수 있습니다. 첫 거래부터 정상 납부 이력을 함께 만들어가요.\n\n문의: 대표번호 02-6933-0099';
+    } else {
+      txt='[KRG그룹·개런티즈 연체 안내]\n'+nm+'님, 전월 임대료가 미납 상태입니다. (미납액 '+amt+'원)\n연락이 닿지 않아 문자로 통지하며, 금일 중 납부 바랍니다.\n\n미납 지속 시 아래 불이익이 적용됩니다.\n① 계약 갱신 불가\n② 서비스 수수료 할증 (최고 200%)\n③ 신용정보 등재(채무 불이행)\n④ 연체료 가산 및 법적 절차(내용증명·지급명령) 진행\n\n기한 내 납부 또는 분납 협의 시 불이익을 피하실 수 있습니다.\n문의: 02-6933-0099';
+    }
+    var id='pt'+i;
+    return '<div class="np"><div class="ttl">'+(kind==='first'?'첫 납부 안내':'전월 연체 통보')+'</div>'
+      +'<div class="meta">'+esc(nm)+'님 · 계약 '+esc(String(no))+'</div>'
+      +'<pre class="bd" id="'+id+'">'+esc(txt)+'</pre>'
+      +'<div style="text-align:center"><button class="cpy" onclick="ptCpy(\''+id+'\',this)">📋 텍스트 복사</button></div></div>';
+  }).join('');
+  var tc = kind==='first' ? '#0369A1' : '#7f1d1d';
+  var html = '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+(kind==='first'?'첫납부 문자':'전월연체 문자')+'</title>'
+    +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif;background:#f3f4f6;padding:24px;color:#1f2937}'
+    +'.np{max-width:680px;margin:0 auto 22px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:26px 30px;box-shadow:0 2px 8px rgba(0,0,0,.05)}'
+    +'.ttl{text-align:center;font-size:18px;font-weight:800;color:'+tc+';margin-bottom:5px}'
+    +'.meta{text-align:center;font-size:12px;color:#9ca3af;border-bottom:1px dashed #e5e7eb;padding-bottom:12px;margin-bottom:14px}'
+    +'.bd{font-size:13.5px;line-height:1.85;white-space:pre-wrap;word-break:break-word;font-family:inherit;color:#111827;margin-bottom:16px}'
+    +'.cpy{background:#1a1a1a;color:#fff;border:none;border-radius:6px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer}'
+    +'</style></head><body>'+pages
+    +'<scr'+'ipt>function ptCpy(id,btn){var t=document.getElementById(id).innerText;if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){var o=btn.textContent;btn.textContent="복사 완료";setTimeout(function(){btn.textContent=o;},1500);});}else{var rg=document.createRange();rg.selectNode(document.getElementById(id));var s=window.getSelection();s.removeAllRanges();s.addRange(rg);try{document.execCommand("copy");}catch(e){}s.removeAllRanges();}}</scr'+'ipt>'
+    +'</body></html>';
+  var win = window.open('', '_blank', 'width=760,height=860,scrollbars=yes');
+  if(!win){ alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.'); return; }
+  win.document.write(html); win.document.close();
+}
+function ptGenFirstSms(){ ptGenSms('first'); }
+function ptGenDelinqSms(){ ptGenSms('delinq'); }
+
 function renderPaymentTargets() {
   const from  = document.getElementById('ptDateFrom').value;
   const to    = document.getElementById('ptDateTo').value;
@@ -4263,9 +4308,13 @@ function renderPaymentTargets() {
     const m = { 전월연체:'pt-tag-delinq', 첫납부:'pt-tag-first', 계약중:'pt-tag-active' };
     return x.cat in m ? `<span class="pt-tag ${m[x.cat]}">${x.cat}</span>` : '—';
   };
+  window._ptSmsData = {};
+  window._ptSelected = new Set();
   const rows = display.map(x => {
     const { r, vacancy, contract } = x;
+    window._ptSmsData[r.no] = { name: x.name, due: r.dueDate||'', amt: (vacancy && vacancy.rent) || '' };
     return `<tr onclick="crNavFromView('${r.no}','payment')">
+      <td onclick="event.stopPropagation()" style="text-align:center"><input type="checkbox" class="pt-row-cb" value="${r.no}" onchange="ptToggleSelect('${r.no}',this.checked)"></td>
       <td><b>${r.no}</b></td>
       <td>${x.name}</td>
       <td style="color:#5A6A8A;font-size:11px">${x.phone}</td>
@@ -4298,7 +4347,7 @@ function renderPaymentTargets() {
       })()}
       <td>${tagHtml(x)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="12" style="text-align:center;color:#B0BDCE;padding:24px">해당 조건의 수납 대상이 없습니다.</td></tr>';
+  }).join('') || '<tr><td colspan="13" style="text-align:center;color:#B0BDCE;padding:24px">해당 조건의 수납 대상이 없습니다.</td></tr>';
 
   window._ptDisplayRows = display.map(x => {
     const { r, vacancy } = x;
@@ -4379,10 +4428,11 @@ function renderPaymentTargets() {
           </div>
         </div>
       </div>
-      <div style="padding:10px 20px 4px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">${chips}<button onclick="downloadPtExcel()" style="margin-left:auto;background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ 엑셀 다운로드</button></div>
+      <div style="padding:10px 20px 4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${chips}<button onclick="ptGenFirstSms()" style="margin-left:auto;background:#0EA5E9;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📩 첫납부문자</button><button onclick="ptGenDelinqSms()" style="background:#DC2626;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📩 전월연체문자</button><button onclick="downloadPtExcel()" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ 엑셀 다운로드</button></div>
       <div style="padding:4px 20px 8px;font-size:11px;color:#8A9AB5">표시 ${display.length}건</div>
       <div style="overflow-x:auto"><table class="pt-table">
         <thead><tr>
+          <th style="width:30px;text-align:center"><input type="checkbox" onchange="ptSelectAll(this.checked)" title="전체 선택"></th>
           <th>계약번호</th><th>임(전)차인명</th><th>연락처</th><th>청구횟수</th>
           <th>공실상태</th>
           <th>당월납부상태</th><th>수납대상여부</th><th>전월 연체일수</th>
