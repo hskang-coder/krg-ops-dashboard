@@ -20125,6 +20125,7 @@ async function okpi_render(){
       window._prpExportData = window._prpExportData || {};
       window._prpExportData[b] = { addr: firstAddr, rows: arr.map(function(rr){
         return {
+          '물건지 주소': firstAddr || '',
           '호실': rr.room,
           '현재 임차인': rr.currentTenant || (rr.lastTenant ? ('공실(직전:'+rr.lastTenant+')') : '공실'),
           '계약 부동산': rr.partnerName || '',
@@ -20269,6 +20270,7 @@ async function okpi_render(){
       window._prpExportData = window._prpExportData || {};
       window._prpExportData[b] = { addr: firstAddr, rows: arr.map(function(rr){
         return {
+          '물건지 주소': firstAddr || '',
           '호실': rr.room,
           '현재 임차인': rr.currentTenant || (rr.lastTenant ? ('공실(직전:'+rr.lastTenant+')') : '공실'),
           '계약 부동산': rr.partnerName || '',
@@ -20338,7 +20340,7 @@ async function okpi_render(){
       var d = (window._prpExportData||{})[b];
       if (!d || !d.rows || !d.rows.length) { alert('내보낼 호실 데이터가 없습니다.'); return; }
       var ws = XLSX.utils.json_to_sheet(d.rows);
-      ws['!cols'] = [{wch:8},{wch:18},{wch:12},{wch:12},{wch:16},{wch:12},{wch:10},{wch:11},{wch:12},{wch:9},{wch:7},{wch:10},{wch:8}];
+      ws['!cols'] = [{wch:30},{wch:8},{wch:18},{wch:12},{wch:12},{wch:16},{wch:12},{wch:10},{wch:11},{wch:12},{wch:9},{wch:7},{wch:10},{wch:8}];
       var wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '호실현황');
       var today = (function(){ var t=new Date(); return t.getFullYear()+String(t.getMonth()+1).padStart(2,'0')+String(t.getDate()).padStart(2,'0'); })();
