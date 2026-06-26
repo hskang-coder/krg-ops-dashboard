@@ -15010,14 +15010,11 @@ function cmgBuildPartnerStats(){
       address: addr, // [v81]
       contractStatus: c ? (c['계약상태']||'') : ''
     });
-    // [v381] 종료 행은 합계에서 제외 (시각 취소선만 유지) — contracts 배열에는 추가
-    var _isTermAgg = String(v.contractKind||'').indexOf('종료') >= 0;
-    if (!_isTermAgg) {
-      byPartner[pn].totalDeposit += dep;
-      byPartner[pn].totalRent    += rent;
-      byPartner[pn].totalTrade   += trade;
-      byPartner[pn].totalBrokerage += brk;
-    }
+    // [v394] 종료 행도 중개보수료 대상 — 합계에 포함 (1년 미만은 brk=0으로 이미 제외)
+    byPartner[pn].totalDeposit += dep;
+    byPartner[pn].totalRent    += rent;
+    byPartner[pn].totalTrade   += trade;
+    byPartner[pn].totalBrokerage += brk;
   });
   var arr = Object.keys(byPartner).map(function(k){ return byPartner[k]; });
   arr.sort(function(a,b){ return b.contracts.length - a.contracts.length || b.totalBrokerage - a.totalBrokerage; });
@@ -15097,12 +15094,9 @@ function cmgExportExcelFor(partnerName, mode){
         '중개보수료(VAT포함)': total,
         '주소': ct.address || ''
       });
-      // [v381] 종료 행은 합계에서 제외 (별도 grandTerm으로 추적)
-      if (!isTerm) {
-        gRent += (ct.rent||0); gSupply += supply; gVat += vat; gBrk += total;
-      } else {
-        grandTermCnt++; grandTermBrk += total;
-      }
+      // [v394] 종료 행도 합계 포함 (1년 미만은 brokerage=0으로 이미 제외)
+      gRent += (ct.rent||0); gSupply += supply; gVat += vat; gBrk += total;
+      if (isTerm) { grandTermCnt++; grandTermBrk += total; }
     });
     // 담당자 소계 행
     data.push({
@@ -15129,7 +15123,7 @@ function cmgExportExcelFor(partnerName, mode){
     '계약번호': '',
     '계약자': '(' + rows.length + '건)',
     '계약종류': '',
-    '종료여부': grandTermCnt > 0 ? '⊗ 종료 ' + grandTermCnt + '건 (₩' + grandTermBrk.toLocaleString() + ' 포함)' : '',
+    '종료여부': grandTermCnt > 0 ? '종료 ' + grandTermCnt + '건 (합계 포함)' : '',
     '입주일': '',
     '계약기간(월)': '',
     '월세': grandRent,
@@ -15182,13 +15176,11 @@ function cmgExportPdfFor(partnerName, mode){
     var supply = Math.round(ct.brokerage);
     var vat = Math.round(ct.brokerage * 0.1);
     byPerson[key].contracts.push(ct);
-    var _isTermPdf = String(ct.contractKind||'').indexOf('종료') >= 0;
-    if (!_isTermPdf) {
-      byPerson[key].rent   += (ct.rent || 0);
-      byPerson[key].supply += supply;
-      byPerson[key].vat    += vat;
-      byPerson[key].total  += supply + vat;
-    }
+    // [v394] 종료 행도 합계 포함
+    byPerson[key].rent   += (ct.rent || 0);
+    byPerson[key].supply += supply;
+    byPerson[key].vat    += vat;
+    byPerson[key].total  += supply + vat;
   });
   // 계약담당자 정렬: 건수 내림차순
   var personGroups = Object.values(byPerson).sort(function(a, b){
@@ -15217,9 +15209,9 @@ function cmgExportPdfFor(partnerName, mode){
       var total = supply + vat;
       var endDate = ct.endDate ? cmgParseStartDate(ct.endDate) : null;
       var months = cmgMonthsBetween(ct.startDate, endDate);
-      // [v375] 계약종류에 '종료' 포함된 행은 붉은 취소선 시각 표시 (합계는 변경 없음)
-      var _isTerm = String(ct.contractKind||'').indexOf('종료') >= 0;
-      var _trStyle = _isTerm ? ' style="text-decoration:line-through;text-decoration-color:#DC2626;text-decoration-thickness:1.5px;color:#9CA3AF"' : '';
+      // [v394] 종료 행도 중개보수료 대상 — 취소선/빨강 제거, 정상 표시
+      var _isTerm = false;
+      var _trStyle = '';
       bodyRows += '<tr' + _trStyle + '>'
         + '<td style="border:1px solid #9CA3AF;padding:4px;text-align:center">' + rowIdx + '</td>'
         + '<td style="border:1px solid #9CA3AF;padding:4px">' + ct.cno + '</td>'
@@ -15386,19 +15378,15 @@ function cmgRenderPartnerStats(){
               +   '</div>'
               +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">총 거래액</div>'
               +     '<div class="cmg-v171-stat-val">' + cmgFmtMoneyKor(p.totalTrade) + '</div>'
-              +     (_termTrade>0 ? '<div class="cmg-term-sub strike" title="종료 ' + _termCnt + '건 거래액 (합계에서 제외됨)">⊗ ' + cmgFmtMoney(_termTrade) + '</div>' : '')
               +   '</div>'
               +   '<div class="cmg-v171-stat"><div class="cmg-v171-stat-label">중개보수 <span style="font-size:9px;color:#059669;font-weight:600">(VAT 포함)</span></div>'
               +     '<div class="cmg-v171-stat-val brk">' + cmgFmtMoney(Math.round(p.totalBrokerage * 1.1)) + '</div>'
-              +     (_termBrk>0 ? '<div class="cmg-term-sub strike" title="종료 ' + _termCnt + '건 중개보수 (VAT 포함) — 합계에서 제외됨">⊗ ' + cmgFmtMoney(Math.round(_termBrk * 1.1)) + '</div>' : '')
               +   '</div>'
               + '</div>'
               + (sparkSvg ? '<div class="cmg-v171-spark">' + sparkSvg + '</div>' : '')
               + '</div>';
-            // [v376-fix2/v381] 안내 박스 — 헤더 밖 별도 행 (종료 행은 합계 제외 + 시각 취소선)
-            var termNotice = (_termCnt>0)
-              ? '<div class="cmg-term-notice">⊗ <b>종료 ' + _termCnt + '건</b> · 거래액 <b>' + cmgFmtMoney(_termTrade) + '</b> · 중개보수 (VAT포함) <b>' + cmgFmtMoney(Math.round(_termBrk*1.1)) + '</b> — 위 합계에서 <b>제외됨</b>. 해당 행은 <span class="cmg-term-mark">붉은 취소선</span>으로 표시됩니다.</div>'
-              : '';
+            // [v394] 종료 행도 중개보수료 대상으로 합계 포함 — 제외 안내 박스 제거
+            var termNotice = '';
 
             rowsExpand = '<tr class="cmg-expand-row"><td colspan="9"><div class="cmg-expand-inner cmg-v171-inner">'
               + summaryHeader
@@ -15442,10 +15430,8 @@ function cmgRenderPartnerStats(){
                   var monthsText = months > 0 ? (months + '개월' + (isShort ? ' ⚠' : '')) : '—';
                   // 중개보수 0원이면 회색
                   var brkMuted = isShort ? 'color:#9CA3AF;text-decoration:line-through' : '';
-                  // [v375/v375-fix] 계약종류에 '종료' 포함된 행은 붉은 취소선 시각 표시
-                  //   tr에 text-decoration 인라인은 미작동 → CSS class .cmg-terminated 적용 (td에 적용됨)
-                  var _isTerm = String(ct.contractKind||'').indexOf('종료') >= 0;
-                  var _trClass = _isTerm ? ' class="cmg-terminated"' : '';
+                  // [v394] 종료 행도 중개보수료 대상 — 취소선/회색 처리 제거, 정상 표시
+                  var _trClass = '';
                   return '<tr style="cursor:pointer"' + _trClass + '>'
                     + '<td style="text-align:center" onclick="event.stopPropagation()"><input type="checkbox" class="cmg-pdf-cb" data-pn="' + p.partnerName.replace(/"/g,'&quot;') + '" value="' + ct.cno + '"' + (isShort ? ' disabled title="12개월 미만 — 중개보수 제외"' : '') + '></td>'
                     + '<td style="text-align:center;color:#8A9AB5;font-size:11px" onclick="event.stopPropagation();crNavFromView(\'' + ct.cno + '\',\'contractMgmt\')">' + (idx+1) + '</td>'
