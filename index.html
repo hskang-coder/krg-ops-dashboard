@@ -12104,6 +12104,11 @@ function generateIncomeReceipt(contractNo){
   if (isSettle) {
     // 🧾 퇴실정산청구서
     var _totSettleDecl = (unpaidData||[]).reduce(function(s,u){ return s + parseAmt(u.amt); }, 0);
+    // [v402] 잔여 서비스 수수료 청구 시 — 개런티즈 계약 근거 명시 (짧고 명료)
+    var _hasSvcFee = (unpaidData||[]).some(function(u){ return /수수료/.test(String(u.name||'')); });
+    var _feeBasisHtml = _hasSvcFee
+      ? '<div style="margin-top:8px;font-size:11px;color:#6B7280;line-height:1.6">※ <b>잔여 서비스 수수료</b>는 개런티즈 서비스 이용계약에 따라 약정 기간 내 중도 해지 시 잔여 계약기간분 서비스 수수료를 청구할 수 있다는 규정에 근거하여 청구됩니다.</div>'
+      : '';
     var _settleExtra = (document.getElementById('crIncRcptSettleExtra')||{}).value || '';
     var _settleExtraHtml = '';
     if (_settleExtra && _settleExtra.trim()) {
@@ -12115,6 +12120,7 @@ function generateIncomeReceipt(contractNo){
       + '<b>미납 및 납부예정 금액 합계 ' + fmtMon(_totSettleDecl) + '</b>의 납부를 청구하기 위하여 발행됩니다.<br>'
       + '아래 「정산 청구 내역」을 확인하시고, 납부 기한 내 케이알지그룹주식회사가 안내하는 계좌로 납부하여 주시기 바랍니다. '
       + '기한 내 미납 시 연체료가 가산되며, 잔여 채무는 보증금에서 우선 공제될 수 있습니다.'
+      + _feeBasisHtml
       + _settleExtraHtml;
   } else if (isClose) {
     // 📋 계약해지증명서
