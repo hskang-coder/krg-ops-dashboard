@@ -11507,6 +11507,8 @@ function openIncomeReceiptModal(contractNo) {
     +       '<div style="font-size:11.5px;color:#9A3412;line-height:1.5;margin-bottom:9px">🧾 <b>퇴실정산청구서</b> — 현재 <b>미납·납부예정</b> 항목이 자동 집계되어 청구서로 발행됩니다. (발행 기간·납부 종류 설정은 적용되지 않습니다)</div>'
     +       '<label style="font-size:11.5px;font-weight:700;color:#9A3412;display:block;margin-bottom:5px">📅 계약 종료일 <span style="color:#C2845A;font-weight:500;font-size:10.5px">— Z열 자동, 없으면 직접 입력</span></label>'
     +       '<input type="date" id="crIncRcptSettleExitDate" value="' + exitInit + '" style="width:100%;padding:7px 9px;border:1px solid #FDBA74;border-radius:5px;font-size:12.5px;background:#fff">'
+    +       '<label style="font-size:11.5px;font-weight:700;color:#9A3412;display:block;margin:9px 0 5px">📝 특약사항 <span style="color:#C2845A;font-weight:500;font-size:10.5px">(선택 — 청구서 본문에 삽입)</span></label>'
+    +       '<textarea id="crIncRcptSettleExtra" rows="3" placeholder="예: 미납금 완납 시 보증금에서 우선 공제 후 잔액을 반환합니다 등" style="width:100%;padding:8px 10px;border:1px solid #FDBA74;border-radius:5px;font-size:12px;background:#fff;resize:vertical;line-height:1.55;font-family:inherit;box-sizing:border-box"></textarea>'
     +     '</div>'
     /* 발행 기간 */
     +     '<div style="margin-bottom:12px" id="crIncRcptPeriodWrap">'
@@ -12102,11 +12104,18 @@ function generateIncomeReceipt(contractNo){
   if (isSettle) {
     // 🧾 퇴실정산청구서
     var _totSettleDecl = (unpaidData||[]).reduce(function(s,u){ return s + parseAmt(u.amt); }, 0);
+    var _settleExtra = (document.getElementById('crIncRcptSettleExtra')||{}).value || '';
+    var _settleExtraHtml = '';
+    if (_settleExtra && _settleExtra.trim()) {
+      var _escS = _settleExtra.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+      _settleExtraHtml = '<div style="margin:10px 0 0;padding:9px 12px;background:#FFFBEB;border-left:4px solid #F59E0B;border-radius:0 5px 5px 0;font-size:12px;color:#78350F;line-height:1.7"><b style="color:#92400E;margin-right:5px">📝 특약사항</b><br>' + _escS + '</div>';
+    }
     declarationHtml = ''
       + '본 청구서는 위 계약(<b>#' + contractNo + '</b>)의 <b>퇴실 정산</b>(계약종료일 <b>' + settleExitStr + '</b>)과 관련하여, 발행일(' + todayStr + ') 현재 임(전)차인 <b>' + tenant + '</b>에게 잔존하는 '
       + '<b>미납 및 납부예정 금액 합계 ' + fmtMon(_totSettleDecl) + '</b>의 납부를 청구하기 위하여 발행됩니다.<br>'
       + '아래 「정산 청구 내역」을 확인하시고, 납부 기한 내 케이알지그룹주식회사가 안내하는 계좌로 납부하여 주시기 바랍니다. '
-      + '기한 내 미납 시 연체료가 가산되며, 잔여 채무는 보증금에서 우선 공제될 수 있습니다.';
+      + '기한 내 미납 시 연체료가 가산되며, 잔여 채무는 보증금에서 우선 공제될 수 있습니다.'
+      + _settleExtraHtml;
   } else if (isClose) {
     // 📋 계약해지증명서
     var settleItems = [];
