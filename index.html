@@ -11490,17 +11490,22 @@ function openIncomeReceiptModal(contractNo) {
     /* 발행 용도 */
     +     '<div style="margin-bottom:12px">'
     +       '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:6px">발행 용도</label>'
-    +       '<div style="display:flex;gap:6px">'
-    +         '<label class="cG_purposeOpt" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 10px;border:1.5px solid #10B981;border-radius:6px;background:#ECFDF5;cursor:pointer;font-weight:600;color:#065F46;font-size:12.5px">'
-    +           '<input type="radio" name="crIncRcptPurpose" id="crIncRcptP1" value="payment_confirm" checked onchange="cG_togglePurposeOptions()" style="accent-color:#10B981"> 📜 납부확인서'
+    +       '<div style="display:flex;gap:4px">'
+    +         '<label class="cG_purposeOpt" style="flex:1;display:flex;align-items:center;justify-content:center;gap:3px;padding:7px 4px;border:1.5px solid #10B981;border-radius:6px;background:#ECFDF5;cursor:pointer;font-weight:700;color:#065F46;font-size:11px;white-space:nowrap">'
+    +           '<input type="radio" name="crIncRcptPurpose" id="crIncRcptP1" value="payment_confirm" checked onchange="cG_togglePurposeOptions()" style="accent-color:#10B981;margin:0"> 📜 납부확인서'
     +         '</label>'
-    +         '<label class="cG_purposeOpt" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 10px;border:1.5px solid #E5E7EB;border-radius:6px;background:#fff;cursor:pointer;font-weight:600;color:#6B7280;font-size:12.5px">'
-    +           '<input type="radio" name="crIncRcptPurpose" id="crIncRcptP2" value="contract_close" onchange="cG_togglePurposeOptions()" style="accent-color:#DC2626"> 📋 계약해지증명서'
+    +         '<label class="cG_purposeOpt" style="flex:1;display:flex;align-items:center;justify-content:center;gap:3px;padding:7px 4px;border:1.5px solid #E5E7EB;border-radius:6px;background:#fff;cursor:pointer;font-weight:700;color:#6B7280;font-size:11px;white-space:nowrap">'
+    +           '<input type="radio" name="crIncRcptPurpose" id="crIncRcptP2" value="contract_close" onchange="cG_togglePurposeOptions()" style="accent-color:#DC2626;margin:0"> 📋 계약해지증명서'
+    +         '</label>'
+    +         '<label class="cG_purposeOpt" style="flex:1;display:flex;align-items:center;justify-content:center;gap:3px;padding:7px 4px;border:1.5px solid #E5E7EB;border-radius:6px;background:#fff;cursor:pointer;font-weight:700;color:#6B7280;font-size:11px;white-space:nowrap">'
+    +           '<input type="radio" name="crIncRcptPurpose" id="crIncRcptP3" value="exit_settlement" onchange="cG_togglePurposeOptions()" style="accent-color:#B45309;margin:0"> 🧾 퇴실정산청구서'
     +         '</label>'
     +       '</div>'
     +     '</div>'
+    /* [v396] 퇴실정산청구서 안내 (디폴트 hidden) */
+    +     '<div id="crIncRcptSettleNote" style="display:none;margin-bottom:12px;padding:9px 12px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:6px;font-size:11.5px;color:#9A3412;line-height:1.5">🧾 <b>퇴실정산청구서</b> — 현재 <b>미납·납부예정</b> 항목이 자동 집계되어 청구서로 발행됩니다. (발행 기간·납부 종류 설정은 적용되지 않습니다)</div>'
     /* 발행 기간 */
-    +     '<div style="margin-bottom:12px">'
+    +     '<div style="margin-bottom:12px" id="crIncRcptPeriodWrap">'
     +       '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:6px">발행 기간 (납기일 기준)</label>'
     +       '<div style="display:flex;align-items:center;gap:8px">'
     +         '<input type="date" id="crIncRcptFrom" value="' + startD + '" style="flex:1;padding:7px 9px;border:1px solid #CBD5E1;border-radius:5px;font-size:12.5px">'
@@ -11508,7 +11513,7 @@ function openIncomeReceiptModal(contractNo) {
     +         '<input type="date" id="crIncRcptTo" value="' + endD + '" style="flex:1;padding:7px 9px;border:1px solid #CBD5E1;border-radius:5px;font-size:12.5px">'
     +       '</div>'
     +     '</div>'
-    +     '<div style="margin-bottom:12px">'
+    +     '<div style="margin-bottom:12px" id="crIncRcptTypeWrap">'
     +       '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:6px">납부 종류 (다중선택)</label>'
     +       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">'
     +         '<label style="display:flex;align-items:center;justify-content:center;gap:4px;padding:5px 6px;border:1px solid #CBD5E1;border-radius:5px;cursor:pointer;font-size:11px;color:#334155"><input type="checkbox" id="crIncRcptT1" checked value="임대료" style="accent-color:#10B981"> 임대료</label>'
@@ -11702,6 +11707,31 @@ function cG_toggleUnpaidSection(){
   console.log('조회된 미납 항목:', unpaidItems);
 }
 
+// [v396] 퇴실정산청구서용 — 계약번호의 미납·납부예정 항목 자동 집계 (체크박스/수동입력 무관)
+function cG_collectUnpaidForContract(contractNo){
+  var data = (typeof paymentRawData !== 'undefined' && paymentRawData) ? paymentRawData : [];
+  var out = [];
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    if (String(row['계약번호'] || '').trim() !== String(contractNo).trim()) continue;
+    var status = String(row['납부상태'] || '').trim();
+    if (status.indexOf('납부예정') === -1 && status.indexOf('연체중') === -1 && status.indexOf('분납중') === -1) continue;
+    var isUpcoming = status.indexOf('납부예정') >= 0;
+    var cands = isUpcoming
+      ? [row['납부금액(원)'], row['납부금액'], row['미납(정제)금액(원)'], row['미납(연체)금액(원)']]
+      : [row['미납(정제)금액(원)'], row['미납(연체)금액(원)'], row['_col_AB'], row['납부금액(원)'], row['납부금액']];
+    var amt = 0;
+    for (var j = 0; j < cands.length; j++) { var v = parseSafeMoney(cands[j]); if (v > 0) { amt = v; break; } }
+    out.push({
+      name: String(row['청구서명'] || row['납부종류'] || '미납항목'),
+      amt: String(amt),
+      due: row['납기일'] || '',
+      status: status.indexOf('연체') >= 0 ? '연체' : (status.indexOf('분납') >= 0 ? '분납' : '예정')
+    });
+  }
+  return out;
+}
+
 // [v370] 자동 조회 - xlsx 파일 선택 후 계약번호 기반 필터링
 function cG_autoLoadUnpaidData(){
   var input = document.createElement('input');
@@ -11799,28 +11829,30 @@ function cG_autoLoadUnpaidData(){
 function cG_togglePurposeOptions(){
   var p1 = document.getElementById('crIncRcptP1');
   var p2 = document.getElementById('crIncRcptP2');
+  var p3 = document.getElementById('crIncRcptP3'); // [v396] 퇴실정산청구서
   var opts = document.getElementById('crIncRcptCloseOpts');
   var unpaidDiv = document.getElementById('crIncRcptUnpaidDiv');
+  var periodWrap = document.getElementById('crIncRcptPeriodWrap');
+  var typeWrap = document.getElementById('crIncRcptTypeWrap');
+  var settleNote = document.getElementById('crIncRcptSettleNote');
   var btn = document.getElementById('crIncRcptGenBtn');
-  if (!p2 || !opts || !btn) return;
-  var isClose = p2.checked;
-  opts.style.display = isClose ? 'block' : 'none';
+  if (!btn) return;
+  var isClose  = !!(p2 && p2.checked);
+  var isSettle = !!(p3 && p3.checked);
+  if (opts) opts.style.display = isClose ? 'block' : 'none';
   if (unpaidDiv) unpaidDiv.style.display = isClose ? 'block' : 'none';
-  btn.textContent = isClose ? '📋 계약해지증명서 생성' : '📄 납부확인서 생성';
-  btn.style.background = isClose ? '#DC2626' : '#10B981';
+  if (periodWrap) periodWrap.style.display = isSettle ? 'none' : 'block';
+  if (typeWrap) typeWrap.style.display = isSettle ? 'none' : 'block';
+  if (settleNote) settleNote.style.display = isSettle ? 'block' : 'none';
+  btn.textContent = isClose ? '📋 계약해지증명서 생성' : (isSettle ? '🧾 퇴실정산청구서 생성' : '📄 납부확인서 생성');
+  btn.style.background = isClose ? '#DC2626' : (isSettle ? '#B45309' : '#10B981');
   // 라디오 라벨 active 스타일 토글
-  if (p1 && p1.parentElement) {
-    var l1 = p1.parentElement;
-    l1.style.borderColor = isClose ? '#E5E7EB' : '#10B981';
-    l1.style.background  = isClose ? '#fff' : '#ECFDF5';
-    l1.style.color       = isClose ? '#6B7280' : '#065F46';
+  function _styleLbl(p, on, color, bg, fg){
+    if (p && p.parentElement){ var l = p.parentElement; l.style.borderColor = on ? color : '#E5E7EB'; l.style.background = on ? bg : '#fff'; l.style.color = on ? fg : '#6B7280'; }
   }
-  if (p2 && p2.parentElement) {
-    var l2 = p2.parentElement;
-    l2.style.borderColor = isClose ? '#DC2626' : '#E5E7EB';
-    l2.style.background  = isClose ? '#FEF2F2' : '#fff';
-    l2.style.color       = isClose ? '#991B1B' : '#6B7280';
-  }
+  _styleLbl(p1, !isClose && !isSettle, '#10B981', '#ECFDF5', '#065F46');
+  _styleLbl(p2, isClose, '#DC2626', '#FEF2F2', '#991B1B');
+  _styleLbl(p3, isSettle, '#B45309', '#FFF7ED', '#9A3412');
 }
 function closeIncomeReceiptModal(){ var m = document.getElementById('crIncRcptModal'); if (m) m.remove(); }
 
@@ -11830,12 +11862,14 @@ function generateIncomeReceipt(contractNo){
   if (!fromVal || !toVal) { alert('발행 기간을 입력해주세요.'); return; }
   var t1 = (document.getElementById('crIncRcptT1')||{}).checked;
   var t2 = (document.getElementById('crIncRcptT2')||{}).checked;
-  if (!t1 && !t2) { alert('납부 종류를 한 가지 이상 선택해주세요.'); return; }
+  var isSettleMode = !!(document.getElementById('crIncRcptP3')||{}).checked; // [v396] 퇴실정산청구서
+  if (!t1 && !t2 && !isSettleMode) { alert('납부 종류를 한 가지 이상 선택해주세요.'); return; }
   var types = [];
   if (t1) types.push('임대료');
   if (t2) types.push('변동관리비');
-  // [v273] 발행 용도 + 해지 옵션 추출
-  var purpose = (document.getElementById('crIncRcptP2')||{}).checked ? 'contract_close' : 'payment_confirm';
+  // [v273/v396] 발행 용도 + 해지 옵션 추출
+  var purpose = (document.getElementById('crIncRcptP2')||{}).checked ? 'contract_close'
+              : (isSettleMode ? 'exit_settlement' : 'payment_confirm');
   var closeOpts = {
     deposit:   !!(document.getElementById('crIncRcptOptDeposit')||{}).checked,
     restore:   !!(document.getElementById('crIncRcptOptRestore')||{}).checked,
@@ -11858,6 +11892,11 @@ function generateIncomeReceipt(contractNo){
         status: (String(u.status || '').indexOf('연체') >= 0) ? '연체' : '예정'
       };
     });
+  }
+  // [v396] 퇴실정산청구서 — 미납·납부예정 항목 자동 집계 (체크박스 무관)
+  if (purpose === 'exit_settlement') {
+    unpaidData = cG_collectUnpaidForContract(contractNo);
+    if (!unpaidData || !unpaidData.length) { alert('미납·납부예정 항목이 없습니다. (퇴실정산청구서 발행 불가)'); return; }
   }
 
   var contract = (contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim() === String(contractNo); });
@@ -11885,7 +11924,7 @@ function generateIncomeReceipt(contractNo){
     return true;
   });
 
-  if (!rows.length) { alert('해당 기간에 납부 완료된 내역이 없습니다.'); return; }
+  if (!rows.length && purpose !== 'exit_settlement') { alert('해당 기간에 납부 완료된 내역이 없습니다.'); return; }
 
   // 납기일 순 정렬
   rows.sort(function(a, b){ return (parseDate(a['납기일'])||0) - (parseDate(b['납기일'])||0); });
@@ -12028,9 +12067,10 @@ function generateIncomeReceipt(contractNo){
 
   // [v273] 용도별 문서 메타 + 본문 분기
   var isClose = (purpose === 'contract_close');
+  var isSettle = (purpose === 'exit_settlement');
   var isTerminated = /종료/.test(contractStatusStr);
-  var docTitle = isClose ? '계 약 해 지 증 명 서' : '납 부 확 인 서';
-  var docFileName = isClose ? '계약해지증명서' : '납부확인서';
+  var docTitle = isClose ? '계 약 해 지 증 명 서' : (isSettle ? '퇴 실 정 산 청 구 서' : '납 부 확 인 서');
+  var docFileName = isClose ? '계약해지증명서' : (isSettle ? '퇴실정산청구서' : '납부확인서');
   // 마지막 납부일 (정산 완료일 추정)
   var lastPaidDateStr = '';
   if (rows.length > 0) {
@@ -12044,7 +12084,15 @@ function generateIncomeReceipt(contractNo){
 
   // 본문 declaration 동적 생성
   var declarationHtml = '';
-  if (isClose) {
+  if (isSettle) {
+    // 🧾 퇴실정산청구서
+    var _totSettleDecl = (unpaidData||[]).reduce(function(s,u){ return s + parseAmt(u.amt); }, 0);
+    declarationHtml = ''
+      + '본 청구서는 위 계약(<b>#' + contractNo + '</b>)의 <b>퇴실 정산</b>과 관련하여, 발행일(' + todayStr + ') 현재 임(전)차인 <b>' + tenant + '</b>에게 잔존하는 '
+      + '<b>미납 및 납부예정 금액 합계 ' + fmtMon(_totSettleDecl) + '</b>의 납부를 청구하기 위하여 발행됩니다.<br>'
+      + '아래 「정산 청구 내역」을 확인하시고, 납부 기한 내 케이알지그룹주식회사가 안내하는 계좌로 납부하여 주시기 바랍니다. '
+      + '기한 내 미납 시 연체료가 가산되며, 잔여 채무는 보증금에서 우선 공제될 수 있습니다.';
+  } else if (isClose) {
     // 📋 계약해지증명서
     var settleItems = [];
     settleItems.push('<li><b>계약 종료일</b>: ' + (exitDateStr || '-') + '</li>');
@@ -12088,15 +12136,15 @@ function generateIncomeReceipt(contractNo){
       + '본 확인서는 납부 사실의 증빙 목적으로 발행되며, 발행일 기준의 시스템 데이터를 기준으로 합니다.';
   }
 
-  // [v369] 미납 항목 표 생성 (계약해지증명서 + 미납 데이터 있을 때만)
+  // [v396] 미납/정산 항목 표 — 계약해지증명서 OR 퇴실정산청구서에서만 출력
   var unpaidTableHtml = '';
-  if (isClose && unpaidData && unpaidData.length > 0) {
+  if ((isClose || isSettle) && unpaidData && unpaidData.length > 0) {
     var totalUnpaid = 0;
     var unpaidRowsHtml = unpaidData.map(function(u, i){
       var amt = parseAmt(u.amt);
       totalUnpaid += amt;
-      var statusColor = u.status === '연체' ? '#DC2626' : '#F59E0B';
-      var statusLabel = u.status === '연체' ? '●연체' : '●예정';
+      var statusColor = (u.status === '연체' || u.status === '분납') ? '#DC2626' : '#F59E0B';
+      var statusLabel = '●' + (u.status || '예정');
       return '<tr>'
         + '<td style="text-align:center;padding:7px 6px;border:1px solid #D1D5DB">' + (i+1) + '</td>'
         + '<td style="padding:7px 6px;border:1px solid #D1D5DB">' + (u.name || '-') + '</td>'
@@ -12106,7 +12154,7 @@ function generateIncomeReceipt(contractNo){
     }).join('');
 
     unpaidTableHtml = '<div style="margin-bottom:14px">'
-      + '<div style="font-size:13px;font-weight:700;color:#DC2626;margin-bottom:8px">⚠️ 현재 미납 항목</div>'
+      + '<div style="font-size:13px;font-weight:700;color:' + (isSettle ? '#B45309' : '#DC2626') + ';margin-bottom:8px">' + (isSettle ? '🧾 정산 청구 내역 (미납·납부예정)' : '⚠️ 현재 미납 항목') + '</div>'
       + '<table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:8px">'
       +   '<thead><tr style="background:#FEE2E2;color:#991B1B">'
       +     '<th style="width:38px;padding:8px 6px;border:1px solid #FCA5A5;font-weight:700;text-align:center">No</th>'
@@ -12122,6 +12170,41 @@ function generateIncomeReceipt(contractNo){
       +     '</tr>'
       +   '</tbody>'
       + '</table>'
+      + '</div>';
+  }
+
+  // [v396] 본문 중단 블록 — 납부확인서/계약해지: 납부내역 표 · 퇴실정산: 청구 합계+납부안내
+  var paidBlockHtml = '';
+  var settleNoticeHtml = '';
+  if (isSettle) {
+    var _totSettle2 = (unpaidData||[]).reduce(function(s,u){ return s + parseAmt(u.amt); }, 0);
+    var _due = new Date(); _due.setDate(_due.getDate() + 7);
+    var _dueStr = _due.getFullYear() + '.' + String(_due.getMonth()+1).padStart(2,'0') + '.' + String(_due.getDate()).padStart(2,'0');
+    var _acct = (typeof landlordAccountMap !== 'undefined' && landlordAccountMap) ? (landlordAccountMap[String(contractNo).trim()] || '') : '';
+    paidBlockHtml = '<div class="period-info" style="background:#FFF7ED;border-left-color:#B45309;color:#9A3412">📅 발행일: <b>' + todayStr + '</b> · 계약상태: <b>' + contractStatusStr + '</b> · 청구 항목: <b>' + unpaidData.length + '건</b></div>';
+    settleNoticeHtml = '<div class="total-box" style="background:#FFF7ED;border-color:#FDBA74">'
+      +   '<div><div class="lbl">청구 합계</div><div class="kr">일금 ' + krWon(_totSettle2) + '원정</div></div>'
+      +   '<div class="amt" style="color:#B45309">' + fmtMon(_totSettle2) + '</div>'
+      + '</div>'
+      + '<div style="margin:12px 0;padding:11px 14px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:6px;font-size:11.5px;color:#78350F;line-height:1.7">'
+      +   '<b>📌 납부 안내</b><br>'
+      +   '· 납부 기한: <b>' + _dueStr + '</b> (발행일로부터 7일 이내)<br>'
+      +   (_acct ? '· 납부 계좌: <b>' + _acct + '</b><br>' : '· 납부 계좌: 담당자 안내 계좌<br>')
+      +   '· 위 금액은 퇴실 정산 기준 <b>미납·납부예정 금액의 합계</b>이며, 기한 내 미납 시 연체료가 가산될 수 있습니다.'
+      + '</div>';
+  } else {
+    paidBlockHtml = '<div class="period-info">📅 발행 기간: <b>' + fromVal + ' ~ ' + toVal + '</b> · 납부종류: <b>' + types.join(', ') + '</b> · 총 <b>' + rows.length + '건</b></div>'
+      + '<table class="detail">'
+      +   '<thead><tr>'
+      +     '<th style="width:38px">No</th><th>청구서명</th><th style="width:80px">납부종류</th>'
+      +     '<th style="width:90px">납기일</th><th style="width:90px">납부일</th>'
+      +     '<th style="width:110px">납부금액</th><th style="width:80px">납부방법</th>'
+      +   '</tr></thead>'
+      +   '<tbody>' + rowsHtml + '</tbody>'
+      + '</table>'
+      + '<div class="total-box">'
+      +   '<div><div class="lbl">합계</div><div class="kr">일금 ' + krWon(totalPaid) + '원정</div></div>'
+      +   '<div class="amt">' + fmtMon(totalPaid) + '</div>'
       + '</div>';
   }
 
@@ -12169,24 +12252,9 @@ function generateIncomeReceipt(contractNo){
     +     '<div class="lbl">계약물건</div><div style="grid-column:span 3">' + contractInfo + '</div>'
     +     '<div class="lbl">계약기간</div><div style="grid-column:span 3">' + period + '</div>'
     +   '</div>'
-    +   '<div class="period-info">📅 발행 기간: <b>' + fromVal + ' ~ ' + toVal + '</b> · 납부종류: <b>' + types.join(', ') + '</b> · 총 <b>' + rows.length + '건</b></div>'
-    +   '<table class="detail">'
-    +     '<thead><tr>'
-    +       '<th style="width:38px">No</th>'
-    +       '<th>청구서명</th>'
-    +       '<th style="width:80px">납부종류</th>'
-    +       '<th style="width:90px">납기일</th>'
-    +       '<th style="width:90px">납부일</th>'
-    +       '<th style="width:110px">납부금액</th>'
-    +       '<th style="width:80px">납부방법</th>'
-    +     '</tr></thead>'
-    +     '<tbody>' + rowsHtml + '</tbody>'
-    +   '</table>'
-    +   '<div class="total-box">'
-    +     '<div><div class="lbl">합계</div><div class="kr">일금 ' + krWon(totalPaid) + '원정</div></div>'
-    +     '<div class="amt">' + fmtMon(totalPaid) + '</div>'
-    +   '</div>'
+    +   paidBlockHtml
     +   unpaidTableHtml
+    +   settleNoticeHtml
     +   '<div class="declaration">' + declarationHtml + '</div>'
     +   '<div class="sign-area">'
     +     '<div class="sign-date">' + todayStr + '</div>'
