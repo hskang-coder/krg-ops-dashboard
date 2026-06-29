@@ -12091,9 +12091,10 @@ function generateIncomeReceipt(contractNo){
   var settleExitStr = settleExitVal
     ? fmtKr(settleExitVal)
     : ((vac && vac.exitDate) ? fmtKr(vac.exitDate) : (contract['종료일'] ? fmtKr(contract['종료일']) : '-'));
-  // [v397] 정산청구서 — 계약기간 란의 종료일을 계약종료일(Z열/입력값)로 출력
+  // [v398] 정산청구서 — 계약기간은 원래대로(시작~종료, gid=1953907648 W~X) 유지 + 계약종료일 부기
   if (isSettle && settleExitStr && settleExitStr !== '-') {
-    period = fmtKr(contract['시작일']) + ' ~ ' + settleExitStr;
+    var _exitKor = (function(s){ var m = String(s).match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); return m ? (m[1] + '년 ' + (+m[2]) + '월 ' + (+m[3]) + '일') : s; })(settleExitStr);
+    period = period + ' (계약종료일 ' + _exitKor + ')';
   }
 
   // 본문 declaration 동적 생성
