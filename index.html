@@ -12195,7 +12195,6 @@ function generateIncomeReceipt(contractNo){
     var _totSettle2 = (unpaidData||[]).reduce(function(s,u){ return s + parseAmt(u.amt); }, 0);
     var _due = new Date(); _due.setDate(_due.getDate() + 7);
     var _dueStr = _due.getFullYear() + '.' + String(_due.getMonth()+1).padStart(2,'0') + '.' + String(_due.getDate()).padStart(2,'0');
-    var _acct = (typeof landlordAccountMap !== 'undefined' && landlordAccountMap) ? (landlordAccountMap[String(contractNo).trim()] || '') : '';
     paidBlockHtml = '<div class="period-info" style="background:#FFF7ED;border-left-color:#B45309;color:#9A3412">📅 발행일: <b>' + todayStr + '</b> · 계약종료일: <b>' + settleExitStr + '</b> · 청구 항목: <b>' + unpaidData.length + '건</b></div>';
     settleNoticeHtml = '<div class="total-box" style="background:#FFF7ED;border-color:#FDBA74">'
       +   '<div><div class="lbl">청구 합계</div><div class="kr">일금 ' + krWon(_totSettle2) + '원정</div></div>'
@@ -12204,7 +12203,7 @@ function generateIncomeReceipt(contractNo){
       + '<div style="margin:12px 0;padding:11px 14px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:6px;font-size:11.5px;color:#78350F;line-height:1.7">'
       +   '<b>📌 납부 안내</b><br>'
       +   '· 납부 기한: <b>' + _dueStr + '</b> (발행일로부터 7일 이내)<br>'
-      +   (_acct ? '· 납부 계좌: <b>' + _acct + '</b><br>' : '· 납부 계좌: 담당자 안내 계좌<br>')
+      +   '· 납부 계좌: <b>118-910035-09304 케이알지그룹</b> (가상계좌)<br>'
       +   '· 위 금액은 퇴실 정산 기준 <b>미납·납부예정 금액의 합계</b>이며, 기한 내 미납 시 연체료가 가산될 수 있습니다.'
       + '</div>';
   } else {
