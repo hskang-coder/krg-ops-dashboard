@@ -12104,11 +12104,15 @@ function generateIncomeReceipt(contractNo){
   if (isSettle) {
     // 🧾 퇴실정산청구서
     var _totSettleDecl = (unpaidData||[]).reduce(function(s,u){ return s + parseAmt(u.amt); }, 0);
-    // [v402] 잔여 서비스 수수료 청구 시 — 개런티즈 계약 근거 명시 (짧고 명료)
+    // [v403] 청구 근거 — 개런티즈 계약서(제13·6·7조 등) 중도퇴실 의무 + 민법 임차인 의무 (컴팩트)
     var _hasSvcFee = (unpaidData||[]).some(function(u){ return /수수료/.test(String(u.name||'')); });
-    var _feeBasisHtml = _hasSvcFee
-      ? '<div style="margin-top:8px;font-size:11px;color:#6B7280;line-height:1.6">※ <b>잔여 서비스 수수료</b>는 개런티즈 계약서 특약사항 「개런티즈 서비스 계약 기간 중 퇴실 시 미납된 수수료(계약 개월 수 − 거주 개월 수) 전액을 지불하여야 하며, 퇴실 시 남은 계약기간의 수수료를 일괄 지급한다」에 근거하여 청구됩니다.</div>'
-      : '';
+    var _basisHtml = '<div style="margin-top:8px;padding:8px 11px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:5px;font-size:10.5px;color:#4B5563;line-height:1.65">'
+      + '<b style="color:#374151">📌 청구 근거</b><br>'
+      + '· <b>개런티즈 계약서 제13조(중도 해지·퇴거 시 책임)</b>: 임차인 귀책으로 계약기간 중 퇴실 시 잔여 서비스 수수료·미납 월세·원상복구비·중개수수료·철거비 등 일체 비용과 위약벌(월세 4개월분 상당)을 즉시 지급하며, 신규 임차인 입주 전까지의 임대료를 부담한다.<br>'
+      + '· <b>제6조(원상회복·명도)·제7조(보증금 공제·정산)</b>: 입주 당시 상태로 원상복구 후 공실 반환하며, 미납금은 보증금에서 우선 공제·정산된다.'
+      + (_hasSvcFee ? '<br>· <b>잔여 서비스 수수료</b>: 계약서 특약 「퇴실 시 남은 계약기간의 수수료를 일괄 지급한다」에 근거한다.' : '')
+      + '<br>· <b>민법상 임(전)차인 의무</b>: 차임 지급의무(제618조), 선량한 관리자의 주의로 임차물을 보존할 의무(제374조), 계약 종료 시 원상회복·반환 의무(제654조·제615조)를 부담한다.'
+      + '</div>';
     var _settleExtra = (document.getElementById('crIncRcptSettleExtra')||{}).value || '';
     var _settleExtraHtml = '';
     if (_settleExtra && _settleExtra.trim()) {
@@ -12120,7 +12124,7 @@ function generateIncomeReceipt(contractNo){
       + '<b>미납 및 납부예정 금액 합계 ' + fmtMon(_totSettleDecl) + '</b>의 납부를 청구하기 위하여 발행됩니다.<br>'
       + '아래 「정산 청구 내역」을 확인하시고, 납부 기한 내 케이알지그룹주식회사가 안내하는 계좌로 납부하여 주시기 바랍니다. '
       + '기한 내 미납 시 연체료가 가산되며, 잔여 채무는 보증금에서 우선 공제될 수 있습니다.'
-      + _feeBasisHtml
+      + _basisHtml
       + _settleExtraHtml;
   } else if (isClose) {
     // 📋 계약해지증명서
