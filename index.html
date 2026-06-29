@@ -11502,8 +11502,12 @@ function openIncomeReceiptModal(contractNo) {
     +         '</label>'
     +       '</div>'
     +     '</div>'
-    /* [v396] 퇴실정산청구서 안내 (디폴트 hidden) */
-    +     '<div id="crIncRcptSettleNote" style="display:none;margin-bottom:12px;padding:9px 12px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:6px;font-size:11.5px;color:#9A3412;line-height:1.5">🧾 <b>퇴실정산청구서</b> — 현재 <b>미납·납부예정</b> 항목이 자동 집계되어 청구서로 발행됩니다. (발행 기간·납부 종류 설정은 적용되지 않습니다)</div>'
+    /* [v396] 퇴실정산청구서 안내 + 계약 종료일(퇴실일) 입력 (디폴트 hidden) */
+    +     '<div id="crIncRcptSettleNote" style="display:none;margin-bottom:12px;padding:11px 12px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:6px">'
+    +       '<div style="font-size:11.5px;color:#9A3412;line-height:1.5;margin-bottom:9px">🧾 <b>퇴실정산청구서</b> — 현재 <b>미납·납부예정</b> 항목이 자동 집계되어 청구서로 발행됩니다. (발행 기간·납부 종류 설정은 적용되지 않습니다)</div>'
+    +       '<label style="font-size:11.5px;font-weight:700;color:#9A3412;display:block;margin-bottom:5px">📅 계약 종료일 (퇴실일) <span style="color:#C2845A;font-weight:500;font-size:10.5px">— Z열 자동, 없으면 직접 입력</span></label>'
+    +       '<input type="date" id="crIncRcptSettleExitDate" value="' + exitInit + '" style="width:100%;padding:7px 9px;border:1px solid #FDBA74;border-radius:5px;font-size:12.5px;background:#fff">'
+    +     '</div>'
     /* 발행 기간 */
     +     '<div style="margin-bottom:12px" id="crIncRcptPeriodWrap">'
     +       '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:6px">발행 기간 (납기일 기준)</label>'
@@ -12082,13 +12086,19 @@ function generateIncomeReceipt(contractNo){
     ? fmtKr(manualExitDate)
     : ((vac && vac.exitDate) ? fmtKr(vac.exitDate) : fmtKr(contract['종료일']));
 
+  // [v396] 퇴실정산청구서 — 계약 종료일(퇴실일): 수동입력 우선, 없으면 vacancy Z열, 없으면 contract 종료일
+  var settleExitVal = (document.getElementById('crIncRcptSettleExitDate')||{}).value || '';
+  var settleExitStr = settleExitVal
+    ? fmtKr(settleExitVal)
+    : ((vac && vac.exitDate) ? fmtKr(vac.exitDate) : (contract['종료일'] ? fmtKr(contract['종료일']) : '-'));
+
   // 본문 declaration 동적 생성
   var declarationHtml = '';
   if (isSettle) {
     // 🧾 퇴실정산청구서
     var _totSettleDecl = (unpaidData||[]).reduce(function(s,u){ return s + parseAmt(u.amt); }, 0);
     declarationHtml = ''
-      + '본 청구서는 위 계약(<b>#' + contractNo + '</b>)의 <b>퇴실 정산</b>과 관련하여, 발행일(' + todayStr + ') 현재 임(전)차인 <b>' + tenant + '</b>에게 잔존하는 '
+      + '본 청구서는 위 계약(<b>#' + contractNo + '</b>)의 <b>퇴실 정산</b>(퇴실일 <b>' + settleExitStr + '</b>)과 관련하여, 발행일(' + todayStr + ') 현재 임(전)차인 <b>' + tenant + '</b>에게 잔존하는 '
       + '<b>미납 및 납부예정 금액 합계 ' + fmtMon(_totSettleDecl) + '</b>의 납부를 청구하기 위하여 발행됩니다.<br>'
       + '아래 「정산 청구 내역」을 확인하시고, 납부 기한 내 케이알지그룹주식회사가 안내하는 계좌로 납부하여 주시기 바랍니다. '
       + '기한 내 미납 시 연체료가 가산되며, 잔여 채무는 보증금에서 우선 공제될 수 있습니다.';
@@ -12181,7 +12191,7 @@ function generateIncomeReceipt(contractNo){
     var _due = new Date(); _due.setDate(_due.getDate() + 7);
     var _dueStr = _due.getFullYear() + '.' + String(_due.getMonth()+1).padStart(2,'0') + '.' + String(_due.getDate()).padStart(2,'0');
     var _acct = (typeof landlordAccountMap !== 'undefined' && landlordAccountMap) ? (landlordAccountMap[String(contractNo).trim()] || '') : '';
-    paidBlockHtml = '<div class="period-info" style="background:#FFF7ED;border-left-color:#B45309;color:#9A3412">📅 발행일: <b>' + todayStr + '</b> · 계약상태: <b>' + contractStatusStr + '</b> · 청구 항목: <b>' + unpaidData.length + '건</b></div>';
+    paidBlockHtml = '<div class="period-info" style="background:#FFF7ED;border-left-color:#B45309;color:#9A3412">📅 발행일: <b>' + todayStr + '</b> · 퇴실(계약종료)일: <b>' + settleExitStr + '</b> · 청구 항목: <b>' + unpaidData.length + '건</b></div>';
     settleNoticeHtml = '<div class="total-box" style="background:#FFF7ED;border-color:#FDBA74">'
       +   '<div><div class="lbl">청구 합계</div><div class="kr">일금 ' + krWon(_totSettle2) + '원정</div></div>'
       +   '<div class="amt" style="color:#B45309">' + fmtMon(_totSettle2) + '</div>'
