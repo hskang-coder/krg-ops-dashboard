@@ -18687,6 +18687,41 @@ function okpi_rowCount(label, src, formula, val, maxVal, colorCls){
 }
 
 // 컨트롤 + 일/주/월 카드
+// [v410] 관리자 확인 중요사항 — 검색기간(range) 기준 gid=554798125(대응내역)+입금내역 교차로 중요도순 넘버링
+function okpi_importantBox(range){
+  try {
+    var daeRaw = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
+    var payRaw = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData : [];
+    var inRangeP = function(s){ var d = okpi_parseDate(s); if (!d) return false; d.setHours(0,0,0,0); return d >= range.start && d <= range.end; };
+    // ① 입금 예정 대상 — 입금예정일(D열)이 검색기간 내인 계약 (중복 제거)
+    var paySet = {};
+    daeRaw.forEach(function(r){ if (r.payDate && inRangeP(r.payDate)) paySet[_normCno(r.no)] = 1; });
+    var payTargets = Object.keys(paySet).filter(function(x){ return x; });
+    // 미납 — 해당 계약이 현재 '연체중'/'분납중'(입금내역 기준)
+    var delinqSet = {};
+    payRaw.forEach(function(p){ var s = String(p['납부상태']||'').trim(); if (s === '연체중' || s === '분납중') delinqSet[_normCno(p['계약번호'])] = 1; });
+    var unpaidCnt = payTargets.filter(function(cno){ return delinqSet[cno]; }).length;
+    // 업무구분별 (대응일 기준, 계약 중복 제거)
+    var byJob = function(kw){ var set = {}; daeRaw.forEach(function(r){ if (okpi_inRange(r, range) && String(r.jobType||'').indexOf(kw) >= 0) set[_normCno(r.no)] = 1; }); return Object.keys(set).filter(function(x){return x;}).length; };
+    var midExit = byJob('중도퇴실'), legal = byJob('법무'), delinqJob = byJob('연체'), renew = byJob('갱신'), moveIn = byJob('계약(입주)');
+    var items = [];
+    if (payTargets.length > 0) items.push('💰 입금 예정 <b>' + payTargets.length + '</b>건' + (unpaidCnt > 0 ? ' 중 <b style="color:#DC2626">미납 ' + unpaidCnt + '건</b> — 입금 확인 필요' : ' — 입금 확인'));
+    if (midExit > 0)   items.push('🚪 중도퇴실 진행 <b>' + midExit + '</b>건 — 정산·일정 확인');
+    if (legal > 0)     items.push('⚖️ 법무 대응 <b>' + legal + '</b>건 — 진척 확인');
+    if (delinqJob > 0) items.push('🔴 연체 대응 <b>' + delinqJob + '</b>건 — 약속·입금 확인');
+    if (renew > 0)     items.push('🔄 갱신 대상 <b>' + renew + '</b>건 — 응답 확인');
+    if (moveIn > 0)    items.push('🏠 계약(입주) <b>' + moveIn + '</b>건 — 처리 확인');
+    var dlbl = okpi_ymd(range.start) + (okpi_ymd(range.start) !== okpi_ymd(range.end) ? ' ~ ' + okpi_ymd(range.end) : '');
+    var numBadge = function(i){ return '<span style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#7C3AED;color:#fff;font-size:10px;font-weight:800;margin-top:1px">' + i + '</span>'; };
+    var body = items.length
+      ? '<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">' + items.map(function(t, i){ return '<div style="display:flex;gap:7px;align-items:flex-start;font-size:11.5px;line-height:1.45;color:#374151">' + numBadge(i+1) + '<span>' + t + '</span></div>'; }).join('') + '</div>'
+      : '<div style="font-size:12px;color:#16A34A;margin-top:8px;font-weight:600">✅ 검색기간 내 확인할 중요사항 없음</div>';
+    return '<div class="okpi-period-card" style="grid-column:1/-1;border-color:#DDD6FE;background:#FAF9FF">'
+      + '<div class="okpi-period-label" style="display:flex;justify-content:space-between;align-items:center"><span style="color:#6D28D9;font-weight:700">📌 관리자 확인 중요사항 <span style="font-weight:500;color:#9CA3AF">(검색기간 기준 · 중요도순)</span></span><span style="color:#9CA3AF;font-weight:600">' + dlbl + '</span></div>'
+      + body
+      + '</div>';
+  } catch(e){ console.warn('[v410] okpi_importantBox:', e); return ''; }
+}
 function okpi_renderTopBar(k){
   var pf = function(p){ return window._okpi.period === p ? 'active' : ''; };
   var diff = k.curTotal - k.prevTotal;
@@ -18718,6 +18753,7 @@ function okpi_renderTopBar(k){
     +   '<div class="okpi-period-card"><div class="okpi-period-label">기간</div>'
     +     '<div class="okpi-period-val" style="font-size:14px;font-weight:700">' + okpi_ymd(k.range.start) + '<br>~ ' + okpi_ymd(k.range.end) + '</div>'
     +   '</div>'
+    +   okpi_importantBox(k.range)
     + '</div>';
 }
 
