@@ -2279,8 +2279,14 @@ function syncMirrorNow(){
 function _krNo(r){
   if (!r) return '';
   // [v324] 헤더 빈값일 때 A열 절대위치 폴백
-  return String(r['계약번호'] || r['계약 번호'] || r['계약No'] || r['계약no'] || r['No'] || r['no'] || r['ContractNo'] || r['_col_A'] || '').trim();
+  var v = String(r['계약번호'] || r['계약 번호'] || r['계약No'] || r['계약no'] || r['No'] || r['no'] || r['ContractNo'] || r['_col_A'] || '').trim();
+  // [v407] 숫자형 계약번호의 '.0' 접미사 제거 (gviz 숫자 변환 대응) — 연체관리 집계(replace /\.0$/)와 동일 정규화
+  //   입금내역 시트에서 '47754.0' 형태로 들어와 상세의 입금내역/연체가 매칭 누락되던 문제 차단
+  v = v.replace(/\.0+$/, '');
+  return v;
 }
+// [v407] 계약번호 비교용 정규화 — 양쪽 모두 '.0' 제거 + trim
+function _normCno(s){ return String(s == null ? '' : s).trim().replace(/\.0+$/, ''); }
 
 function _keepBig(prev, next){ return (Array.isArray(next) && next.length>0 && (!Array.isArray(prev) || prev.length===0 || next.length >= prev.length*0.5)) ? next : prev; }
 async function loadContractData() {
@@ -4536,23 +4542,40 @@ function selectContractRow(no) {
   if (feeCalcBtn) { feeCalcBtn.disabled = false; feeCalcBtn.title = '수수료계산 (계약번호: ' + no + ')'; }
   var delqRptBtn = document.getElementById('crDelqReportBtn');
   if (delqRptBtn) { delqRptBtn.disabled = false; delqRptBtn.title = '연체 대응 REPORT (계약번호: ' + no + ')'; }
-  const contract = contractRawData.find(r => String(r['계약번호']).trim() === no);
+  const _noNorm = _normCno(no);
+  const contract = contractRawData.find(r => _normCno(r['계약번호']) === _noNorm);
   if (!contract) return;
-  const payments  = paymentRawData.filter(r => _krNo(r) === String(no).trim());
-  const responses = daeungRawData.filter(r => String(r.no).trim() === no)
+  const payments  = paymentRawData.filter(r => _krNo(r) === _noNorm);
+  const responses = daeungRawData.filter(r => _normCno(r.no) === _noNorm)
     .sort(cG_sortResponsesNewest); // 최신순
   renderContractRecord(contract, payments, responses);
   document.getElementById('contractView').scrollIntoView({behavior:'smooth', block:'start'});
+  // [v407] (A) 연체 집계(_dlqTableRows) 미로드 시 — 연체관리 데이터 백그라운드 준비 후 상세 재렌더
+  //   ※ 연체관리 탭 전용 함수(renderDelinquency)를 그대로 빌려 호출 — 탭 로직은 일절 변경하지 않음
+  if ((!window._dlqTableRows || !window._dlqTableRows.length) && !window._dlqPreloading && typeof renderDelinquency === 'function') {
+    window._dlqPreloading = true;
+    Promise.resolve().then(() => renderDelinquency()).then(() => {
+      window._dlqPreloading = false;
+      if (_normCno(window._crCurrentNo) === _noNorm) {
+        const c4 = contractRawData.find(r => _normCno(r['계약번호']) === _noNorm);
+        if (c4) {
+          const p4 = paymentRawData.filter(r => _krNo(r) === _noNorm);
+          const r4 = (daeungRawData||[]).filter(r => _normCno(r.no) === _noNorm).sort(cG_sortResponsesNewest);
+          renderContractRecord(c4, p4, r4);
+        }
+      }
+    }).catch(() => { window._dlqPreloading = false; });
+  }
   // [v405] paymentRawData 미로드 시 백그라운드 로드 후 연체현황·입금내역 재렌더
   //   (새로고침 직후 상세 진입 시 입금내역 0건·연체없음으로 표시되는 버그 차단)
   if (!paymentRawData.length) {
     fetchSheetByName(INCOME_SHEET).then(pResp => {
       paymentRawData = _keepBig(paymentRawData, gvizToObjects(pResp).filter(r => _krNo(r)));
-      if (String(window._crCurrentNo||'').trim() === String(no).trim()) {
-        const c2 = contractRawData.find(r => String(r['계약번호']).trim() === no);
+      if (_normCno(window._crCurrentNo) === _noNorm) {
+        const c2 = contractRawData.find(r => _normCno(r['계약번호']) === _noNorm);
         if (c2) {
-          const pays = paymentRawData.filter(r => _krNo(r) === String(no).trim());
-          const resp2 = (daeungRawData||[]).filter(r => String(r.no).trim() === no).sort(cG_sortResponsesNewest);
+          const pays = paymentRawData.filter(r => _krNo(r) === _noNorm);
+          const resp2 = (daeungRawData||[]).filter(r => _normCno(r.no) === _noNorm).sort(cG_sortResponsesNewest);
           renderContractRecord(c2, pays, resp2);
         }
       }
@@ -4711,17 +4734,20 @@ function renderContractRecord(c, payments, responses = []) {
   const _cnoStr_v341 = String(c['계약번호']||'').trim();
   const masterDlqMark = (window._delinqMarkMap && window._delinqMarkMap[_cnoStr_v341]) || null;
   const hasMasterDelinq = !!(masterDlqMark && masterDlqMark.types && masterDlqMark.types.length);
-  // [v406] 입금내역(paymentRawData)에 연체 행이 미반영된 경우 — 연체관리 탭 집계(_dlqTableRows)의 연체금액으로 보강
-  //   (상세가 ₩0/'확인 필요'로 표시되며 연체관리 탭과 불일치하던 문제 해소)
-  let dlqTabAmt = 0;
+  // [v406/v407] 연체관리 탭 집계(_dlqTableRows)와 정합성 보강 — 권위 데이터인 연체관리 탭과 일치시킴
+  //   (A) 입금내역(paymentRawData) 금액이 0이면 탭 집계 금액으로 보강
+  //   (B) 둘 다 값이 있고 1천원 이상 다르면 '탭 집계' 배지로 불일치 가시화 (숨기지 않음)
+  let dlqTabAmtAll = null;
   try {
-    if (delinqTotal === 0 && Array.isArray(window._dlqTableRows)) {
+    if (Array.isArray(window._dlqTableRows)) {
       const _dr = window._dlqTableRows.find(r => String(r.cno||'').trim() === _cnoStr_v341);
-      if (_dr) dlqTabAmt = _dr.amt || 0;
+      if (_dr) dlqTabAmtAll = _dr.amt || 0;
     }
   } catch(_e){}
+  const dlqTabAmt = (delinqTotal === 0 && dlqTabAmtAll != null) ? dlqTabAmtAll : 0;
   const effectiveDelinqTotal = delinqTotal > 0 ? delinqTotal : dlqTabAmt;
   const fromDlqTab    = delinqTotal === 0 && dlqTabAmt > 0; // 연체관리 탭 집계 기준 표시 중
+  const tabMismatch   = (dlqTabAmtAll != null) && delinqTotal > 0 && Math.abs(dlqTabAmtAll - delinqTotal) > 1000; // 입금내역 vs 탭 집계 불일치
   const hasDelinq     = effectiveDelinqTotal > 0 || hasMasterDelinq;
   const masterDelinqOnly = hasMasterDelinq && effectiveDelinqTotal === 0; // 마스터 마킹만 있고 금액 미상
 
@@ -5024,7 +5050,7 @@ function renderContractRecord(c, payments, responses = []) {
         return '';
       })()}
       <div class="cr-delinq-card ${hasDelinq?'':'safe'}">
-        <div class="cr-delinq-title ${hasDelinq?'':'safe'}">${hasDelinq?'연체 총액':'연체 없음'}${masterDelinqOnly?` <span style="background:#DC2626;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:5px;letter-spacing:0.3px" title="마스터 시트(gid=418937767)에 연체 마킹이 있으나 입금내역(paymentRawData)에는 연체 행 미발견 — 시트 동기화 확인 필요. 연체관리 탭에 노출됨.">⚠ 마스터 연체 감지</span>`:''}</div>
+        <div class="cr-delinq-title ${hasDelinq?'':'safe'}">${hasDelinq?'연체 총액':'연체 없음'}${masterDelinqOnly?` <span style="background:#DC2626;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:5px;letter-spacing:0.3px" title="마스터 시트(gid=418937767)에 연체 마킹이 있으나 입금내역(paymentRawData)에는 연체 행 미발견 — 시트 동기화 확인 필요. 연체관리 탭에 노출됨.">⚠ 마스터 연체 감지</span>`:''}${tabMismatch?` <span style="background:#F59E0B;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:5px;letter-spacing:0.3px" title="입금내역 기준 ${fmtMoney(delinqTotal)} · 연체관리 탭 집계 ${fmtMoney(dlqTabAmtAll)} — 시트 동기화 시점 차이 가능. 점검 권장.">⚠ 탭 집계 ${fmtMoney(dlqTabAmtAll)}</span>`:''}</div>
         <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
           <div class="cr-delinq-amount ${hasDelinq?'':'safe'}">${masterDelinqOnly?'<span style="color:#DC2626">확인 필요</span>':fmtMoney(effectiveDelinqTotal)}</div>
           ${longestCurrentDelinq>0 && hasDelinq?`<div style="display:flex;align-items:baseline;gap:3px">
