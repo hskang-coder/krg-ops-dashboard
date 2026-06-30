@@ -4778,13 +4778,14 @@ function renderContractRecord(c, payments, responses = []) {
     const cnoKey = String(c['계약번호']||'').trim();
     const fromDlqMap = (window._delinqDaysMap && cnoKey) ? (window._delinqDaysMap[cnoKey] || 0) : 0;
     if (fromDlqMap > 0) return fromDlqMap;
+    // [v409] '연체납부'(이미 늦게 납부 완료)는 현재 연체가 아님 — '연체중'/'분납중'만 현재 연체일로 집계
     const fromStatus = payments
-      .filter(p => { const s = String(p['납부상태']||'').trim(); return s.includes('연체') || s.includes('분납'); })
+      .filter(p => { const s = String(p['납부상태']||'').trim(); return s === '연체중' || s === '분납중'; })
       .reduce((max, p) => Math.max(max, parseInt(p['연체일수']||0)), 0);
     if (fromStatus > 0) return fromStatus;
     // 미납금액 기준 fallback
     const fromUnpaid = payments
-      .filter(p => _unpaidAmt(p) > 0) // [v269] 다중 헤더 매칭
+      .filter(p => _unpaidAmt(p) > 0 && isPastDue(p)) // [v269/v409] 미납>0 + 납기 도래분만 (미래 납부예정 제외)
       .reduce((max, p) => Math.max(max, parseInt(p['연체일수']||0)), 0);
     return fromUnpaid;
   })();
