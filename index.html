@@ -4521,10 +4521,18 @@ function renderPaymentTargets() {
       <div style="overflow-x:auto"><table class="pt-table">
         <thead><tr>
           <th style="width:30px;text-align:center"><input type="checkbox" onchange="ptSelectAll(this.checked)" title="전체 선택"></th>
-          <th>계약번호</th><th>임(전)차인명</th><th>연락처</th><th>청구횟수</th>
-          <th>공실상태</th>
-          <th>당월납부상태</th><th>수납대상여부</th><th>전월 연체일수</th>
-          <th>납기일</th><th>최근 대응일</th><th>최근 대응내용</th><th>수납 대상</th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">계약번호<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">임(전)차인명<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">연락처<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">청구횟수<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">공실상태<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">당월납부상태<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">수납대상여부<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">전월 연체일수<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">납기일<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">최근 대응일<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">최근 대응내용<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">수납 대상<span class="pt-sort-arrow"></span></th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
@@ -4537,6 +4545,45 @@ function parseKorDate(str) {
   const m = str.match(/(\d{4})[.\-\/\s]+(\d{1,2})[.\-\/\s]+(\d{1,2})/);
   if (m) return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
   return null;
+}
+
+// [v415] 수납관리 표 헤더 클릭 정렬 — 렌더된 행을 직접 정렬(숫자·날짜·텍스트 자동 인식, 빈값(—)은 항상 아래)
+function ptSortTable(th){
+  try {
+    var table = th.closest('table'); if (!table) return;
+    var tbody = table.querySelector('tbody'); if (!tbody) return;
+    var colIdx = th.cellIndex;
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll(':scope > tr'));
+    if (rows.length <= 1 && (!rows[0] || rows[0].children.length <= 1)) return; // 빈 상태 행
+    var dir = (th.getAttribute('data-sort') === 'asc') ? 'desc' : 'asc';
+    // 다른 헤더 화살표 초기화
+    table.querySelectorAll('th').forEach(function(h){ h.removeAttribute('data-sort'); var s = h.querySelector('.pt-sort-arrow'); if (s) s.textContent = ''; });
+    th.setAttribute('data-sort', dir);
+    var ar = th.querySelector('.pt-sort-arrow'); if (ar) ar.textContent = dir === 'asc' ? ' ▲' : ' ▼';
+    var parse = function(cell){
+      var t = (cell ? (cell.textContent||'') : '').trim();
+      if (t === '' || t === '—' || t === '-') return { n: null, s: '' };
+      var num = t.replace(/[,\s₩]/g,'').match(/^(-?\d+(?:\.\d+)?)(회|일|원|건|명|%)?$/);
+      if (num) return { n: parseFloat(num[1]), s: t };
+      var dm = t.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+      if (dm) return { n: new Date(+dm[1], +dm[2]-1, +dm[3]).getTime(), s: t };
+      return { n: null, s: t };
+    };
+    rows.sort(function(a, b){
+      var av = parse(a.children[colIdx]), bv = parse(b.children[colIdx]);
+      var ae = (av.n === null && av.s === ''), be = (bv.n === null && bv.s === '');
+      if (ae && be) return 0; if (ae) return 1; if (be) return -1; // 빈값은 방향 무관 항상 아래
+      var r;
+      if (av.n !== null && bv.n !== null) r = av.n - bv.n;
+      else if (av.n !== null) r = -1;
+      else if (bv.n !== null) r = 1;
+      else r = av.s.localeCompare(bv.s, 'ko');
+      return dir === 'asc' ? r : -r;
+    });
+    var frag = document.createDocumentFragment();
+    rows.forEach(function(tr){ frag.appendChild(tr); });
+    tbody.appendChild(frag);
+  } catch(e){ console.warn('[v415] ptSortTable:', e); }
 }
 
 // ── 이전 페이지로 돌아가기 ──────────────────────────────
