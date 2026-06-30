@@ -2288,6 +2288,39 @@ function _krNo(r){
 // [v407] 계약번호 비교용 정규화 — 양쪽 모두 '.0' 제거 + trim
 function _normCno(s){ return String(s == null ? '' : s).trim().replace(/\.0+$/, ''); }
 
+// [v408] 입금내역 시트 헤더 깨짐 대응 — 라벨 누락 시 positional 컬럼을 표준 라벨로 보정
+//   입금내역(Raw DATA) 시트의 1행에 제목/날짜범위가 들어가 gviz 헤더가 어긋나면
+//   '계약번호','청구서명','납기일','미납금액' 등 라벨이 비어 모든 라벨기반 화면(입금내역·연체현황·수납)이 깨진다.
+//   계약번호 라벨이 없고 E열(_col_E)이 숫자형이면 → 아래 고정 컬럼 매핑으로 표준 라벨 채움.
+//   ※ 헤더가 정상화되면(계약번호 라벨 존재) 자동 비활성 — 안전한 self-healing.
+//   ※ 연체관리 대시보드는 자체 positional 파서를 쓰므로 영향 없음. 기존 _col_* 키는 보존(추가만 함).
+function _normPaymentRows(arr){
+  if (!Array.isArray(arr)) return arr;
+  for (var i = 0; i < arr.length; i++) {
+    var r = arr[i];
+    if (!r) continue;
+    var cnL  = String(r['계약번호'] == null ? '' : r['계약번호']).trim().replace(/\.0+$/, '');
+    var colE = String(r['_col_E'] == null ? '' : r['_col_E']).trim();
+    // 헤더 정상: 계약번호 라벨이 숫자형(계약번호)이면 그대로 둔다 → 자동 비활성(self-healing)
+    if (/^\d{3,}$/.test(cnL)) continue;
+    // 헤더 깨짐: 계약번호 라벨이 비정상이고 E열이 숫자형이면 → 확정된 positional 매핑으로 표준 라벨 보정(덮어쓰기)
+    if (/^\d{3,}/.test(colE)) {
+      r['계약번호']            = colE.replace(/\.0+$/, '');
+      r['납부종류']            = r['_col_F'];
+      r['계약상태']            = r['_col_N'];
+      r['청구서명']            = r['_col_S'];
+      r['납부상태']            = r['_col_T'];
+      r['납부금액(원)']        = r['_col_U'];
+      r['미납(연체)금액(원)']  = r['_col_AB'];
+      r['납기일']              = r['_col_AC'];
+      r['연체일수']            = r['_col_AD'];
+      r['납부일']              = r['_col_AE'];
+      r['납부방법']            = r['_col_AF'];
+    }
+  }
+  return arr;
+}
+
 function _keepBig(prev, next){ return (Array.isArray(next) && next.length>0 && (!Array.isArray(prev) || prev.length===0 || next.length >= prev.length*0.5)) ? next : prev; }
 async function loadContractData() {
   const el = document.getElementById('crResult');
@@ -2300,6 +2333,7 @@ async function loadContractData() {
     ]);
     contractRawData = _keepBig(contractRawData, gvizToObjects(cGviz).filter(r => _krNo(r)));
     paymentRawData = _keepBig(paymentRawData, gvizToObjects(pGviz).filter(r => _krNo(r)));
+    _normPaymentRows(paymentRawData); // [v408] 입금내역 헤더 깨짐 대응 — 표준 라벨 보정
     // [v288] 진단 로그 — 입금내역 정상 로드 여부 확인
     try {
       var p0 = paymentRawData[0] || {};
@@ -2777,6 +2811,7 @@ async function loadPaymentTargets() {
       ]);
       contractRawData = _keepBig(contractRawData, gvizToObjects(cGviz).filter(r => _krNo(r)));
       paymentRawData = _keepBig(paymentRawData, gvizToObjects(pGviz).filter(r => _krNo(r)));
+      _normPaymentRows(paymentRawData); // [v408] 입금내역 헤더 깨짐 대응
       crLoaded = true;
     }
     // 공실현황 없으면 로드
@@ -4550,27 +4585,12 @@ function selectContractRow(no) {
     .sort(cG_sortResponsesNewest); // 최신순
   renderContractRecord(contract, payments, responses);
   document.getElementById('contractView').scrollIntoView({behavior:'smooth', block:'start'});
-  // [v407] (A) 연체 집계(_dlqTableRows) 미로드 시 — 연체관리 데이터 백그라운드 준비 후 상세 재렌더
-  //   ※ 연체관리 탭 전용 함수(renderDelinquency)를 그대로 빌려 호출 — 탭 로직은 일절 변경하지 않음
-  if ((!window._dlqTableRows || !window._dlqTableRows.length) && !window._dlqPreloading && typeof renderDelinquency === 'function') {
-    window._dlqPreloading = true;
-    Promise.resolve().then(() => renderDelinquency()).then(() => {
-      window._dlqPreloading = false;
-      if (_normCno(window._crCurrentNo) === _noNorm) {
-        const c4 = contractRawData.find(r => _normCno(r['계약번호']) === _noNorm);
-        if (c4) {
-          const p4 = paymentRawData.filter(r => _krNo(r) === _noNorm);
-          const r4 = (daeungRawData||[]).filter(r => _normCno(r.no) === _noNorm).sort(cG_sortResponsesNewest);
-          renderContractRecord(c4, p4, r4);
-        }
-      }
-    }).catch(() => { window._dlqPreloading = false; });
-  }
   // [v405] paymentRawData 미로드 시 백그라운드 로드 후 연체현황·입금내역 재렌더
   //   (새로고침 직후 상세 진입 시 입금내역 0건·연체없음으로 표시되는 버그 차단)
   if (!paymentRawData.length) {
     fetchSheetByName(INCOME_SHEET).then(pResp => {
       paymentRawData = _keepBig(paymentRawData, gvizToObjects(pResp).filter(r => _krNo(r)));
+      _normPaymentRows(paymentRawData); // [v408] 입금내역 헤더 깨짐 대응
       if (_normCno(window._crCurrentNo) === _noNorm) {
         const c2 = contractRawData.find(r => _normCno(r['계약번호']) === _noNorm);
         if (c2) {
@@ -14177,6 +14197,7 @@ function renderRenewalView(){
       ]).then(function(arr){
         contractRawData = gvizToObjects(arr[0]).filter(function(x){return _krNo(x);});
         paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return _krNo(x);});
+      _normPaymentRows(paymentRawData); // [v408] 입금내역 헤더 깨짐 대응
         crLoaded = true;
       }));
     }
@@ -16373,6 +16394,7 @@ function renderContractMgmtView(){
     if (!crLoaded) promises.push(Promise.all([fetchSheetByName(CONTRACT_SHEET), fetchSheetByName(INCOME_SHEET)]).then(function(arr){
       contractRawData = gvizToObjects(arr[0]).filter(function(x){return _krNo(x);});
       paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return _krNo(x);});
+      _normPaymentRows(paymentRawData); // [v408] 입금내역 헤더 깨짐 대응
       crLoaded = true;
     }));
     if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) promises.push(fetchSheetByGid(VACANCY_GID).then(function(r){ vacancyRawData = parseVacancySheet(r); }));
@@ -16714,6 +16736,7 @@ function renderSummaryDashboard(){
       if (!crLoaded) {
         contractRawData = gvizToObjects(cName1.data).filter(function(x){return _krNo(x);});
         paymentRawData  = gvizToObjects(cName2.data).filter(function(x){return _krNo(x);});
+        _normPaymentRows(paymentRawData); // [v408] 입금내역 헤더 깨짐 대응
         crLoaded = true;
       }
       if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) {
@@ -16730,6 +16753,7 @@ function renderSummaryDashboard(){
         ]).then(function(arr){
           contractRawData = gvizToObjects(arr[0]).filter(function(x){return _krNo(x);});
           paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return _krNo(x);});
+      _normPaymentRows(paymentRawData); // [v408] 입금내역 헤더 깨짐 대응
           vacancyRawData  = parseVacancySheet(arr[2]);
           window._sumBgRefreshing = false;
           renderSummaryDashboard();
@@ -16747,6 +16771,7 @@ function renderSummaryDashboard(){
         }
         contractRawData = gvizToObjects(arr[0]).filter(function(x){return _krNo(x);});
         paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return _krNo(x);});
+      _normPaymentRows(paymentRawData); // [v408] 입금내역 헤더 깨짐 대응
         crLoaded = true;
       }));
       if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) promises.push(fetchSheetByGid(VACANCY_GID).then(function(r){
