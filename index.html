@@ -18687,40 +18687,66 @@ function okpi_rowCount(label, src, formula, val, maxVal, colorCls){
 }
 
 // 컨트롤 + 일/주/월 카드
-// [v410] 관리자 확인 중요사항 — 검색기간(range) 기준 gid=554798125(대응내역)+입금내역 교차로 중요도순 넘버링
+// [v410/v411] 관리자 확인 중요사항 — 검색기간 기준 대응내역(gid=554798125) 텍스트 분석 + 입금내역 교차
+//   단순 건수 요약 + "언제까지/예정" 등 약속 텍스트를 추출해 계약자별 확인 액션을 중요도순 넘버링.
 function okpi_importantBox(range){
   try {
     var daeRaw = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
     var payRaw = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData : [];
+    var crRaw  = (typeof contractRawData !== 'undefined' && Array.isArray(contractRawData)) ? contractRawData : [];
     var inRangeP = function(s){ var d = okpi_parseDate(s); if (!d) return false; d.setHours(0,0,0,0); return d >= range.start && d <= range.end; };
-    // ① 입금 예정 대상 — 입금예정일(D열)이 검색기간 내인 계약 (중복 제거)
+    var nameOf = function(cno){ var k=_normCno(cno); var c = crRaw.find(function(x){ return _normCno(x['계약번호']) === k; }); return c ? String(c['임차인명'] || c['임차인'] || c['계약자'] || '').trim() : ''; };
+    // 현재 미납(연체중/분납중) 계약 집합
+    var delinqSet = {};
+    payRaw.forEach(function(p){ var s = String(p['납부상태']||'').trim(); if (s === '연체중' || s === '분납중') delinqSet[_normCno(p['계약번호'])] = 1; });
+    // ── 요약 카운트 ──
     var paySet = {};
     daeRaw.forEach(function(r){ if (r.payDate && inRangeP(r.payDate)) paySet[_normCno(r.no)] = 1; });
     var payTargets = Object.keys(paySet).filter(function(x){ return x; });
-    // 미납 — 해당 계약이 현재 '연체중'/'분납중'(입금내역 기준)
-    var delinqSet = {};
-    payRaw.forEach(function(p){ var s = String(p['납부상태']||'').trim(); if (s === '연체중' || s === '분납중') delinqSet[_normCno(p['계약번호'])] = 1; });
     var unpaidCnt = payTargets.filter(function(cno){ return delinqSet[cno]; }).length;
-    // 업무구분별 (대응일 기준, 계약 중복 제거)
     var byJob = function(kw){ var set = {}; daeRaw.forEach(function(r){ if (okpi_inRange(r, range) && String(r.jobType||'').indexOf(kw) >= 0) set[_normCno(r.no)] = 1; }); return Object.keys(set).filter(function(x){return x;}).length; };
-    var midExit = byJob('중도퇴실'), legal = byJob('법무'), delinqJob = byJob('연체'), renew = byJob('갱신'), moveIn = byJob('계약(입주)');
-    var items = [];
-    if (payTargets.length > 0) items.push('💰 입금 예정 <b>' + payTargets.length + '</b>건' + (unpaidCnt > 0 ? ' 중 <b style="color:#DC2626">미납 ' + unpaidCnt + '건</b> — 입금 확인 필요' : ' — 입금 확인'));
-    if (midExit > 0)   items.push('🚪 중도퇴실 진행 <b>' + midExit + '</b>건 — 정산·일정 확인');
-    if (legal > 0)     items.push('⚖️ 법무 대응 <b>' + legal + '</b>건 — 진척 확인');
-    if (delinqJob > 0) items.push('🔴 연체 대응 <b>' + delinqJob + '</b>건 — 약속·입금 확인');
-    if (renew > 0)     items.push('🔄 갱신 대상 <b>' + renew + '</b>건 — 응답 확인');
-    if (moveIn > 0)    items.push('🏠 계약(입주) <b>' + moveIn + '</b>건 — 처리 확인');
+    var sums = [];
+    if (payTargets.length) sums.push('입금예정 <b>' + payTargets.length + '</b>' + (unpaidCnt?'<span style="color:#DC2626">(미납 ' + unpaidCnt + ')</span>':''));
+    var _me=byJob('중도퇴실'), _lg=byJob('법무'), _dl=byJob('연체'), _rn=byJob('갱신'), _mi=byJob('계약(입주)');
+    if (_dl) sums.push('연체 <b>' + _dl + '</b>'); if (_me) sums.push('중도퇴실 <b>' + _me + '</b>');
+    if (_lg) sums.push('법무 <b>' + _lg + '</b>'); if (_rn) sums.push('갱신 <b>' + _rn + '</b>'); if (_mi) sums.push('입주 <b>' + _mi + '</b>');
+    // ── 약속/확인 텍스트 분석 ──
+    var dlRe = /(오늘|금일|내일|익일|명일|모레|이번\s?주|다음\s?주|[월화수목금토일]\s?요일|\d{1,2}\s?월\s?\d{1,2}\s?일|\d{1,2}\/\d{1,2}|\d{1,2}\s?일까지|\d{1,2}\s?시(?:\s?\d{1,2}\s?분)?(?:\s?까지)?)/g;
+    var promiseRe = /(까지|예정|하기로|한다고|약속|완납|재신청|재등록|보내(?:기로|드림|드리)|연락(?:주|드)|답(?:변|장)?\s?주|확인\s?예정|입금하기)/;
+    var clean = function(s){ return String(s||'').replace(/\s+/g,' ').trim(); };
+    var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    var hi = function(s){ return esc(s).replace(dlRe, function(m){ return '<b style="color:#B45309">' + m + '</b>'; }); };
+    var map = {};
+    var add = function(cno, prio, content, tag, due){ var k=_normCno(cno); if(!k)return; if(!map[k]||prio<map[k].prio){ map[k]={cno:k,prio:prio,content:clean(content),tag:tag,due:due,unpaid:!!delinqSet[k]}; } };
+    // 1) 입금예정일이 검색기간 내 (미납 우선)
+    daeRaw.forEach(function(r){ if (r.payDate && inRangeP(r.payDate)) add(r.no, delinqSet[_normCno(r.no)]?1:2, r.content, '입금예정', r.payDate); });
+    // 2) 검색기간 내 대응 중 약속/기한 텍스트가 있는 건
+    daeRaw.forEach(function(r){ if (okpi_inRange(r, range) && r.content && (promiseRe.test(r.content) || dlRe.test(r.content))){ var jt=String(r.jobType||''); var p = jt.indexOf('중도퇴실')>=0?3:(jt.indexOf('법무')>=0?3:4); add(r.no, p, r.content, jt||'대응', ''); } });
+    var arr = Object.keys(map).map(function(k){ return map[k]; }).sort(function(a,b){ return a.prio - b.prio; });
     var dlbl = okpi_ymd(range.start) + (okpi_ymd(range.start) !== okpi_ymd(range.end) ? ' ~ ' + okpi_ymd(range.end) : '');
-    var numBadge = function(i){ return '<span style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#7C3AED;color:#fff;font-size:10px;font-weight:800;margin-top:1px">' + i + '</span>'; };
-    var body = items.length
-      ? '<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">' + items.map(function(t, i){ return '<div style="display:flex;gap:7px;align-items:flex-start;font-size:11.5px;line-height:1.45;color:#374151">' + numBadge(i+1) + '<span>' + t + '</span></div>'; }).join('') + '</div>'
-      : '<div style="font-size:12px;color:#16A34A;margin-top:8px;font-weight:600">✅ 검색기간 내 확인할 중요사항 없음</div>';
+    var numBadge = function(i, color){ return '<span style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:' + (color||'#7C3AED') + ';color:#fff;font-size:10px;font-weight:800;margin-top:1px">' + i + '</span>'; };
+    var MAX = 8;
+    var listHtml;
+    if (arr.length) {
+      listHtml = '<div style="display:flex;flex-direction:column;gap:4px;margin-top:7px">' + arr.slice(0, MAX).map(function(it, i){
+        var nm = nameOf(it.cno) || ('#' + it.cno);
+        var jt = String(it.tag||'');
+        var icon = it.unpaid ? '🔴' : (it.tag==='입금예정' ? '💰' : (jt.indexOf('중도퇴실')>=0 ? '🚪' : (jt.indexOf('법무')>=0 ? '⚖️' : (jt.indexOf('갱신')>=0 ? '🔄' : '📞'))));
+        var unpaidBadge = it.unpaid ? ' <span style="color:#DC2626;font-weight:700;font-size:10px">미납</span>' : '';
+        var dueBadge = it.due ? (' <span style="color:#9CA3AF;font-size:10px">[' + it.due + ' 입금예정]</span>') : '';
+        var snip = it.content ? (' — ' + hi(it.content.slice(0, 60)) + (it.content.length > 60 ? '…' : '')) : '';
+        return '<div style="display:flex;gap:7px;align-items:flex-start;font-size:11.5px;line-height:1.45;color:#374151">' + numBadge(i+1, it.unpaid?'#DC2626':'#7C3AED') + '<span>' + icon + ' <b>' + esc(nm) + '</b>' + unpaidBadge + dueBadge + snip + '</span></div>';
+      }).join('') + (arr.length > MAX ? '<div style="font-size:10.5px;color:#9CA3AF;margin-top:2px;padding-left:24px">외 ' + (arr.length - MAX) + '건 — 연체관리·대응내역 탭에서 확인</div>' : '') + '</div>';
+    } else {
+      listHtml = '<div style="font-size:12px;color:#16A34A;margin-top:8px;font-weight:600">✅ 검색기간 내 확인/약속 항목 없음</div>';
+    }
+    var sumLine = sums.length ? '<div style="font-size:11px;color:#6B7280;margin-top:3px">요약 · ' + sums.join(' &nbsp;·&nbsp; ') + '</div>' : '';
     return '<div class="okpi-period-card" style="grid-column:1/-1;border-color:#DDD6FE;background:#FAF9FF">'
-      + '<div class="okpi-period-label" style="display:flex;justify-content:space-between;align-items:center"><span style="color:#6D28D9;font-weight:700">📌 관리자 확인 중요사항 <span style="font-weight:500;color:#9CA3AF">(검색기간 기준 · 중요도순)</span></span><span style="color:#9CA3AF;font-weight:600">' + dlbl + '</span></div>'
-      + body
+      + '<div class="okpi-period-label" style="display:flex;justify-content:space-between;align-items:center"><span style="color:#6D28D9;font-weight:700">📌 관리자 확인 중요사항 <span style="font-weight:500;color:#9CA3AF">(검색기간 · 약속/확인 분석 · 중요도순)</span></span><span style="color:#9CA3AF;font-weight:600">' + dlbl + '</span></div>'
+      + sumLine
+      + listHtml
       + '</div>';
-  } catch(e){ console.warn('[v410] okpi_importantBox:', e); return ''; }
+  } catch(e){ console.warn('[v411] okpi_importantBox:', e); return ''; }
 }
 function okpi_renderTopBar(k){
   var pf = function(p){ return window._okpi.period === p ? 'active' : ''; };
