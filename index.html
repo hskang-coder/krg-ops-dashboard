@@ -18689,8 +18689,37 @@ function okpi_rowCount(label, src, formula, val, maxVal, colorCls){
 // 컨트롤 + 일/주/월 카드
 // [v410/v411] 관리자 확인 중요사항 — 검색기간 기준 대응내역(gid=554798125) 텍스트 분석 + 입금내역 교차
 //   단순 건수 요약 + "언제까지/예정" 등 약속 텍스트를 추출해 계약자별 확인 액션을 중요도순 넘버링.
-function okpi_importantBox(range){
+// [v412] 업무구분 필터 탭 + 하단 배치 래퍼
+function okpi_setImpFilter(f){
+  window._okpi = window._okpi || {};
+  window._okpi.importantFilter = f;
   try {
+    var sec = document.getElementById('okpiImpSection');
+    if (sec) sec.outerHTML = okpi_importantSection();
+  } catch(e){ console.warn('[v412] setImpFilter:', e); }
+}
+function okpi_importantSection(){
+  var period = (window._okpi && window._okpi.period) || 'day';
+  var anchor = (window._okpi && window._okpi.date) || new Date();
+  var range = okpi_getRange(period, anchor);
+  var filter = (window._okpi && window._okpi.importantFilter) || '전체';
+  var tabsDef = ['전체','입주(계약)관리','갱신관리','수납관리','연체관리','법무관리','중도퇴실관리'];
+  var tabBtn = function(t){
+    var on = (filter === t);
+    return '<button onclick="okpi_setImpFilter(\'' + t.replace(/'/g,"\\'") + '\')" style="padding:5px 11px;border:1px solid ' + (on?'#7C3AED':'#E5E7EB') + ';background:' + (on?'#7C3AED':'#fff') + ';color:' + (on?'#fff':'#6B7280') + ';border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap">' + t + '</button>';
+  };
+  return '<div id="okpiImpSection">'
+    + '<div class="okpi-section-title" style="margin-top:18px">📌 관리자 확인 중요사항 <span class="pill">검색기간 · 약속/확인 분석</span></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' + tabsDef.map(tabBtn).join('') + '</div>'
+    + okpi_importantBox(range, filter)
+    + '</div>';
+}
+function okpi_importantBox(range, filter){
+  try {
+    filter = filter || '전체';
+    var fmap = { '전체': null, '입주(계약)관리': '계약(입주)', '갱신관리': '갱신', '수납관리': '수납', '연체관리': '연체', '법무관리': '법무', '중도퇴실관리': '중도퇴실' };
+    var fkw = fmap[filter] || null;
+    var matchJob = function(jt){ return !fkw || String(jt||'').indexOf(fkw) >= 0; };
     var daeRaw = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
     var payRaw = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData : [];
     var crRaw  = (typeof contractRawData !== 'undefined' && Array.isArray(contractRawData)) ? contractRawData : [];
@@ -18718,10 +18747,10 @@ function okpi_importantBox(range){
     var hi = function(s){ return esc(s).replace(dlRe, function(m){ return '<b style="color:#B45309">' + m + '</b>'; }); };
     var map = {};
     var add = function(cno, prio, content, tag, due){ var k=_normCno(cno); if(!k)return; if(!map[k]||prio<map[k].prio){ map[k]={cno:k,prio:prio,content:clean(content),tag:tag,due:due,unpaid:!!delinqSet[k]}; } };
-    // 1) 입금예정일이 검색기간 내 (미납 우선)
-    daeRaw.forEach(function(r){ if (r.payDate && inRangeP(r.payDate)) add(r.no, delinqSet[_normCno(r.no)]?1:2, r.content, '입금예정', r.payDate); });
-    // 2) 검색기간 내 대응 중 약속/기한 텍스트가 있는 건
-    daeRaw.forEach(function(r){ if (okpi_inRange(r, range) && r.content && (promiseRe.test(r.content) || dlRe.test(r.content))){ var jt=String(r.jobType||''); var p = jt.indexOf('중도퇴실')>=0?3:(jt.indexOf('법무')>=0?3:4); add(r.no, p, r.content, jt||'대응', ''); } });
+    // 1) 입금예정일이 검색기간 내 (미납 우선) — 업무구분 필터 적용
+    daeRaw.forEach(function(r){ if (r.payDate && inRangeP(r.payDate) && matchJob(r.jobType)) add(r.no, delinqSet[_normCno(r.no)]?1:2, r.content, '입금예정', r.payDate); });
+    // 2) 검색기간 내 대응 중 약속/기한 텍스트가 있는 건 — 업무구분 필터 적용
+    daeRaw.forEach(function(r){ if (okpi_inRange(r, range) && matchJob(r.jobType) && r.content && (promiseRe.test(r.content) || dlRe.test(r.content))){ var jt=String(r.jobType||''); var p = jt.indexOf('중도퇴실')>=0?3:(jt.indexOf('법무')>=0?3:4); add(r.no, p, r.content, jt||'대응', ''); } });
     var arr = Object.keys(map).map(function(k){ return map[k]; }).sort(function(a,b){ return a.prio - b.prio; });
     var dlbl = okpi_ymd(range.start) + (okpi_ymd(range.start) !== okpi_ymd(range.end) ? ' ~ ' + okpi_ymd(range.end) : '');
     var numBadge = function(i, color){ return '<span style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:' + (color||'#7C3AED') + ';color:#fff;font-size:10px;font-weight:800;margin-top:1px">' + i + '</span>'; };
@@ -18779,7 +18808,6 @@ function okpi_renderTopBar(k){
     +   '<div class="okpi-period-card"><div class="okpi-period-label">기간</div>'
     +     '<div class="okpi-period-val" style="font-size:14px;font-weight:700">' + okpi_ymd(k.range.start) + '<br>~ ' + okpi_ymd(k.range.end) + '</div>'
     +   '</div>'
-    +   okpi_importantBox(k.range)
     + '</div>';
 }
 
@@ -19740,6 +19768,7 @@ async function okpi_render(){
       + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
       + okpi_renderChart(k)
       + okpi_renderPersonCards(k)
+      + okpi_importantSection()
       + '</div>';
   } catch(e) {
     console.error('[okpi] render fatal:', e);
