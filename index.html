@@ -4045,15 +4045,44 @@ function downloadDlqExcel() {
     return true;
   });
   filtered.sort((a,b) => { const sa=statusOrder[a.contractStatus||'계약중']??0,sb=statusOrder[b.contractStatus||'계약중']??0; return sa!==sb?sa-sb:(b.days||0)-(a.days||0); });
+  // [v404] 화면 표와 동일한 컬럼·값으로 출력 (연체외주·공실상태·위약금·점수·법적진행 포함)
+  const _outsourceStr = (cno) => {
+    try { if(!Array.isArray(vacancyRawData))return '-'; const vr=vacancyRawData.find(v=>String(v.no||'').trim()===String(cno||'').trim()); const os=(vr&&vr.outsource)?String(vr.outsource).trim():''; return os||'-'; } catch(_) { return '-'; }
+  };
+  const _legalStr = (cno) => {
+    try {
+      if(!Array.isArray(daeungRawData))return '-';
+      const c=String(cno||'').trim();
+      const rs=daeungRawData.filter(d=>d&&String(d.no||'').trim()===c&&d.jobSub);
+      const arr=[];
+      if(rs.some(d=>String(d.jobSub).replace(/\s/g,'').indexOf('내용증명발송')>=0))arr.push('내용증명');
+      if(rs.some(d=>String(d.jobSub).indexOf('지급명령')>=0))arr.push('지급명령');
+      if(rs.some(d=>{var s=String(d.jobSub||'');return s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0;}))arr.push('기타');
+      return arr.length?arr.join(', '):'-';
+    } catch(_) { return '-'; }
+  };
   const data = filtered.map(r => ({
-    '계약번호':r.cno,'그룹':r.group||'-','임차인':r.nm||'-','계약정보':r.info||'-',
-    '등급':r.grade||'-','연체일수':r.days||0,'담당자':r.assignee||'-','대응단계':r.actionStep||'-',
+    '계약번호':r.cno,
+    '대응패턴':r.grade||'-',
+    '연체외주':_outsourceStr(r.cno),
+    '그룹':r.group||'-',
+    '계약정보':r.info||'-',
+    '연체일수':r.days||0,
     '납부구분':(r.연체구분==='연체중'||r.연체구분==='분납중')?r.연체구분:'-',
-    '연체금액':r.amt||0,'입금예정일':r.dateStr||'-','계약상태':r.contractStatus||'계약중',
-    '연락처':r.tel||'-','대응일':r.actionDateStr||'-','최근 대응 내용':r.content||'-'
+    '계약상태':r.contractStatus||'계약중',
+    '공실상태':r.vacancyStatus||'-',
+    '임(전)차인':r.nm||'-',
+    '연락처':r.tel||'-',
+    '연체금액':r.amt||0,
+    '위약금':_dlqPenalty(r.cno)||0,
+    '대응일':r.actionDateStr||'-',
+    '입금예정일':r.dateStr||'-',
+    '점수':_dlqScore(r.cno)||'',
+    '법적진행':_legalStr(r.cno),
+    '최근 대응 내용':r.content||'-'
   }));
   const ws = XLSX.utils.json_to_sheet(data);
-  ws['!cols'] = [{wch:10},{wch:8},{wch:12},{wch:10},{wch:6},{wch:8},{wch:7},{wch:20},{wch:8},{wch:12},{wch:10},{wch:12},{wch:14},{wch:10},{wch:35}];
+  ws['!cols'] = [{wch:10},{wch:8},{wch:9},{wch:8},{wch:16},{wch:8},{wch:8},{wch:12},{wch:12},{wch:12},{wch:13},{wch:12},{wch:12},{wch:11},{wch:11},{wch:6},{wch:14},{wch:40}];
   const wb = XLSX.utils.book_new();
   const today = (()=>{const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');})();
   XLSX.utils.book_append_sheet(wb, ws, '연체자현황');
