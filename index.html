@@ -2303,7 +2303,25 @@ async function loadContractData() {
       }
     } catch(_e){}
     crLoaded = true;
-    el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료.<br>검색 방법을 선택 후 입력하거나, 📋 목록에서 선택하세요.<br><span style="font-size:11px;color:#B0BDCE">📞 대응내역 로딩 중...</span></div>`;
+    // [v405] 재발방지 — 데이터 로드 완료 시점에 이미 열려있는 계약 상세가 있으면 재렌더
+    //   (새로고침 시 paymentRawData 로드 전 상세가 그려져 연체현황·입금내역이 0건으로 굳는 버그 차단)
+    //   renderContractRecord가 crResult에 그리므로, 상세가 열려있으면 아래 안내문으로 덮어쓰지 않는다.
+    var _detailReRendered = false;
+    try {
+      if (window._crCurrentNo) {
+        const _no = String(window._crCurrentNo).trim();
+        const _c = contractRawData.find(r => String(r['계약번호']||'').trim() === _no);
+        if (_c) {
+          const _p = paymentRawData.filter(p => _krNo(p) === _no);
+          const _r = (daeungRawData||[]).filter(r => String(r.no).trim() === _no).sort(cG_sortResponsesNewest);
+          renderContractRecord(_c, _p, _r);
+          _detailReRendered = true;
+        }
+      }
+    } catch(_e){ console.warn('[v405] 상세 재렌더 실패:', _e); }
+    if (!_detailReRendered) {
+      el.innerHTML = `<div class="cr-empty">✅ ${contractRawData.length}건 계약 데이터 로드 완료.<br>검색 방법을 선택 후 입력하거나, 📋 목록에서 선택하세요.<br><span style="font-size:11px;color:#B0BDCE">📞 대응내역 로딩 중...</span></div>`;
+    }
     // 2단계: 연체관리(Daily Report) + 공실현황 (백그라운드 로드)
     fetchSheetByGid(DAILY_RPT_GID).then(dResp => {
       daeungRawData = _keepBig(daeungRawData, parseDailyReport(dResp));
@@ -4525,6 +4543,21 @@ function selectContractRow(no) {
     .sort(cG_sortResponsesNewest); // 최신순
   renderContractRecord(contract, payments, responses);
   document.getElementById('contractView').scrollIntoView({behavior:'smooth', block:'start'});
+  // [v405] paymentRawData 미로드 시 백그라운드 로드 후 연체현황·입금내역 재렌더
+  //   (새로고침 직후 상세 진입 시 입금내역 0건·연체없음으로 표시되는 버그 차단)
+  if (!paymentRawData.length) {
+    fetchSheetByName(INCOME_SHEET).then(pResp => {
+      paymentRawData = _keepBig(paymentRawData, gvizToObjects(pResp).filter(r => _krNo(r)));
+      if (String(window._crCurrentNo||'').trim() === String(no).trim()) {
+        const c2 = contractRawData.find(r => String(r['계약번호']).trim() === no);
+        if (c2) {
+          const pays = paymentRawData.filter(r => _krNo(r) === String(no).trim());
+          const resp2 = (daeungRawData||[]).filter(r => String(r.no).trim() === no).sort(cG_sortResponsesNewest);
+          renderContractRecord(c2, pays, resp2);
+        }
+      }
+    }).catch(()=>{});
+  }
   // daeungRawData 미로드 시 백그라운드 로드 후 대응내역 업데이트
   if (!daeungRawData.length) {
     fetchSheetByGid(DAILY_RPT_GID).then(dResp => {
