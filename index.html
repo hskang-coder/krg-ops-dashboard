@@ -4711,8 +4711,19 @@ function renderContractRecord(c, payments, responses = []) {
   const _cnoStr_v341 = String(c['계약번호']||'').trim();
   const masterDlqMark = (window._delinqMarkMap && window._delinqMarkMap[_cnoStr_v341]) || null;
   const hasMasterDelinq = !!(masterDlqMark && masterDlqMark.types && masterDlqMark.types.length);
-  const hasDelinq     = delinqTotal > 0 || hasMasterDelinq;
-  const masterDelinqOnly = hasMasterDelinq && delinqTotal === 0; // 마스터만 연체 표시
+  // [v406] 입금내역(paymentRawData)에 연체 행이 미반영된 경우 — 연체관리 탭 집계(_dlqTableRows)의 연체금액으로 보강
+  //   (상세가 ₩0/'확인 필요'로 표시되며 연체관리 탭과 불일치하던 문제 해소)
+  let dlqTabAmt = 0;
+  try {
+    if (delinqTotal === 0 && Array.isArray(window._dlqTableRows)) {
+      const _dr = window._dlqTableRows.find(r => String(r.cno||'').trim() === _cnoStr_v341);
+      if (_dr) dlqTabAmt = _dr.amt || 0;
+    }
+  } catch(_e){}
+  const effectiveDelinqTotal = delinqTotal > 0 ? delinqTotal : dlqTabAmt;
+  const fromDlqTab    = delinqTotal === 0 && dlqTabAmt > 0; // 연체관리 탭 집계 기준 표시 중
+  const hasDelinq     = effectiveDelinqTotal > 0 || hasMasterDelinq;
+  const masterDelinqOnly = hasMasterDelinq && effectiveDelinqTotal === 0; // 마스터 마킹만 있고 금액 미상
 
   // 현재 연체중 항목의 최장 연체일
   // ① 납부상태가 '연체중'/'연체' 포함 OR ② 미납금액 > 0 인 항목 모두 검사
@@ -5015,7 +5026,7 @@ function renderContractRecord(c, payments, responses = []) {
       <div class="cr-delinq-card ${hasDelinq?'':'safe'}">
         <div class="cr-delinq-title ${hasDelinq?'':'safe'}">${hasDelinq?'연체 총액':'연체 없음'}${masterDelinqOnly?` <span style="background:#DC2626;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:5px;letter-spacing:0.3px" title="마스터 시트(gid=418937767)에 연체 마킹이 있으나 입금내역(paymentRawData)에는 연체 행 미발견 — 시트 동기화 확인 필요. 연체관리 탭에 노출됨.">⚠ 마스터 연체 감지</span>`:''}</div>
         <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
-          <div class="cr-delinq-amount ${hasDelinq?'':'safe'}">${masterDelinqOnly?'<span style="color:#DC2626">확인 필요</span>':fmtMoney(delinqTotal)}</div>
+          <div class="cr-delinq-amount ${hasDelinq?'':'safe'}">${masterDelinqOnly?'<span style="color:#DC2626">확인 필요</span>':fmtMoney(effectiveDelinqTotal)}</div>
           ${longestCurrentDelinq>0 && hasDelinq?`<div style="display:flex;align-items:baseline;gap:3px">
             <span style="font-size:26px;font-weight:900;color:#DC2626">${longestCurrentDelinq}</span>
             <span style="font-size:13px;font-weight:700;color:#DC2626">일 연체</span>
@@ -5038,9 +5049,11 @@ function renderContractRecord(c, payments, responses = []) {
             //   장점: 키워드 매칭 의존 X → 청구서명/납부종류 변형(보증금/기타계약/퇴실정산 등) 모두 자동 포함
             //   사용자 데이터 검증: #50497 row 15 → 청구서명="보증금(5..." 미납=150,000 연체중
             //                       → delinqTotal=150,000, delinqRent=0, delinqFee=0 → 기타=150,000 ✓
-            var etcAll = Math.max(0, (delinqTotal||0) - (delinqRent||0) - (delinqFee||0));
-            return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">기타 (퇴실정산·기타계약금·계약보증금)</span><span class="cr-delinq-row-val ' + (etcAll>0?'red':'') + '">' + fmtMoney(etcAll) + '</span></div>';
+            var etcAll = Math.max(0, (effectiveDelinqTotal||0) - (delinqRent||0) - (delinqFee||0));
+            var etcLabel = fromDlqTab ? '연체관리 탭 집계 (항목 미분류)' : '기타 (퇴실정산·기타계약금·계약보증금)';
+            return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">' + etcLabel + '</span><span class="cr-delinq-row-val ' + (etcAll>0?'red':'') + '">' + fmtMoney(etcAll) + '</span></div>';
           })()}
+          ${fromDlqTab?`<div class="cr-delinq-row" style="margin-top:4px;padding:6px 8px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:4px;font-size:10.5px;color:#92400E;line-height:1.45"><b>ℹ 연체관리 탭 집계 기준</b><br><span style="font-size:9.5px;color:#92400E">입금내역(paymentRawData)에 아직 반영되지 않아, 연체관리 탭의 연체금액으로 표시합니다. 항목별 분류는 연체관리 탭을 참조하세요.</span></div>`:''}
           ${masterDelinqOnly?`<div class="cr-delinq-row" style="margin-top:4px;padding:6px 8px;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:4px;font-size:10.5px;color:#991B1B;line-height:1.45"><b>⚠ 마스터 연체 마킹:</b> ${masterDlqMark.types.join(' · ')}<br><span style="font-size:9.5px;color:#7F1D1D">입금내역(paymentRawData)에는 연체 행이 없습니다. 시트 동기화 시점 차이 또는 미반영 가능성 — 연체관리 탭에서 노출됩니다.</span></div>`:''}
           ${window._cr_penalty>0?`<div class="cr-delinq-row" style="margin-top:auto;padding-top:5px;border-top:1px dashed #FCA5A5"><span class="cr-delinq-row-label">위약금<span style="font-size:10px;color:#9CA3AF;margin-left:5px;font-weight:500">임대료×4개월</span></span><span class="cr-delinq-row-val red">${fmtMoney(window._cr_penalty)}</span></div>`:''}
         </div>
