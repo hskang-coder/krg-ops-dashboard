@@ -18746,28 +18746,50 @@ function okpi_importantBox(range, filter){
     var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
     var hi = function(s){ return esc(s).replace(dlRe, function(m){ return '<b style="color:#B45309">' + m + '</b>'; }); };
     var map = {};
-    var add = function(cno, prio, content, tag, due){ var k=_normCno(cno); if(!k)return; if(!map[k]||prio<map[k].prio){ map[k]={cno:k,prio:prio,content:clean(content),tag:tag,due:due,unpaid:!!delinqSet[k]}; } };
+    var add = function(cno, prio, content, tag, due, cat, person, jobSub){ var k=_normCno(cno); if(!k)return; if(!map[k]||prio<map[k].prio){ map[k]={cno:k,prio:prio,content:clean(content),tag:tag,due:due,cat:String(cat||'').trim(),person:String(person||'').trim(),jobSub:String(jobSub||'').trim(),unpaid:!!delinqSet[k]}; } };
     // 1) 입금예정일이 검색기간 내 (미납 우선) — 업무구분 필터 적용
-    daeRaw.forEach(function(r){ if (r.payDate && inRangeP(r.payDate) && matchJob(r.jobType)) add(r.no, delinqSet[_normCno(r.no)]?1:2, r.content, '입금예정', r.payDate); });
+    daeRaw.forEach(function(r){ if (r.payDate && inRangeP(r.payDate) && matchJob(r.jobType)) add(r.no, delinqSet[_normCno(r.no)]?1:2, r.content, '입금예정', r.payDate, r.jobType, r.person, r.jobSub); });
     // 2) 검색기간 내 대응 중 약속/기한 텍스트가 있는 건 — 업무구분 필터 적용
-    daeRaw.forEach(function(r){ if (okpi_inRange(r, range) && matchJob(r.jobType) && r.content && (promiseRe.test(r.content) || dlRe.test(r.content))){ var jt=String(r.jobType||''); var p = jt.indexOf('중도퇴실')>=0?3:(jt.indexOf('법무')>=0?3:4); add(r.no, p, r.content, jt||'대응', ''); } });
+    daeRaw.forEach(function(r){ if (okpi_inRange(r, range) && matchJob(r.jobType) && r.content && (promiseRe.test(r.content) || dlRe.test(r.content))){ var jt=String(r.jobType||''); var p = jt.indexOf('중도퇴실')>=0?3:(jt.indexOf('법무')>=0?3:4); add(r.no, p, r.content, jt||'대응', '', jt, r.person, r.jobSub); } });
     var arr = Object.keys(map).map(function(k){ return map[k]; }).sort(function(a,b){ return a.prio - b.prio; });
     var dlbl = okpi_ymd(range.start) + (okpi_ymd(range.start) !== okpi_ymd(range.end) ? ' ~ ' + okpi_ymd(range.end) : '');
     var numBadge = function(i, color){ return '<span style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:' + (color||'#7C3AED') + ';color:#fff;font-size:10px;font-weight:800;margin-top:1px">' + i + '</span>'; };
-    var MAX = 8;
+    var catIcon = function(k){ k=String(k||''); return k.indexOf('연체')>=0?'🔴':(k.indexOf('수납')>=0?'💳':(k.indexOf('중도퇴실')>=0?'🚪':(k.indexOf('법무')>=0?'⚖️':(k.indexOf('갱신')>=0?'🔄':(k.indexOf('입주')>=0||k.indexOf('계약')>=0?'🏠':'📞'))))); };
+    var renderItem = function(it, idx){
+      var nm = nameOf(it.cno) || ('#' + it.cno);
+      var jt = String(it.cat||it.tag||'');
+      var icon = it.unpaid ? '🔴' : (it.tag==='입금예정' ? '💰' : catIcon(jt));
+      var unpaidBadge = it.unpaid ? ' <span style="color:#DC2626;font-weight:700;font-size:10px">미납</span>' : '';
+      var dueBadge = it.due ? (' <span style="color:#9CA3AF;font-size:10px">[' + it.due + ' 입금예정]</span>') : '';
+      var meta = [];
+      if (it.person) meta.push('담당 ' + esc(it.person));
+      if (it.jobSub) meta.push(esc(it.jobSub));
+      var metaBadge = meta.length ? ' <span style="color:#7C3AED;font-size:10px;font-weight:600">· ' + meta.join(' · ') + '</span>' : '';
+      var snip = it.content ? (' — ' + hi(it.content.slice(0, 58)) + (it.content.length > 58 ? '…' : '')) : '';
+      return '<div style="display:flex;gap:7px;align-items:flex-start;font-size:11.5px;line-height:1.45;color:#374151">' + numBadge(idx, it.unpaid?'#DC2626':'#7C3AED') + '<span>' + icon + ' <b>' + esc(nm) + '</b>' + unpaidBadge + dueBadge + metaBadge + snip + '</span></div>';
+    };
     var listHtml;
-    if (arr.length) {
-      listHtml = '<div style="display:flex;flex-direction:column;gap:4px;margin-top:7px">' + arr.slice(0, MAX).map(function(it, i){
-        var nm = nameOf(it.cno) || ('#' + it.cno);
-        var jt = String(it.tag||'');
-        var icon = it.unpaid ? '🔴' : (it.tag==='입금예정' ? '💰' : (jt.indexOf('중도퇴실')>=0 ? '🚪' : (jt.indexOf('법무')>=0 ? '⚖️' : (jt.indexOf('갱신')>=0 ? '🔄' : '📞'))));
-        var unpaidBadge = it.unpaid ? ' <span style="color:#DC2626;font-weight:700;font-size:10px">미납</span>' : '';
-        var dueBadge = it.due ? (' <span style="color:#9CA3AF;font-size:10px">[' + it.due + ' 입금예정]</span>') : '';
-        var snip = it.content ? (' — ' + hi(it.content.slice(0, 60)) + (it.content.length > 60 ? '…' : '')) : '';
-        return '<div style="display:flex;gap:7px;align-items:flex-start;font-size:11.5px;line-height:1.45;color:#374151">' + numBadge(i+1, it.unpaid?'#DC2626':'#7C3AED') + '<span>' + icon + ' <b>' + esc(nm) + '</b>' + unpaidBadge + dueBadge + snip + '</span></div>';
-      }).join('') + (arr.length > MAX ? '<div style="font-size:10.5px;color:#9CA3AF;margin-top:2px;padding-left:24px">외 ' + (arr.length - MAX) + '건 — 연체관리·대응내역 탭에서 확인</div>' : '') + '</div>';
-    } else {
+    if (!arr.length) {
       listHtml = '<div style="font-size:12px;color:#16A34A;margin-top:8px;font-weight:600">✅ 검색기간 내 확인/약속 항목 없음</div>';
+    } else if (filter === '전체') {
+      // 업무구분별 그룹 개요 — 카테고리별 상위 3건 (연체관리 탭과 중복 방지)
+      var catOrder = ['연체관리','수납관리','중도퇴실관리','법무관리','갱신관리','계약(입주)관리'];
+      var keyOf = function(c){ c=String(c||''); for (var i=0;i<catOrder.length;i++){ var base=catOrder[i].replace('관리','').replace(/[()]/g,''); if (c.indexOf(catOrder[i])>=0 || (base && c.indexOf(base)>=0)) return catOrder[i]; } return c||'기타'; };
+      var groups = {};
+      arr.forEach(function(it){ var k=keyOf(it.cat||it.tag); (groups[k]=groups[k]||[]).push(it); });
+      var orderedKeys = catOrder.filter(function(k){return groups[k];}).concat(Object.keys(groups).filter(function(k){return catOrder.indexOf(k)<0;}));
+      var PERCAT = 3;
+      listHtml = '<div style="display:flex;flex-direction:column;gap:1px;margin-top:7px">' + orderedKeys.map(function(k){
+        var g = groups[k];
+        var head = '<div style="font-size:11px;font-weight:700;color:#6D28D9;margin:6px 0 2px">' + catIcon(k) + ' ' + esc(k) + ' <span style="color:#9CA3AF;font-weight:600">' + g.length + '건</span></div>';
+        var rows = g.slice(0, PERCAT).map(function(it,i){ return renderItem(it, i+1); }).join('');
+        var more = g.length > PERCAT ? '<div style="font-size:10px;color:#9CA3AF;padding-left:24px">외 ' + (g.length-PERCAT) + '건 — 해당 탭에서 확인</div>' : '';
+        return head + rows + more;
+      }).join('') + '</div>';
+    } else {
+      // 단일 업무구분 — 플랫 목록
+      var MAX = 12;
+      listHtml = '<div style="display:flex;flex-direction:column;gap:4px;margin-top:7px">' + arr.slice(0, MAX).map(function(it, i){ return renderItem(it, i+1); }).join('') + (arr.length > MAX ? '<div style="font-size:10.5px;color:#9CA3AF;margin-top:2px;padding-left:24px">외 ' + (arr.length - MAX) + '건</div>' : '') + '</div>';
     }
     var sumLine = sums.length ? '<div style="font-size:11px;color:#6B7280;margin-top:3px">요약 · ' + sums.join(' &nbsp;·&nbsp; ') + '</div>' : '';
     return '<div class="okpi-period-card" style="grid-column:1/-1;border-color:#DDD6FE;background:#FAF9FF">'
