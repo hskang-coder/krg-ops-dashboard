@@ -21180,11 +21180,12 @@ async function okpi_render(){
     var today=new Date(),TY=today.getFullYear(),TM=today.getMonth()+1,TD=today.getDate();
     function monthDaily(y,mo){ var ld=lastDay(y,mo),isCur=(y===TY&&mo===TM),cap=isCur?TD:ld,b=billed(y,mo)||1,cnt=[],rate=[];
       for(var d=1;d<=31;d++){ if(d>ld||d>cap){cnt.push(null);rate.push(null);} else {var c=delqAsOf(y*10000+mo*100+d);cnt.push(c);rate.push(+(c/b*100).toFixed(2));} }
-      var sd={'정상납부':[],'연체납부':[],'연체중':[],'분납중':[]}; for(var d=1;d<=31;d++){for(var k in sd)sd[k].push(0);}
-      for(var i=0;i<all.length;i++){var r=all[i];if(r.due==null)continue;var yy=Math.floor(r.due/10000),mm=Math.floor(r.due/100)%100,dd=r.due%100;if(yy===y&&mm===mo&&sd[r.st]&&dd>=1&&dd<=31&&activeAt(r.cno,r.due))sd[r.st][dd-1]++;}
-      return {cnt:cnt,rate:rate,status:sd,label:mlabel(y,mo),billed:b}; }
+      var sd={'정상납부':[],'연체납부':[],'연체중':[],'분납중':[],'납부예정':[]}; for(var d=1;d<=31;d++){for(var k in sd)sd[k].push(0);}
+      var bd=[]; for(var d=1;d<=31;d++) bd.push(0);
+      for(var i=0;i<all.length;i++){var r=all[i];if(r.due==null)continue;var yy=Math.floor(r.due/10000),mm=Math.floor(r.due/100)%100,dd=r.due%100;if(yy===y&&mm===mo&&dd>=1&&dd<=31&&activeAt(r.cno,r.due)){ if(sd[r.st])sd[r.st][dd-1]++; bd[dd-1]++; }}
+      return {cnt:cnt,rate:rate,status:sd,billedDaily:bd,label:mlabel(y,mo),billed:b}; }
     function monthAgg(y,mo){ var ld=lastDay(y,mo),day=Math.min(TD,ld),asof=y*10000+mo*100+day,b=billed(y,mo)||1,c=delqAsOf(asof);
-      var sc={'정상납부':0,'연체납부':0,'연체중':0,'분납중':0}; for(var i=0;i<all.length;i++){var r=all[i];if(r.due==null)continue;var yy=Math.floor(r.due/10000),mm=Math.floor(r.due/100)%100;if(yy===y&&mm===mo&&sc[r.st]!=null&&activeAt(r.cno,r.due))sc[r.st]++;}
+      var sc={'정상납부':0,'연체납부':0,'연체중':0,'분납중':0,'납부예정':0}; for(var i=0;i<all.length;i++){var r=all[i];if(r.due==null)continue;var yy=Math.floor(r.due/10000),mm=Math.floor(r.due/100)%100;if(yy===y&&mm===mo&&sc[r.st]!=null&&activeAt(r.cno,r.due))sc[r.st]++;}
       return {count:c,rate:+(c/b*100).toFixed(2),label:mlabel(y,mo),billed:b,status:sc}; }
     var res={ today:{count:delqAsOf(TY*10000+TM*100+TD),day:TD}, monthDaily:monthDaily, monthAgg:monthAgg, TY:TY,TM:TM,TD:TD };
     cache[pt]=res; return res;
@@ -21192,7 +21193,7 @@ async function okpi_render(){
   function lastVal(a){ for(var i=a.length-1;i>=0;i--) if(a[i]!=null) return a[i]; return 0; }
   function build(anchorCard){
     if (document.getElementById(CARD_ID)) return; if (!compute('임대료')) return;
-    var COL={cur:'#2f6fc0',prev:'#e8852b',prev2:'#9ca3af',jeong:'#16a34a',napbu:'#e8852b',jung:'#dc2626',bunnab:'#7c3aed',mon:'#2f6fc0'};
+    var COL={cur:'#2f6fc0',prev:'#e8852b',prev2:'#9ca3af',jeong:'#16a34a',napbu:'#e8852b',jung:'#dc2626',bunnab:'#7c3aed',yejeong:'#cbd5e1',mon:'#2f6fc0'};
     var types=['임대료','변동관리비','기타계약금','전체'];
     var periods=[{k:1,t:'1개월'},{k:2,t:'2개월'},{k:3,t:'3개월'},{k:6,t:'6개월'},{k:12,t:'12개월'}];
     var card=document.createElement('div'); card.id=CARD_ID; card.setAttribute('style','background:#fff;border:2px solid #4d8fe0;border-radius:10px;padding:12px 15px;position:relative;margin-bottom:13px;');
@@ -21229,7 +21230,7 @@ async function okpi_render(){
     var statusTip={callbacks:{beforeBody:function(items){ if(!items.length)return ''; var idx=items[0].dataIndex,sum=0; items[0].chart.data.datasets.forEach(function(ds){ var v=ds.data[idx]; if(v!=null)sum+=v; }); return '청구인원: '+sum+'명'; },label:function(ctx){ var idx=ctx.dataIndex,sum=0; ctx.chart.data.datasets.forEach(function(ds){ var v=ds.data[idx]; if(v!=null)sum+=v; }); var v=ctx.raw||0,pct=sum>0?Math.round(v/sum*100):0; return ' '+ctx.dataset.label+': '+v+' ('+pct+'%)'; }}};
     // [v417] 납부상태 막대 상단에 '납부 대상(청구건수 합계)'을 표시 — 납부대상 먼저 인지 후 상태 분해
     var totLblPlugin={id:'totLbl',afterDatasetsDraw:function(c){ try{ var ctx=c.ctx; var dss=c.data.datasets; if(!dss||!dss.length)return; var topMeta=c.getDatasetMeta(dss.length-1); var n=(c.data.labels||[]).length; for(var i=0;i<n;i++){ var sum=0; dss.forEach(function(ds){ var v=ds.data[i]; if(v!=null)sum+=v; }); if(sum<=0)continue; var bar=topMeta.data[i]; if(!bar)continue; ctx.save(); ctx.fillStyle='#1A3A5C'; ctx.font='700 9px sans-serif'; ctx.textAlign='center'; ctx.fillText(String(sum), bar.x, bar.y-3); ctx.restore(); } }catch(e){} }};
-    var statusSummaryHtml=function(stTot, grand){ var k=function(lbl,val,color){ return '<span style="color:'+(color||'#4b5563')+'">'+lbl+' <b>'+val+'</b></span>'; }; return '<div style="font-size:11.5px;color:#374151;align-self:center;line-height:1.5;"><b style="color:#185FA5;">📌 납부 대상 '+grand+'건</b> &nbsp;=&nbsp; '+k('정상납부',stTot['정상납부']||0,'#16A34A')+' · '+k('연체납부',stTot['연체납부']||0,'#e8852b')+' · '+k('연체중',stTot['연체중']||0,'#DC2626')+' · '+k('분납중',stTot['분납중']||0,'#7C3AED')+'</div>'; };
+    var statusSummaryHtml=function(stTot, grand){ var k=function(lbl,val,color){ return '<span style="color:'+(color||'#4b5563')+'">'+lbl+' <b>'+val+'</b></span>'; }; return '<div style="font-size:11.5px;color:#374151;align-self:center;line-height:1.5;"><b style="color:#185FA5;">📌 납부 대상 '+grand+'건</b> &nbsp;=&nbsp; '+k('정상납부',stTot['정상납부']||0,'#16A34A')+' · '+k('연체납부',stTot['연체납부']||0,'#e8852b')+' · '+k('연체중',stTot['연체중']||0,'#DC2626')+' · '+k('분납중',stTot['분납중']||0,'#7C3AED')+' · '+k('납부예정',stTot['납부예정']||0,'#94a3b8')+'</div>'; };
     var chart=null, curMode='count', curType='임대료', state={period:2, custom:null};  // [v378] 기본 2개월(당월 vs 전월) — 전전월은 과거 데이터 한계로 참고용
     function mb(S,n){ var d=new Date(S.TY,S.TM-1-n,1); return {y:d.getFullYear(),m:d.getMonth()+1}; }
     function getMonths(S){ if(state.custom) return state.custom; var L=[]; for(var k=state.period-1;k>=0;k--) L.push(mb(S,k)); return L; }
@@ -21245,21 +21246,21 @@ async function okpi_render(){
         var cols=[COL.prev2,COL.prev,COL.cur].slice(3-md.length);
         var names = md.map(function(x,i){ return (i===md.length-1?'당월':(i===md.length-2?'전월':'전전월'))+'('+x.label+')'; });
         if(mode==='target'){
-          var sdt=recent.status;
-          var totals=days.map(function(_,i){ var s=0; ['정상납부','연체납부','연체중','분납중'].forEach(function(kk){ s+=(sdt[kk]&&sdt[kk][i])||0; }); return s>0?s:null; });
-          var grandT=totals.reduce(function(a,v){return a+(v||0);},0);
-          lg.innerHTML=sw('#185FA5','납부 대상 (정상+연체납부+연체중+분납중)');
-          mt.innerHTML='<div style="font-size:11.5px;color:#374151;align-self:center;"><b style="color:#185FA5;">📌 '+recent.label+' 납부 대상 총 '+grandT+'건</b> <span style="color:#9aa0a6;">· 막대 = 납기일별 납부 대상 건수</span></div>';
+          var bdaily=recent.billedDaily||[];
+          var totals=bdaily.map(function(v){ return v>0?v:null; });
+          var grandT=bdaily.reduce(function(a,v){return a+(v||0);},0);
+          lg.innerHTML=sw('#185FA5','납부 대상 (해당 납기일 전체 청구 — 납부예정 포함)');
+          mt.innerHTML='<div style="font-size:11.5px;color:#374151;align-self:center;"><b style="color:#185FA5;">📌 '+recent.label+' 납부 대상 총 '+grandT+'건</b> <span style="color:#9aa0a6;">· 막대 = 납기일별 납부 대상 건수(납부예정 포함)</span></div>';
           chart=new Chart(ctx,{type:'bar',data:{labels:days,datasets:[{label:'납부 대상',data:totals,backgroundColor:'#185FA5',barPercentage:0.95,categoryPercentage:0.72}]},options:{responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:14}},scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'건';}},grid:{color:'rgba(120,120,120,0.1)'}},x:dayX},plugins:{legend:{display:false}}},plugins:[totLblPlugin]});
           return;
         }
         if(mode==='status'){
-          var sd=recent.status; lg.innerHTML=sw(COL.jeong,'정상납부')+sw(COL.napbu,'연체납부')+sw(COL.jung,'연체중')+sw(COL.bunnab,'분납중');
-          var _stKeys=['정상납부','연체납부','연체중','분납중'], _stTot={}, _grand=0;
-          _stKeys.forEach(function(kk){ var t=(sd[kk]||[]).reduce(function(a,v){return a+(v||0);},0); _stTot[kk]=t; _grand+=t; });
-          mt.innerHTML='<div style="display:flex;flex-direction:column;gap:2px;"><div style="font-size:11px;color:#9aa0a6;">'+recent.label+' 납기일 기준 · 막대 상단 숫자 = 그 날 납부 대상</div>'+statusSummaryHtml(_stTot,_grand)+'</div>';
-          var g=function(a){return a.map(function(v){return v>0?v:null;});};
-          chart=new Chart(ctx,{type:'bar',data:{labels:days,datasets:[{label:'정상납부',data:sd['정상납부'],backgroundColor:COL.jeong},{label:'연체납부',data:sd['연체납부'],backgroundColor:COL.napbu},{label:'연체중',data:sd['연체중'],backgroundColor:COL.jung},{label:'분납중',data:sd['분납중'],backgroundColor:COL.bunnab}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},layout:{padding:{top:14}},scales:{y:{stacked:true,beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'건';}},grid:{color:'rgba(120,120,120,0.1)'}},x:Object.assign({stacked:true},dayX)},plugins:{legend:{display:false},tooltip:statusTip}},plugins:[totLblPlugin]});
+          var sd=recent.status; lg.innerHTML=sw(COL.jeong,'정상납부')+sw(COL.napbu,'연체납부')+sw(COL.jung,'연체중')+sw(COL.bunnab,'분납중')+sw(COL.yejeong,'납부예정');
+          var _stKeys=['정상납부','연체납부','연체중','분납중','납부예정'], _stTot={};
+          _stKeys.forEach(function(kk){ _stTot[kk]=(sd[kk]||[]).reduce(function(a,v){return a+(v||0);},0); });
+          var _grand=recent.billed||_stKeys.reduce(function(a,kk){return a+_stTot[kk];},0);
+          mt.innerHTML='<div style="display:flex;flex-direction:column;gap:2px;"><div style="font-size:11px;color:#9aa0a6;">'+recent.label+' 납기일 기준 · 막대 상단 숫자 = 그 날 납부 대상(납부예정 포함)</div>'+statusSummaryHtml(_stTot,_grand)+'</div>';
+          chart=new Chart(ctx,{type:'bar',data:{labels:days,datasets:[{label:'정상납부',data:sd['정상납부'],backgroundColor:COL.jeong},{label:'연체납부',data:sd['연체납부'],backgroundColor:COL.napbu},{label:'연체중',data:sd['연체중'],backgroundColor:COL.jung},{label:'분납중',data:sd['분납중'],backgroundColor:COL.bunnab},{label:'납부예정',data:sd['납부예정'],backgroundColor:COL.yejeong}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},layout:{padding:{top:14}},scales:{y:{stacked:true,beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'건';}},grid:{color:'rgba(120,120,120,0.1)'}},x:Object.assign({stacked:true},dayX)},plugins:{legend:{display:false},tooltip:statusTip}},plugins:[totLblPlugin]});
           return;
         }
         var key = mode==='count'?'cnt':'rate';
@@ -21274,20 +21275,19 @@ async function okpi_render(){
         var ma = months.map(function(m){ return S.monthAgg(m.y,m.m); });
         var labels = ma.map(function(x){ return x.label; });
         if(mode==='target'){
-          var totalsM=ma.map(function(x){ var s=0; ['정상납부','연체납부','연체중','분납중'].forEach(function(kk){ s+=x.status[kk]||0; }); return s>0?s:null; });
-          var grandM2=totalsM.reduce(function(a,v){return a+(v||0);},0);
-          lg.innerHTML=sw('#185FA5','납부 대상');
+          var totalsM=ma.map(function(x){ return x.billed>0?x.billed:null; });
+          var grandM2=ma.reduce(function(a,x){return a+(x.billed||0);},0);
+          lg.innerHTML=sw('#185FA5','납부 대상 (전체 청구 — 납부예정 포함)');
           mt.innerHTML='<div style="font-size:11.5px;color:#374151;align-self:center;"><b style="color:#185FA5;">📌 납부 대상 총 '+grandM2+'건</b> <span style="color:#9aa0a6;">· 막대 = 월별 납부 대상 건수</span></div>';
           chart=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{label:'납부 대상',data:totalsM,backgroundColor:'#185FA5',barPercentage:0.7,categoryPercentage:0.8}]},options:{responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:14}},scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'건';}},grid:{color:'rgba(120,120,120,0.1)'}},x:monX},plugins:{legend:{display:false}}},plugins:[totLblPlugin]});
           return;
         }
         if(mode==='status'){
-          lg.innerHTML=sw(COL.jeong,'정상납부')+sw(COL.napbu,'연체납부')+sw(COL.jung,'연체중')+sw(COL.bunnab,'분납중');
-          var _stTotM={'정상납부':0,'연체납부':0,'연체중':0,'분납중':0}, _grandM=0;
-          ma.forEach(function(x){ ['정상납부','연체납부','연체중','분납중'].forEach(function(kk){ var v=x.status[kk]||0; _stTotM[kk]+=v; _grandM+=v; }); });
-          mt.innerHTML='<div style="display:flex;flex-direction:column;gap:2px;"><div style="font-size:11px;color:#9aa0a6;">월별 납기 기준 · 막대 상단 숫자 = 그 달 납부 대상</div>'+statusSummaryHtml(_stTotM,_grandM)+'</div>';
-          function col(k){ return ma.map(function(x){ var v=x.status[k]; return v>0?v:null; }); }
-          chart=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{label:'정상납부',data:ma.map(function(x){return x.status['정상납부'];}),backgroundColor:COL.jeong},{label:'연체납부',data:ma.map(function(x){return x.status['연체납부'];}),backgroundColor:COL.napbu},{label:'연체중',data:ma.map(function(x){return x.status['연체중'];}),backgroundColor:COL.jung},{label:'분납중',data:ma.map(function(x){return x.status['분납중'];}),backgroundColor:COL.bunnab}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},layout:{padding:{top:14}},scales:{y:{stacked:true,beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'건';}},grid:{color:'rgba(120,120,120,0.1)'}},x:Object.assign({stacked:true},monX)},plugins:{legend:{display:false},tooltip:statusTip}},plugins:[totLblPlugin]});
+          lg.innerHTML=sw(COL.jeong,'정상납부')+sw(COL.napbu,'연체납부')+sw(COL.jung,'연체중')+sw(COL.bunnab,'분납중')+sw(COL.yejeong,'납부예정');
+          var _stTotM={'정상납부':0,'연체납부':0,'연체중':0,'분납중':0,'납부예정':0}, _grandM=0;
+          ma.forEach(function(x){ ['정상납부','연체납부','연체중','분납중','납부예정'].forEach(function(kk){ _stTotM[kk]+=(x.status[kk]||0); }); _grandM+=(x.billed||0); });
+          mt.innerHTML='<div style="display:flex;flex-direction:column;gap:2px;"><div style="font-size:11px;color:#9aa0a6;">월별 납기 기준 · 막대 상단 숫자 = 그 달 납부 대상(납부예정 포함)</div>'+statusSummaryHtml(_stTotM,_grandM)+'</div>';
+          chart=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{label:'정상납부',data:ma.map(function(x){return x.status['정상납부'];}),backgroundColor:COL.jeong},{label:'연체납부',data:ma.map(function(x){return x.status['연체납부'];}),backgroundColor:COL.napbu},{label:'연체중',data:ma.map(function(x){return x.status['연체중'];}),backgroundColor:COL.jung},{label:'분납중',data:ma.map(function(x){return x.status['분납중'];}),backgroundColor:COL.bunnab},{label:'납부예정',data:ma.map(function(x){return x.status['납부예정'];}),backgroundColor:COL.yejeong}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},layout:{padding:{top:14}},scales:{y:{stacked:true,beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'건';}},grid:{color:'rgba(120,120,120,0.1)'}},x:Object.assign({stacked:true},monX)},plugins:{legend:{display:false},tooltip:statusTip}},plugins:[totLblPlugin]});
           return;
         }
         var recent=ma[ma.length-1], prev=ma[ma.length-2];
