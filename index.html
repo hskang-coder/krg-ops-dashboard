@@ -21177,16 +21177,21 @@ async function okpi_render(){
     for (var i=0;i<pr.length;i++){ var o=pr[i]; var ty=String(o['납부종류']==null?'':o['납부종류']).trim(); if(!matchType(pt,ty))continue; var cno=String(o['계약번호']==null?'':o['계약번호']).trim(); var due=ser(o['납기일']); var pay=ser(o['납부일']); var st=String(o['납부상태']==null?'':o['납부상태']).trim(); all.push({cno:cno,due:due,st:st}); if(st==='연체중'||st==='분납중'){ R.push({cno:cno,due:due,pay:null}); } else if(st==='연체납부'){ R.push({cno:cno,due:due,pay:pay}); } }
     function delqAsOf(a){ var s={}; for(var i=0;i<R.length;i++){var r=R[i]; if(r.due==null||r.due>a)continue; if(r.pay!=null&&!(r.pay>a))continue; if(!activeAt(r.cno,a))continue; s[r.cno]=1; } var n=0;for(var k in s)n++;return n; }
     function billed(y,mo){ var lo=y*10000+mo*100+1,hi=y*10000+mo*100+31,s={}; for(var i=0;i<all.length;i++){var r=all[i]; if(r.due!=null&&r.due>=lo&&r.due<=hi&&activeAt(r.cno,r.due))s[r.cno]=1;} var n=0;for(var k in s)n++;return n; }
+    // [v421] 계약별 정기 납기일(최근 청구 기준) — 청구서 미생성 월도 사전 예상 청구 인원 투영
+    var dueDayMap={},_ddL={};
+    for(var _i=0;_i<all.length;_i++){var _r=all[_i]; if(_r.due==null)continue; if(_ddL[_r.cno]==null||_r.due>_ddL[_r.cno]){_ddL[_r.cno]=_r.due; dueDayMap[_r.cno]=_r.due%100;}}
+    function projectedBilled(y,mo){ var ld=lastDay(y,mo),bd=[]; for(var d=1;d<=31;d++)bd.push(0); for(var cno in dueDayMap){ var day=Math.min(dueDayMap[cno],ld); if(day<1)continue; if(activeAt(cno,y*10000+mo*100+day)) bd[day-1]++; } return bd; }
     var today=new Date(),TY=today.getFullYear(),TM=today.getMonth()+1,TD=today.getDate();
     function monthDaily(y,mo){ var ld=lastDay(y,mo),isCur=(y===TY&&mo===TM),cap=isCur?TD:ld,b=billed(y,mo)||1,cnt=[],rate=[];
       for(var d=1;d<=31;d++){ if(d>ld||d>cap){cnt.push(null);rate.push(null);} else {var c=delqAsOf(y*10000+mo*100+d);cnt.push(c);rate.push(+(c/b*100).toFixed(2));} }
       var sd={'정상납부':[],'연체납부':[],'연체중':[],'분납중':[],'납부예정':[]}; for(var d=1;d<=31;d++){for(var k in sd)sd[k].push(0);}
       var bd=[]; for(var d=1;d<=31;d++) bd.push(0);
       for(var i=0;i<all.length;i++){var r=all[i];if(r.due==null)continue;var yy=Math.floor(r.due/10000),mm=Math.floor(r.due/100)%100,dd=r.due%100;if(yy===y&&mm===mo&&dd>=1&&dd<=31&&activeAt(r.cno,r.due)){ if(sd[r.st])sd[r.st][dd-1]++; bd[dd-1]++; }}
-      return {cnt:cnt,rate:rate,status:sd,billedDaily:bd,label:mlabel(y,mo),billed:b}; }
+      return {cnt:cnt,rate:rate,status:sd,billedDaily:bd,projectedDaily:projectedBilled(y,mo),label:mlabel(y,mo),billed:b}; }
     function monthAgg(y,mo){ var ld=lastDay(y,mo),day=Math.min(TD,ld),asof=y*10000+mo*100+day,b=billed(y,mo)||1,c=delqAsOf(asof);
       var sc={'정상납부':0,'연체납부':0,'연체중':0,'분납중':0,'납부예정':0}; for(var i=0;i<all.length;i++){var r=all[i];if(r.due==null)continue;var yy=Math.floor(r.due/10000),mm=Math.floor(r.due/100)%100;if(yy===y&&mm===mo&&sc[r.st]!=null&&activeAt(r.cno,r.due))sc[r.st]++;}
-      return {count:c,rate:+(c/b*100).toFixed(2),label:mlabel(y,mo),billed:b,status:sc}; }
+      var _pj=projectedBilled(y,mo),_pjT=0; for(var _q=0;_q<_pj.length;_q++)_pjT+=_pj[_q];
+      return {count:c,rate:+(c/b*100).toFixed(2),label:mlabel(y,mo),billed:b,status:sc,projected:_pjT}; }
     var res={ today:{count:delqAsOf(TY*10000+TM*100+TD),day:TD}, monthDaily:monthDaily, monthAgg:monthAgg, TY:TY,TM:TM,TD:TD };
     cache[pt]=res; return res;
   }
@@ -21246,13 +21251,17 @@ async function okpi_render(){
         var cols=[COL.prev2,COL.prev,COL.cur].slice(3-md.length);
         var names = md.map(function(x,i){ return (i===md.length-1?'당월':(i===md.length-2?'전월':'전전월'))+'('+x.label+')'; });
         if(mode==='target'){
-          var bdaily=recent.billedDaily||[];
-          var totals=bdaily.map(function(v){ return v>0?v:null; });
-          var grandT=bdaily.reduce(function(a,v){return a+(v||0);},0);
-          lg.innerHTML=sw('#185FA5','납부 대상 (해당 납기일 전체 청구 — 납부예정 포함)');
+          var pj=recent.projectedDaily||recent.billedDaily||[];
+          var totals=pj.map(function(v){ return v>0?v:null; });
+          var grandT=pj.reduce(function(a,v){return a+(v||0);},0);
           var _stT={}; ['정상납부','연체납부','연체중','분납중','납부예정'].forEach(function(kk){ _stT[kk]=(recent.status[kk]||[]).reduce(function(a,v){return a+(v||0);},0); });
-          mt.innerHTML='<div style="display:flex;flex-direction:column;gap:2px;"><div style="font-size:11px;color:#9aa0a6;">'+recent.label+' · 막대 = 납기일별 납부 대상 건수(납부예정 포함)</div>'+statusSummaryHtml(_stT, grandT)+'</div>';
-          chart=new Chart(ctx,{type:'bar',data:{labels:days,datasets:[{label:'납부 대상',data:totals,backgroundColor:'#185FA5',barPercentage:0.95,categoryPercentage:0.72}]},options:{responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:14}},scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'건';}},grid:{color:'rgba(120,120,120,0.1)'}},x:dayX},plugins:{legend:{display:false}}},plugins:[totLblPlugin]});
+          var _gen=recent.billed||0, _yn=(_stT['연체납부']+_stT['연체중']+_stT['분납중']);
+          lg.innerHTML=sw('#185FA5','예상 납부 대상 (계약 정기 납기일 기준)');
+          mt.innerHTML='<div style="display:flex;flex-direction:column;gap:2px;">'
+            +'<div style="font-size:11px;color:#9aa0a6;">'+recent.label+' · 막대 = 계약별 정기 납기일 기준 사전 예상 청구 인원(명)</div>'
+            +'<div style="font-size:11.5px;color:#374151;"><b style="color:#185FA5;">📌 예상 납부 대상 총 '+grandT+'명</b> &nbsp;·&nbsp; 청구서 생성 <b>'+_gen+'</b>건 <span style="color:#9aa0a6;">(정상납부 '+_stT['정상납부']+' · 납부예정 '+_stT['납부예정']+(_yn>0?' · 연체 '+_yn:'')+')</span></div>'
+            +'</div>';
+          chart=new Chart(ctx,{type:'bar',data:{labels:days,datasets:[{label:'예상 납부 대상',data:totals,backgroundColor:'#185FA5',barPercentage:0.95,categoryPercentage:0.72}]},options:{responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:14}},scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'명';}},grid:{color:'rgba(120,120,120,0.1)'}},x:dayX},plugins:{legend:{display:false}}},plugins:[totLblPlugin]});
           return;
         }
         if(mode==='status'){
@@ -21276,12 +21285,11 @@ async function okpi_render(){
         var ma = months.map(function(m){ return S.monthAgg(m.y,m.m); });
         var labels = ma.map(function(x){ return x.label; });
         if(mode==='target'){
-          var totalsM=ma.map(function(x){ return x.billed>0?x.billed:null; });
-          var grandM2=ma.reduce(function(a,x){return a+(x.billed||0);},0);
-          lg.innerHTML=sw('#185FA5','납부 대상 (전체 청구 — 납부예정 포함)');
-          var _stTM={'정상납부':0,'연체납부':0,'연체중':0,'분납중':0,'납부예정':0}; ma.forEach(function(x){ ['정상납부','연체납부','연체중','분납중','납부예정'].forEach(function(kk){ _stTM[kk]+=(x.status[kk]||0); }); });
-          mt.innerHTML='<div style="display:flex;flex-direction:column;gap:2px;"><div style="font-size:11px;color:#9aa0a6;">막대 = 월별 납부 대상 건수(납부예정 포함)</div>'+statusSummaryHtml(_stTM, grandM2)+'</div>';
-          chart=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{label:'납부 대상',data:totalsM,backgroundColor:'#185FA5',barPercentage:0.7,categoryPercentage:0.8}]},options:{responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:14}},scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'건';}},grid:{color:'rgba(120,120,120,0.1)'}},x:monX},plugins:{legend:{display:false}}},plugins:[totLblPlugin]});
+          var totalsM=ma.map(function(x){ return x.projected>0?x.projected:null; });
+          var grandM2=ma.reduce(function(a,x){return a+(x.projected||0);},0);
+          lg.innerHTML=sw('#185FA5','예상 납부 대상 (계약 정기 납기일 기준)');
+          mt.innerHTML='<div style="font-size:11.5px;color:#374151;align-self:center;"><b style="color:#185FA5;">📌 예상 납부 대상 (월별 청구 인원)</b> <span style="color:#9aa0a6;">· 막대 상단 숫자 = 그 달 예상 청구 인원(명)</span></div>';
+          chart=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{label:'예상 납부 대상',data:totalsM,backgroundColor:'#185FA5',barPercentage:0.7,categoryPercentage:0.8}]},options:{responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:14}},scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'명';}},grid:{color:'rgba(120,120,120,0.1)'}},x:monX},plugins:{legend:{display:false}}},plugins:[totLblPlugin]});
           return;
         }
         if(mode==='status'){
