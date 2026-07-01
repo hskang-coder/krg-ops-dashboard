@@ -6712,7 +6712,6 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-filter-btn" data-group="contractStatus" onclick="dlqApplyFilter('contractStatus','all',this)">전체</button>
           <button class="dlq-filter-btn active" data-group="contractStatus" onclick="dlqApplyFilter('contractStatus','계약중',this)">계약중</button>
           <button class="dlq-filter-btn" data-group="contractStatus" onclick="dlqApplyFilter('contractStatus','종료',this)">종료</button>
-          <button class="dlq-filter-btn" data-group="contractStatus" onclick="dlqApplyFilter('contractStatus','종료(3개월이내)',this)">종료 3개월이내</button>
         </div>
         <div class="dlq-filter-group">
           <span class="dlq-filter-label">법적진행</span>
@@ -6763,18 +6762,8 @@ function buildDlqUI(d1, d2, d3, d4) {
     if (_dlqSet.has(cno)) return null; // 이미 계약중 목록에 있으면 중복 제외
     const det = (d2.contractDetails || {})[cno] || { group:'-', 연체구분:'-', days:0 };
     const pay = (d3.payDateMap || {})[cno] || { dateStr:'-', payStatus:null, content:'-' };
-    // 퇴실일 기준 3개월(90일) 이내 여부
+    // [v426] 계약상태는 계약중/종료 두 가지로만 분류 (종료 3개월이내 세분류 제거)
     let contractStatus = '종료';
-    if (r.actualExitDateStr || r.exitDateStr) {
-      try {
-        const ex = parseKorDate(r.actualExitDateStr || r.exitDateStr);
-        if (ex) {
-          ex.setHours(0,0,0,0);
-          const diffDays = (_today90 - ex) / 86400000;
-          if (diffDays >= 0 && diffDays <= 90) contractStatus = '종료(3개월이내)';
-        }
-      } catch(e2) {}
-    }
     const dlqDays = (window._delinqDaysMap && window._delinqDaysMap[cno]) || det.days || 0;
     return {
       cno,
