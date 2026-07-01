@@ -21250,7 +21250,8 @@ async function okpi_render(){
           var totals=bdaily.map(function(v){ return v>0?v:null; });
           var grandT=bdaily.reduce(function(a,v){return a+(v||0);},0);
           lg.innerHTML=sw('#185FA5','납부 대상 (해당 납기일 전체 청구 — 납부예정 포함)');
-          mt.innerHTML='<div style="font-size:11.5px;color:#374151;align-self:center;"><b style="color:#185FA5;">📌 '+recent.label+' 납부 대상 총 '+grandT+'건</b> <span style="color:#9aa0a6;">· 막대 = 납기일별 납부 대상 건수(납부예정 포함)</span></div>';
+          var _stT={}; ['정상납부','연체납부','연체중','분납중','납부예정'].forEach(function(kk){ _stT[kk]=(recent.status[kk]||[]).reduce(function(a,v){return a+(v||0);},0); });
+          mt.innerHTML='<div style="display:flex;flex-direction:column;gap:2px;"><div style="font-size:11px;color:#9aa0a6;">'+recent.label+' · 막대 = 납기일별 납부 대상 건수(납부예정 포함)</div>'+statusSummaryHtml(_stT, grandT)+'</div>';
           chart=new Chart(ctx,{type:'bar',data:{labels:days,datasets:[{label:'납부 대상',data:totals,backgroundColor:'#185FA5',barPercentage:0.95,categoryPercentage:0.72}]},options:{responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:14}},scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'건';}},grid:{color:'rgba(120,120,120,0.1)'}},x:dayX},plugins:{legend:{display:false}}},plugins:[totLblPlugin]});
           return;
         }
@@ -21278,7 +21279,8 @@ async function okpi_render(){
           var totalsM=ma.map(function(x){ return x.billed>0?x.billed:null; });
           var grandM2=ma.reduce(function(a,x){return a+(x.billed||0);},0);
           lg.innerHTML=sw('#185FA5','납부 대상 (전체 청구 — 납부예정 포함)');
-          mt.innerHTML='<div style="font-size:11.5px;color:#374151;align-self:center;"><b style="color:#185FA5;">📌 납부 대상 총 '+grandM2+'건</b> <span style="color:#9aa0a6;">· 막대 = 월별 납부 대상 건수</span></div>';
+          var _stTM={'정상납부':0,'연체납부':0,'연체중':0,'분납중':0,'납부예정':0}; ma.forEach(function(x){ ['정상납부','연체납부','연체중','분납중','납부예정'].forEach(function(kk){ _stTM[kk]+=(x.status[kk]||0); }); });
+          mt.innerHTML='<div style="display:flex;flex-direction:column;gap:2px;"><div style="font-size:11px;color:#9aa0a6;">막대 = 월별 납부 대상 건수(납부예정 포함)</div>'+statusSummaryHtml(_stTM, grandM2)+'</div>';
           chart=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{label:'납부 대상',data:totalsM,backgroundColor:'#185FA5',barPercentage:0.7,categoryPercentage:0.8}]},options:{responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:14}},scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'건';}},grid:{color:'rgba(120,120,120,0.1)'}},x:monX},plugins:{legend:{display:false}}},plugins:[totLblPlugin]});
           return;
         }
