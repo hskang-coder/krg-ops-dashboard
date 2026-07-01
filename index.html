@@ -7000,7 +7000,12 @@ function dlqRenderTableRows() {
                   var m = String(rows[i].content || '').match(/KCB\s*(\d+)/i);
                   if (m) return '<span style="color:#DC2626">' + m[1] + '</span>';
                 }
-                // [v371-fix] 우선순위 2: KCB 없으면 표시 안 함 (정확도 우선)
+                // [v422] 우선순위 2: KCB 없으면 — 법적조치 검토 행의 대응상세내용 첫 숫자(2~4자리)를 점수로
+                for (var j = 0; j < rows.length; j++) {
+                  if (String(rows[j].jobSub || '').indexOf('법적조치') < 0) continue;
+                  var m2 = String(rows[j].content || '').match(/^\s*(?:KCB\s*)?(\d{2,4})(?!\d)/i);
+                  if (m2) return '<span style="color:#DC2626">' + m2[1] + '</span>';
+                }
                 return '<span style="color:#D1D5DB">-</span>';
               } catch(_) { return '<span style="color:#D1D5DB">-</span>'; }
             })()}</td>
@@ -7051,6 +7056,8 @@ function _dlqScore(cno){
   if(!rs.length)return null;
   rs.sort(function(a,b){return (b._idx||0)-(a._idx||0);});
   for(var i=0;i<rs.length;i++){ var m=String(rs[i].content||'').match(/KCB\s*(\d+)/i); if(m)return m[1]; }
+  // [v422] KCB 없을 때 — 법적조치검토 행 대응상세내용 첫 숫자(2~4자리)를 점수로
+  for(var j=0;j<rs.length;j++){ if(String(rs[j].jobSub||'').replace(/\s/g,'').indexOf('법적조치검토')<0)continue; var m2=String(rs[j].content||'').match(/^\s*(?:KCB\s*)?(\d{2,4})(?!\d)/i); if(m2)return m2[1]; }
   return null;
 }
 function _dlqDt(s){ var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(m[1].slice(2)+'.'+('0'+m[2]).slice(-2)+'.'+('0'+m[3]).slice(-2)):''; }
