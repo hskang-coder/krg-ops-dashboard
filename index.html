@@ -4958,18 +4958,13 @@ function renderContractRecord(c, payments, responses = []) {
           try {
             if (!Array.isArray(daeungRawData)) return '<span style="color:#D1D5DB">-</span>';
             var cno = String(c['계약번호']||'').trim();
-            var SCORE_SUBS = ['법적조치 검토','법적조치검토','법적 조치 검토','내용증명 발송','내용증명발송','내용 증명 발송'];
-            var rs = daeungRawData.filter(function(d){
-              if (!d || String(d.no||'').trim() !== cno) return false;
-              var s = String(d.jobSub||'').trim();
-              if (!s) return false;
-              if (SCORE_SUBS.indexOf(s) >= 0) return true;
-              return s.indexOf('법적조치') >= 0 || s.indexOf('법적 조치') >= 0 || s.replace(/\s/g,'').indexOf('내용증명발송') >= 0;
-            });
+            // [v424] KCB 점수 = 'KCB' 인접 3자리 (업무하위 무관)
+            var rs = daeungRawData.filter(function(d){ return d && String(d.no||'').trim() === cno && /KCB/i.test(d.content||''); });
             if (!rs.length) return '<span style="color:#D1D5DB">-</span>';
             rs.sort(function(a,b){ return (b._idx||0) - (a._idx||0); });
             for (var i = 0; i < rs.length; i++) {
-              var m = String(rs[i].content || '').match(/(?:^|\D)(\d{3})(?!\d)/);
+              var c = String(rs[i].content || '');
+              var m = c.match(/(\d{3})(?!\d)\s*KCB/i) || c.match(/KCB\s*(?:ID|조회|점수?)?\s*(\d{3})(?!\d)/i);
               if (m) return '<span style="color:#DC2626;font-weight:700">' + m[1] + '</span>';
             }
             return '<span style="color:#D1D5DB">-</span>';
@@ -6978,25 +6973,14 @@ function dlqRenderTableRows() {
               try {
                 if (!Array.isArray(daeungRawData)) return '<span style="color:#D1D5DB">-</span>';
                 var cno = String(r.cno||'').trim();
-                var SCORE_SUBS = [
-                  '법적조치 검토', '법적조치검토', '법적 조치 검토', '법적 조치검토',
-                  '내용증명 발송', '내용증명발송', '내용증명발송 ', '내용 증명 발송'
-                ];
-                var rows = daeungRawData.filter(function(d){
-                  if (!d || String(d.no||'').trim() !== cno) return false;
-                  var s = String(d.jobSub||'').trim();
-                  if (!s) return false;
-                  // 정확/부분 매칭 둘 다 허용
-                  if (SCORE_SUBS.indexOf(s) >= 0) return true;
-                  return s.indexOf('법적조치') >= 0 || s.indexOf('법적 조치') >= 0 || s.replace(/\s/g,'').indexOf('내용증명발송') >= 0;
-                });
+                // [v424] KCB 점수 = 대응상세내용의 'KCB' 인접 3자리 숫자 (업무하위 무관 — 법적조치·전화응대 등 모두)
+                //   "엄주희 KCB 998"→998, "424 KCB <12자리ID>"→424, "150 KCBID ..."→150, "KCB조회 612"→612 (전화번호·ID 오추출 방지)
+                var rows = daeungRawData.filter(function(d){ return d && String(d.no||'').trim() === cno && /KCB/i.test(d.content||''); });
                 if (!rows.length) return '<span style="color:#D1D5DB">-</span>';
-                // 가장 최근 행 (_idx 기준 내림차순)
                 rows.sort(function(a,b){ return (b._idx||0) - (a._idx||0); });
-                // [v423] KCB 점수 = 대응상세내용의 첫 독립 3자리 숫자 (뒤 12자리 KCB ID·긴 숫자 제외)
-                //   지원: "424 KCB 167535370131"→424, "150 KCBID ..."→150, "KCB 651점"→651, "KCB조회 612 점"→612
                 for (var i = 0; i < rows.length; i++) {
-                  var m = String(rows[i].content || '').match(/(?:^|\D)(\d{3})(?!\d)/);
+                  var c = String(rows[i].content || '');
+                  var m = c.match(/(\d{3})(?!\d)\s*KCB/i) || c.match(/KCB\s*(?:ID|조회|점수?)?\s*(\d{3})(?!\d)/i);
                   if (m) return '<span style="color:#DC2626">' + m[1] + '</span>';
                 }
                 return '<span style="color:#D1D5DB">-</span>';
@@ -7045,11 +7029,11 @@ function _dlqLegalLatest(cno, matchFn){
 }
 function _dlqScore(cno){
   if(!Array.isArray(daeungRawData))return null;
-  var rs=daeungRawData.filter(function(d){ if(!d||String(d.no||'').trim()!==String(cno).trim())return false; var s=String(d.jobSub||'').replace(/\s/g,''); return s.indexOf('법적조치검토')>=0||s.indexOf('내용증명발송')>=0; });
+  // [v424] KCB 점수 = 'KCB' 인접 3자리 (업무하위 무관)
+  var rs=daeungRawData.filter(function(d){ return d && String(d.no||'').trim()===String(cno).trim() && /KCB/i.test(d.content||''); });
   if(!rs.length)return null;
   rs.sort(function(a,b){return (b._idx||0)-(a._idx||0);});
-  // [v423] KCB 점수 = 대응상세내용의 첫 독립 3자리 숫자 (뒤 12자리 KCB ID·긴 숫자 제외)
-  for(var i=0;i<rs.length;i++){ var m=String(rs[i].content||'').match(/(?:^|\D)(\d{3})(?!\d)/); if(m)return m[1]; }
+  for(var i=0;i<rs.length;i++){ var c=String(rs[i].content||''); var m=c.match(/(\d{3})(?!\d)\s*KCB/i)||c.match(/KCB\s*(?:ID|조회|점수?)?\s*(\d{3})(?!\d)/i); if(m)return m[1]; }
   return null;
 }
 function _dlqDt(s){ var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(m[1].slice(2)+'.'+('0'+m[2]).slice(-2)+'.'+('0'+m[3]).slice(-2)):''; }
