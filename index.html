@@ -17008,6 +17008,7 @@ window._sumChartCfg = window._sumChartCfg || (function(){
   var startD = new Date(t.getFullYear(), t.getMonth() - 11, 1);
   var endD = new Date(t.getFullYear(), t.getMonth() + 1, 0); // 이번달 말일
   return {
+    view:  'contract',      // [v427] 'contract' (월별 가계약/입주 추이) | 'valid' (유효계약수)
     basis: 'tentative',     // 'tentative' (가계약일 BI) | 'startDate' (입주일 W)
     start: fmt(startD),
     end:   fmt(endD),
@@ -17148,35 +17149,115 @@ function sumRenderDailyCard(){
     var act = (unit === u) ? 'true' : 'false';
     return '<button class="sum-unit-btn" data-act="' + act + '" onclick="sumSetCfg(\'unit\',\'' + u + '\')">' + lbl + '</button>';
   }).join('');
+  var isValid = cfg.view === 'valid';
+  var vt = function(v,lbl){ var on=cfg.view===v; return '<button onclick="sumSetCfg(\'view\',\'' + v + '\')" style="padding:5px 12px;border:1px solid ' + (on?'#0EA5E9':'#CBD5E1') + ';background:' + (on?'#0EA5E9':'#fff') + ';color:' + (on?'#fff':'#475569') + ';border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">' + lbl + '</button>'; };
   var html = ''
-    + '<div class="sum-card-title"><span class="dot" style="background:#0EA5E9"></span>① ' + unitLabel + ' ' + titleVerb + ' 추이 (' + basisLabel + ') <span class="badge sum-badge-sales">SALES</span></div>'
+    + '<div class="sum-card-title"><span class="dot" style="background:#0EA5E9"></span>① ' + (isValid ? '월별 유효계약수 (입주 기준)' : (unitLabel + ' ' + titleVerb + ' 추이 (' + basisLabel + ')')) + ' <span class="badge sum-badge-sales">SALES</span></div>'
+    + '<div class="sum-cfg-row" style="gap:6px">'
+    +   '<span class="sum-cfg-label">보기:</span>' + vt('contract','월별 가계약 추이') + vt('valid','유효계약수 (입주 기준)')
+    + '</div>'
     + '<div class="sum-cfg-row">'
     +   '<span class="sum-cfg-label">단위:</span>' + unitBtns
-    +   '<span class="sum-cfg-sep"></span>'
+    +   (isValid ? '' : ('<span class="sum-cfg-sep"></span>'
     +   '<span class="sum-cfg-label">기준:</span>'
     +   '<label class="sum-cfg-radio"><input type="radio" name="sumBasis" value="tentative" ' + (cfg.basis==='tentative'?'checked':'') + ' onchange="sumSetCfg(\'basis\',\'tentative\')"> 가계약일(BI)</label>'
-    +   '<label class="sum-cfg-radio"><input type="radio" name="sumBasis" value="startDate" ' + (cfg.basis==='startDate'?'checked':'') + ' onchange="sumSetCfg(\'basis\',\'startDate\')"> 입주일(W)</label>'
+    +   '<label class="sum-cfg-radio"><input type="radio" name="sumBasis" value="startDate" ' + (cfg.basis==='startDate'?'checked':'') + ' onchange="sumSetCfg(\'basis\',\'startDate\')"> 입주일(W)</label>'))
     +   '<span class="sum-cfg-sep"></span>'
     +   '<span class="sum-cfg-label">기간:</span>'
     +   '<input type="date" value="' + cfg.start + '" onchange="sumSetCfg(\'start\',this.value)">'
     +   '<span style="color:#6B7280">~</span>'
     +   '<input type="date" value="' + cfg.end + '" onchange="sumSetCfg(\'end\',this.value)">'
     + '</div>'
-    + (unit === 'month' ? ('<div class="sum-cfg-row">'
+    + (isValid ? '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 막대: 신규 입주(+, 초록) · 만기퇴실(−, 주황) · 중도퇴실(−, 빨강) — 단위 건 · 라인: <b style="color:#185FA5">유효계약수 누적</b>(우측 축, 이전 유효계약 base 포함)</div>'
+    : (unit === 'month' ? ('<div class="sum-cfg-row">'
     +   '<span class="sum-cfg-label">체크포인트:</span>'
     +   '매월 <input type="number" min="0" max="31" value="' + cfg.day1 + '" onchange="sumSetCfg(\'day1\',Math.max(0,Math.min(31,parseInt(this.value)||0)))" style="width:46px">일까지 누적 (0=미사용)'
     +   '<span class="sum-cfg-sep"></span>'
     +   '<span style="color:#6B7280;font-size:10.5px">핑크 라인 = <b style="color:#EC4899">오늘(' + todayDay + '일) 자동</b> 기준 누적</span>'
     + '</div>'
-    + '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 누적 막대 — 진한 색 ' + titleVerb + ' (체크포인트 ' + cfg.day1 + '일까지) · 중간 색 (오늘 ' + todayDay + '일까지) · 연한 색 (오늘 이후, 미래 영업)</div>') : '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 ' + unitLabel + ' ' + titleVerb + ' 건수</div>')
+    + '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 누적 막대 — 진한 색 ' + titleVerb + ' (체크포인트 ' + cfg.day1 + '일까지) · 중간 색 (오늘 ' + todayDay + '일까지) · 연한 색 (오늘 이후, 미래 영업)</div>') : '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 ' + unitLabel + ' ' + titleVerb + ' 건수</div>'))
     + ''
     + '<div style="position:relative;height:380px"><canvas id="sumDailyChart"></canvas></div>'
     + '<div class="sum-insight-row" id="sumDailyInsight"></div>';
   return html;
 }
 
+// [v427] Section ① 유효계약수 데이터 — 신규 입주(W열)/만기·중도 퇴실(Z열+J열)/유효 누적(base 포함)
+function sumBuildValidData(){
+  if (!Array.isArray(vacancyRawData)) return { rows: [], base: 0 };
+  var cfg = window._sumChartCfg;
+  var unit = cfg.unit || 'month';
+  var startD = cmgParseStartDate(cfg.start) || new Date();
+  var endD   = cmgParseStartDate(cfg.end)   || new Date();
+  startD.setHours(0,0,0,0); endD.setHours(23,59,59,0);
+  var bucketKey, bucketLabel, weekStart;
+  if (unit === 'day') {
+    bucketKey   = function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+    bucketLabel = function(d){ return (d.getMonth()+1)+'/'+d.getDate(); };
+  } else if (unit === 'week') {
+    weekStart   = function(d){ var x=new Date(d); x.setDate(x.getDate()-x.getDay()); x.setHours(0,0,0,0); return x; };
+    bucketKey   = function(d){ var w=weekStart(d); return w.getFullYear()+'-'+String(w.getMonth()+1).padStart(2,'0')+'-'+String(w.getDate()).padStart(2,'0'); };
+    bucketLabel = function(d){ var w=weekStart(d); return (w.getMonth()+1)+'/'+String(w.getDate()).padStart(2,'0'); };
+  } else {
+    bucketKey   = function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
+    bucketLabel = function(d){ return (d.getFullYear()%100)+'.'+String(d.getMonth()+1).padStart(2,'0'); };
+  }
+  var buckets=[], idx={}, cur;
+  if (unit==='day'){ cur=new Date(startD); while(cur<=endD){ var kd=bucketKey(cur); idx[kd]=buckets.length; buckets.push({label:bucketLabel(cur),neu:0,exp:0,ear:0,valid:0}); cur.setDate(cur.getDate()+1); } }
+  else if (unit==='week'){ cur=weekStart(startD); var ew=weekStart(endD); while(cur<=ew){ var kw=bucketKey(cur); idx[kw]=buckets.length; buckets.push({label:bucketLabel(cur),neu:0,exp:0,ear:0,valid:0}); cur.setDate(cur.getDate()+7); } }
+  else { cur=new Date(startD.getFullYear(),startD.getMonth(),1); var em=new Date(endD.getFullYear(),endD.getMonth(),1); while(cur<=em){ var km=bucketKey(cur); idx[km]=buckets.length; buckets.push({label:bucketLabel(cur),neu:0,exp:0,ear:0,valid:0}); cur.setMonth(cur.getMonth()+1); } }
+  var isMid = function(v){ return /중도퇴실/.test(String(v.jValue||'')); };
+  var base = 0;
+  vacancyRawData.forEach(function(v){
+    var sd = cmgParseStartDate(v.startDate); if(!sd) return;
+    var ex = cmgParseStartDate(v.actualExitDate);
+    if (sd < startD && (!ex || ex >= startD)) base++;                                  // 기간 시작 시점 유효계약(base)
+    if (sd >= startD && sd <= endD){ var k1=bucketKey(sd); if(idx[k1]!==undefined) buckets[idx[k1]].neu++; }   // 신규 입주
+    if (ex && ex >= startD && ex <= endD){ var k2=bucketKey(ex); if(idx[k2]!==undefined){ if(isMid(v)) buckets[idx[k2]].ear++; else buckets[idx[k2]].exp++; } } // 퇴실
+  });
+  var cum = base;
+  buckets.forEach(function(b){ cum += b.neu - b.exp - b.ear; b.valid = cum; });
+  return { rows: buckets, base: base };
+}
+// [v427] 유효계약수 차트 — 신규 입주(+)/만기·중도 퇴실(−) 막대 + 유효계약수 누적 라인(우측 축)
+function sumDrawValidChart(){
+  var canvas = document.getElementById('sumDailyChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  if (window._sumDailyChartInstance){ try{ window._sumDailyChartInstance.destroy(); }catch(e){} }
+  var data = sumBuildValidData(), rows = data.rows;
+  var labels = rows.map(function(r){return r.label;});
+  var neu = rows.map(function(r){return r.neu;});
+  var expv = rows.map(function(r){return -r.exp;});
+  var earv = rows.map(function(r){return -r.ear;});
+  var validv = rows.map(function(r){return r.valid;});
+  window._sumDailyChartInstance = new Chart(canvas, {
+    data:{ labels:labels, datasets:[
+      { type:'bar', label:'신규 입주', data:neu, backgroundColor:'#1baf7a', stack:'f', yAxisID:'y' },
+      { type:'bar', label:'만기퇴실', data:expv, backgroundColor:'#EF9F27', stack:'f', yAxisID:'y' },
+      { type:'bar', label:'중도퇴실', data:earv, backgroundColor:'#E24B4A', stack:'f', yAxisID:'y' },
+      { type:'line', label:'유효계약수(누적)', data:validv, borderColor:'#185FA5', backgroundColor:'#185FA5', borderWidth:2, pointRadius:2, tension:0.3, yAxisID:'y1' }
+    ]},
+    options:{ maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{position:'top',align:'center',labels:{boxWidth:12,font:{size:11},padding:10}},
+        tooltip:{ callbacks:{ label:function(ctx){ return ctx.dataset.label+': '+Math.abs(ctx.raw)+'건'; } } } },
+      scales:{ x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},
+        y:{stacked:true,position:'left',grid:{color:'rgba(120,120,120,0.1)'},ticks:{font:{size:10},callback:function(v){return v+'건';}},title:{display:true,text:'월 증감(건)',font:{size:10}}},
+        y1:{position:'right',beginAtZero:true,grid:{display:false},ticks:{font:{size:10},callback:function(v){return v+'건';}},title:{display:true,text:'유효계약수(건)',font:{size:10}}} } }
+  });
+  var ins = document.getElementById('sumDailyInsight');
+  if (ins){
+    var tN=rows.reduce(function(s,r){return s+r.neu;},0), tE=rows.reduce(function(s,r){return s+r.exp;},0), tM=rows.reduce(function(s,r){return s+r.ear;},0);
+    var last=rows[rows.length-1]||{valid:0}, net=tN-tE-tM, churn=tN>0?Math.round((tE+tM)/tN*100):0;
+    ins.innerHTML = ''
+      + '<div><span style="color:#6B7280">유효계약수:</span> <b style="color:#185FA5">'+data.base+' → '+last.valid+'건</b> (순증 '+(net>=0?'+':'')+net+')</div>'
+      + '<div><span style="color:#6B7280">신규 입주:</span> <b style="color:#128a5e">'+tN+'건</b></div>'
+      + '<div><span style="color:#6B7280">만기퇴실:</span> <b style="color:#B5730F">'+tE+'건</b> · <span style="color:#6B7280">중도퇴실:</span> <b style="color:#A32D2D">'+tM+'건</b></div>'
+      + '<div style="margin-left:auto;color:#9CA3AF;font-size:10px">이탈률 약 '+churn+'%'+(tM>tE?' · 중도퇴실 > 만기퇴실 (중도이탈 관리 필요)':'')+'</div>';
+  }
+}
 // [v105] Section ① 차트 그리기 — 12개월 막대+라인 (커스텀 데이터 라벨)
 function sumDrawDailyChart(){
+  if (window._sumChartCfg && window._sumChartCfg.view === 'valid') return sumDrawValidChart();
   var canvas = document.getElementById('sumDailyChart');
   if (!canvas || typeof Chart === 'undefined') return;
   if (window._sumDailyChartInstance) {
