@@ -17230,6 +17230,26 @@ function sumDrawValidChart(){
   var expv = rows.map(function(r){return -r.exp;});
   var earv = rows.map(function(r){return -r.ear;});
   var validv = rows.map(function(r){return r.valid;});
+  // [v428] 월별 값 라벨 — 각 막대 segment 값(흰색) + 유효계약수 라인 값(파랑, 상단)
+  var vLabels = { id:'vLabels', afterDatasetsDraw:function(chart){
+    var ctx=chart.ctx;
+    chart.data.datasets.forEach(function(ds,i){
+      var meta=chart.getDatasetMeta(i);
+      meta.data.forEach(function(pt,idx){
+        var v=ds.data[idx];
+        if(v==null||v===0)return;
+        ctx.save();
+        if(ds.type==='line'){
+          ctx.fillStyle='#185FA5'; ctx.font='700 10px Pretendard,"Malgun Gothic",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+          ctx.fillText(v, pt.x, pt.y-7);
+        } else if(Math.abs(v)>=3){
+          ctx.fillStyle='#ffffff'; ctx.font='700 9.5px Pretendard,"Malgun Gothic",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+          ctx.fillText(Math.abs(v), pt.x, (pt.y+pt.base)/2);
+        }
+        ctx.restore();
+      });
+    });
+  }};
   window._sumDailyChartInstance = new Chart(canvas, {
     data:{ labels:labels, datasets:[
       { type:'bar', label:'신규 입주', data:neu, backgroundColor:'#1baf7a', stack:'f', yAxisID:'y' },
@@ -17237,12 +17257,13 @@ function sumDrawValidChart(){
       { type:'bar', label:'중도퇴실', data:earv, backgroundColor:'#E24B4A', stack:'f', yAxisID:'y' },
       { type:'line', label:'유효계약수(누적)', data:validv, borderColor:'#185FA5', backgroundColor:'#185FA5', borderWidth:2, pointRadius:2, tension:0.3, yAxisID:'y1' }
     ]},
-    options:{ maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+    options:{ maintainAspectRatio:false, layout:{padding:{top:20}}, interaction:{mode:'index',intersect:false},
       plugins:{ legend:{position:'top',align:'center',labels:{boxWidth:12,font:{size:11},padding:10}},
         tooltip:{ callbacks:{ label:function(ctx){ return ctx.dataset.label+': '+Math.abs(ctx.raw)+'건'; } } } },
       scales:{ x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},
         y:{stacked:true,position:'left',grid:{color:'rgba(120,120,120,0.1)'},ticks:{font:{size:10},callback:function(v){return v+'건';}},title:{display:true,text:'월 증감(건)',font:{size:10}}},
-        y1:{position:'right',beginAtZero:true,grid:{display:false},ticks:{font:{size:10},callback:function(v){return v+'건';}},title:{display:true,text:'유효계약수(건)',font:{size:10}}} } }
+        y1:{position:'right',beginAtZero:true,grid:{display:false},ticks:{font:{size:10},callback:function(v){return v+'건';}},title:{display:true,text:'유효계약수(건)',font:{size:10}}} } },
+    plugins:[vLabels]
   });
   var ins = document.getElementById('sumDailyInsight');
   if (ins){
