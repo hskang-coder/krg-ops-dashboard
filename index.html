@@ -4969,7 +4969,7 @@ function renderContractRecord(c, payments, responses = []) {
             if (!rs.length) return '<span style="color:#D1D5DB">-</span>';
             rs.sort(function(a,b){ return (b._idx||0) - (a._idx||0); });
             for (var i = 0; i < rs.length; i++) {
-              var m = String(rs[i].content || '').match(/KCB\\s*(\\d+)/i);
+              var m = String(rs[i].content || '').match(/(?:^|\D)(\d{3})(?!\d)/);
               if (m) return '<span style="color:#DC2626;font-weight:700">' + m[1] + '</span>';
             }
             return '<span style="color:#D1D5DB">-</span>';
@@ -6993,18 +6993,11 @@ function dlqRenderTableRows() {
                 if (!rows.length) return '<span style="color:#D1D5DB">-</span>';
                 // 가장 최근 행 (_idx 기준 내림차순)
                 rows.sort(function(a,b){ return (b._idx||0) - (a._idx||0); });
-                // [v371] content에서 "KCB" 키워드 뒤의 숫자 추출 (KCB 신용평가 점수)
-                // "KCB 200 / 직장 ..." → 200 / 다른 숫자(날짜·금액)는 무시
-                // 우선순위 1: KCB 뒤 숫자 (가장 정확)
+                // [v423] KCB 점수 = 대응상세내용의 첫 독립 3자리 숫자 (뒤 12자리 KCB ID·긴 숫자 제외)
+                //   지원: "424 KCB 167535370131"→424, "150 KCBID ..."→150, "KCB 651점"→651, "KCB조회 612 점"→612
                 for (var i = 0; i < rows.length; i++) {
-                  var m = String(rows[i].content || '').match(/KCB\s*(\d+)/i);
+                  var m = String(rows[i].content || '').match(/(?:^|\D)(\d{3})(?!\d)/);
                   if (m) return '<span style="color:#DC2626">' + m[1] + '</span>';
-                }
-                // [v422] 우선순위 2: KCB 없으면 — 법적조치 검토 행의 대응상세내용 첫 숫자(2~3자리)를 점수로
-                for (var j = 0; j < rows.length; j++) {
-                  if (String(rows[j].jobSub || '').indexOf('법적조치') < 0) continue;
-                  var m2 = String(rows[j].content || '').match(/^\s*(?:KCB\s*)?(\d{2,3})(?!\d)/i);
-                  if (m2) return '<span style="color:#DC2626">' + m2[1] + '</span>';
                 }
                 return '<span style="color:#D1D5DB">-</span>';
               } catch(_) { return '<span style="color:#D1D5DB">-</span>'; }
@@ -7055,9 +7048,8 @@ function _dlqScore(cno){
   var rs=daeungRawData.filter(function(d){ if(!d||String(d.no||'').trim()!==String(cno).trim())return false; var s=String(d.jobSub||'').replace(/\s/g,''); return s.indexOf('법적조치검토')>=0||s.indexOf('내용증명발송')>=0; });
   if(!rs.length)return null;
   rs.sort(function(a,b){return (b._idx||0)-(a._idx||0);});
-  for(var i=0;i<rs.length;i++){ var m=String(rs[i].content||'').match(/KCB\s*(\d+)/i); if(m)return m[1]; }
-  // [v422] KCB 없을 때 — 법적조치검토 행 대응상세내용 첫 숫자(2~3자리)를 점수로
-  for(var j=0;j<rs.length;j++){ if(String(rs[j].jobSub||'').replace(/\s/g,'').indexOf('법적조치검토')<0)continue; var m2=String(rs[j].content||'').match(/^\s*(?:KCB\s*)?(\d{2,3})(?!\d)/i); if(m2)return m2[1]; }
+  // [v423] KCB 점수 = 대응상세내용의 첫 독립 3자리 숫자 (뒤 12자리 KCB ID·긴 숫자 제외)
+  for(var i=0;i<rs.length;i++){ var m=String(rs[i].content||'').match(/(?:^|\D)(\d{3})(?!\d)/); if(m)return m[1]; }
   return null;
 }
 function _dlqDt(s){ var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(m[1].slice(2)+'.'+('0'+m[2]).slice(-2)+'.'+('0'+m[3]).slice(-2)):''; }
