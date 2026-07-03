@@ -2019,6 +2019,7 @@ function parseVacancySheet(resp) {
   const coPhoneIdx     = findColIdx(labels, ['연락처'],            53);  // BB
   const coRrnIdx       = findColIdx(labels, ['주민번호.1'],        54);  // BC
   const inspectTypeIdx = findColIdx(labels, ['심사구분'],          58);  // BG
+  const signDateIdx    = findColIdx(labels, ['계약체결일','체결일'], 63);  // BL [v429] 위수탁계약서 계약체결일 디폴트
 let tentativeDateIdx = findColIdx(labels, ['가계약일'], 61);
   tentativeDateIdx = (function(w){function dt(x){var tt=0,h=0;for(var i=0;i<rows.length&&tt<240;i++){var cc=(rows[i].c||[])[x];var vv=cc?String(cc.f!=null?cc.f:(cc.v!=null?cc.v:'')).trim():'';if(!vv)continue;tt++;if(/\d{4}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2}/.test(vv)||/^Date\(/.test(vv))h++;}return tt?h/tt:0;}return (w>=0&&dt(w)>=0.3)?w:61;})(tentativeDateIdx);  // BJ
   const partnerNameIdx = findColIdx(labels, ['부동산명'],          64);  // BM
@@ -2097,6 +2098,8 @@ let outsourceIdx = findColIdx(labels, ['연체외주','연체 외주'], 71);
       startDate:     cell(startDateIdx),
       // [v86/v201] 가계약일 (BJ열)
       tentativeDate: cell(tentativeDateIdx),
+      // [v429] 계약체결일 (BL열) — 위수탁계약서 디폴트
+      signDate:      cell(signDateIdx),
       // [v102] 실제 퇴실일 (Z열) — 거주기간/갱신차수 계산
       actualExitDate: cell(actualExitDateIdx),
       // [v148] 입금내역서용 계약물건 정보
@@ -10568,6 +10571,26 @@ function mgmtCtrPrefillFromContract(no){
   // 월세 (임대료)
   var rent = String(c['임대료']||c['월세']||'').replace(/[^0-9]/g,'');
   if (rent) setIn('Rent', rent);
+  // [v429] 공실현황 시트(gid=1953907648) 기반 보정 — 소재지(T+V) · 계약체결일(BL) · 납기일(W열 day)
+  try {
+    var vac = (typeof vacancyRawData !== 'undefined' && Array.isArray(vacancyRawData))
+      ? vacancyRawData.find(function(v){ return String(v.no||'').trim() === String(no).trim(); }) : null;
+    var setForce = function(idSuffix, val){
+      if (val == null || val === '') return;
+      document.querySelectorAll('input[id="mctr_'+idSuffix+'"]').forEach(function(el){
+        var pane = el.closest('#mctr_searchPane,#mctr_manualPane');
+        if (pane && pane.style.display !== 'none') { el.value = val; el.classList.add('mctr-info'); }
+      });
+    };
+    if (vac) {
+      var addrTV = [vac.propAddr, vac.propRoom].filter(function(s){ return s && String(s).trim(); }).join(' ').trim();
+      if (addrTV) setForce('PropAddr', addrTV);                        // ① 소재지 = T열 + V열
+      var vsd = fmtDate(vac.signDate);
+      if (vsd) setForce('SignDate', vsd);                              // ② 계약체결일 = BL열
+      var wd = fmtDate(vac.startDate);
+      if (wd) { var dd = parseInt(wd.slice(8,10),10); if (dd>=1 && dd<=31) setForce('PayDay', String(dd)); } // ③ 납기일 = W열 day
+    }
+  } catch(_e){}
 }
 
 // 텍스트 직접 붙여넣기 — modal 폴백
@@ -10874,7 +10897,7 @@ function buildMgmtContractHtml(d){
     +   '<div class="clause">③ 본 계약은 "갑"과 "을"의 기명날인 또는 서명이 있는 서면 합의를 통해서만 수정 또는 변경될 수 있다.</div>'
     +   '<div class="clause"><b>제11조(특약)</b> "갑"과 "을"은 제1조부터 제10조까지에서 규정한 사항 외에 필요한 사항에 대해서는 따로 특약을 정할 수 있다.</div>'
     +   '<div class="signrow">'
-    +     '<div class="signbox"><b>갑 (임대인)</b>성명: '+d.name+'<br>주소: '+d.addr+'<br>주민번호: '+d.rrn+'<br><span style="display:inline-block;margin-top:18px">(서명 또는 날인) ____________</span></div>'
+    +     '<div class="signbox"><b>갑 (임대인)</b>성명: '+d.name+'<br>주소: '+d.addr+'<br>주민번호: '+d.rrn+'<br><span style="display:inline-block;margin-top:14px">(서명 또는 날인)</span><span class="stamp" id="gapStamp"></span></div>'
     +     '<div class="signbox"><b>을 (주택임대관리업자)</b>성명: 케이알지그룹 주식회사<br>주소: 충남 천안시 동남구 목천읍 천정1길 227-14<br>법인등기번호: 110111-6847987<span class="stamp">'+sealHtml+'</span></div>'
     +   '</div>'
     +   '<div style="text-align:center;margin-top:24px;font-size:13px;font-weight:700">'+fmtKr(d.signDate)+'</div>'
@@ -10883,8 +10906,10 @@ function buildMgmtContractHtml(d){
     + '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>위수탁계약서_'+(d.name||'')+'_'+(d.signDate||'')+'</title>'
     + '<style>'+css+'</style>'
     + '<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>'
+    + '<script>function attachGapStamp(){var i=document.createElement(\'input\');i.type=\'file\';i.accept=\'image/*\';i.onchange=function(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){var s=document.getElementById(\'gapStamp\');if(s)s.innerHTML=\'<img src="\'+ev.target.result+\'" alt="갑 도장" style="width:64px;height:64px;object-fit:contain;vertical-align:middle;margin-left:8px">\';};r.readAsDataURL(f);};i.click();}<\/script>'
     + '</head><body>'
     + '<div class="print-actions">'
+    +   '<button class="print-btn" style="background:#B45309" onclick="attachGapStamp()">🖊️ 갑 도장 첨부</button>'
     +   '<button class="print-btn" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>'
     +   '<button class="print-btn" style="background:#0EA5E9" onclick="(function(){var pages=document.querySelectorAll(\'.page\'); if(!pages.length) return; var acts=document.querySelector(\'.print-actions\'); if(acts) acts.style.display=\'none\'; var promises=[]; pages.forEach(function(p,i){promises.push(html2canvas(p,{scale:2,backgroundColor:\'#fff\'}).then(function(c){var a=document.createElement(\'a\');a.href=c.toDataURL(\'image/jpeg\',0.95);a.download=\'위수탁계약서_'+(d.name||'')+'_p\'+(i+1)+\'.jpg\';document.body.appendChild(a);a.click();document.body.removeChild(a);}));}); Promise.all(promises).then(function(){if(acts) acts.style.display=\'\';}).catch(function(e){if(acts) acts.style.display=\'\'; alert(\'JPG 생성 실패\');});})()">🖼️ JPG 저장 (페이지별)</button>'
     +   '<button class="print-btn" style="background:#6B7280" onclick="window.close()">닫기</button>'
