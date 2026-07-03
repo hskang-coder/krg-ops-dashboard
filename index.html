@@ -13513,12 +13513,13 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
 .rnw-filter-btn { background:#F3F4F6; border:1px solid #E5E7EB; border-radius:16px; padding:5px 14px; font-size:11.5px; font-weight:700; color:#374151; cursor:pointer; transition:all .15s; }
 .rnw-filter-btn:hover { background:#E5E7EB; }
 .rnw-filter-btn.active { background:#06B6D4; border-color:#06B6D4; color:#fff; }
-.rnw-tbl { width:100%; border-collapse:collapse; font-size:12px; min-width:1300px; }
+.rnw-tbl { width:100%; border-collapse:collapse; font-size:10.5px; table-layout:fixed; }  /* [v430] 가로 스크롤 없이 전체 폭 맞춤 */
 .rnw-tbl thead tr { background:#F9FAFB; }
-.rnw-tbl th { padding:8px 8px; text-align:left; font-weight:700; color:#475569; font-size:11px; border-bottom:2px solid #E5E7EB; white-space:nowrap; }
-.rnw-tbl td { padding:7px 8px; border-bottom:1px solid #F3F4F6; vertical-align:middle; white-space:nowrap; }
+.rnw-tbl th { padding:6px 4px; text-align:left; font-weight:700; color:#475569; font-size:9.5px; border-bottom:2px solid #E5E7EB; white-space:normal; word-break:keep-all; line-height:1.25; }
+.rnw-tbl td { padding:5px 4px; border-bottom:1px solid #F3F4F6; vertical-align:middle; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .rnw-tbl tr:hover td { background:#F0FDFA; cursor:pointer; }
-.rnw-tbl-content { white-space:normal !important; word-break:keep-all; line-height:1.5; min-width:240px; max-width:340px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.rnw-tbl-content { white-space:normal !important; word-break:keep-all; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.rnw-tbl .rnw-badge { padding:2px 5px; font-size:9.5px; }  /* [v430] 좁은 셀에서 배지 폭 축소 */
 .rnw-badge { display:inline-block; padding:2px 9px; border-radius:10px; font-size:10.5px; font-weight:700; line-height:1.5; white-space:nowrap; }
 .rnw-b-app  { background:#DCFCE7; color:#166534; }
 .rnw-b-cond { background:#FEF3C7; color:#92400E; }
@@ -14383,7 +14384,14 @@ function renderRenewalView(){
     rowsHtml = '<div class="rnw-empty">해당 조건의 대상자가 없습니다.</div>';
   } else {
     // [v47] 컬럼: No > 계약번호 > 그룹 > 계약상태 > 공실상태 > 갱신심사결과 > 임(전)차인 > 연락처 > 갱신기한 > 만기일 > D-Day > 회차 > 연체횟수 > 누적일 > 연체율 > 진행상태 > 대응일 > 최근 대응 내용
-    rowsHtml = '<div style="overflow-x:auto"><table class="rnw-tbl">'
+    rowsHtml = '<div><table class="rnw-tbl">'
+      + '<colgroup>'
+      +   '<col style="width:2%"><col style="width:2.5%"><col style="width:5%"><col style="width:4%">'      /* cb·No·계약번호·그룹 */
+      +   '<col style="width:5%"><col style="width:4.5%"><col style="width:5.5%"><col style="width:5%">'    /* 계약상태·공실상태·갱신심사결과·임(전)차인 */
+      +   '<col style="width:7%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:3.5%">'  /* 연락처·갱신기한·만기일·D-Day */
+      +   '<col style="width:3%"><col style="width:4%"><col style="width:3.5%"><col style="width:3.5%">'    /* 회차·연체횟수·누적일·연체율 */
+      +   '<col style="width:5%"><col style="width:5%"><col style="width:16%">'                            /* 진행상태·대응일·최근대응내용 */
+      + '</colgroup>'
       + '<thead><tr>'
       + '<th style="width:32px;text-align:center"><input type="checkbox" class="dlq-cb" id="rnwChkAll" onchange="rnwSelectAll(this.checked)" title="전체 선택"></th>'
       + '<th>No</th><th>계약번호</th><th>그룹</th><th>계약상태</th><th>공실상태</th>'
