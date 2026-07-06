@@ -19960,6 +19960,85 @@ function crQF_render(no, tenantName){
 })();
 
 // 메인 렌더
+// ── [v433] 수신 전화 업무 구분 · AI 자동화 분석 (gid=1658264212) ──
+function okpi_parseCalls(resp){
+  if(!resp||!resp.table) return [];
+  return (resp.table.rows||[]).map(function(r){
+    var c=r.c||[];
+    var g=function(i){return c[i]?String(c[i].f!=null?c[i].f:(c[i].v!=null?c[i].v:'')).trim():'';};
+    return { date:g(1), who:g(2), target:g(3), seg:g(4), task:g(5), note:g(6) };
+  }).filter(function(r){ return r.who; });
+}
+function okpi_callSection(rows, range){
+  if(range){ rows = (rows||[]).filter(function(r){ return okpi_inRange(r, range); }); }
+  if(!rows||!rows.length){
+    return '<div class="okpi-section-title">📞 수신 전화 업무 구분 · AI 자동화 우선순위</div>'
+      +'<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:16px;color:#8A97A8;font-size:12px;margin-bottom:14px">선택 기간에 수신 전화 기록이 없습니다. (gid=1658264212)</div>';
+  }
+  var PER=2.5, total=rows.length;
+  var fm=function(n){ return Math.round(n*10)/10; };
+  var ds=rows.map(function(r){return r.date;}).filter(Boolean).sort();
+  var dr= ds.length? ds[0]+' ~ '+ds[ds.length-1] : '-';
+  var whoMap={}; rows.forEach(function(r){var k=r.who||'미상';whoMap[k]=(whoMap[k]||0)+1;});
+  var whoArr=Object.keys(whoMap).map(function(k){return [k,whoMap[k]];}).sort(function(a,b){return b[1]-a[1];});
+  var segNorm=function(s){ if(/신규/.test(s))return 'new'; if(/기존/.test(s))return 'old'; return 'unk'; };
+  var tOrder=['임차인','임대인','부동산','기타'];
+  var tMap={}; rows.forEach(function(r){var k=r.target||'기타'; if(!tMap[k])tMap[k]={n:0,old:0,'new':0,unk:0}; tMap[k].n++; tMap[k][segNorm(r.seg)]++;});
+  var tKeys=tOrder.filter(function(k){return tMap[k];}).concat(Object.keys(tMap).filter(function(k){return tOrder.indexOf(k)<0;}));
+  var taskMap={}; rows.forEach(function(r){var k=(r.task&&r.task.trim())?r.task.trim():'미분류'; taskMap[k]=(taskMap[k]||0)+1;});
+  var taskArr=Object.keys(taskMap).map(function(k){return [k,taskMap[k]];}).sort(function(a,b){return b[1]-a[1];});
+  var urg=function(t){ if(/수납|정산|연체/.test(t))return 'h'; if(/정보변경|기타|미분류/.test(t))return 'l'; return 'm'; };
+  var uinfo={h:['🔴','높음'],m:['🟡','중간'],l:['🟢','낮음']};
+  var top=taskArr[0]||['-',0];
+  var w0=whoArr[0]||['-',0], w1=whoArr[1]||['',0];
+  var kpi='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">'
+    +'<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#6B7280;font-weight:700">총 수신콜</div><div style="font-size:24px;font-weight:800;color:#1B3976">'+total+'<span style="font-size:12px;color:#8A97A8">건</span></div><div style="font-size:10.5px;color:#8A97A8">'+dr+'</div></div>'
+    +'<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#6B7280;font-weight:700">총 응대시간</div><div style="font-size:24px;font-weight:800;color:#0E7490">'+fm(total*PER)+'<span style="font-size:12px;color:#8A97A8">분</span></div><div style="font-size:10.5px;color:#8A97A8">건당 2.5분 환산</div></div>'
+    +'<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#6B7280;font-weight:700">담당자 부하</div><div style="font-size:14px;font-weight:800;color:#B45309">'+w0[0]+' '+fm(w0[1]*PER)+'분 <span style="font-size:11px;color:#DC2626">'+Math.round(w0[1]/total*100)+'%</span></div>'+(w1[0]?'<div style="font-size:11px;font-weight:700;color:#475569">'+w1[0]+' '+fm(w1[1]*PER)+'분 <span style="color:#8A97A8">'+Math.round(w1[1]/total*100)+'%</span></div>':'')+'</div>'
+    +'<div style="background:#EEF3FB;border:1px solid #C3D4EE;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#1B3976;font-weight:700">최우선 자동화 대상</div><div style="font-size:16px;font-weight:800;color:#1B3976;line-height:1.25;margin-top:2px">'+top[0]+'</div><div style="font-size:11px;color:#2E5AAC;font-weight:700">'+top[1]+'건 · '+Math.round(top[1]/total*100)+'% · '+fm(top[1]*PER)+'분</div></div>'
+    +'</div>';
+  var tmax=taskArr[0]?taskArr[0][1]:1;
+  var tbars=taskArr.map(function(x){
+    var w=(x[1]/tmax*100).toFixed(1);
+    var col=x[1]>=tmax*0.6?'#1B3976':x[1]>=tmax*0.18?'#2E5AAC':'#7BA4E3';
+    return '<div style="display:flex;align-items:center;gap:8px"><div style="width:92px;text-align:right;color:#475569;font-weight:600">'+x[0]+'</div><div style="flex:1;background:#EEF2F8;border-radius:4px;height:16px;overflow:hidden"><div style="width:'+w+'%;background:'+col+';height:100%;border-radius:4px"></div></div><div style="width:84px;color:#1B3976;font-weight:700">'+x[1]+'건 · '+fm(x[1]*PER)+'분</div></div>';
+  }).join('');
+  var gmax=1; tKeys.forEach(function(k){ if(tMap[k].n>gmax)gmax=tMap[k].n; });
+  var cc={old:'#1B3976','new':'#7BA4E3',unk:'#D8E0EC'};
+  var gbars=tKeys.map(function(k){
+    var m=tMap[k];
+    var seg=['old','new','unk'].map(function(s){ return m[s]>0?'<div style="width:'+(m[s]/gmax*100).toFixed(1)+'%;background:'+cc[s]+';height:100%"></div>':''; }).join('');
+    return '<div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-weight:700;color:#374151">'+k+'</span><span style="color:#1B3976;font-weight:700">'+m.n+'건 · '+Math.round(m.n/total*100)+'%</span></div><div style="display:flex;background:#EEF2F8;border-radius:4px;height:15px;overflow:hidden">'+seg+'</div></div>';
+  }).join('');
+  var panels='<div style="display:grid;grid-template-columns:1.25fr 1fr;gap:10px;margin-bottom:12px">'
+    +'<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:14px"><div style="font-size:12px;font-weight:800;color:#1B3976;margin-bottom:10px">🧩 업무구분별 볼륨 · 시간 <span style="font-size:10.5px;font-weight:600;color:#8A97A8">(무엇을 — 병목)</span></div><div style="display:flex;flex-direction:column;gap:6px;font-size:11px">'+tbars+'</div></div>'
+    +'<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:14px"><div style="font-size:12px;font-weight:800;color:#1B3976;margin-bottom:10px">👥 대상별 <span style="font-size:10.5px;font-weight:600;color:#8A97A8">(누구를 — 기존/신규)</span></div><div style="display:flex;flex-direction:column;gap:9px;font-size:11px">'+gbars+'</div><div style="margin-top:9px;font-size:10px;color:#8A97A8"><span style="display:inline-block;width:9px;height:9px;background:#1B3976;border-radius:2px;vertical-align:middle"></span> 기존 <span style="display:inline-block;width:9px;height:9px;background:#7BA4E3;border-radius:2px;vertical-align:middle;margin-left:6px"></span> 신규 <span style="display:inline-block;width:9px;height:9px;background:#D8E0EC;border-radius:2px;vertical-align:middle;margin-left:6px"></span> 미상</div></div>'
+    +'</div>';
+  var cum=0;
+  var rankRows=taskArr.map(function(x,i){
+    cum+=x[1];
+    var u=uinfo[urg(x[0])];
+    var pct=Math.round(x[1]/total*100), cpct=Math.round(cum/total*100);
+    var rankBg=i===0?'#1B3976':i<3?'#2E5AAC':'#94A3B8';
+    return '<tr style="border-bottom:1px solid #F1F5F9">'
+      +'<td style="padding:5px 8px;text-align:center"><span style="display:inline-block;min-width:18px;background:'+rankBg+';color:#fff;border-radius:10px;font-size:10.5px;font-weight:800;padding:1px 6px">'+(i+1)+'</span></td>'
+      +'<td style="padding:5px 8px;font-weight:700;color:#1E293B">'+x[0]+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;color:#1B3976;font-weight:700">'+x[1]+'건</td>'
+      +'<td style="padding:5px 8px;text-align:right;color:#475569">'+pct+'%</td>'
+      +'<td style="padding:5px 8px;text-align:right;color:#8A97A8">'+cpct+'%</td>'
+      +'<td style="padding:5px 8px;text-align:right;color:#0E7490">'+fm(x[1]*PER)+'분</td>'
+      +'<td style="padding:5px 8px;text-align:center">'+u[0]+' <span style="font-size:10px;color:#6B7280">'+u[1]+'</span></td>'
+      +'</tr>';
+  }).join('');
+  var c2=0,cover=0; for(var ci=0;ci<taskArr.length;ci++){c2+=taskArr[ci][1];cover=ci+1;if(c2/total>=0.7)break;}
+  var priority='<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:14px;margin-bottom:14px">'
+    +'<div style="font-size:12px;font-weight:800;color:#1B3976;margin-bottom:4px">🎯 AI 자동화 우선순위 <span style="font-size:10.5px;font-weight:600;color:#8A97A8">(콜 볼륨 기준 — 무엇을 먼저)</span></div>'
+    +'<div style="font-size:10.5px;color:#15803D;margin-bottom:9px">💡 상위 '+cover+'개 업무구분이 전체 콜의 '+Math.round(c2/total*100)+'% → 우선 자동화 시 최대 효과</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:11.5px"><thead><tr style="background:#F8FAFC;color:#64748B;font-size:10.5px"><th style="padding:5px 8px">순위</th><th style="padding:5px 8px;text-align:left">업무구분</th><th style="padding:5px 8px;text-align:right">콜수</th><th style="padding:5px 8px;text-align:right">비중</th><th style="padding:5px 8px;text-align:right">누적</th><th style="padding:5px 8px;text-align:right">시간</th><th style="padding:5px 8px">긴급도</th></tr></thead><tbody>'+rankRows+'</tbody></table>'
+    +'<div style="margin-top:8px;font-size:10px;color:#8A97A8">긴급도: 🔴 높음(수납·정산 등 시간민감) · 🟡 중간(계약·퇴실·심사) · 🟢 낮음(정보변경·기타) — 각 건은 자동화 검토용 로우데이터</div></div>';
+  return '<div class="okpi-section-title">📞 수신 전화 업무 구분 · AI 자동화 우선순위 <span class="pill">'+dr+' · '+total+'콜 · 건당 2.5분</span></div>'+kpi+panels+priority;
+}
+
 async function okpi_render(){
   try {
     okpi_injectCss();
@@ -19969,8 +20048,12 @@ async function okpi_render(){
     host.innerHTML = '<div class="okpi-empty">📡 KPI 데이터 로딩 중...</div>';
     await okpi_ensureData();
     var k = okpi_calcAll();
+    var _callRows=[];
+    try{ var _cr=await okpi_fetchRaw('1658264212'); _callRows=okpi_parseCalls(_cr); }catch(_e){ console.warn('[okpi] 수신전화 fetch 실패:', _e); }
+    var _callRange = okpi_getRange((window._okpi&&window._okpi.period)||'day', (window._okpi&&window._okpi.date)||new Date());
     host.innerHTML = '<div class="okpi-wrap">'
       + okpi_renderTopBar(k)
+      + okpi_callSection(_callRows, _callRange)
       + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
       + okpi_renderChart(k)
       + okpi_renderPersonCards(k)
