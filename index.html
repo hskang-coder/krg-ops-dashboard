@@ -4,8 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KRG 개런티즈 운영팀</title>
+<!-- [perf] 데이터 서버 사전 연결 — gviz/AppsScript 요청 시작 시간 단축 -->
+<link rel="preconnect" href="https://docs.google.com">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- [perf] xlsx는 Excel 내보내기 버튼 클릭 시에만 사용 — defer로 초기 렌더 차단 제거 -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -43,20 +48,22 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
 /* ─── VIEW TABS ─────────────────────────────── */
+/* [design] 안3 플로팅 독 — 중앙 정렬 카드형 버튼바. CSS만 교체, 마크업·JS·클래스명 무변경 */
 .view-tabs {
-  display: flex; padding: 0 24px;
-  border-top: 1px solid rgba(255,255,255,0.08);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  background: rgba(0,0,0,0.12);
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 2px;
+  width: fit-content; max-width: 100%;
+  margin: 10px auto 14px; padding: 6px;
+  background: #FFFFFF; border: 1px solid #E2EAF5; border-radius: 14px;
+  box-shadow: 0 6px 22px rgba(26,58,92,0.28);
 }
 .view-tab {
   background: none; border: none; cursor: pointer;
-  color: rgba(255,255,255,0.5); font-size: 13px; font-weight: 700;
-  padding: 10px 20px; border-bottom: 3px solid transparent; transition: all 0.2s;
+  color: #5A6B85; font-size: 12.5px; font-weight: 700;
+  padding: 9px 15px; border-radius: 10px; transition: all 0.2s;
   display: flex; align-items: center; gap: 5px;
 }
-.view-tab.active { color: #FFF; border-bottom-color: #4DA3E8; }
-.view-tab:hover:not(.active) { color: rgba(255,255,255,0.8); }
+.view-tab.active { background: linear-gradient(135deg,#2563A8,#4DA3E8); color: #FFF; box-shadow: 0 3px 10px rgba(37,99,168,0.35); }
+.view-tab:hover:not(.active) { background: #EDF2F9; color: #1A3A5C; }
 
 /* ─── PERSON TABS (체크리스트 전용) ─────────────────────────────── */
 .person-tabs-row {
@@ -1011,7 +1018,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 </style>
 <!-- v1776817031 -->
 <!-- [v243] 케이알지그룹(주) 도장 자동 날인 — 갑 서명 영역에 디폴트 삽입 -->
-<script src="_assets/seal-dataurl.js"></script>
+<!-- [perf] 도장 데이터(250KB)는 문서 생성 시에만 사용 — defer로 초기 렌더 차단 제거 -->
+<script defer src="_assets/seal-dataurl.js"></script>
 </head>
 <body>
 
@@ -1696,49 +1704,125 @@ function switchView(view) {
 // [v262] 시트 active filter 영향 영구 차단 — SQL(tq=SELECT *) + range=A:ZZ + 캐시버스트(_t) + cache:'no-store' 4중 안전장치
 //   ※ v145의 range=A:ZZ만으로는 일부 케이스에서 active filter가 gviz 응답에 영향을 미침
 //   ※ v218(okpi) / v257(연체관리)에서 검증된 패턴을 전체 fetch 헬퍼에 적용
+// [perf] 동시 중복 fetch 공유 — 같은 시트 요청이 "진행 중"일 때만 그 Promise를 재사용.
+//   완료된 뒤의 재호출은 기존과 100% 동일하게 매번 새로 fetch (신선도·기존 동작 불변).
+//   초기 로딩 시 계약관리(Raw DATA)·입금내역(Raw DATA)이 2회씩 중복 호출되던 낭비 제거.
+window._sheetInflight = window._sheetInflight || {};
+function _sheetFetchShared(fkey, doFetch){
+  if (window._sheetInflight[fkey]) return window._sheetInflight[fkey];
+  const p = doFetch();
+  window._sheetInflight[fkey] = p;
+  const clear = function(){ if (window._sheetInflight[fkey] === p) delete window._sheetInflight[fkey]; };
+  p.then(clear, clear);
+  // 네트워크가 응답 없이 걸린 경우 20초 후 공유 해제 — 재조회 시 새 요청이 나가는 기존 동작 보존
+  setTimeout(clear, 20000);
+  return p;
+}
+
 async function fetchSheetByName(sheetName) {
-  const enc = encodeURIComponent(sheetName);
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`
-            + `&sheet=${enc}`
-            + `&range=A:ZZ`
-            + `&tq=${encodeURIComponent('SELECT *')}`
-            + `&headers=1`
-            + `&_t=${Date.now()}`;
-  const res = await fetch(url, { cache: 'no-store' });
-  const text = await res.text();
-  const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
-  if (!m) throw new Error('parse error');
-  return JSON.parse(m[1]);
+  return _sheetFetchShared('name:' + sheetName, async function(){
+    const enc = encodeURIComponent(sheetName);
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`
+              + `&sheet=${enc}`
+              + `&range=A:ZZ`
+              + `&tq=${encodeURIComponent('SELECT *')}`
+              + `&headers=1`
+              + `&_t=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    const text = await res.text();
+    const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
+    if (!m) throw new Error('parse error');
+    return JSON.parse(m[1]);
+  });
 }
 
 async function fetchSheetByGid(gid) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`
-            + `&gid=${gid}`
-            + `&range=A:ZZ`
-            + `&tq=${encodeURIComponent('SELECT *')}`
-            + `&headers=1`
-            + `&_t=${Date.now()}`;
-  const res = await fetch(url, { cache: 'no-store' });
-  const text = await res.text();
-  const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
-  if (!m) throw new Error('parse error');
-  return JSON.parse(m[1]);
+  return _sheetFetchShared('gid:' + gid, async function(){
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`
+              + `&gid=${gid}`
+              + `&range=A:ZZ`
+              + `&tq=${encodeURIComponent('SELECT *')}`
+              + `&headers=1`
+              + `&_t=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    const text = await res.text();
+    const m = text.match(/setResponse\((\{[\s\S]+\})\)/);
+    if (!m) throw new Error('parse error');
+    return JSON.parse(m[1]);
+  });
 }
 
 // [v113] 시트 캐시 (stale-while-revalidate)
+// [perf] 저장소 교체: localStorage → IndexedDB + 메모리 미러
+//   사유: 계약관리(Raw DATA) 캐시가 약 4MB로 localStorage 한도(5MB)에 걸려 setItem이 조용히
+//         실패해 캐시가 사실상 동작하지 않았음. IndexedDB는 한도가 넉넉해 캐시가 실제로 유지됨.
+//   ※ _sumSheetCacheGet/Set의 시그니처·반환 형태는 기존과 완전히 동일 (호출부 무수정)
 window._sumSheetCacheTTL = 3 * 60 * 1000; // 3분
 window._sumSheetCacheKey = function(kind, key){ return "krg_sum_cache_" + kind + "_" + key; };
+window._sumCacheMem = {};        // 동기 조회용 메모리 미러
+window._sumCacheLoaded = false;  // IndexedDB → 메모리 초기 로드 완료 여부
+window._sumCacheDbReady = new Promise(function(resolve){
+  try {
+    var req = indexedDB.open('krg_sheet_cache_db', 1);
+    req.onupgradeneeded = function(){ try { req.result.createObjectStore('kv'); } catch(_){} };
+    req.onsuccess = function(){
+      var db = req.result;
+      window._sumCacheDb = db;
+      try {
+        var store = db.transaction('kv', 'readonly').objectStore('kv');
+        var kReq = store.getAllKeys();
+        var vReq = store.getAll();
+        var done = 0;
+        var finish = function(){
+          done++;
+          if (done < 2) return;
+          try {
+            var ks = kReq.result || [], vs = vReq.result || [];
+            for (var i = 0; i < ks.length; i++) window._sumCacheMem[ks[i]] = vs[i];
+          } catch(_){}
+          window._sumCacheLoaded = true;
+          resolve(db);
+        };
+        kReq.onsuccess = finish; vReq.onsuccess = finish;
+        kReq.onerror = finish;   vReq.onerror = finish;
+      } catch(e){ window._sumCacheLoaded = true; resolve(db); }
+    };
+    req.onerror = function(){ window._sumCacheLoaded = true; resolve(null); };
+  } catch(e){ window._sumCacheLoaded = true; resolve(null); }
+});
+window._sumCacheIdbPut = function(k, v){
+  try { if (window._sumCacheDb) window._sumCacheDb.transaction('kv','readwrite').objectStore('kv').put(v, k); } catch(e){}
+};
 window._sumSheetCacheGet = function(kind, key){
   try {
-    const raw = localStorage.getItem(window._sumSheetCacheKey(kind, key));
-    if (!raw) return null;
-    const o = JSON.parse(raw);
+    var k = window._sumSheetCacheKey(kind, key);
+    var o = window._sumCacheMem[k];
+    if (!o) {
+      // 마이그레이션 폴백: 과거 localStorage에 저장돼 있던 소형 캐시 재사용
+      var raw = localStorage.getItem(k);
+      if (raw) o = JSON.parse(raw);
+    }
     if (!o || !o.data || !o.ts) return null;
     return { data: o.data, ts: o.ts, age: Date.now() - o.ts };
   } catch(e){ return null; }
 };
 window._sumSheetCacheSet = function(kind, key, data){
-  try { localStorage.setItem(window._sumSheetCacheKey(kind, key), JSON.stringify({ data: data, ts: Date.now() })); } catch(e){}
+  try {
+    var k = window._sumSheetCacheKey(kind, key);
+    var o = { data: data, ts: Date.now() };
+    window._sumCacheMem[k] = o;
+    window._sumCacheIdbPut(k, o);
+    try { localStorage.removeItem(k); } catch(_){} // 구버전 localStorage 잔여물 정리 (quota 확보)
+  } catch(e){}
+};
+// [perf] 전체 무효화 — 연체관리 진입 시 기존 localStorage 삭제와 동일한 의미 보존용
+window._sumSheetCacheClearAll = function(){
+  try {
+    Object.keys(window._sumCacheMem).forEach(function(k){
+      if (k.indexOf('krg_sum_cache_') === 0) delete window._sumCacheMem[k];
+    });
+    if (window._sumCacheDb) window._sumCacheDb.transaction('kv','readwrite').objectStore('kv').clear();
+  } catch(e){}
 };
 // pre-fetch — 캐시 만료된 항목만 백그라운드 fetch
 window.sumPrefetch = function(){
@@ -6276,6 +6360,8 @@ async function renderDelinquency() {
       if (k.indexOf('krg_sum_cache_') === 0) localStorage.removeItem(k);
     });
   } catch(_){}
+  // [perf] IndexedDB로 이전된 시트 캐시도 동일하게 무효화 — v262의 기존 무효화 동작 그대로 보존
+  try { if (window._sumSheetCacheClearAll) window._sumSheetCacheClearAll(); } catch(_){}
   // [v306] 메모리 캐시 없으면 sessionStorage에서 복원 시도 (페이지 새로고침 직후 즉시 표시)
   if (!window._dlqRawCache) {
     try {
@@ -16857,6 +16943,15 @@ function renderSummaryDashboard(){
   if (!wrap) return;
   // [v113] 데이터 로드 — 캐시 우선 (즉시 표시) + 백그라운드 갱신
   var needLoad = !Array.isArray(vacancyRawData) || !vacancyRawData.length || !crLoaded;
+  // [perf] 첫 진입 시 IndexedDB 캐시 로드가 끝나기 전이면 잠깐(최대 0.5초) 대기 후 재시도.
+  //   캐시가 있으면 fetch 없이 즉시 표시되고, 없거나 실패하면 기존 로딩 경로 그대로 진행.
+  if (needLoad && !window._sumCacheLoaded && !window._sumCacheWaited) {
+    window._sumCacheWaited = true;
+    wrap.innerHTML = '<div class="sum-loading">📡 K.R.G. Enterprize 데이터 로딩 중...</div>';
+    Promise.race([window._sumCacheDbReady, new Promise(function(r){ setTimeout(r, 500); })])
+      .then(function(){ renderSummaryDashboard(); });
+    return;
+  }
   if (needLoad) {
     var cName1 = window._sumSheetCacheGet && window._sumSheetCacheGet('name', CONTRACT_SHEET);
     var cName2 = window._sumSheetCacheGet && window._sumSheetCacheGet('name', INCOME_SHEET);
