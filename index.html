@@ -1045,6 +1045,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <button class="view-tab active" onclick="switchView('summary')">📈 DashBoard</button>
     <button class="view-tab"        onclick="switchView('opskpi')">📊 운영관리</button>
     <button class="view-tab"        onclick="switchView('contractMgmt')">📑 계약관리</button>
+    <button class="view-tab"        onclick="switchView('partnerMgmt')">🏢 파트너관리</button>
     <button class="view-tab"        onclick="switchView('contract')">📋 입주관리</button>
     <button class="view-tab"        onclick="switchView('renewal')">🔄 갱신관리</button>
     <button class="view-tab"        onclick="switchView('payment')">💰 수납관리</button>
@@ -1311,6 +1312,10 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
   <!-- [v74] 계약관리 뷰 -->
   <div id="contractMgmtView" class="view-content">
     <div class="cmg-inner"></div>
+  </div>
+  <!-- [v435] 파트너관리 뷰 (계약관리에서 파트너·중개보수·담당자·정산·지역 섹션 분리) -->
+  <div id="partnerMgmtView" class="view-content">
+    <div class="cmg-inner ptn-inner"></div>
   </div>
   <div id="summaryView" class="view-content active">
     <div class="sum-inner"></div>
@@ -1605,6 +1610,7 @@ function switchView(view) {
   document.getElementById('delinquencyView').classList.toggle('active', view === 'delinquency');
   document.getElementById('renewalView').classList.toggle('active', view === 'renewal');  // [v43]
   document.getElementById('contractMgmtView').classList.toggle('active', view === 'contractMgmt');  // [v74]
+  try { document.getElementById('partnerMgmtView').classList.toggle('active', view === 'partnerMgmt'); } catch(e){} // [v435]
   document.getElementById('summaryView').classList.toggle('active', view === 'summary'); // [v102]
   // [Phase 2a] 운영관리 (KPI) 탭 — 격리 모듈
   try { document.getElementById('opskpiView').classList.toggle('active', view === 'opskpi'); } catch(e){}
@@ -1615,17 +1621,18 @@ function switchView(view) {
   if (view === 'delinquency') renderDelinquency();
   if (view === 'renewal') renderRenewalView();  // [v43]
   if (view === 'contractMgmt') renderContractMgmtView();  // [v74]
+  if (view === 'partnerMgmt') renderPartnerMgmtView();  // [v435]
   if (view === 'summary') renderSummaryDashboard(); // [v102]
   document.getElementById('personTabsRow').style.display = view === 'checklist' ? 'flex' : 'none';
   // [v74] contractMgmt 추가
-  const titles = { dashboard:'운영관리(구)', opskpi:'운영관리', checklist:'업무 체크리스트', contract:'입주관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리', contractMgmt:'계약관리', summary:'K.R.G. Enterprize', property:'물건관리' };
+  const titles = { dashboard:'운영관리(구)', opskpi:'운영관리', checklist:'업무 체크리스트', contract:'입주관리', payment:'수납 대상 관리', delinquency:'연체관리', renewal:'갱신관리', contractMgmt:'계약관리', partnerMgmt:'파트너관리', summary:'K.R.G. Enterprize', property:'물건관리' };
   document.getElementById('pageTitle').textContent = titles[view] || '';
   document.getElementById('refreshBtn').style.display = view === 'dashboard' ? '' : 'none';
 
   // [v74] 7개 탭 (dashboard/checklist/contract/contractMgmt/payment/delinquency/renewal)
   document.querySelectorAll('.view-tab').forEach((btn,i) => {
     // [v101] DOM 순서와 일치 (v94: dashboard/checklist/contractMgmt/contract/renewal/payment/delinquency)
-    btn.classList.toggle('active', ['summary','opskpi','contractMgmt','contract','renewal','payment','delinquency','property'][i] === view);
+    btn.classList.toggle('active', ['summary','opskpi','contractMgmt','partnerMgmt','contract','renewal','payment','delinquency','property'][i] === view);
   });
 
   if (view === 'checklist') {
@@ -16471,38 +16478,23 @@ function cmgPctColor(p){
 function renderContractMgmtView(){
   var wrap = document.querySelector('#contractMgmtView .cmg-inner');
   if (!wrap) return;
-  // 데이터 로드 대기
-  // [v434] 핵심 먼저 렌더 — 입금시트(약 6.8초, 파트너 '연체%'에만 필요)를 기다리지 않고
-  //        계약·공실·파트너 시트만으로 즉시 렌더. 입금데이터는 백그라운드 로드 후 연체% 부분만 갱신.
-  //        ⚠ 연체·수납 탭과 공유하는 paymentRawData/crLoaded는 실제 입금 로드 완료 시에만 세팅(축소 금지).
+  // [v435] 파트너관리 탭이 활성이면 그쪽으로 위임 (파트너 섹션 필터가 이 함수를 호출해도 정상 동작)
+  var _pv = document.getElementById('partnerMgmtView');
+  if (_pv && _pv.classList.contains('active')) { return renderPartnerMgmtView(); }
+  // 데이터 로드 대기 — [v435] 계약관리 핵심(진척표·KPI)은 계약+공실 시트만 필요.
+  //   (파트너 통계·중개보수·담당자·정산·지역, 그리고 그에 쓰이는 입금시트는 파트너관리 탭으로 이관)
   var contractReady = Array.isArray(contractRawData) && contractRawData.length;
   var vacReady      = Array.isArray(vacancyRawData) && vacancyRawData.length;
-  var coreNeed = !contractReady || !vacReady || !partnerLoaded; // 핵심 3종(계약·공실·파트너)
+  var coreNeed = !contractReady || !vacReady;
   if (coreNeed) {
     wrap.innerHTML = '<div class="cmg-empty">📡 계약관리 데이터 로딩 중...</div>';
     var p1 = [];
     if (!contractReady) p1.push(fetchSheetByName(CONTRACT_SHEET).then(function(g){ contractRawData = _keepBig(contractRawData, gvizToObjects(g).filter(function(x){return _krNo(x);})); }));
     if (!vacReady) p1.push(fetchSheetByGid(VACANCY_GID).then(function(r){ vacancyRawData = parseVacancySheet(r); }));
-    if (!partnerLoaded) p1.push(fetchSheetByGid(PARTNER_GID).then(function(r){ partnerRawData = parsePartnerSheet(r); partnerLoaded = true; }).catch(function(e){ console.warn('partner fetch fail', e); partnerLoaded = true; })); // [v76]
     Promise.all(p1).then(function(){ renderContractMgmtView(); }).catch(function(e){
       wrap.innerHTML = '<div class="cmg-empty">❌ 데이터 로드 실패: ' + e.message + '</div>';
     });
     return;
-  }
-  // 핵심 데이터 준비 완료 → 즉시 렌더. 입금데이터(파트너 연체%용)는 아직이면 백그라운드 로드.
-  var incomeReady = crLoaded || (Array.isArray(paymentRawData) && paymentRawData.length > 0);
-  window._cmgIncomeReady = incomeReady;
-  if (!incomeReady && !window._cmgIncomeFetching) {
-    window._cmgIncomeFetching = true;
-    fetchSheetByName(INCOME_SHEET).then(function(g){
-      paymentRawData = _keepBig(paymentRawData, gvizToObjects(g).filter(function(x){return _krNo(x);}));
-      _normPaymentRows(paymentRawData); // [v408] 입금내역 헤더 깨짐 대응
-      crLoaded = true;                  // 계약(이미 로드) + 입금 로드 완료 → 공유 플래그 정상 세팅
-      window._cmgIncomeFetching = false;
-      window._cmgIncomeReady = true;
-      var _cmv = document.getElementById('contractMgmtView');
-      if (_cmv && _cmv.classList.contains('active')) renderContractMgmtView(); // 현재 탭일 때만 연체% 갱신
-    }).catch(function(e){ window._cmgIncomeFetching = false; console.warn('[cmg] 입금 백그라운드 로드 실패', e); });
   }
   var rows = cmgBuildProgress();
   var period = window._cmgPeriod || 'all';
@@ -16690,11 +16682,50 @@ function renderContractMgmtView(){
     + '<div class="cmg-card">'
     + '<div class="cmg-card-title"><span class="dot"></span>📋 입주 전 진척 체크리스트 (홈버튼 / 전자계약 / 수수료 / 서명 / NAS)</div>'
     + rowsHtml
-    + '</div>'
-    + cmgRenderPartnerStats() // [v77] 섹션 B
-    + cmgRenderPersonStats() // [v78] 섹션 C
-    + cmgRenderSettlementCard() // [v79] 6-2
-    + cmgRenderRegionCard(); // [v79] 6-5 (v95: 6-4 온보딩 삭제)
+    + '</div>';  // [v435] 파트너 섹션(B/C/정산/지역)은 파트너관리 탭(renderPartnerMgmtView)으로 이관
+}
+
+// ═══════════════════════════════════════════
+// ■ [v435] 파트너관리 탭 — 계약관리에서 분리한 파트너/중개보수/담당자/정산/지역 섹션
+//   핵심 먼저 렌더: 계약+공실+파트너 시트로 즉시 렌더, 입금시트(연체%용)는 백그라운드 로드 후 갱신.
+//   ⚠ 연체·수납과 공유하는 paymentRawData/crLoaded는 실제 입금 로드 완료 시에만 세팅(축소 금지).
+// ═══════════════════════════════════════════
+function renderPartnerMgmtView(){
+  var wrap = document.querySelector('#partnerMgmtView .cmg-inner');
+  if (!wrap) return;
+  var contractReady = Array.isArray(contractRawData) && contractRawData.length;
+  var vacReady      = Array.isArray(vacancyRawData) && vacancyRawData.length;
+  var coreNeed = !contractReady || !vacReady || !partnerLoaded;
+  if (coreNeed) {
+    wrap.innerHTML = '<div class="cmg-empty">📡 파트너관리 데이터 로딩 중...</div>';
+    var p1 = [];
+    if (!contractReady) p1.push(fetchSheetByName(CONTRACT_SHEET).then(function(g){ contractRawData = _keepBig(contractRawData, gvizToObjects(g).filter(function(x){return _krNo(x);})); }));
+    if (!vacReady) p1.push(fetchSheetByGid(VACANCY_GID).then(function(r){ vacancyRawData = parseVacancySheet(r); }));
+    if (!partnerLoaded) p1.push(fetchSheetByGid(PARTNER_GID).then(function(r){ partnerRawData = parsePartnerSheet(r); partnerLoaded = true; }).catch(function(e){ console.warn('partner fetch fail', e); partnerLoaded = true; }));
+    Promise.all(p1).then(function(){ renderPartnerMgmtView(); }).catch(function(e){
+      wrap.innerHTML = '<div class="cmg-empty">❌ 데이터 로드 실패: ' + e.message + '</div>';
+    });
+    return;
+  }
+  // 입금데이터(파트너 연체%용)는 아직이면 백그라운드 로드 후 연체% 갱신
+  var incomeReady = crLoaded || (Array.isArray(paymentRawData) && paymentRawData.length > 0);
+  window._cmgIncomeReady = incomeReady;
+  if (!incomeReady && !window._cmgIncomeFetching) {
+    window._cmgIncomeFetching = true;
+    fetchSheetByName(INCOME_SHEET).then(function(g){
+      paymentRawData = _keepBig(paymentRawData, gvizToObjects(g).filter(function(x){return _krNo(x);}));
+      _normPaymentRows(paymentRawData); // [v408] 입금내역 헤더 깨짐 대응
+      crLoaded = true;
+      window._cmgIncomeFetching = false;
+      window._cmgIncomeReady = true;
+      var _pvv = document.getElementById('partnerMgmtView');
+      if (_pvv && _pvv.classList.contains('active')) renderPartnerMgmtView();
+    }).catch(function(e){ window._cmgIncomeFetching = false; console.warn('[ptn] 입금 백그라운드 로드 실패', e); });
+  }
+  wrap.innerHTML = cmgRenderPartnerStats()   // [v77] 섹션 B — 부동산(파트너)별 계약 통계 + 중개보수료
+    + cmgRenderPersonStats()                 // [v78] 섹션 C — 계약담당자별 통계
+    + cmgRenderSettlementCard()              // [v79] 6-2 정산
+    + cmgRenderRegionCard();                 // [v79] 6-5 지역
 }
 // ═══════════════════════════════════════════
 // ■ [v44] 갱신관리 끝
