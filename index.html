@@ -16022,6 +16022,8 @@ function cmgRenderQuality(q){
     var pct = Math.round(q.delqRate * 100);
     var cls = q.delqRate <= 0.05 ? 'cmg-q-good' : (q.delqRate <= 0.15 ? 'cmg-q-mid' : 'cmg-q-bad');
     html += '<span class="cmg-quality ' + cls + '" title="연체 발생: ' + q.delqCnt + '/' + q.validCnt + '">연체 ' + pct + '%</span>';
+  } else if (window._cmgIncomeReady === false) {
+    html += '<span class="cmg-quality cmg-q-na" title="입금 데이터 로딩 중">연체 확인중…</span>'; // [v434] 핵심 먼저 렌더 — 입금 백그라운드 로드 중
   } else {
     html += '<span class="cmg-quality cmg-q-na">연체 N/A</span>';
   }
@@ -16470,22 +16472,37 @@ function renderContractMgmtView(){
   var wrap = document.querySelector('#contractMgmtView .cmg-inner');
   if (!wrap) return;
   // 데이터 로드 대기
-  var needLoad = !Array.isArray(vacancyRawData) || !vacancyRawData.length || !crLoaded || !partnerLoaded; // [v76] partnerLoaded
-  if (needLoad) {
+  // [v434] 핵심 먼저 렌더 — 입금시트(약 6.8초, 파트너 '연체%'에만 필요)를 기다리지 않고
+  //        계약·공실·파트너 시트만으로 즉시 렌더. 입금데이터는 백그라운드 로드 후 연체% 부분만 갱신.
+  //        ⚠ 연체·수납 탭과 공유하는 paymentRawData/crLoaded는 실제 입금 로드 완료 시에만 세팅(축소 금지).
+  var contractReady = Array.isArray(contractRawData) && contractRawData.length;
+  var vacReady      = Array.isArray(vacancyRawData) && vacancyRawData.length;
+  var coreNeed = !contractReady || !vacReady || !partnerLoaded; // 핵심 3종(계약·공실·파트너)
+  if (coreNeed) {
     wrap.innerHTML = '<div class="cmg-empty">📡 계약관리 데이터 로딩 중...</div>';
-    var promises = [];
-    if (!crLoaded) promises.push(Promise.all([fetchSheetByName(CONTRACT_SHEET), fetchSheetByName(INCOME_SHEET)]).then(function(arr){
-      contractRawData = gvizToObjects(arr[0]).filter(function(x){return _krNo(x);});
-      paymentRawData  = gvizToObjects(arr[1]).filter(function(x){return _krNo(x);});
-      _normPaymentRows(paymentRawData); // [v408] 입금내역 헤더 깨짐 대응
-      crLoaded = true;
-    }));
-    if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) promises.push(fetchSheetByGid(VACANCY_GID).then(function(r){ vacancyRawData = parseVacancySheet(r); }));
-    if (!partnerLoaded) promises.push(fetchSheetByGid(PARTNER_GID).then(function(r){ partnerRawData = parsePartnerSheet(r); partnerLoaded = true; }).catch(function(e){ console.warn('partner fetch fail', e); partnerLoaded = true; })); // [v76]
-    Promise.all(promises).then(function(){ renderContractMgmtView(); }).catch(function(e){
+    var p1 = [];
+    if (!contractReady) p1.push(fetchSheetByName(CONTRACT_SHEET).then(function(g){ contractRawData = _keepBig(contractRawData, gvizToObjects(g).filter(function(x){return _krNo(x);})); }));
+    if (!vacReady) p1.push(fetchSheetByGid(VACANCY_GID).then(function(r){ vacancyRawData = parseVacancySheet(r); }));
+    if (!partnerLoaded) p1.push(fetchSheetByGid(PARTNER_GID).then(function(r){ partnerRawData = parsePartnerSheet(r); partnerLoaded = true; }).catch(function(e){ console.warn('partner fetch fail', e); partnerLoaded = true; })); // [v76]
+    Promise.all(p1).then(function(){ renderContractMgmtView(); }).catch(function(e){
       wrap.innerHTML = '<div class="cmg-empty">❌ 데이터 로드 실패: ' + e.message + '</div>';
     });
     return;
+  }
+  // 핵심 데이터 준비 완료 → 즉시 렌더. 입금데이터(파트너 연체%용)는 아직이면 백그라운드 로드.
+  var incomeReady = crLoaded || (Array.isArray(paymentRawData) && paymentRawData.length > 0);
+  window._cmgIncomeReady = incomeReady;
+  if (!incomeReady && !window._cmgIncomeFetching) {
+    window._cmgIncomeFetching = true;
+    fetchSheetByName(INCOME_SHEET).then(function(g){
+      paymentRawData = _keepBig(paymentRawData, gvizToObjects(g).filter(function(x){return _krNo(x);}));
+      _normPaymentRows(paymentRawData); // [v408] 입금내역 헤더 깨짐 대응
+      crLoaded = true;                  // 계약(이미 로드) + 입금 로드 완료 → 공유 플래그 정상 세팅
+      window._cmgIncomeFetching = false;
+      window._cmgIncomeReady = true;
+      var _cmv = document.getElementById('contractMgmtView');
+      if (_cmv && _cmv.classList.contains('active')) renderContractMgmtView(); // 현재 탭일 때만 연체% 갱신
+    }).catch(function(e){ window._cmgIncomeFetching = false; console.warn('[cmg] 입금 백그라운드 로드 실패', e); });
   }
   var rows = cmgBuildProgress();
   var period = window._cmgPeriod || 'all';
