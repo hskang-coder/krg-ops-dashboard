@@ -20112,16 +20112,19 @@ function okpi_parseCalls(resp){
     return { date:g(1), who:g(2), target:g(3), seg:g(4), task:g(5), note:g(6) };
   }).filter(function(r){ return r.who; });
 }
-function okpi_callSection(rows, range){
+function okpi_callSection(rows, range, period){
   if(range){ rows = (rows||[]).filter(function(r){ return okpi_inRange(r, range); }); }
+  // [v436] 선택 기간(일/주/월 · 기준일)을 헤더에 표시 — 위 KPI 카드의 '기간'과 동일하게 연동
+  var _f=function(d){ return (d instanceof Date && !isNaN(d)) ? (d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')) : ''; };
+  var selDr = range ? (function(){ var s=_f(range.start), e=_f(range.end); return s? ((s===e)? s : (s+' ~ '+e)) : '-'; })() : '-';
+  var plabel = ({day:'일',week:'주',month:'월'}[period]||'');
+  var pTag = (plabel? plabel+' · ':'') + selDr;
   if(!rows||!rows.length){
-    return '<div class="okpi-section-title">📞 수신 전화 업무 구분 · AI 자동화 우선순위</div>'
-      +'<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:16px;color:#8A97A8;font-size:12px;margin-bottom:14px">선택 기간에 수신 전화 기록이 없습니다. (gid=1658264212)</div>';
+    return '<div class="okpi-section-title">📞 수신 전화 업무 구분 · AI 자동화 우선순위 <span class="pill">'+pTag+' · 0콜</span></div>'
+      +'<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:16px;color:#8A97A8;font-size:12px;margin-bottom:14px">선택 기간(<b>'+pTag+'</b>)에 수신 전화 기록이 없습니다. (gid=1658264212)</div>';
   }
   var PER=2.5, total=rows.length;
   var fm=function(n){ return Math.round(n*10)/10; };
-  var ds=rows.map(function(r){return r.date;}).filter(Boolean).sort();
-  var dr= ds.length? ds[0]+' ~ '+ds[ds.length-1] : '-';
   var whoMap={}; rows.forEach(function(r){var k=r.who||'미상';whoMap[k]=(whoMap[k]||0)+1;});
   var whoArr=Object.keys(whoMap).map(function(k){return [k,whoMap[k]];}).sort(function(a,b){return b[1]-a[1];});
   var segNorm=function(s){ if(/신규/.test(s))return 'new'; if(/기존/.test(s))return 'old'; return 'unk'; };
@@ -20135,7 +20138,7 @@ function okpi_callSection(rows, range){
   var top=taskArr[0]||['-',0];
   var w0=whoArr[0]||['-',0], w1=whoArr[1]||['',0];
   var kpi='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">'
-    +'<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#6B7280;font-weight:700">총 수신콜</div><div style="font-size:24px;font-weight:800;color:#1B3976">'+total+'<span style="font-size:12px;color:#8A97A8">건</span></div><div style="font-size:10.5px;color:#8A97A8">'+dr+'</div></div>'
+    +'<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#6B7280;font-weight:700">총 수신콜</div><div style="font-size:24px;font-weight:800;color:#1B3976">'+total+'<span style="font-size:12px;color:#8A97A8">건</span></div><div style="font-size:10.5px;color:#8A97A8">'+selDr+'</div></div>'
     +'<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#6B7280;font-weight:700">총 응대시간</div><div style="font-size:24px;font-weight:800;color:#0E7490">'+fm(total*PER)+'<span style="font-size:12px;color:#8A97A8">분</span></div><div style="font-size:10.5px;color:#8A97A8">건당 2.5분 환산</div></div>'
     +'<div style="background:#fff;border:1px solid #E2EAF8;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#6B7280;font-weight:700">담당자 부하</div><div style="font-size:14px;font-weight:800;color:#B45309">'+w0[0]+' '+fm(w0[1]*PER)+'분 <span style="font-size:11px;color:#DC2626">'+Math.round(w0[1]/total*100)+'%</span></div>'+(w1[0]?'<div style="font-size:11px;font-weight:700;color:#475569">'+w1[0]+' '+fm(w1[1]*PER)+'분 <span style="color:#8A97A8">'+Math.round(w1[1]/total*100)+'%</span></div>':'')+'</div>'
     +'<div style="background:#EEF3FB;border:1px solid #C3D4EE;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#1B3976;font-weight:700">최우선 자동화 대상</div><div style="font-size:16px;font-weight:800;color:#1B3976;line-height:1.25;margin-top:2px">'+top[0]+'</div><div style="font-size:11px;color:#2E5AAC;font-weight:700">'+top[1]+'건 · '+Math.round(top[1]/total*100)+'% · '+fm(top[1]*PER)+'분</div></div>'
@@ -20179,7 +20182,7 @@ function okpi_callSection(rows, range){
     +'<div style="font-size:10.5px;color:#15803D;margin-bottom:9px">💡 상위 '+cover+'개 업무구분이 전체 콜의 '+Math.round(c2/total*100)+'% → 우선 자동화 시 최대 효과</div>'
     +'<table style="width:100%;border-collapse:collapse;font-size:11.5px"><thead><tr style="background:#F8FAFC;color:#64748B;font-size:10.5px"><th style="padding:5px 8px">순위</th><th style="padding:5px 8px;text-align:left">업무구분</th><th style="padding:5px 8px;text-align:right">콜수</th><th style="padding:5px 8px;text-align:right">비중</th><th style="padding:5px 8px;text-align:right">누적</th><th style="padding:5px 8px;text-align:right">시간</th><th style="padding:5px 8px">긴급도</th></tr></thead><tbody>'+rankRows+'</tbody></table>'
     +'<div style="margin-top:8px;font-size:10px;color:#8A97A8">긴급도: 🔴 높음(수납·정산 등 시간민감) · 🟡 중간(계약·퇴실·심사) · 🟢 낮음(정보변경·기타) — 각 건은 자동화 검토용 로우데이터</div></div>';
-  return '<div class="okpi-section-title">📞 수신 전화 업무 구분 · AI 자동화 우선순위 <span class="pill">'+dr+' · '+total+'콜 · 건당 2.5분</span></div>'+kpi+panels+priority;
+  return '<div class="okpi-section-title">📞 수신 전화 업무 구분 · AI 자동화 우선순위 <span class="pill">'+pTag+' · '+total+'콜 · 건당 2.5분</span></div>'+kpi+panels+priority;
 }
 
 async function okpi_render(){
@@ -20193,10 +20196,11 @@ async function okpi_render(){
     var k = okpi_calcAll();
     var _callRows=[];
     try{ var _cr=await okpi_fetchRaw('1658264212'); _callRows=okpi_parseCalls(_cr); }catch(_e){ console.warn('[okpi] 수신전화 fetch 실패:', _e); }
-    var _callRange = okpi_getRange((window._okpi&&window._okpi.period)||'day', (window._okpi&&window._okpi.date)||new Date());
+    var _callPeriod = (window._okpi&&window._okpi.period)||'day';
+    var _callRange = okpi_getRange(_callPeriod, (window._okpi&&window._okpi.date)||new Date());
     host.innerHTML = '<div class="okpi-wrap">'
       + okpi_renderTopBar(k)
-      + okpi_callSection(_callRows, _callRange)
+      + okpi_callSection(_callRows, _callRange, _callPeriod)
       + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
       + okpi_renderChart(k)
       + okpi_renderPersonCards(k)

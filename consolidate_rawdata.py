@@ -66,6 +66,18 @@ def consolidate_data():
                 log(f"→ 읽기 중: {file.name}")
                 df = pd.read_excel(file, sheet_name=0)
 
+                # 헤더 자동 탐지: 제목행이 있는 파일은 아래쪽 행에서 헤더 탐색
+                if '계약번호' not in df.columns:
+                    for header_row in range(1, 6):
+                        try:
+                            candidate = pd.read_excel(file, sheet_name=0, header=header_row)
+                        except Exception:
+                            break
+                        if '계약번호' in candidate.columns:
+                            df = candidate
+                            log(f"  ℹ 헤더 행 자동 감지: {header_row + 1}번째 행")
+                            break
+
                 # 필수 컬럼 확인
                 if '계약번호' not in df.columns:
                     log(f"⚠ 필수 컬럼 없음: {file.name}")
