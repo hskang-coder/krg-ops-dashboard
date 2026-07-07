@@ -5035,11 +5035,11 @@ function renderContractRecord(c, payments, responses = []) {
     return `<tr>
       <td>${fmt(p['청구서명']||p['납부종류'])}</td>
       <td style="color:#8A9AB5;font-size:11px">${fmt(p['납기일'])}</td>
+      <td>${fmt(p['납부일'])}</td>
+      <td style="color:#0E7490;font-size:11px">${__fmtSettleShort(__settleForRow(p['납기일']))}</td>
       <td>${badge}</td>
       <td style="text-align:center;color:${parseInt(p['연체일수']||0)>0?'#DC2626':'#059669'};font-weight:700">${p['연체일수']||0}</td>
       <td style="text-align:right;color:${unpaid>0?'#DC2626':'#1A3A5C'};font-weight:700">${unpaid>0?fmtMoney(unpaid):'—'}</td>
-      <td>${fmt(p['납부일'])}</td>
-      <td style="color:#0E7490;font-size:11px">${__fmtSettleShort(__settleForRow(p['납기일']))}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:#B0BDCE;padding:20px">입금 내역 없음</td></tr>';
 
@@ -5364,8 +5364,8 @@ function renderContractRecord(c, payments, responses = []) {
     <div style="overflow-x:auto;padding:0 4px 4px">
       <table class="cr-detail-table">
         <thead><tr>
-          <th>청구 항목</th><th>납기일</th><th>상태</th><th style="text-align:center">연체일수</th>
-          <th style="text-align:right">미납금액</th><th>납부일</th><th>정산일</th>
+          <th>청구 항목</th><th>납기일</th><th>납부일</th><th>정산일</th><th>상태</th>
+          <th style="text-align:center">연체일수</th><th style="text-align:right">미납금액</th>
         </tr></thead>
         <tbody>${detailRows}</tbody>
       </table>
