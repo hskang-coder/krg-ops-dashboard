@@ -11739,6 +11739,7 @@ function openIncomeReceiptModal(contractNo) {
   if (!contract) { alert('계약 데이터를 찾을 수 없습니다.'); return; }
   // 기존 모달 제거
   var prev = document.getElementById('crIncRcptModal'); if (prev) prev.remove();
+  window.__crDocVerMode = 'tenant'; // [v440] 발송 대상 모드 초기화 (임차인용 기본)
 
   // 디폴트 기간 — 계약 시작일 ~ today (또는 종료일)
   var fmt = function(d){ if(!d) return ''; if (typeof d==='string') return d.replace(/\./g,'-').replace(/\s/g,'').replace(/-(\d)(?!\d)/g,'-0$1'); return ''; };
@@ -11938,6 +11939,9 @@ function cG_setExtraNoteTemplate(type){
     landlord: '본 증명서는 임대인 측 정산 처리 및 관계 기관 제출용으로 발행되었으며, 임차인의 임대료·관리비 등 납부 내역과 계약 종결 상태를 객관적으로 증명합니다. 향후 임대차 계약 종결에 따른 정산 협의 시 본 문서를 기준 자료로 활용 가능합니다.'
   };
   el.value = templates[type] || '';
+  // [v440] 발송 대상 모드 — 임대인 발송용/임차인 요청용 (비우기는 모드 유지)
+  if (type === 'landlord') window.__crDocVerMode = 'landlord';
+  else if (type === 'tenant') window.__crDocVerMode = 'tenant';
   try { el.focus(); el.scrollTop = 0; } catch(_){}
 }
 
@@ -12150,7 +12154,7 @@ function cG_togglePurposeOptions(){
 }
 function closeIncomeReceiptModal(){ var m = document.getElementById('crIncRcptModal'); if (m) m.remove(); }
 
-function generateIncomeReceipt(contractNo){
+async function generateIncomeReceipt(contractNo){
   var fromVal = (document.getElementById('crIncRcptFrom')||{}).value;
   var toVal = (document.getElementById('crIncRcptTo')||{}).value;
   if (!fromVal || !toVal) { alert('발행 기간을 입력해주세요.'); return; }
@@ -12218,13 +12222,47 @@ function generateIncomeReceipt(contractNo){
     return true;
   });
 
+  // [v440] 임대인 발송용 — 정산일(V열) 매칭 · 미납 임대료 대위납부 완납 처리 · 예정 제외 · 미납표 숨김
+  var isLandlord = (window.__crDocVerMode === 'landlord') && (purpose === 'contract_close');
+  var settleMap = {};            // { 'YYYY-MM': 정산일 }
+  var missedSet = new WeakSet(); // 대위납부(완납 처리)로 편입된 미납 임대료 행
+  if (isLandlord) {
+    try {
+      var _sResp = await okpi_fetchRaw('1253974103');
+      (_sResp.table.rows||[]).forEach(function(r){
+        var c=r.c||[]; var gg=function(i){ return c[i]?String(c[i].f!=null?c[i].f:(c[i].v!=null?c[i].v:'')).trim():''; };
+        if (gg(9) !== String(contractNo)) return;              // 계약번호 = index 9
+        var mm = gg(3).match(/(\d{4})\s*년\s*(\d{1,2})\s*월/);  // 정산서월 = index 3
+        var sv = gg(21);                                        // 정산일(V열) = index 21
+        if (!mm || !sv) return;
+        settleMap[mm[1] + '-' + String(+mm[2]).padStart(2,'0')] = sv;
+      });
+    } catch(_e){ console.warn('[정산일] fetch 실패', _e); }
+    var _missedRows = (paymentRawData||[]).filter(function(p){
+      if (String(p['계약번호']||'').trim() !== String(contractNo)) return false;
+      if (types.indexOf(String(p['납부종류']||'').trim()) < 0) return false;
+      var st = String(p['납부상태']||'').trim();
+      if (!(st.indexOf('연체중')>=0 || st.indexOf('분납중')>=0)) return false; // 예정/완료 제외
+      var due = parseDate(p['납기일']);
+      if (!due || due < fromTs || due > toTs) return false;
+      return true;
+    });
+    _missedRows.forEach(function(p){ missedSet.add(p); });
+    rows = rows.concat(_missedRows);
+  }
+
   if (!rows.length && purpose !== 'exit_settlement') { alert('해당 기간에 납부 완료된 내역이 없습니다.'); return; }
 
   // 납기일 순 정렬
   rows.sort(function(a, b){ return (parseDate(a['납기일'])||0) - (parseDate(b['납기일'])||0); });
 
+  // 납기월 → YYYY-MM (정산일 매칭용)
+  var monthKey = function(s){ var d=parseDate(s); if(!d) return ''; var dt=new Date(d); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0'); };
+  // 행 납부금액 — 대위납부 완납행은 최종 청구금액 기준
+  var rowPaidAmt = function(r){ return missedSet.has(r) ? parseAmt(r['최종 청구금액(원)(①+②+③-④-⑤+⑥)'] || r['미납(연체)금액(원)'] || r['납부금액(원)']) : parseAmt(r['납부금액(원)']); };
+
   // 합계
-  var totalPaid = rows.reduce(function(s, r){ return s + parseAmt(r['납부금액(원)']); }, 0);
+  var totalPaid = rows.reduce(function(s, r){ return s + rowPaidAmt(r); }, 0);
 
   // 한글 금액 (간단 변환)
   var krWon = function(num){
@@ -12295,14 +12333,23 @@ function generateIncomeReceipt(contractNo){
       + '</svg>';
 
   var rowsHtml = rows.map(function(r, i){
+    var _missed = isLandlord && missedSet.has(r);
+    // 납부일: 임대인용 → 정산일(정산서월 매칭, 없으면 '-'), 대위납부 완납행은 '-'
+    var payDateCell;
+    if (isLandlord) {
+      payDateCell = _missed ? '-' : (function(){ var sv = settleMap[monthKey(r['납기일'])]; return sv ? fmtKr(sv) : '-'; })();
+    } else {
+      payDateCell = fmtKr(r['납부일']);
+    }
+    var methodCell = _missed ? '대위납부' : (r['납부방법']||'-');
     return '<tr>'
       + '<td style="text-align:center">' + (i+1) + '</td>'
       + '<td>' + (r['청구서명']||'-') + '</td>'
       + '<td style="text-align:center">' + (r['납부종류']||'-') + '</td>'
       + '<td style="text-align:center">' + fmtKr(r['납기일']) + '</td>'
-      + '<td style="text-align:center">' + fmtKr(r['납부일']) + '</td>'
-      + '<td style="text-align:right;font-weight:700;color:#065F46">' + fmtMon(parseAmt(r['납부금액(원)'])) + '</td>'
-      + '<td style="text-align:center">' + (r['납부방법']||'-') + '</td>'
+      + '<td style="text-align:center">' + payDateCell + '</td>'
+      + '<td style="text-align:right;font-weight:700;color:#065F46">' + fmtMon(rowPaidAmt(r)) + '</td>'
+      + '<td style="text-align:center">' + methodCell + '</td>'
       + '</tr>';
   }).join('');
 
@@ -12460,7 +12507,7 @@ function generateIncomeReceipt(contractNo){
 
   // [v396] 미납/정산 항목 표 — 계약해지증명서 OR 퇴실정산청구서에서만 출력
   var unpaidTableHtml = '';
-  if ((isClose || isSettle) && unpaidData && unpaidData.length > 0) {
+  if ((isClose || isSettle) && unpaidData && unpaidData.length > 0 && !isLandlord) { // [v440] 임대인 발송용은 미납 표 숨김
     var totalUnpaid = 0;
     var unpaidRowsHtml = unpaidData.map(function(u, i){
       var amt = parseAmt(u.amt);
