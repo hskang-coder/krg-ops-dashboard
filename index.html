@@ -9271,7 +9271,12 @@ function cG_parsePdfText(text){
   // [v179] 5가지 payCondition 매핑
   var sfRaw = pickIn(text, /서비스\s*수수료\s*(?:납부방법)?\s*[:：]?\s*([^\n\d]+)/).replace(/\s/g,'');
   var sfMap = { '분납':'분할','분할':'분할','일시납':'일시납','일시불':'일시납','비용포함':'비용포함','수수료별도':'수수료별도','수수료포함':'수수료포함' };
-  data.payCondition = sfMap[sfRaw] || sfRaw || '';
+  // [v438] 값에 괄호 주석 등이 붙어도(예: "비용포함(임대인 송악부담)") 키워드 부분일치로 매핑
+  data.payCondition = sfMap[sfRaw] || (function(){
+    var keys = ['비용포함','수수료별도','수수료포함','일시납','일시불','분납','분할']; // 더 구체적인 키 우선
+    for (var i=0;i<keys.length;i++){ if (sfRaw.indexOf(keys[i]) >= 0) return sfMap[keys[i]]; }
+    return sfRaw || '';
+  })();
 
   // [v188] 계약유형 자동 추출 — '상업용' 키워드 우선, 없으면 '주거용'(디폴트)
   if (/상업\s*용/.test(text)) data.useType = '상업용';
