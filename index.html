@@ -8232,7 +8232,7 @@ function cG_refNo(contractNo) {
 }
 
 // ── 특약 문구 생성 (3단계) ────────────────────────────────
-function cG_specialClause(payCondition, contractInfo, specialNotes) {
+function cG_specialClause(payCondition, contractInfo, specialNotes, longTermDiscount) {
   var parts = [];
   // 1단계: 자유 입력
   if (specialNotes && specialNotes.trim()) parts.push(specialNotes.trim());
@@ -8245,9 +8245,11 @@ function cG_specialClause(payCondition, contractInfo, specialNotes) {
     '분할': '개런티즈 서비스의 보장 기간은 임대차 계약기간이며, 수수료를 분할하여 지불한다. 개런티즈서비스수수료는 월세납기일과 동일한 일자에 지불한다. 개런티즈 서비스 계약 기간 중 퇴실 시 미납된 수수료(계약 개월 수 - 거주 개월 수) 전액을 지불하여야 한다.',
     '일시납': '개런티즈 서비스의 보장 기간은 계약기간과 동일하며, 일시납 수수료는 1년치 수수료를 한번에 지불한다.',
     '수수료별도': '개런티즈 서비스의 보장 기간은 계약기간과 동일하며, 수수료를 분할하여 지불한다. 잔여 개런티즈서비스수수료는 월세납기일과 동일한 일자에 지불한다. 개런티즈 서비스 계약 기간 중 퇴실 시 미납된 수수료(계약기간-거주기간) 전액을 지불하여야 한다.',
-    '비용포함': '임차인의 사유로 계약해지(중도퇴실)할 경우, 잔여 기간의 개런티즈 서비스수수료 (1년 계약 기준 : 1달 임대료/12 X 잔여 개월수)는 퇴실 의사를 밝힌 그 달 말일까지 임차인이 케이알지그룹주식회사로 전액 납부 하여야 한다.(서비스수수료 : 임대료 1달 / 1년), 갱신은 1년 단위임'
+    '비용포함': '임차인의 사유로 계약해지(중도퇴실)할 경우, 잔여 기간의 개런티즈 서비스수수료(1년 계약 기준 : 1달 임대료/12 X 잔여 개월수)는 퇴실 의사를 밝힌 그 달 말일까지 임차인이 케이알지그룹주식회사로 전액 납부 하여야 한다.(서비스수수료 : 임대료 1달 / 1년)'
   };
   if (clauseMap[payCondition]) parts.push(clauseMap[payCondition]);
+  // [v439] 장기할인적용 시 장기 전대 약정 특약 자동 추가
+  if (longTermDiscount) parts.push('본 계약은 장기 전대 약정에 따라 체결되며, 임차인은 조정된 월 임대료를 약정된 기일 내에 지급하여야 한다. "단, 임차인이 약정기간을 위반할 경우, 위반일로부터 계약 종료 시까지의 임대료는 계약서에 기재된 임대료 금액을 기준으로 지급하여야 한다."');
   return parts.join('\n\n');
 }
 
@@ -8540,6 +8542,7 @@ function cG_buildManualForm(){
             + '<option value="수수료포함">수수료포함</option>'
             + '</select>')
         )
+      + '<label style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:7px 10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;font-size:12px;color:#374151;font-weight:600;cursor:pointer"><input type="checkbox" id="cG_m_longDiscount" onchange="cG_recalcServiceFee&&cG_recalcServiceFee()" style="width:15px;height:15px;cursor:pointer"> 장기할인적용 <span style="font-size:10.5px;color:#9CA3AF;font-weight:500">(비용포함 계약서 발행 시 월세 +10만원 표기 · 서비스수수료 미표기)</span></label>'
       )
     // ③ 임대인 정보
     + section('③ 임대인 정보',
@@ -9277,6 +9280,7 @@ function cG_parsePdfText(text){
     for (var i=0;i<keys.length;i++){ if (sfRaw.indexOf(keys[i]) >= 0) return sfMap[keys[i]]; }
     return sfRaw || '';
   })();
+  data.longTermDiscount = /장기\s*할인/.test(text); // [v439] 임대료 "(장기할인적용)" 감지
 
   // [v188] 계약유형 자동 추출 — '상업용' 키워드 우선, 없으면 '주거용'(디폴트)
   if (/상업\s*용/.test(text)) data.useType = '상업용';
@@ -9499,6 +9503,9 @@ function cG_applyParsedData(data){
       }
     }
   }
+  // [v439] 장기할인적용 체크박스 자동 반영
+  var _ld = document.getElementById('cG_m_longDiscount');
+  if (_ld) _ld.checked = !!data.longTermDiscount;
   setVal('landlordName', data.landlordName);
   setVal('landlordPhone', data.landlordPhone);
   setVal('landlordAddr', data.landlordAddr);
@@ -9740,6 +9747,7 @@ function cG_collectManualData(){
     contractInfo: v('contractInfo') || (v('coName') ? '공동전차인' : '단독계약'),  // [v195] 사용자 선택 우선
     contractTerms: v('contractTerms') || '',  // [v195] 계약조건 (SGI보증서 등)
     payCondition: v('payCondition') || '분할',
+    longTermDiscount: !!(document.getElementById('cG_m_longDiscount') && document.getElementById('cG_m_longDiscount').checked), // [v439]
     address:      v('address'),
     buildingName: '',
     roomNo:       '',
@@ -13263,15 +13271,18 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
   // 월납부금액: payCondition(S열)이 '분할' 또는 '수수료별도'일 때만 AL(serviceFee) 포함
   // 그 외 (일시납/단기일시납/비용포함/수수료포함 등): AK(totalRent)만
   var includeSvcFee = (d.payCondition === '분할' || d.payCondition === '수수료별도');
-  var monthlyTotal  = (d.totalRent || 0) + (includeSvcFee ? (d.serviceFee || 0) : 0);
-  var specialClause = cG_specialClause(d.payCondition, d.contractInfo, specialNotes);
+  // [v439] 비용포함 + 장기할인적용 → 월세 +10만원 표기, 서비스수수료 미표기
+  var longDisc      = !!d.longTermDiscount && String(d.payCondition) === '비용포함';
+  var rentBump      = longDisc ? 100000 : 0;
+  var monthlyTotal  = (d.totalRent || 0) + rentBump + (includeSvcFee ? (d.serviceFee || 0) : 0);
+  var specialClause = cG_specialClause(d.payCondition, d.contractInfo, specialNotes, d.longTermDiscount);
   var hasCoParty    = !!(d.coName && d.coName !== '-' && d.coName.trim());
   var coTitle       = (d.contractInfo === '공동전차인') ? '계약인2(을)' : '공동계약인(병)';
   // 부가세 포함 표기: 상업용 계약서일 때만 표시 (주거용은 무관)
   var isCommercial  = String(d.useType||'').indexOf('상업') >= 0;
   var vatNote       = (isCommercial && d.vat > 0) ? '(부가세 포함)' : '';
   // 월세 표시값: AH(rent) + AI(vat) 합계
-  var rentDisplay   = (d.rent || 0) + (d.vat || 0);
+  var rentDisplay   = (d.rent || 0) + (d.vat || 0) + rentBump;
   // [v230] 관계,이름 결합 표시 — 구분자: 쉼표/슬래시/공백 모두 허용
   var emergRel = '', emergName = '', emergCombo = '';
   if (d.emergInfo) {
@@ -13383,9 +13394,9 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
     + '</tr>'
     + '<tr>'
     +   '<th style="background:#f0f4ff;color:#374151;font-weight:600;padding:5px 7px;border:1px solid #d1d5db">임대료(①＋②)</th>'
-    +   '<td style="padding:5px 7px;border:1px solid #d1d5db;color:#1B3976;font-weight:600">' + cG_fmtKRW(d.totalRent) + '</td>'
+    +   '<td style="padding:5px 7px;border:1px solid #d1d5db;color:#1B3976;font-weight:600">' + cG_fmtKRW((d.totalRent||0) + rentBump) + '</td>'
     +   '<th style="background:#f0f4ff;color:#374151;font-weight:600;padding:5px 7px;border:1px solid #d1d5db">③서비스수수료/' + (/일시/.test(String(d.payCondition||''))?'연':'월') + '</th>'
-    +   '<td style="padding:5px 7px;border:1px solid #d1d5db;color:#1B3976;font-weight:600">' + cG_fmtKRW(d.serviceFee) + (vatNote?' '+vatNote:'') + '</td>'
+    +   '<td style="padding:5px 7px;border:1px solid #d1d5db;color:#1B3976;font-weight:600">' + (longDisc ? '-' : (cG_fmtKRW(d.serviceFee) + (vatNote?' '+vatNote:''))) + '</td>'
     + '</tr>'
     + '<tr>'
     +   '<th style="background:#f0f4ff;color:#374151;font-weight:600;padding:5px 7px;border:1px solid #d1d5db">' + depositLabel + '</th>'
@@ -13409,7 +13420,7 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
     + '<div class="fee-box" style="break-inside:avoid;page-break-inside:avoid"><div class="fee-ttl">서비스 수수료</div>'
     + '<table style="width:100%;border-collapse:collapse;font-size:8.5pt"><tr>'
     + '<td style="width:28%;padding:2px 4px">서비스 수수료</td>'
-    + '<td style="padding:2px 4px"><span class="fee-amt">' + cG_fmtKRW(d.serviceFee) + '</span> / ' + (/일시/.test(String(d.payCondition||''))?'연':'월') + '</td>'
+    + '<td style="padding:2px 4px">' + (longDisc ? '<span class="fee-amt">-</span>' : ('<span class="fee-amt">' + cG_fmtKRW(d.serviceFee) + '</span> / ' + (/일시/.test(String(d.payCondition||''))?'연':'월'))) + '</td>'
     + '<td style="width:28%;padding:2px 4px">수수료 확인</td>'
     + '<td style="padding:2px 4px">서비스수수료확인 (인)</td></tr></table>'
     + '<div class="fee-note">*첫 서비스 수수료 납입기한은 임대차계약 시작일의 3영업일 전까지</div>'
