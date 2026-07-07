@@ -4832,9 +4832,38 @@ function fmtPhone(s) {
   return raw;
 }
 function _cumLateDays(v){var s=String(v==null?'':v).trim();if(!s)return 0;var n=parseFloat(s.replace(/[^0-9.]/g,''));if(isNaN(n))return 0;if(s.indexOf('%')>=0)n=n/100;return Math.round(n);}
+// [v441] 정산 시트(gid=1253974103) → { 계약번호: { 'YYYY-MM': 정산일(V열), __latest, __latestKey } }
+async function cG_loadSettleSheet(){
+  var resp = await okpi_fetchRaw('1253974103');
+  var map = {};
+  (resp.table.rows||[]).forEach(function(r){
+    var c=r.c||[]; var g=function(i){ return c[i]?String(c[i].f!=null?c[i].f:(c[i].v!=null?c[i].v:'')).trim():''; };
+    var cno=g(9); var sv=g(21); var mm=g(3).match(/(\d{4})\s*년\s*(\d{1,2})\s*월/); // 계약번호9·정산일V(21)·정산서월3
+    if(!cno||!sv||!mm) return;
+    var key=mm[1]+'-'+String(+mm[2]).padStart(2,'0');
+    if(!map[cno]) map[cno]={};
+    map[cno][key]=sv;
+    if(!map[cno].__latestKey || key > map[cno].__latestKey){ map[cno].__latest=sv; map[cno].__latestKey=key; }
+  });
+  window.__settleMapAll = map;
+}
+
 function renderContractRecord(c, payments, responses = []) {
   // vacancyRawData에서 매칭 행 찾기 (없으면 빈 객체)
   const __vacRow = (Array.isArray(vacancyRawData) ? vacancyRawData.find(v => String(v.no).trim() === String(c['계약번호']||'').trim()) : null) || {};
+  // [v441] 정산일 데이터 준비 — 없으면 백그라운드 로드 후 재렌더 (연체·수납 무영향, 읽기 전용)
+  const __cnoKey = String(c['계약번호']||'').trim();
+  if (window.__settleMapAll === undefined && !window.__settleFetching) {
+    window.__settleFetching = true;
+    cG_loadSettleSheet().then(function(){ window.__settleFetching=false; renderContractRecord(c, payments, responses); })
+      .catch(function(e){ window.__settleFetching=false; if(window.__settleMapAll===undefined) window.__settleMapAll={}; console.warn('[정산일] load', e); });
+  }
+  const __settleForCno = (window.__settleMapAll||{})[__cnoKey] || {};
+  const __settleLatest = __settleForCno.__latest || '';
+  const __settleMonthKey = function(dueStr){ var m=String(dueStr||'').match(/(\d{4})[.\/-](\d{1,2})/); return m ? (m[1]+'-'+String(+m[2]).padStart(2,'0')) : ''; };
+  const __settleForRow = function(dueStr){ return __settleForCno[__settleMonthKey(dueStr)] || ''; };
+  const __fmtSettleKr = function(v){ var m=String(v||'').match(/(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})/); return m ? (m[1]+'년 '+String(+m[2]).padStart(2,'0')+'월 '+String(+m[3]).padStart(2,'0')+'일') : ''; };
+  const __fmtSettleShort = function(v){ var m=String(v||'').match(/(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})/); return m ? (m[1]+'.'+String(+m[2]).padStart(2,'0')+'.'+String(+m[3]).padStart(2,'0')) : '—'; };
   const gradeRaw  = String((c['S등급']||c['연체등급'])||'').trim();
   const grade     = gradeRaw.replace(/등급$/,'').trim() || '—';
   const gradeClass= {A:'cr-grade-A',B:'cr-grade-B',C:'cr-grade-C',D:'cr-grade-D',E:'cr-grade-E',F:'cr-grade-D'}[grade] || 'cr-grade-D';
@@ -5005,13 +5034,14 @@ function renderContractRecord(c, payments, responses = []) {
       : `<span class="cr-badge-partial">${status||'—'}</span>`;
     return `<tr>
       <td>${fmt(p['청구서명']||p['납부종류'])}</td>
-      <td>${fmt(p['납부일'])}</td>
+      <td style="color:#8A9AB5;font-size:11px">${fmt(p['납기일'])}</td>
+      <td>${badge}</td>
       <td style="text-align:center;color:${parseInt(p['연체일수']||0)>0?'#DC2626':'#059669'};font-weight:700">${p['연체일수']||0}</td>
       <td style="text-align:right;color:${unpaid>0?'#DC2626':'#1A3A5C'};font-weight:700">${unpaid>0?fmtMoney(unpaid):'—'}</td>
-      <td>${badge}</td>
-      <td style="color:#8A9AB5;font-size:11px">${fmt(p['납기일'])}</td>
+      <td>${fmt(p['납부일'])}</td>
+      <td style="color:#0E7490;font-size:11px">${__fmtSettleShort(__settleForRow(p['납기일']))}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="6" style="text-align:center;color:#B0BDCE;padding:20px">입금 내역 없음</td></tr>';
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:#B0BDCE;padding:20px">입금 내역 없음</td></tr>';
 
   const totalDelinq = parseFloat(String(c['연체금액']||'0').replace(/[^0-9.-]/g,''))||0;
   const rentDelinq  = parseFloat(String(c['임대료연체']||'0').replace(/[^0-9.-]/g,''))||0;
@@ -5144,6 +5174,7 @@ function renderContractRecord(c, payments, responses = []) {
         })()}</span></div>
         <div class="cr-field"><span class="cr-field-label">계약형태</span><span class="cr-field-val">${fmt(c['계약형태'])} / ${fmt(c['계약구분'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">납기일</span><span class="cr-field-val">매월 ${fmt(c['납기일'])}일${(__vacRow.payMethod||c['월세납입형태']||c['납부방법']) ? ' <span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:4px;background:'+(/후불/.test(String(__vacRow.payMethod||c['월세납입형태']||c['납부방법']||''))?'#FEF3C7;color:#92400E':'#DBEAFE;color:#1E40AF')+'">'+(__vacRow.payMethod||c['월세납입형태']||c['납부방법'])+'</span>' : ''}</span></div>
+        <div class="cr-field"><span class="cr-field-label">정산 예정일자</span><span class="cr-field-val" style="color:#0E7490;font-weight:700">${__settleLatest ? __fmtSettleKr(__settleLatest) : '—'}</span></div>
       </div>
       <div class="cr-info-section">
         <div class="cr-info-title">금액 정보</div>
@@ -5334,8 +5365,8 @@ function renderContractRecord(c, payments, responses = []) {
     <div style="overflow-x:auto;padding:0 4px 4px">
       <table class="cr-detail-table">
         <thead><tr>
-          <th>청구 항목</th><th>납부일</th><th style="text-align:center">연체일수</th>
-          <th style="text-align:right">미납금액</th><th>상태</th><th>납기일</th>
+          <th>청구 항목</th><th>납기일</th><th>상태</th><th style="text-align:center">연체일수</th>
+          <th style="text-align:right">미납금액</th><th>납부일</th><th>정산일</th>
         </tr></thead>
         <tbody>${detailRows}</tbody>
       </table>
