@@ -3859,9 +3859,9 @@ function buildDlqSmsTextHtml(rows, contractDetails) {
   rows.forEach(function(r){
     var cno = String(r.cno);
     var label = nameLabel(cno);
-    var dueDateStr = (function(){ // [v449] 최종 납부 기한 = 발행일+14일 이상 (과거 입금예정일 방지)
+    var dueDateStr = (function(){ // [v450] 최종 납부 기한 = 발행일+3일 이상 (과거 입금예정일 방지)
       var _t = new Date(); _t.setHours(0,0,0,0);
-      var _min = new Date(_t); _min.setDate(_min.getDate()+14);
+      var _min = new Date(_t); _min.setDate(_min.getDate()+3);
       var _m = String(r.dateStr||'').match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
       var _d = (_m && r.dateStr !== '긴급대응필요') ? new Date(+_m[1], +_m[2]-1, +_m[3]) : null;
       var _use = (_d && _d.getTime() > _min.getTime()) ? _d : _min;
@@ -3977,9 +3977,9 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
     var _penalty = _isEnded ? Math.round(_rentAmt * 4) : 0;
     var _totalDue = (r.amt||0) + _penalty;
     // [v29] '긴급대응필요'인 경우도 todayKo (발행일)로 표시
-    var dueDateStr = (function(){ // [v449] 최종 납부 기한 = 발행일+14일 이상 (과거 입금예정일 방지)
+    var dueDateStr = (function(){ // [v450] 최종 납부 기한 = 발행일+3일 이상 (과거 입금예정일 방지)
       var _t = new Date(); _t.setHours(0,0,0,0);
-      var _min = new Date(_t); _min.setDate(_min.getDate()+14);
+      var _min = new Date(_t); _min.setDate(_min.getDate()+3);
       var _m = String(r.dateStr||'').match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
       var _d = (_m && r.dateStr !== '긴급대응필요') ? new Date(+_m[1], +_m[2]-1, +_m[3]) : null;
       var _use = (_d && _d.getTime() > _min.getTime()) ? _d : _min;
@@ -4051,7 +4051,7 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
           '<li>이에 따라 당사는 귀하를 상대로 <strong>검찰·경찰에 형사고소를 병행 진행</strong>할 예정임을 분명히 밝힙니다.</li>' +
           '</ol>'
         : '')
-      + '<p><strong>' + num납부 + '. 납부 기한</strong><br>&nbsp;&nbsp;&nbsp;&nbsp;본 문서 도달일로부터 14일 이내, 또는 늦어도 아래 기한까지 미납 금액 전액을 본 발신인의 계좌로 입금하여 주시기 바랍니다.</p>'
+      + '<p><strong>' + num납부 + '. 납부 기한</strong><br>&nbsp;&nbsp;&nbsp;&nbsp;본 문서 도달일로부터 3일 이내, 또는 늦어도 아래 기한까지 미납 금액 전액을 본 발신인의 계좌로 입금하여 주시기 바랍니다.</p>'
       + '<div class="cm-deadline">최종 납부 기한 <span class="cm-deadline-date">' + dueDateStr + '</span> 까지</div>'
       + '<p><strong>' + num결론 + '. 결    론</strong><br>&nbsp;&nbsp;&nbsp;&nbsp;본 통지서는 향후 발생할 수 있는 일체의 분쟁 및 소송에 있어 증빙자료로 사용될 것임을 알려드립니다. 귀하의 신속하고 성실한 이행을 촉구합니다.</p>'
       + '</div>'
@@ -4097,9 +4097,9 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
     rows.forEach(function(r){
       var cno = String(r.cno);
       var nameLine = _nameDisplay(cno, r.nm);
-      var dueDateStr = (function(){ // [v449] 최종 납부 기한 = 발행일+14일 이상 (과거 입금예정일 방지)
+      var dueDateStr = (function(){ // [v450] 최종 납부 기한 = 발행일+3일 이상 (과거 입금예정일 방지)
       var _t = new Date(); _t.setHours(0,0,0,0);
-      var _min = new Date(_t); _min.setDate(_min.getDate()+14);
+      var _min = new Date(_t); _min.setDate(_min.getDate()+3);
       var _m = String(r.dateStr||'').match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
       var _d = (_m && r.dateStr !== '긴급대응필요') ? new Date(+_m[1], +_m[2]-1, +_m[3]) : null;
       var _use = (_d && _d.getTime() > _min.getTime()) ? _d : _min;
