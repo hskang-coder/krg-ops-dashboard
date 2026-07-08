@@ -3859,7 +3859,14 @@ function buildDlqSmsTextHtml(rows, contractDetails) {
   rows.forEach(function(r){
     var cno = String(r.cno);
     var label = nameLabel(cno);
-    var dueDateStr = (r.dateStr && r.dateStr !== '-' && r.dateStr !== '긴급대응필요') ? r.dateStr : todayKo;
+    var dueDateStr = (function(){ // [v449] 최종 납부 기한 = 발행일+14일 이상 (과거 입금예정일 방지)
+      var _t = new Date(); _t.setHours(0,0,0,0);
+      var _min = new Date(_t); _min.setDate(_min.getDate()+14);
+      var _m = String(r.dateStr||'').match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+      var _d = (_m && r.dateStr !== '긴급대응필요') ? new Date(+_m[1], +_m[2]-1, +_m[3]) : null;
+      var _use = (_d && _d.getTime() > _min.getTime()) ? _d : _min;
+      return _use.getFullYear() + '. ' + (_use.getMonth()+1) + '. ' + _use.getDate();
+    })();
     pages += '<div class="np">'
       + '<div class="sms-hdr"><div class="sms-hdr-sub">법무팀 공식 통보</div><div class="sms-hdr-title">[ 민사소송 예정 통보 ]</div></div>'
       + '<div class="sms-meta"><span>증서번호: ' + refNo(cno) + '</span><span>작성일자: ' + todayKo + '</span></div>'
@@ -3970,7 +3977,14 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
     var _penalty = _isEnded ? Math.round(_rentAmt * 4) : 0;
     var _totalDue = (r.amt||0) + _penalty;
     // [v29] '긴급대응필요'인 경우도 todayKo (발행일)로 표시
-    var dueDateStr = (r.dateStr && r.dateStr !== '-' && r.dateStr !== '긴급대응필요') ? r.dateStr : todayKo;
+    var dueDateStr = (function(){ // [v449] 최종 납부 기한 = 발행일+14일 이상 (과거 입금예정일 방지)
+      var _t = new Date(); _t.setHours(0,0,0,0);
+      var _min = new Date(_t); _min.setDate(_min.getDate()+14);
+      var _m = String(r.dateStr||'').match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+      var _d = (_m && r.dateStr !== '긴급대응필요') ? new Date(+_m[1], +_m[2]-1, +_m[3]) : null;
+      var _use = (_d && _d.getTime() > _min.getTime()) ? _d : _min;
+      return _use.getFullYear() + '. ' + (_use.getMonth()+1) + '. ' + _use.getDate();
+    })();
 
     var _safeName = (r.nm || '').replace(/[^a-z0-9\uAC00-\uD7AF]/gi, '');
     pages += '<div class="np" data-name="' + _safeName + '" data-pageseq="1">'
@@ -4083,7 +4097,14 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
     rows.forEach(function(r){
       var cno = String(r.cno);
       var nameLine = _nameDisplay(cno, r.nm);
-      var dueDateStr = (r.dateStr && r.dateStr !== '-' && r.dateStr !== '긴급대응필요') ? r.dateStr : todayKo;
+      var dueDateStr = (function(){ // [v449] 최종 납부 기한 = 발행일+14일 이상 (과거 입금예정일 방지)
+      var _t = new Date(); _t.setHours(0,0,0,0);
+      var _min = new Date(_t); _min.setDate(_min.getDate()+14);
+      var _m = String(r.dateStr||'').match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+      var _d = (_m && r.dateStr !== '긴급대응필요') ? new Date(+_m[1], +_m[2]-1, +_m[3]) : null;
+      var _use = (_d && _d.getTime() > _min.getTime()) ? _d : _min;
+      return _use.getFullYear() + '. ' + (_use.getMonth()+1) + '. ' + _use.getDate();
+    })();
       // [v447] 종료(중도퇴실)자 — 미납 총 합계(미납+위약금 월세 4개월분) 표시
       var _cRow = (Array.isArray(contractRawData)?contractRawData:[]).find(function(x){ return String(x['계약번호']||'').trim() === cno; });
       var _isEnded = !!(_cRow && /종료|해지/.test(String(_cRow['계약상태']||'')));
