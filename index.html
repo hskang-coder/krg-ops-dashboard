@@ -3963,6 +3963,12 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
   rows.forEach(function(r) {
     var cno = String(r.cno);
     var addr = (contractDetails[cno] && contractDetails[cno].addr) || '';
+    // [v444] 종료(중도퇴실)자 — 위약금(월세 4개월분) + 총 합계금액 추가
+    var _cRow = (Array.isArray(contractRawData)?contractRawData:[]).find(function(x){ return String(x['계약번호']||'').trim() === cno; });
+    var _isEnded = !!(_cRow && /종료|해지/.test(String(_cRow['계약상태']||'')));
+    var _rentAmt = _cRow ? (parseFloat(String(_cRow['월세']||_cRow['임대료']||'').replace(/[^0-9.]/g,''))||0) : 0;
+    var _penalty = _isEnded ? Math.round(_rentAmt * 4) : 0;
+    var _totalDue = (r.amt||0) + _penalty;
     // [v29] '긴급대응필요'인 경우도 todayKo (발행일)로 표시
     var dueDateStr = (r.dateStr && r.dateStr !== '-' && r.dateStr !== '긴급대응필요') ? r.dateStr : todayKo;
 
@@ -3999,6 +4005,14 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
       + '<table class="cm-amt-tbl"><tr><th style="width:30%">계약자</th><th style="width:25%">연체 일수</th><th>미납 금액 (발행일 기준 누적)</th></tr>'
       + '<tr><td>' + (r.nm||'') + '</td><td class="days">' + (r.days||0) + '일</td><td class="amt">금 ' + fmtKRW(r.amt) + '원 정 (₩' + fmtKRW(r.amt) + ')</td></tr>'
       + '</table>'
+      // [v444] 종료(중도퇴실)자 — 위약금 + 총 합계금액
+      + (_isEnded ? (
+          '<table class="cm-amt-tbl" style="margin-top:8px"><tr><th style="width:30%">위약금액</th><th>청구 근거</th></tr>'
+          + '<tr><td class="amt">금 ' + fmtKRW(_penalty) + '원 정<br>(₩' + fmtKRW(_penalty) + ')</td>'
+          + '<td style="text-align:left;font-size:8pt;line-height:1.55;font-weight:400;color:#333">청구 근거 · <b>개런티즈 계약서 제13조(중도 해지·퇴거 시 책임)</b>: 임차인 귀책으로 계약기간 중 퇴실 시 잔여 서비스 수수료·미납 월세·원상복구비·중개수수료·철거비 등 일체 비용과 위약벌(월세 4개월분 상당)을 즉시 지급하며, 신규 임차인 입주 전까지의 임대료를 부담한다. · <b>제6조(원상회복·명도)·제7조(보증금 공제·정산)</b>: 입주 당시 상태로 원상복구 후 공실 반환하며, 미납금은 보증금에서 우선 공제·정산된다. · <b>민법상 임(전)차인 의무</b>: 차임 지급의무(제618조), 선량한 관리자의 주의로 임차물을 보존할 의무(제374조), 계약 종료 시 원상회복·반환 의무(제654조·제615조)를 부담한다.</td></tr>'
+          + '</table>'
+          + '<table class="cm-amt-tbl" style="margin-top:8px"><tr><th style="width:30%;background:#1f2937;color:#fff">총 합계금액</th><td class="amt" style="font-size:12.5pt">금 ' + fmtKRW(_totalDue) + '원 정 (₩' + fmtKRW(_totalDue) + ')</td></tr></table>'
+        ) : '')
       // [v41] '3. 본 통지의 요지' 섹션은 페이지2로 이동 (분량 균형)
       + '</div>'  // [v30] 페이지1 cm-body 닫기
       + '<div style="text-align:right;font-size:8.5pt;color:#9ca3af;margin-top:18px;border-top:1px solid #d1d5db;padding-top:6px">— 1 / 2 —</div>'
