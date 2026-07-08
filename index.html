@@ -4005,13 +4005,13 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
       + '<table class="cm-amt-tbl"><tr><th style="width:30%">계약자</th><th style="width:25%">연체 일수</th><th>미납 금액 (발행일 기준 누적)</th></tr>'
       + '<tr><td>' + (r.nm||'') + '</td><td class="days">' + (r.days||0) + '일</td><td class="amt">금 ' + fmtKRW(r.amt) + '원 정 (₩' + fmtKRW(r.amt) + ')</td></tr>'
       + '</table>'
-      // [v445] 종료(중도퇴실)자 — 위약금·청구근거·총합계금액 (행 라벨 형식, 제13조만)
+      // [v446] 종료(중도퇴실)자 — 위약금·총합계금액 표 + 청구근거는 표 아래 각주(※)로
       + (_isEnded ? (
           '<table class="cm-amt-tbl" style="margin-top:8px">'
           + '<tr><th style="width:30%">위약금액</th><td class="amt">금 ' + fmtKRW(_penalty) + '원 정 (₩' + fmtKRW(_penalty) + ')</td></tr>'
-          + '<tr><th style="width:30%">청구 근거</th><td style="text-align:left;font-size:8.5pt;line-height:1.55;font-weight:400;color:#333"><b>개런티즈 계약서 제13조(중도 해지·퇴거 시 책임)</b>: 임차인 귀책으로 계약기간 중 퇴실 시 잔여 서비스 수수료·미납 월세·원상복구비·중개수수료·철거비 등 일체 비용과 위약벌(월세 4개월분 상당)을 즉시 지급하며, 신규 임차인 입주 전까지의 임대료를 부담한다.</td></tr>'
           + '<tr><th style="width:30%;background:#1f2937;color:#fff">총 합계금액</th><td class="amt" style="font-size:12.5pt">금 ' + fmtKRW(_totalDue) + '원 정 (₩' + fmtKRW(_totalDue) + ')</td></tr>'
           + '</table>'
+          + '<div style="margin-top:8px;font-size:8.5pt;line-height:1.6;color:#333"><b>※ 청구근거 :</b> <b>개런티즈 계약서 제13조(중도 해지·퇴거 시 책임)</b> — 임차인 귀책으로 계약기간 중 퇴실 시 잔여 서비스 수수료·미납 월세·원상복구비·중개수수료·철거비 등 일체 비용과 위약벌(월세 4개월분 상당)을 즉시 지급하며, 신규 임차인 입주 전까지의 임대료를 부담한다.</div>'
         ) : '')
       // [v41] '3. 본 통지의 요지' 섹션은 페이지2로 이동 (분량 균형)
       + '</div>'  // [v30] 페이지1 cm-body 닫기
