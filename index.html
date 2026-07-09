@@ -2111,6 +2111,7 @@ function parseVacancySheet(resp) {
   const coRrnIdx       = findColIdx(labels, ['주민번호.1'],        54);  // BC
   const inspectTypeIdx = findColIdx(labels, ['심사구분'],          58);  // BG
   const signDateIdx    = findColIdx(labels, ['계약체결일','체결일'], 63);  // BL [v429] 위수탁계약서 계약체결일 디폴트
+  const imdaeShingoIdx = findColIdx(labels, ['KRG임대차'], 94);  // CQ [v451] 임대차신고 결과 (CQ열=KRG임대차, 라벨 '임대차신고'는 CP열이라 제외)
 let tentativeDateIdx = findColIdx(labels, ['가계약일'], 61);
   tentativeDateIdx = (function(w){function dt(x){var tt=0,h=0;for(var i=0;i<rows.length&&tt<240;i++){var cc=(rows[i].c||[])[x];var vv=cc?String(cc.f!=null?cc.f:(cc.v!=null?cc.v:'')).trim():'';if(!vv)continue;tt++;if(/\d{4}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2}/.test(vv)||/^Date\(/.test(vv))h++;}return tt?h/tt:0;}return (w>=0&&dt(w)>=0.3)?w:61;})(tentativeDateIdx);  // BJ
   const partnerNameIdx = findColIdx(labels, ['부동산명'],          64);  // BM
@@ -2191,6 +2192,7 @@ let outsourceIdx = findColIdx(labels, ['연체외주','연체 외주'], 71);
       tentativeDate: cell(tentativeDateIdx),
       // [v429] 계약체결일 (BL열) — 위수탁계약서 디폴트
       signDate:      cell(signDateIdx),
+      imdaeShingo:   cell(imdaeShingoIdx),   // [v451] CQ열: 임대차신고
       // [v102] 실제 퇴실일 (Z열) — 거주기간/갱신차수 계산
       actualExitDate: cell(actualExitDateIdx),
       // [v148] 입금내역서용 계약물건 정보
@@ -5160,7 +5162,7 @@ function renderContractRecord(c, payments, responses = []) {
 
   <div class="cr-card" style="margin-bottom:10px">
     <div class="cr-card-title">📋 계약 조건 정보</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr)">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr)">
       <div class="cr-info-section">
         <div class="cr-info-title">계약정보</div>
         <div class="cr-field"><span class="cr-field-val" style="font-size:13px;font-weight:600;color:#1D4ED8">${fmt(c['계약정보'])}${(__vacRow.reviewResult && String(__vacRow.reviewResult).trim() && String(__vacRow.reviewResult).trim() !== '-') ? ' <span style="font-size:11px;color:#6B7280;font-weight:500;margin-left:2px">('+String(__vacRow.reviewResult).trim()+')</span>' : ''}</span></div>
@@ -5176,6 +5178,10 @@ function renderContractRecord(c, payments, responses = []) {
       <div class="cr-info-section">
         <div class="cr-info-title">납부조건</div>
         <div class="cr-field"><span class="cr-field-val" style="font-size:13px;font-weight:600;color:#1D4ED8">${fmt(c['납부조건'])}</span></div>
+      </div>
+      <div class="cr-info-section">
+        <div class="cr-info-title">임대차신고</div>
+        <div class="cr-field"><span class="cr-field-val" style="font-size:13px;font-weight:600;color:#1D4ED8">${fmt(__vacRow.imdaeShingo)}</span></div>
       </div>
     </div>
   </div>
