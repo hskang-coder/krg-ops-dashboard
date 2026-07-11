@@ -7318,8 +7318,12 @@ function _drTargets(){
       rows.push(Object.assign({}, r, { _dr: { who:'김영철', act:callAct, nc:dr.nc, pen:dr.pen } }));
     }
   });
+  // [v464] 점수 사전 계산 + 점수 정렬 지원
+  rows.forEach(function(r){ var s = (typeof _dlqScore === 'function') ? _dlqScore(r.cno) : null; r._sc = s ? parseFloat(s) : 0; });
+  var _sk = window._dlqDrCfg.sortKey, _dir = window._dlqDrCfg.sortDir === 'desc' ? -1 : 1;
   rows.sort(function(a,b){
     if (a._dr.who !== b._dr.who) return a._dr.who === '오진선' ? -1 : 1;
+    if (_sk === 'score') { var sd = (a._sc - b._sc) * _dir; if (sd) return sd; }
     if (a._dr.act.p !== b._dr.act.p) return a._dr.act.p - b._dr.act.p;
     return (b.days||0) - (a.days||0) || (b.amt||0) - (a.amt||0);
   });
@@ -7334,13 +7338,14 @@ function _drRowHtml(r, cfg){
   var legal = _drLegal(r.cno);
   var lg = [legal.nae?'내용증명':'', legal.ji?'지급명령':'', legal.bo?'보정명령':''].filter(Boolean).join('·');
   var lgTag = lg ? '<span style="background:#ecfdf5;color:#059669;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+lg+'</span>' : '';
-  var sc = (typeof _dlqScore === 'function') ? _dlqScore(r.cno) : null;   // [v461]
-  var scTag = sc ? '<span style="background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:800">KCB '+sc+'</span> ' : '';
+  var sc = (typeof _dlqScore === 'function') ? _dlqScore(r.cno) : null;   // [v464] 점수 독립 컬럼
+  var scCell = '<td style="padding:7px 8px;white-space:nowrap;text-align:center">'+(sc?'<span style="background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 6px;font-size:10.5px;font-weight:800">'+sc+'</span>':'<span style="color:#cbd5e1">—</span>')+'</td>';
   var gTag = r.grade && r.grade !== '-' ? '<span style="background:'+(String(r.grade).indexOf('E')>=0?'#dc2626':String(r.grade).indexOf('C')>=0||String(r.grade).indexOf('D')>=0?'#d97706':'#64748b')+';color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:800">'+_drEsc(r.grade)+'</span>' : '';
   return '<tr style="border-bottom:1px solid #f1f5f9">'
     + '<td style="padding:7px 8px;white-space:nowrap"><span style="color:#2563eb;font-weight:700;cursor:pointer" onclick="dlqCloseDailyReport();dlqGoToContract(\''+r.cno+'\')">'+r.cno+'</span></td>'
     + '<td style="padding:7px 8px"><b>'+_drEsc(r.nm)+'</b><br><span style="color:#64748b;font-size:10.5px">'+_drEsc(r.tel)+'</span></td>'
-    + '<td style="padding:7px 8px;white-space:nowrap">'+gTag+' <span style="background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+(r.days||0)+'일</span> '+ncTag+' '+scTag+lgTag+'</td>'
+    + scCell
+    + '<td style="padding:7px 8px;white-space:nowrap">'+gTag+' <span style="background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+(r.days||0)+'일</span> '+ncTag+' '+lgTag+'</td>'
     + '<td style="padding:7px 8px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums">'+_drWon(r.amt)+(d.pen?'<br><span style="color:#dc2626;font-size:11px">'+_drWon(d.pen)+'</span>':'')+'</td>'
     + '<td style="padding:7px 8px;max-width:230px"><div style="color:#64748b;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_drEsc(r.content)+'">'+_drEsc(r.content||'—')+'</div></td>'
     + '<td style="padding:7px 8px;border-left:2px solid '+a.c+';background:'+(a.warn?'#fff7ed':'#fcfdfe')+'">'
@@ -7356,7 +7361,7 @@ function _drSectionHtml(who, role, color, rows, cfg){
   var body = rows.length
     ? '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff">'
       + '<thead><tr style="background:#f8fafc;color:#64748b;font-size:10.5px">'
-      + '<th style="padding:5px 8px;text-align:left">계약번호</th><th style="padding:5px 8px;text-align:left">임(전)차인</th><th style="padding:5px 8px;text-align:left">상태</th>'
+      + '<th style="padding:5px 8px;text-align:left">계약번호</th><th style="padding:5px 8px;text-align:left">임(전)차인</th><th onclick="dlqDrSort(\'score\')" title="클릭하여 점수 정렬" style="padding:5px 8px;text-align:center;cursor:pointer;user-select:none">점수'+(window._dlqDrCfg.sortKey==='score'?(window._dlqDrCfg.sortDir==='asc'?' ▲':' ▼'):' <span style="opacity:.35">↕</span>')+'</th><th style="padding:5px 8px;text-align:left">상태</th>'
       + '<th style="padding:5px 8px;text-align:right">연체금액/위약금</th><th style="padding:5px 8px;text-align:left">최근 대응 내용</th>'
       + '<th style="padding:5px 8px;text-align:left;width:34%">▶ 대응 지시 (SOP 근거)</th></tr></thead><tbody>'
       + rows.map(function(r){ return _drRowHtml(r, cfg); }).join('') + '</tbody></table></div>'
@@ -7369,7 +7374,7 @@ function _drByTarget(){
   var map = {}, order = [];
   rows.forEach(function(e){
     var k = e.cno;
-    if (!map[k]) { map[k] = { r:e, oh:[], ky:[], p:9, nc:e._dr.nc||0, pen:e._dr.pen||0 }; order.push(k); }
+    if (!map[k]) { map[k] = { r:e, oh:[], ky:[], p:9, nc:e._dr.nc||0, pen:e._dr.pen||0, sc:e._sc||0 }; order.push(k); }
     map[k][e._dr.who === '오진선' ? 'oh' : 'ky'].push(e._dr.act);
     map[k].p = Math.min(map[k].p, e._dr.act.p);
   });
@@ -7383,6 +7388,7 @@ function _drByTarget(){
       if (sk === 'days') return t.r.days || 0;
       if (sk === 'amt')  return t.r.amt || 0;
       if (sk === 'nc')   return t.nc || 0;
+      if (sk === 'score') return t.sc || 0;       // [v464] 점수 정렬
       if (sk === 'oh' || sk === 'ky') {           // [v457] TO DO LIST 정렬 — 우선순위 → 액션명 (같은 액션끼리 묶임)
         var arr = (sk === 'oh') ? t.oh : t.ky;
         return arr.length ? (String(arr[0].p) + '_' + arr[0].t) : '9_';
@@ -7431,15 +7437,15 @@ function _drTargetViewHtml(cfg){
     var r = t.r;
     var legal = _drLegal(r.cno);
     var lg = [legal.nae?'내용증명':'', legal.ji?'지급명령':'', legal.bo?'보정명령':''].filter(Boolean).join('·');
-    var sc = (typeof _dlqScore === 'function') ? _dlqScore(r.cno) : null;   // [v461] KCB 점수
-    var scTag = sc ? '<span style="background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:800">KCB '+sc+'</span> ' : '';
+    var sc = (typeof _dlqScore === 'function') ? _dlqScore(r.cno) : null;   // [v464] 점수 독립 컬럼
+    var scCell = '<td style="padding:7px 8px;white-space:nowrap;text-align:center">'+(sc?'<span style="background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 6px;font-size:10.5px;font-weight:800">'+sc+'</span>':'<span style="color:#cbd5e1">—</span>')+'</td>';
     var gTag = r.grade && r.grade !== '-' ? '<span style="background:'+(String(r.grade).indexOf('E')>=0?'#dc2626':String(r.grade).indexOf('C')>=0||String(r.grade).indexOf('D')>=0?'#d97706':'#64748b')+';color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:800">'+_drEsc(r.grade)+'</span>' : '';
     return '<tr style="border-bottom:1px solid #f1f5f9;background:'+(t.p===1?'#fff7f7':'#fff')+'">'
       + '<td style="padding:7px 8px;white-space:nowrap"><span style="color:#2563eb;font-weight:700;cursor:pointer" onclick="dlqCloseDailyReport();dlqGoToContract(\''+r.cno+'\')">'+r.cno+'</span></td>'
       + '<td style="padding:7px 8px"><b>'+_drEsc(r.nm)+'</b><br><span style="color:#64748b;font-size:10.5px">'+_drEsc(r.tel)+'</span></td>'
+      + scCell
       + '<td style="padding:7px 8px;white-space:nowrap">'+gTag+' <span style="background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+(r.days||0)+'일</span> '
         + (t.nc>=cfg.noContact?'<span style="background:#fef2f2;color:#dc2626;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">미연락 '+t.nc+'일</span> ':'')
-        + scTag
         + (lg?'<span style="background:#ecfdf5;color:#059669;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+lg+'</span>':'')+'</td>'
       + '<td style="padding:7px 8px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums">'+_drWon(r.amt)+(t.pen?'<br><span style="color:#dc2626;font-size:11px">'+_drWon(t.pen)+'</span>':'')+'</td>'
       + '<td style="padding:7px 8px;min-width:240px"><div style="color:#475569;font-size:11px;line-height:1.5;word-break:break-all">'+_drEsc(r.content||'—')+'</div></td>'
@@ -7452,6 +7458,7 @@ function _drTargetViewHtml(cfg){
     + '<thead><tr style="background:#f8fafc;color:#64748b;font-size:10.5px">'
     + _drTh('cno','계약번호')
     + _drTh('nm','임(전)차인')
+    + _drTh('score','점수','center')
     + _drTh('days','상태(연체일)')
     + _drTh('amt','연체금액/위약금','right')
     + '<th style="padding:6px 8px;text-align:left">최근 대응 내용 <span onclick="dlqDrSort(\'nc\')" title="미연락 일수로 정렬" style="cursor:pointer;user-select:none;opacity:.7">📵'+(window._dlqDrCfg.sortKey==='nc'?(window._dlqDrCfg.sortDir==='asc'?'▲':'▼'):'↕')+'</span></th>'
@@ -7490,7 +7497,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v463</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v464</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
