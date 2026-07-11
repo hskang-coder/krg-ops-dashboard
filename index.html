@@ -6849,6 +6849,7 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-doc-btn" id="dlqDocBtn4" onclick="dlqGenerateDoc('sms')">📄 내용증명 문자 발송</button>
           <button class="dlq-doc-btn" id="dlqVisitBtn" onclick="dlqOpenVisitModal()">🚗 방문대응</button>
           <button class="dlq-doc-btn" id="dlqLegalBtn" onclick="dlqToggleLegalView()" style="background:#059669;color:#fff;border-color:#059669" title="법무 진척 보기 — 내용증명·지급명령·보정명령·기타집행">⚖️ 법무관리</button>
+          <button class="dlq-doc-btn" id="dlqDailyReportBtn" onclick="dlqOpenDailyReport()" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8;font-weight:700" title="SOP04 수납/연체 + SOP06 강제퇴실 기준 — 오진선·김영철 당일 대응 지시서 자동 생성">📋 Daily Report</button>
           <span class="dlq-sel-info" id="dlqSelInfo" style="font-size:11px;color:#6366f1;font-weight:700;white-space:nowrap"></span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -7186,6 +7187,226 @@ function dlqToggleLegalView(){
   if (b){ b.innerHTML = window._dlqLegalView ? '↩ 연체관리' : '⚖️ 법무관리'; }
   dlqRenderTableRows();
 }
+// ═══════════ [v452] 연체대응 Daily Report — SOP04 수납/연체 + SOP06 강제퇴실 기준 자동 지시 ═══════════
+// 배정 규칙 (운영매뉴얼 krg-manual.html 정합):
+//   SOP04 분류: ①연락(1~7일) ②방문(8~30일) → 김영철 / ③법적대응(30일+) → 오진선
+//   법무 7단계: 내용증명 → CB조회 → 지급명령 → 변론 → 채권압류 → 추심명령 → 명도소송
+//   SOP06 강제퇴실: 인입 = 연체 15~20일 경과 + 연락두절 → [김영철] 현장 1차 대응 → [오진선] 퇴실관리(시트·청소·해지)
+//   운영 지시: 고액(연체금액·위약금)·E패턴은 연체일 무관 오진선
+window._dlqDrCfg = { amt:1000000, penalty:2500000, visit:8, legalDays:30, noContact:3, evictIn:15, evict:20, includeTerminated:false };
+
+function _drParseDt(s){
+  var m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  return m ? new Date(+m[1], +m[2]-1, +m[3]) : null;
+}
+function _drDaysSince(s){
+  var d = _drParseDt(s); if (!d) return null;
+  var t = new Date(); t.setHours(0,0,0,0); d.setHours(0,0,0,0);
+  return Math.floor((t - d) / 86400000);
+}
+var _DR_NC_KW = ['부재','두절','무응답','미응답','불통','안받','않받','수신거부','미수신','잠수'];
+function _drNoContactDays(r){
+  var gap = _drDaysSince(r.actionDateStr);           // 대응일 경과
+  var kw = _DR_NC_KW.some(function(k){ return String(r.content||'').indexOf(k) >= 0; });
+  if (kw && gap != null) return Math.max(gap, 3);
+  if (kw) return 3;
+  return gap != null ? gap : 0;
+}
+function _drLegal(cno){
+  var mNae = function(s){ return s.indexOf('내용증명발송') >= 0; };
+  var mJi  = function(s){ return s.indexOf('지급명령') >= 0; };
+  var mBo  = function(s){ return s.indexOf('보정명령') >= 0; };
+  return { nae: !!_dlqLegalLatest(cno, mNae), ji: !!_dlqLegalLatest(cno, mJi), bo: !!_dlqLegalLatest(cno, mBo) };
+}
+// ── 지시 정의: 액션명 · 우선순위 · 색 · SOP 근거 한 줄 ──
+var _DR_ACT = {
+  bojeong:   { t:'보정명령 처리',                 p:1, c:'#dc2626', g:'법원 보정명령 기한 내 보정서 제출 — 기한 도과 시 각하 (SOP04 법무)' },
+  evictMgmt: { t:'강제퇴실 퇴실관리',              p:1, c:'#dc2626', g:'퇴실관리 SHEET 등록 → 청소 지시(임을빈 멘션) → 청소비 → 계약해지 확정(잔여 청구서 삭제 필수) → 김기성 보고 (SOP06 04~06)' },
+  jiMgmt:    { t:'지급명령 진행 관리',             p:2, c:'#d97706', g:'이의신청 시 변론 → 채권압류 → 추심명령 → (최종) 명도소송 (SOP04 법무)' },
+  jiApply:   { t:'지급명령 신청 (CB조회 병행)',    p:2, c:'#dc2626', g:'내용증명 후 미납 지속 — CB 조회로 자산 파악 → 법원 지급명령 신청 (SOP04 법무)' },
+  naeSend:   { t:'내용증명 발송',                 p:3, c:'#d97706', g:'미연락 지속 — 1차 경고 등기우편 발송, 결과 노션 기록 (SOP04 법무 1단계)' },
+  ohFocus:   { t:'중요 연체자 집중 협의',          p:4, c:'#7c3aed', g:'고액·E패턴 — 납부계획 협의, 연체패턴 노션 기록 (SOP04)' },
+  ohPromise: { t:'입금약속 관리 (당일 확인)',      p:5, c:'#059669', g:'입금예정일 당일 494계좌 확인 → 미이행 시 익일 단계 상향 (SOP04)' },
+  ohBunnap:  { t:'분납 이행 점검',                p:5, c:'#059669', g:'분납 약속 이행 주 1회 점검 — 미이행 시 즉시 연체 처리 전환 (SOP04)' },
+  evictDone: { t:'강제퇴실 확정 → 오진선 인계',    p:1, c:'#dc2626', g:'현장 대응 결과 매니저·차장 Slack 보고 → 오진선 퇴실관리(SOP06 STEP04~) 인계' },
+  evictField:{ t:'강제퇴실 현장 1차 대응',         p:2, c:'#d97706', g:'실거주 확인·자진퇴실 회유·비밀번호 입수(미입수 시 열쇠 출장) · ⚠ 정산 확정금액 현장 언급 금지 (SOP06 01~03)', warn:true },
+  visit:     { t:'현장 방문 (거주확인·고지·독촉)', p:3, c:'#2563eb', g:'방문 구간(8~30일) 또는 미연락 3일↑ — 방문 → Report 작성 → 차회 일정 등록 → 노션 기록 (SOP04 ②방문)' },
+  callSms:   { t:'통화·문자 독촉',                p:4, c:'#2563eb', g:'연락 구간(1~7일) — 1차 통화 → 미응답 시 문자 → 응답 여부 기록 (SOP04 ①연락)' },
+  kyPromise: { t:'입금약속 확인 콜',              p:5, c:'#059669', g:'입금예정일 당일 확인 콜 → 미이행 시 방문 단계 전환 (SOP04)' },
+  bohum:     { t:'보증보험 청구·법적 회수 검토',    p:3, c:'#7c3aed', g:'종료 계약 연체 — 임대인 직접 협상 대신 보증보험사 청구 경로 검토' }
+};
+function _drClassify(r, cfg){
+  var nc = _drNoContactDays(r);
+  var legal = _drLegal(r.cno);
+  var pen = (typeof _dlqPenalty === 'function' ? _dlqPenalty(r.cno) : 0) || 0;
+  var days = r.days || 0, amt = r.amt || 0;
+  var promised = (r.payStatus === 'today' || r.payStatus === 'future');
+  var bunnap = String(r.연체구분||'') === '분납중';
+  var evictState = String(r.vacancyStatus||'').indexOf('퇴실') >= 0 || String(r.content||'').indexOf('강제퇴실') >= 0;
+  var terminated = (r.contractStatus||'계약중') !== '계약중';
+  var important = amt >= cfg.amt || pen >= cfg.penalty || String(r.grade||'').indexOf('E') >= 0;
+  var isOh = legal.nae || legal.ji || legal.bo || important || days >= cfg.legalDays || terminated;
+  var a;
+  if (isOh) {
+    if (legal.bo)                          a = _DR_ACT.bojeong;
+    else if (terminated)                   a = _DR_ACT.bohum;
+    else if (evictState)                   a = _DR_ACT.evictMgmt;
+    else if (legal.ji)                     a = _DR_ACT.jiMgmt;
+    else if (legal.nae && nc >= cfg.noContact) a = _DR_ACT.jiApply;
+    else if (nc >= cfg.noContact)          a = _DR_ACT.naeSend;
+    else if (bunnap)                       a = _DR_ACT.ohBunnap;
+    else if (promised)                     a = _DR_ACT.ohPromise;
+    else                                   a = _DR_ACT.ohFocus;
+    return { who:'오진선', act:a, nc:nc, pen:pen };
+  }
+  if (days >= cfg.evict   && nc >= cfg.noContact) a = _DR_ACT.evictDone;
+  else if (days >= cfg.evictIn && nc >= cfg.noContact) a = _DR_ACT.evictField;
+  else if (bunnap)                                a = _DR_ACT.ohBunnap;
+  else if (days >= cfg.visit || nc >= cfg.noContact) a = _DR_ACT.visit;
+  else if (promised)                              a = _DR_ACT.kyPromise;
+  else                                            a = _DR_ACT.callSms;
+  return { who:'김영철', act:a, nc:nc, pen:pen };
+}
+function _drTargets(){
+  var cfg = window._dlqDrCfg;
+  var rows = (window._dlqTableRows || []).filter(function(r){
+    if (!cfg.includeTerminated && (r.contractStatus||'계약중') !== '계약중') return false;
+    return true;
+  });
+  rows.forEach(function(r){ r._dr = _drClassify(r, cfg); });
+  rows.sort(function(a,b){
+    if (a._dr.who !== b._dr.who) return a._dr.who === '오진선' ? -1 : 1;
+    if (a._dr.act.p !== b._dr.act.p) return a._dr.act.p - b._dr.act.p;
+    return (b.days||0) - (a.days||0) || (b.amt||0) - (a.amt||0);
+  });
+  return rows;
+}
+function _drEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _drWon(v){ return '₩' + Math.round(v||0).toLocaleString(); }
+function _drRowHtml(r, cfg){
+  var d = r._dr, a = d.act;
+  var ncTag = d.nc >= cfg.noContact ? '<span style="background:#fef2f2;color:#dc2626;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">미연락 '+d.nc+'일</span>' : '';
+  var legal = _drLegal(r.cno);
+  var lg = [legal.nae?'내용증명':'', legal.ji?'지급명령':'', legal.bo?'보정명령':''].filter(Boolean).join('·');
+  var lgTag = lg ? '<span style="background:#ecfdf5;color:#059669;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+lg+'</span>' : '';
+  var gTag = r.grade && r.grade !== '-' ? '<span style="background:'+(String(r.grade).indexOf('E')>=0?'#dc2626':String(r.grade).indexOf('C')>=0||String(r.grade).indexOf('D')>=0?'#d97706':'#64748b')+';color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:800">'+_drEsc(r.grade)+'</span>' : '';
+  return '<tr style="border-bottom:1px solid #f1f5f9">'
+    + '<td style="padding:7px 8px;white-space:nowrap"><span style="color:#2563eb;font-weight:700;cursor:pointer" onclick="dlqCloseDailyReport();dlqGoToContract(\''+r.cno+'\')">'+r.cno+'</span></td>'
+    + '<td style="padding:7px 8px"><b>'+_drEsc(r.nm)+'</b><br><span style="color:#64748b;font-size:10.5px">'+_drEsc(r.tel)+'</span></td>'
+    + '<td style="padding:7px 8px;white-space:nowrap">'+gTag+' <span style="background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+(r.days||0)+'일</span><br>'+ncTag+' '+lgTag+'</td>'
+    + '<td style="padding:7px 8px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums">'+_drWon(r.amt)+(d.pen?'<br><span style="color:#dc2626;font-size:11px">'+_drWon(d.pen)+'</span>':'')+'</td>'
+    + '<td style="padding:7px 8px;max-width:230px"><div style="color:#64748b;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_drEsc(r.content)+'">'+_drEsc(r.content||'—')+'</div></td>'
+    + '<td style="padding:7px 8px;border-left:2px solid '+a.c+';background:'+(a.warn?'#fff7ed':'#fcfdfe')+'">'
+      + '<div style="font-size:12px;font-weight:800;color:'+a.c+'">▶ '+a.t+'</div>'
+      + '<div style="font-size:10.5px;color:'+(a.warn?'#9a3412':'#64748b')+';margin-top:2px;line-height:1.45">'+a.g+'</div>'
+    + '</td></tr>';
+}
+function _drSectionHtml(who, role, color, rows, cfg){
+  var head = '<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid #e2e8f0;background:#fff;border-radius:12px 12px 0 0">'
+    + '<div style="width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">'+who.charAt(0)+'</div>'
+    + '<div><div style="font-size:14.5px;font-weight:800">'+who+'</div><div style="font-size:11px;color:#64748b">'+role+'</div></div>'
+    + '<div style="margin-left:auto;font-size:12px;font-weight:700;color:#64748b">배정 '+rows.length+'건</div></div>';
+  var body = rows.length
+    ? '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff">'
+      + '<thead><tr style="background:#f8fafc;color:#64748b;font-size:10.5px">'
+      + '<th style="padding:5px 8px;text-align:left">계약번호</th><th style="padding:5px 8px;text-align:left">임(전)차인</th><th style="padding:5px 8px;text-align:left">상태</th>'
+      + '<th style="padding:5px 8px;text-align:right">연체금액/위약금</th><th style="padding:5px 8px;text-align:left">최근 대응 내용</th>'
+      + '<th style="padding:5px 8px;text-align:left;width:34%">▶ 대응 지시 (SOP 근거)</th></tr></thead><tbody>'
+      + rows.map(function(r){ return _drRowHtml(r, cfg); }).join('') + '</tbody></table></div>'
+    : '<div style="padding:14px;color:#94a3b8;font-size:12px;background:#fff">오늘 배정 건이 없습니다.</div>';
+  return '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px">'+head+body+'</div>';
+}
+function _drBuildHtml(){
+  var cfg = window._dlqDrCfg;
+  var rows = _drTargets();
+  var oh = rows.filter(function(r){ return r._dr.who === '오진선'; });
+  var ky = rows.filter(function(r){ return r._dr.who === '김영철'; });
+  var urgent = rows.filter(function(r){ return r._dr.act.p === 1; }).length;
+  var ncCnt = rows.filter(function(r){ return r._dr.nc >= cfg.noContact; }).length;
+  var d = new Date();
+  var ds = d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')+' ('+['일','월','화','수','목','금','토'][d.getDay()]+')';
+  var kpi = function(label, val, sub, color){
+    return '<div style="flex:1;min-width:130px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px">'
+      + '<div style="font-size:10.5px;color:#64748b;font-weight:700">'+label+'</div>'
+      + '<div style="font-size:20px;font-weight:800;color:'+color+'">'+val+'</div>'
+      + '<div style="font-size:10.5px;color:#64748b">'+sub+'</div></div>';
+  };
+  return '<div style="padding:14px 18px;max-width:1500px;margin:0 auto">'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+    + kpi('대상 연체자', rows.length+'명', cfg.includeTerminated?'계약중+종료 포함':'계약중 기준', '#1e293b')
+    + kpi('오진선 · 법무/중요', oh.length+'건', '법무 7단계·고액·E패턴·퇴실관리', '#7c3aed')
+    + kpi('김영철 · 초기/현장', ky.length+'건', '연락(1~7)·방문(8~30)·강제퇴실 현장', '#2563eb')
+    + kpi('🚨 최우선 조치', urgent+'건', '보정명령·강제퇴실·퇴실관리', '#dc2626')
+    + kpi('📵 미연락 '+cfg.noContact+'일↑', ncCnt+'건', '내용증명·방문 트리거', '#dc2626')
+    + '</div>'
+    + _drSectionHtml('오진선', 'SOP04 법무 7단계 · 고액/E패턴 · SOP06 퇴실관리(시트·청소·해지)', '#7c3aed', oh, cfg)
+    + _drSectionHtml('김영철', 'SOP04 연락(1~7일)·방문(8~30일) · SOP06 강제퇴실 현장 1차 대응', '#2563eb', ky, cfg)
+    + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
+    + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
+    + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
+    + ' · Daily Report 생성일 '+ds+' · build v452</div>'
+    + '</div>';
+}
+function dlqOpenDailyReport(){
+  if (!window._dlqTableRows || !window._dlqTableRows.length) { alert('연체 데이터가 아직 로드되지 않았습니다. 잠시 후 다시 시도해 주세요.'); return; }
+  var old = document.getElementById('dlqDrModal'); if (old) old.remove();
+  var cfg = window._dlqDrCfg;
+  var wrap = document.createElement('div');
+  wrap.id = 'dlqDrModal';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:24px;overflow:auto';
+  wrap.innerHTML = '<div style="background:#f6f8fb;border-radius:16px;width:100%;max-width:1520px;max-height:calc(100vh - 48px);overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)">'
+    + '<div style="position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid #e2e8f0;border-radius:16px 16px 0 0;padding:12px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    + '<div style="font-size:16px;font-weight:800">📋 연체대응 Daily Report</div>'
+    + '<label style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:4px">고액 ≥ <input id="drCfgAmt" type="number" value="'+cfg.amt+'" step="100000" style="width:90px;border:1px solid #e2e8f0;border-radius:5px;padding:2px 5px;font-size:11.5px;text-align:right">원</label>'
+    + '<label style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:4px">미연락 ≥ <input id="drCfgNc" type="number" value="'+cfg.noContact+'" style="width:44px;border:1px solid #e2e8f0;border-radius:5px;padding:2px 5px;font-size:11.5px;text-align:right">일</label>'
+    + '<label style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:4px">강제퇴실 인입 ≥ <input id="drCfgEv" type="number" value="'+cfg.evictIn+'" style="width:44px;border:1px solid #e2e8f0;border-radius:5px;padding:2px 5px;font-size:11.5px;text-align:right">일</label>'
+    + '<label style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:4px"><input id="drCfgTerm" type="checkbox" '+(cfg.includeTerminated?'checked':'')+'> 종료 포함</label>'
+    + '<span style="flex:1"></span>'
+    + '<button onclick="dlqDrSlackCopy()" style="border:1px solid #e2e8f0;background:#fff;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">💬 Slack용 복사</button>'
+    + '<button onclick="dlqDrPrint()" style="border:1px solid #e2e8f0;background:#fff;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">🖨️ 인쇄</button>'
+    + '<button onclick="dlqCloseDailyReport()" style="border:none;background:#1d4ed8;color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">닫기 ✕</button>'
+    + '</div><div id="dlqDrBody"></div></div>';
+  wrap.addEventListener('click', function(e){ if (e.target === wrap) dlqCloseDailyReport(); });
+  document.body.appendChild(wrap);
+  var rerender = function(){
+    cfg.amt = +document.getElementById('drCfgAmt').value || cfg.amt;
+    cfg.noContact = +document.getElementById('drCfgNc').value || cfg.noContact;
+    cfg.evictIn = +document.getElementById('drCfgEv').value || cfg.evictIn;
+    cfg.includeTerminated = !!document.getElementById('drCfgTerm').checked;
+    document.getElementById('dlqDrBody').innerHTML = _drBuildHtml();
+  };
+  ['drCfgAmt','drCfgNc','drCfgEv','drCfgTerm'].forEach(function(id){ document.getElementById(id).addEventListener('change', rerender); });
+  document.getElementById('dlqDrBody').innerHTML = _drBuildHtml();
+}
+function dlqCloseDailyReport(){ var m = document.getElementById('dlqDrModal'); if (m) m.remove(); }
+function dlqDrPrint(){
+  var body = document.getElementById('dlqDrBody'); if (!body) return;
+  var w = window.open('', '_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>연체대응 Daily Report</title>'
+    + '<style>body{font-family:Pretendard,-apple-system,"Malgun Gothic",sans-serif;margin:0;background:#fff}a{color:#2563eb}@media print{a{text-decoration:none}}</style>'
+    + '</head><body>' + body.innerHTML + '</body></html>');
+  w.document.close();
+  setTimeout(function(){ w.print(); }, 300);
+}
+function dlqDrSlackCopy(){
+  var cfg = window._dlqDrCfg;
+  var rows = _drTargets();
+  var d = new Date();
+  var t = '📋 연체대응 Daily Report — ' + d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0') + '\n대상 ' + rows.length + '명 (SOP04/SOP06 기준)\n';
+  ['오진선','김영철'].forEach(function(who){
+    var list = rows.filter(function(r){ return r._dr.who === who; });
+    t += '\n■ ' + who + ' (' + list.length + '건)\n';
+    var cur = '';
+    list.forEach(function(r){
+      if (r._dr.act.t !== cur) { cur = r._dr.act.t; t += '\n▶ ' + cur + '\n'; }
+      t += '  · ' + r.cno + ' ' + r.nm + ' / ' + (r.days||0) + '일 / ' + _drWon(r.amt) + (r._dr.nc >= cfg.noContact ? ' / 미연락' + r._dr.nc + '일' : '') + '\n';
+    });
+  });
+  var done = function(){ alert('Slack용 지시 텍스트가 복사되었습니다.'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(done).catch(function(){ prompt('복사(Ctrl+C):', t); }); }
+  else { prompt('복사(Ctrl+C):', t); }
+}
+// ═══════════ [v452] Daily Report 끝 ═══════════
 function _dlqLegalLatest(cno, matchFn){
   if (!Array.isArray(daeungRawData)) return null;
   var rs = daeungRawData.filter(function(d){ return d && String(d.no||'').trim()===String(cno).trim() && d.jobSub && matchFn(String(d.jobSub).replace(/\s/g,'')); });
