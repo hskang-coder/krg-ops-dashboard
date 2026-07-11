@@ -7260,7 +7260,10 @@ function _drClassify(r, cfg){
   var important = amt >= cfg.amt || pen >= cfg.penalty || String(r.grade||'').indexOf('E') >= 0;
   // [v454] 당일 납부 예정자 납부 확인 = 김영철 배정 (지급명령·보정명령·퇴실관리·종료 건 제외)
   if (todayProm && !legal.ji && !legal.bo && !evictState && !terminated) {
-    return { who:'김영철', act:_DR_ACT.kyPayCheck, nc:nc, pen:pen };
+    // [v463] 라벨에 당일 날짜 표시 — '당일(0000/00/00) 납부예정자 납부 확인'
+    var _td = new Date();
+    var _tds = _td.getFullYear() + '/' + String(_td.getMonth()+1).padStart(2,'0') + '/' + String(_td.getDate()).padStart(2,'0');
+    return { who:'김영철', act:Object.assign({}, _DR_ACT.kyPayCheck, { t:'당일('+_tds+') 납부예정자 납부 확인' }), nc:nc, pen:pen };
   }
   // [v454] 연체 3~5일 · 전 연락망 불가 · 납부일정 미등록 → 오진선 내용증명·지급명령 선별
   if (!terminated && days >= 3 && days <= 5 && nc >= cfg.noContact && noSchedule && !legal.nae && !legal.ji && !legal.bo) {
@@ -7487,7 +7490,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v462</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v463</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
