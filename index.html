@@ -7305,6 +7305,11 @@ function _drTargets(){
     if (_drKcbTask(r) && dr.act !== _DR_ACT.ohKcb) {
       rows.push(Object.assign({}, r, { _dr: { who:'오진선', act:_DR_ACT.ohKcb, nc:dr.nc, pen:dr.pen } }));
     }
+    // [v458] 1~2일차 연체자 전원 김영철 전화연락 — 주담당이 오진선이어도 병행 배정
+    if ((r.contractStatus||'계약중') === '계약중' && (r.days||0) <= 2 && dr.who === '오진선') {
+      var callAct = ((r.days||0) === 2) ? _DR_ACT.kyCall2 : _DR_ACT.kyCall1;
+      rows.push(Object.assign({}, r, { _dr: { who:'김영철', act:callAct, nc:dr.nc, pen:dr.pen } }));
+    }
   });
   rows.sort(function(a,b){
     if (a._dr.who !== b._dr.who) return a._dr.who === '오진선' ? -1 : 1;
@@ -7473,7 +7478,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v457</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v458</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
