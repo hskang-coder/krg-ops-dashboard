@@ -7331,11 +7331,13 @@ function _drRowHtml(r, cfg){
   var legal = _drLegal(r.cno);
   var lg = [legal.nae?'내용증명':'', legal.ji?'지급명령':'', legal.bo?'보정명령':''].filter(Boolean).join('·');
   var lgTag = lg ? '<span style="background:#ecfdf5;color:#059669;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+lg+'</span>' : '';
+  var sc = (typeof _dlqScore === 'function') ? _dlqScore(r.cno) : null;   // [v461]
+  var scTag = sc ? '<span style="background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:800">KCB '+sc+'</span> ' : '';
   var gTag = r.grade && r.grade !== '-' ? '<span style="background:'+(String(r.grade).indexOf('E')>=0?'#dc2626':String(r.grade).indexOf('C')>=0||String(r.grade).indexOf('D')>=0?'#d97706':'#64748b')+';color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:800">'+_drEsc(r.grade)+'</span>' : '';
   return '<tr style="border-bottom:1px solid #f1f5f9">'
     + '<td style="padding:7px 8px;white-space:nowrap"><span style="color:#2563eb;font-weight:700;cursor:pointer" onclick="dlqCloseDailyReport();dlqGoToContract(\''+r.cno+'\')">'+r.cno+'</span></td>'
     + '<td style="padding:7px 8px"><b>'+_drEsc(r.nm)+'</b><br><span style="color:#64748b;font-size:10.5px">'+_drEsc(r.tel)+'</span></td>'
-    + '<td style="padding:7px 8px;white-space:nowrap">'+gTag+' <span style="background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+(r.days||0)+'일</span><br>'+ncTag+' '+lgTag+'</td>'
+    + '<td style="padding:7px 8px;white-space:nowrap">'+gTag+' <span style="background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+(r.days||0)+'일</span> '+ncTag+' '+scTag+lgTag+'</td>'
     + '<td style="padding:7px 8px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums">'+_drWon(r.amt)+(d.pen?'<br><span style="color:#dc2626;font-size:11px">'+_drWon(d.pen)+'</span>':'')+'</td>'
     + '<td style="padding:7px 8px;max-width:230px"><div style="color:#64748b;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_drEsc(r.content)+'">'+_drEsc(r.content||'—')+'</div></td>'
     + '<td style="padding:7px 8px;border-left:2px solid '+a.c+';background:'+(a.warn?'#fff7ed':'#fcfdfe')+'">'
@@ -7426,12 +7428,15 @@ function _drTargetViewHtml(cfg){
     var r = t.r;
     var legal = _drLegal(r.cno);
     var lg = [legal.nae?'내용증명':'', legal.ji?'지급명령':'', legal.bo?'보정명령':''].filter(Boolean).join('·');
+    var sc = (typeof _dlqScore === 'function') ? _dlqScore(r.cno) : null;   // [v461] KCB 점수
+    var scTag = sc ? '<span style="background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:800">KCB '+sc+'</span> ' : '';
     var gTag = r.grade && r.grade !== '-' ? '<span style="background:'+(String(r.grade).indexOf('E')>=0?'#dc2626':String(r.grade).indexOf('C')>=0||String(r.grade).indexOf('D')>=0?'#d97706':'#64748b')+';color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:800">'+_drEsc(r.grade)+'</span>' : '';
     return '<tr style="border-bottom:1px solid #f1f5f9;background:'+(t.p===1?'#fff7f7':'#fff')+'">'
       + '<td style="padding:7px 8px;white-space:nowrap"><span style="color:#2563eb;font-weight:700;cursor:pointer" onclick="dlqCloseDailyReport();dlqGoToContract(\''+r.cno+'\')">'+r.cno+'</span></td>'
       + '<td style="padding:7px 8px"><b>'+_drEsc(r.nm)+'</b><br><span style="color:#64748b;font-size:10.5px">'+_drEsc(r.tel)+'</span></td>'
-      + '<td style="padding:7px 8px;white-space:nowrap">'+gTag+' <span style="background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+(r.days||0)+'일</span><br>'
+      + '<td style="padding:7px 8px;white-space:nowrap">'+gTag+' <span style="background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+(r.days||0)+'일</span> '
         + (t.nc>=cfg.noContact?'<span style="background:#fef2f2;color:#dc2626;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">미연락 '+t.nc+'일</span> ':'')
+        + scTag
         + (lg?'<span style="background:#ecfdf5;color:#059669;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+lg+'</span>':'')+'</td>'
       + '<td style="padding:7px 8px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums">'+_drWon(r.amt)+(t.pen?'<br><span style="color:#dc2626;font-size:11px">'+_drWon(t.pen)+'</span>':'')+'</td>'
       + '<td style="padding:7px 8px;max-width:200px"><div style="color:#64748b;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_drEsc(r.content)+'">'+_drEsc(r.content||'—')+'</div></td>'
@@ -7482,7 +7487,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v460</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v461</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
