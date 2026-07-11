@@ -7193,7 +7193,7 @@ function dlqToggleLegalView(){
 //   법무 7단계: 내용증명 → CB조회 → 지급명령 → 변론 → 채권압류 → 추심명령 → 명도소송
 //   SOP06 강제퇴실: 인입 = 연체 15~20일 경과 + 연락두절 → [김영철] 현장 1차 대응 → [오진선] 퇴실관리(시트·청소·해지)
 //   운영 지시: 고액(연체금액·위약금)·E패턴은 연체일 무관 오진선
-window._dlqDrCfg = { amt:1000000, penalty:2500000, visit:8, legalDays:30, noContact:3, evictIn:15, evict:20, includeTerminated:false, view:'target' };
+window._dlqDrCfg = { amt:1000000, penalty:2500000, visit:8, legalDays:30, noContact:3, evictIn:15, evict:20, includeTerminated:false, view:'target', sortKey:null, sortDir:'asc' };
 
 function _drParseDt(s){
   var m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
@@ -7360,12 +7360,43 @@ function _drByTarget(){
     map[k].p = Math.min(map[k].p, e._dr.act.p);
   });
   var list = order.map(function(k){ return map[k]; });
-  list.sort(function(a,b){
-    if (a.p !== b.p) return a.p - b.p;
-    return (b.r.days||0) - (a.r.days||0) || (b.r.amt||0) - (a.r.amt||0);
-  });
+  // [v456] 헤더 클릭 정렬 — sortKey 없으면 기본(우선순위 → 연체일 → 금액)
+  var sk = window._dlqDrCfg.sortKey, dir = window._dlqDrCfg.sortDir === 'desc' ? -1 : 1;
+  if (sk) {
+    var val = function(t){
+      if (sk === 'cno')  return parseFloat(String(t.r.cno).replace(/[^\d.]/g,'')) || 0;
+      if (sk === 'nm')   return String(t.r.nm||'');
+      if (sk === 'days') return t.r.days || 0;
+      if (sk === 'amt')  return t.r.amt || 0;
+      if (sk === 'nc')   return t.nc || 0;
+      return 0;
+    };
+    list.sort(function(a,b){
+      var va = val(a), vb = val(b);
+      if (typeof va === 'string') return va.localeCompare(vb, 'ko') * dir;
+      return (va - vb) * dir;
+    });
+  } else {
+    list.sort(function(a,b){
+      if (a.p !== b.p) return a.p - b.p;
+      return (b.r.days||0) - (a.r.days||0) || (b.r.amt||0) - (a.r.amt||0);
+    });
+  }
   list._baseCount = rows._baseCount;
   return list;
+}
+// [v456] 정렬 순환: 오름차순 → 내림차순 → 기본(우선순위)
+function dlqDrSort(key){
+  var cfg = window._dlqDrCfg;
+  if (cfg.sortKey !== key)      { cfg.sortKey = key; cfg.sortDir = 'asc'; }
+  else if (cfg.sortDir === 'asc'){ cfg.sortDir = 'desc'; }
+  else                          { cfg.sortKey = null; cfg.sortDir = 'asc'; }
+  var b = document.getElementById('dlqDrBody'); if (b) b.innerHTML = _drBuildHtml();
+}
+function _drTh(key, label, align, extra){
+  var cfg = window._dlqDrCfg;
+  var arrow = cfg.sortKey === key ? (cfg.sortDir === 'asc' ? ' ▲' : ' ▼') : ' <span style="opacity:.35">↕</span>';
+  return '<th onclick="dlqDrSort(\''+key+'\')" title="클릭하여 정렬 (오름차순→내림차순→우선순위)" style="padding:6px 8px;text-align:'+(align||'left')+';cursor:pointer;user-select:none;white-space:nowrap;'+(extra||'')+'">'+label+arrow+'</th>';
 }
 function _drActCell(acts, warnColor){
   if (!acts.length) return '<span style="color:#cbd5e1">—</span>';
@@ -7398,8 +7429,11 @@ function _drTargetViewHtml(cfg){
   return '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px"><div style="overflow-x:auto">'
     + '<table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff">'
     + '<thead><tr style="background:#f8fafc;color:#64748b;font-size:10.5px">'
-    + '<th style="padding:6px 8px;text-align:left">계약번호</th><th style="padding:6px 8px;text-align:left">임(전)차인</th><th style="padding:6px 8px;text-align:left">상태</th>'
-    + '<th style="padding:6px 8px;text-align:right">연체금액/위약금</th><th style="padding:6px 8px;text-align:left">최근 대응 내용</th>'
+    + _drTh('cno','계약번호')
+    + _drTh('nm','임(전)차인')
+    + _drTh('days','상태(연체일)')
+    + _drTh('amt','연체금액/위약금','right')
+    + '<th style="padding:6px 8px;text-align:left">최근 대응 내용 <span onclick="dlqDrSort(\'nc\')" title="미연락 일수로 정렬" style="cursor:pointer;user-select:none;opacity:.7">📵'+(window._dlqDrCfg.sortKey==='nc'?(window._dlqDrCfg.sortDir==='asc'?'▲':'▼'):'↕')+'</span></th>'
     + '<th style="padding:6px 8px;text-align:left;width:23%;color:#7c3aed;font-weight:800">🟣 오진선 액션</th>'
     + '<th style="padding:6px 8px;text-align:left;width:23%;color:#2563eb;font-weight:800">🔵 김영철 액션</th>'
     + '</tr></thead><tbody>' + body + '</tbody></table></div></div>';
@@ -7435,7 +7469,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v455</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v456</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
