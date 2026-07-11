@@ -7283,7 +7283,7 @@ function _drClassify(r, cfg){
   else if (days >= 3 && nc >= cfg.noContact)      a = _DR_ACT.visitPlan;      // 3일차 연락불가 → 방문 조율
   else if (days <= 1)                             a = _DR_ACT.kyCall1;        // 1일차 본인·계약자
   else if (days === 2)                            a = _DR_ACT.kyCall2;        // 2일차 긴급연락처
-  else if (futureProm)                            a = _DR_ACT.kyPromise;
+  else if (futureProm)                            a = Object.assign({}, _DR_ACT.kyPromise, { t: '입금예정일(' + ((r.dateStr && r.dateStr !== '-') ? String(r.dateStr).replace(/[.\-]/g,'/') : '미등록') + ') 관리' });
   else                                            a = _DR_ACT.callSms;        // 3~7일 연락 가능
   return { who:'김영철', act:a, nc:nc, pen:pen };
 }
@@ -7478,7 +7478,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v458</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v459</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
