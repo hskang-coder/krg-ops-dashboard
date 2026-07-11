@@ -7369,6 +7369,10 @@ function _drByTarget(){
       if (sk === 'days') return t.r.days || 0;
       if (sk === 'amt')  return t.r.amt || 0;
       if (sk === 'nc')   return t.nc || 0;
+      if (sk === 'oh' || sk === 'ky') {           // [v457] TO DO LIST 정렬 — 우선순위 → 액션명 (같은 액션끼리 묶임)
+        var arr = (sk === 'oh') ? t.oh : t.ky;
+        return arr.length ? (String(arr[0].p) + '_' + arr[0].t) : '9_';
+      }
       return 0;
     };
     list.sort(function(a,b){
@@ -7434,8 +7438,8 @@ function _drTargetViewHtml(cfg){
     + _drTh('days','상태(연체일)')
     + _drTh('amt','연체금액/위약금','right')
     + '<th style="padding:6px 8px;text-align:left">최근 대응 내용 <span onclick="dlqDrSort(\'nc\')" title="미연락 일수로 정렬" style="cursor:pointer;user-select:none;opacity:.7">📵'+(window._dlqDrCfg.sortKey==='nc'?(window._dlqDrCfg.sortDir==='asc'?'▲':'▼'):'↕')+'</span></th>'
-    + '<th style="padding:6px 8px;text-align:left;width:23%;color:#7c3aed;font-weight:800">🟣 오진선 액션</th>'
-    + '<th style="padding:6px 8px;text-align:left;width:23%;color:#2563eb;font-weight:800">🔵 김영철 액션</th>'
+    + _drTh('oh','🟣 오진선 TO DO LIST','left','width:23%;color:#7c3aed;font-weight:800')
+    + _drTh('ky','🔵 김영철 TO DO LIST','left','width:23%;color:#2563eb;font-weight:800')
     + '</tr></thead><tbody>' + body + '</tbody></table></div></div>';
 }
 function _drBuildHtml(){
@@ -7469,7 +7473,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v456</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v457</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
