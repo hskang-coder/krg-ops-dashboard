@@ -7193,7 +7193,7 @@ function dlqToggleLegalView(){
 //   법무 7단계: 내용증명 → CB조회 → 지급명령 → 변론 → 채권압류 → 추심명령 → 명도소송
 //   SOP06 강제퇴실: 인입 = 연체 15~20일 경과 + 연락두절 → [김영철] 현장 1차 대응 → [오진선] 퇴실관리(시트·청소·해지)
 //   운영 지시: 고액(연체금액·위약금)·E패턴은 연체일 무관 오진선
-window._dlqDrCfg = { amt:1000000, penalty:2500000, visit:8, legalDays:30, noContact:3, evictIn:15, evict:20, includeTerminated:false, view:'target', sortKey:null, sortDir:'asc' };
+window._dlqDrCfg = { amt:1000000, penalty:2500000, visit:8, legalDays:30, noContact:3, evictIn:15, evict:20, includeTerminated:false, view:'target', sortKey:null, sortDir:'asc', cardFilter:null };
 
 function _drParseDt(s){
   var m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
@@ -7409,6 +7409,12 @@ function _drByTarget(){
   list._baseCount = rows._baseCount;
   return list;
 }
+// [v465] 카드 필터 토글 — 같은 카드 재클릭 시 해제, 'all'은 항상 해제
+function dlqDrCardFilter(key){
+  var cfg = window._dlqDrCfg;
+  cfg.cardFilter = (key === 'all' || cfg.cardFilter === key) ? null : key;
+  var b = document.getElementById('dlqDrBody'); if (b) b.innerHTML = _drBuildHtml();
+}
 // [v456] 정렬 순환: 오름차순 → 내림차순 → 기본(우선순위)
 function dlqDrSort(key){
   var cfg = window._dlqDrCfg;
@@ -7433,6 +7439,13 @@ function _drActCell(acts, warnColor){
 }
 function _drTargetViewHtml(cfg){
   var list = _drByTarget();
+  // [v465] 카드 필터 — 클릭한 카드의 대상만 표시
+  var cf = cfg.cardFilter;
+  if (cf === 'oh')          list = list.filter(function(t){ return t.oh.length; });
+  else if (cf === 'ky')     list = list.filter(function(t){ return t.ky.length; });
+  else if (cf === 'urgent') list = list.filter(function(t){ return t.p === 1; });
+  else if (cf === 'nc')     list = list.filter(function(t){ return t.nc >= cfg.noContact; });
+  else if (cf === 'pay')    list = list.filter(function(t){ return t.r.payStatus === 'today' || t.r.payStatus === 'future'; });
   var body = list.map(function(t){
     var r = t.r;
     var legal = _drLegal(r.cno);
@@ -7474,30 +7487,43 @@ function _drBuildHtml(){
   var urgent = rows.filter(function(r){ return r._dr.act.p === 1; }).length;
   var ncCnt = rows.filter(function(r){ return r._dr.nc >= cfg.noContact && r._dr.act !== _DR_ACT.ohKcb; }).length;
   var baseCount = rows._baseCount != null ? rows._baseCount : rows.length;
+  // [v465] 입금예정일 확정 카운트 (연체자 기준 중복 제거)
+  var payToday = 0, payFuture = 0, _seen = {};
+  rows.forEach(function(r){ if (_seen[r.cno]) return; _seen[r.cno] = 1; if (r.payStatus === 'today') payToday++; else if (r.payStatus === 'future') payFuture++; });
+  // [v465] 카드 필터 적용 (담당자별 뷰 섹션용 — KPI 숫자는 전체 기준 유지)
+  var cf = cfg.cardFilter;
+  var fRows = rows;
+  if (cf === 'urgent')   fRows = rows.filter(function(r){ return r._dr.act.p === 1; });
+  else if (cf === 'nc')  fRows = rows.filter(function(r){ return r._dr.nc >= cfg.noContact; });
+  else if (cf === 'pay') fRows = rows.filter(function(r){ return r.payStatus === 'today' || r.payStatus === 'future'; });
+  var ohF = (cf === 'ky') ? [] : fRows.filter(function(r){ return r._dr.who === '오진선'; });
+  var kyF = (cf === 'oh') ? [] : fRows.filter(function(r){ return r._dr.who === '김영철'; });
   var d = new Date();
   var ds = d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')+' ('+['일','월','화','수','목','금','토'][d.getDay()]+')';
-  var kpi = function(label, val, sub, color){
-    return '<div style="flex:1;min-width:130px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px">'
-      + '<div style="font-size:10.5px;color:#64748b;font-weight:700">'+label+'</div>'
+  var kpi = function(key, label, val, sub, color){
+    var active = cfg.cardFilter === key;
+    return '<div onclick="dlqDrCardFilter(\''+key+'\')" title="클릭 시 해당 대상만 표시 (다시 클릭하면 해제)" style="flex:1;min-width:130px;background:'+(active?'#eff6ff':'#fff')+';border:'+(active?'2px solid #1d4ed8':'1px solid #e2e8f0')+';border-radius:10px;padding:10px 12px;cursor:pointer">'
+      + '<div style="font-size:10.5px;color:#64748b;font-weight:700">'+label+(active?' <span style="color:#1d4ed8">●</span>':'')+'</div>'
       + '<div style="font-size:20px;font-weight:800;color:'+color+'">'+val+'</div>'
       + '<div style="font-size:10.5px;color:#64748b">'+sub+'</div></div>';
   };
   return '<div style="padding:14px 18px;max-width:1500px;margin:0 auto">'
     + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
-    + kpi('대상 연체자', baseCount+'명', cfg.includeTerminated?'계약중+종료 포함':'계약중 기준', '#1e293b')
-    + kpi('오진선 · 법무/중요', oh.length+'건', '법무 7단계·고액·E패턴·퇴실관리', '#7c3aed')
-    + kpi('김영철 · 초기/현장', ky.length+'건', '연락(1~7)·방문(8~30)·강제퇴실 현장', '#2563eb')
-    + kpi('🚨 최우선 조치', urgent+'건', '보정명령·강제퇴실·퇴실관리', '#dc2626')
-    + kpi('📵 미연락 '+cfg.noContact+'일↑', ncCnt+'건', '내용증명·방문 트리거', '#dc2626')
+    + kpi('all','대상 연체자', baseCount+'명', cfg.includeTerminated?'계약중+종료 포함':'계약중 기준', '#1e293b')
+    + kpi('oh','오진선 · 법무/중요', oh.length+'건', '법무 7단계·고액·E패턴·퇴실관리', '#7c3aed')
+    + kpi('ky','김영철 · 초기/현장', ky.length+'건', '연락(1~7)·방문(8~30)·강제퇴실 현장', '#2563eb')
+    + kpi('urgent','🚨 최우선 조치', urgent+'건', '보정명령·강제퇴실·퇴실관리', '#dc2626')
+    + kpi('nc','📵 미연락 '+cfg.noContact+'일↑', ncCnt+'건', '내용증명·방문 트리거', '#dc2626')
+    + kpi('pay','📅 입금예정일 확정', (payToday+payFuture)+'명', '당일 '+payToday+'명 / 미도래 '+payFuture+'명', '#059669')
     + '</div>'
     + (cfg.view === 'target'
         ? _drTargetViewHtml(cfg)
-        : _drSectionHtml('오진선', 'KCB 조회·등급 정리(1~3일차) · 3~5일 연락불가·일정미등록 법무 선별 · 법무 7단계 · 고액/E패턴 · 퇴실관리', '#7c3aed', oh, cfg)
-        + _drSectionHtml('김영철', '당일 납부 확인 · 1일차 본인·계약자 → 2일차 긴급연락처 → 3일차 방문 조율 → 8일↑ 방문 · SOP06 강제퇴실 현장', '#2563eb', ky, cfg))
+        : _drSectionHtml('오진선', 'KCB 조회·등급 정리(1~3일차) · 3~5일 연락불가·일정미등록 법무 선별 · 법무 7단계 · 고액/E패턴 · 퇴실관리', '#7c3aed', ohF, cfg)
+        + _drSectionHtml('김영철', '당일 납부 확인 · 1일차 본인·계약자 → 2일차 긴급연락처 → 3일차 방문 조율 → 8일↑ 방문 · SOP06 강제퇴실 현장', '#2563eb', kyF, cfg))
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v464</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v465</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
