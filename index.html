@@ -12762,7 +12762,11 @@ async function generateIncomeReceipt(contractNo){
   // 납기월 → YYYY-MM (정산일 매칭용)
   var monthKey = function(s){ var d=parseDate(s); if(!d) return ''; var dt=new Date(d); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0'); };
   // 행 납부금액 — 대위납부 완납행은 최종 청구금액 기준
-  var rowPaidAmt = function(r){ return missedSet.has(r) ? parseAmt(r['최종 청구금액(원)(①+②+③-④-⑤+⑥)'] || r['미납(연체)금액(원)'] || r['납부금액(원)']) : parseAmt(r['납부금액(원)']); };
+  var rowPaidAmt = function(r){
+    if (missedSet.has(r)) return parseAmt(r['최종 청구금액(원)(①+②+③-④-⑤+⑥)'] || r['미납(연체)금액(원)'] || r['납부금액(원)']);
+    var _paid = parseAmt(r['납부금액(원)']);
+    return _paid > 0 ? _paid : parseAmt(r['최종 청구금액(원)(①+②+③-④-⑤+⑥)'] || 0); // [v452] 납부금액(원) 0(원본 공란)이면 최종 청구금액으로 보정
+  };
 
   // 합계
   var totalPaid = rows.reduce(function(s, r){ return s + rowPaidAmt(r); }, 0);
