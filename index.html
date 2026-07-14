@@ -5327,6 +5327,12 @@ function renderContractRecord(c, payments, responses = []) {
             var etcLabel = fromDlqTab ? '연체관리 탭 집계 (항목 미분류)' : '기타 (퇴실정산·기타계약금·계약보증금)';
             return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">' + etcLabel + '</span><span class="cr-delinq-row-val ' + (etcAll>0?'red':'') + '">' + fmtMoney(etcAll) + '</span></div>';
           })()}
+          ${(function(){
+            // [v454] 지연손해금 = 입금내역(gid=131074722) Z열(연체료, _col_Z) 합계 — 임대료·수수료·기타 전체
+            var _jy = 0;
+            (payments||[]).forEach(function(p){ _jy += (parseFloat(String(p['_col_Z']||'0').replace(/[^0-9.\-]/g,''))||0); });
+            return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">지연손해금<span style="font-size:10px;color:#9CA3AF;margin-left:5px;font-weight:500">연체료 누적</span></span><span class="cr-delinq-row-val ' + (_jy>0?'red':'') + '">' + fmtMoney(_jy) + '</span></div>';
+          })()}
           ${fromDlqTab?`<div class="cr-delinq-row" style="margin-top:4px;padding:6px 8px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:4px;font-size:10.5px;color:#92400E;line-height:1.45"><b>ℹ 연체관리 탭 집계 기준</b><br><span style="font-size:9.5px;color:#92400E">입금내역(paymentRawData)에 아직 반영되지 않아, 연체관리 탭의 연체금액으로 표시합니다. 항목별 분류는 연체관리 탭을 참조하세요.</span></div>`:''}
           ${masterDelinqOnly?`<div class="cr-delinq-row" style="margin-top:4px;padding:6px 8px;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:4px;font-size:10.5px;color:#991B1B;line-height:1.45"><b>⚠ 마스터 연체 마킹:</b> ${masterDlqMark.types.join(' · ')}<br><span style="font-size:9.5px;color:#7F1D1D">입금내역(paymentRawData)에는 연체 행이 없습니다. 시트 동기화 시점 차이 또는 미반영 가능성 — 연체관리 탭에서 노출됩니다.</span></div>`:''}
           ${window._cr_penalty>0?`<div class="cr-delinq-row" style="margin-top:auto;padding-top:5px;border-top:1px dashed #FCA5A5"><span class="cr-delinq-row-label">위약금<span style="font-size:10px;color:#9CA3AF;margin-left:5px;font-weight:500">임대료×4개월</span></span><span class="cr-delinq-row-val red">${fmtMoney(window._cr_penalty)}</span></div>`:''}
