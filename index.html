@@ -4970,6 +4970,14 @@ function renderContractRecord(c, payments, responses = []) {
   const delinqRent    = sumDelinq('임대료', '수수료');
   const delinqFee     = sumDelinq('수수료');
   const delinqExit    = sumDelinq('퇴실정산');
+  // [v455] 지연손해금 = 입금내역 Z열(연체료, _col_Z) — 연체 분류와 동일 필터로 카테고리별 합산
+  const sumLateFee = (keyword, exclude) => payments
+    .filter(p => isDelinqStatus(p) && isPastDue(p))
+    .filter(p => { const nm = String(p['청구서명']||p['납부종류']||''); return nm.includes(keyword) && (!exclude || !nm.includes(exclude)); })
+    .reduce((acc, p) => acc + (parseFloat(String(p['_col_Z']||'0').replace(/[^0-9.\-]/g,''))||0), 0);
+  const lateFeeAll  = payments.filter(p => isDelinqStatus(p) && isPastDue(p)).reduce((acc,p)=>acc+(parseFloat(String(p['_col_Z']||'0').replace(/[^0-9.\-]/g,''))||0),0);
+  const lateFeeRent = sumLateFee('임대료','수수료');
+  const lateFeeFee  = sumLateFee('수수료');
   // [v276] 총 연체 = 모든 연체중/분납중 행의 미납 합계 (잔액 방식)
   //   [v308] 미래 납기일 제외 — 납기 도래 후만 연체로 인정
   const delinqAllSum = (payments||[])
@@ -5316,8 +5324,8 @@ function renderContractRecord(c, payments, responses = []) {
           })()}
         </div>
         <div class="cr-delinq-breakdown">
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">임대료 연체</span><span class="cr-delinq-row-val ${delinqRent>0?'red':''}">${fmtMoney(delinqRent)}</span></div>
-          <div class="cr-delinq-row"><span class="cr-delinq-row-label">수수료 연체</span><span class="cr-delinq-row-val ${delinqFee>0?'red':''}">${fmtMoney(delinqFee)}</span></div>
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">임대료 연체</span><span class="cr-delinq-row-val ${delinqRent>0?'red':''}">${fmtMoney(delinqRent)}<span style="font-size:10px;color:#9CA3AF;font-weight:500;margin-left:4px">(지연손해금 ${fmtMoney(lateFeeRent)} 포함)</span></span></div>
+          <div class="cr-delinq-row"><span class="cr-delinq-row-label">수수료 연체</span><span class="cr-delinq-row-val ${delinqFee>0?'red':''}">${fmtMoney(delinqFee)}<span style="font-size:10px;color:#9CA3AF;font-weight:500;margin-left:4px">(지연손해금 ${fmtMoney(lateFeeFee)} 포함)</span></span></div>
           ${(function(){
             // [v276] 기타 = 잔액 방식 (전체 연체중 미납 - 임대료 - 수수료)
             //   장점: 키워드 매칭 의존 X → 청구서명/납부종류 변형(보증금/기타계약/퇴실정산 등) 모두 자동 포함
@@ -5325,13 +5333,8 @@ function renderContractRecord(c, payments, responses = []) {
             //                       → delinqTotal=150,000, delinqRent=0, delinqFee=0 → 기타=150,000 ✓
             var etcAll = Math.max(0, (effectiveDelinqTotal||0) - (delinqRent||0) - (delinqFee||0));
             var etcLabel = fromDlqTab ? '연체관리 탭 집계 (항목 미분류)' : '기타 (퇴실정산·기타계약금·계약보증금)';
-            return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">' + etcLabel + '</span><span class="cr-delinq-row-val ' + (etcAll>0?'red':'') + '">' + fmtMoney(etcAll) + '</span></div>';
-          })()}
-          ${(function(){
-            // [v454] 지연손해금 = 입금내역(gid=131074722) Z열(연체료, _col_Z) 합계 — 임대료·수수료·기타 전체
-            var _jy = 0;
-            (payments||[]).forEach(function(p){ _jy += (parseFloat(String(p['_col_Z']||'0').replace(/[^0-9.\-]/g,''))||0); });
-            return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">지연손해금<span style="font-size:10px;color:#9CA3AF;margin-left:5px;font-weight:500">연체료 누적</span></span><span class="cr-delinq-row-val ' + (_jy>0?'red':'') + '">' + fmtMoney(_jy) + '</span></div>';
+            var _etcLate = Math.max(0, (lateFeeAll||0) - (lateFeeRent||0) - (lateFeeFee||0)); // [v455] 기타 지연손해금
+            return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">' + etcLabel + '</span><span class="cr-delinq-row-val ' + (etcAll>0?'red':'') + '">' + fmtMoney(etcAll) + '<span style="font-size:10px;color:#9CA3AF;font-weight:500;margin-left:4px">(지연손해금 ' + fmtMoney(_etcLate) + ' 포함)</span></span></div>';
           })()}
           ${fromDlqTab?`<div class="cr-delinq-row" style="margin-top:4px;padding:6px 8px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:4px;font-size:10.5px;color:#92400E;line-height:1.45"><b>ℹ 연체관리 탭 집계 기준</b><br><span style="font-size:9.5px;color:#92400E">입금내역(paymentRawData)에 아직 반영되지 않아, 연체관리 탭의 연체금액으로 표시합니다. 항목별 분류는 연체관리 탭을 참조하세요.</span></div>`:''}
           ${masterDelinqOnly?`<div class="cr-delinq-row" style="margin-top:4px;padding:6px 8px;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:4px;font-size:10.5px;color:#991B1B;line-height:1.45"><b>⚠ 마스터 연체 마킹:</b> ${masterDlqMark.types.join(' · ')}<br><span style="font-size:9.5px;color:#7F1D1D">입금내역(paymentRawData)에는 연체 행이 없습니다. 시트 동기화 시점 차이 또는 미반영 가능성 — 연체관리 탭에서 노출됩니다.</span></div>`:''}
