@@ -3972,11 +3972,9 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
   rows.forEach(function(r) {
     var cno = String(r.cno);
     var addr = (contractDetails[cno] && contractDetails[cno].addr) || '';
-    // [v444] 종료(중도퇴실)자 — 위약금(월세 4개월분) + 총 합계금액 추가
-    var _cRow = (Array.isArray(contractRawData)?contractRawData:[]).find(function(x){ return String(x['계약번호']||'').trim() === cno; });
-    var _isEnded = !!(_cRow && /종료|해지/.test(String(_cRow['계약상태']||'')));
-    var _rentAmt = _cRow ? (parseFloat(String(_cRow['월세']||_cRow['임대료']||'').replace(/[^0-9.]/g,''))||0) : 0;
-    var _penalty = _isEnded ? Math.round(_rentAmt * 4) : 0;
+    // [v453] 위약금 = 연체표와 동일 규칙(_dlqPenalty: 계약 시작일 2025-06-01 이후만 임대료×4). 대상 아니면 위약금·총합계 미표시
+    var _penalty = (typeof _dlqPenalty === 'function' ? _dlqPenalty(cno) : 0) || 0;
+    var _hasPenalty = _penalty > 0;
     var _totalDue = (r.amt||0) + _penalty;
     // [v29] '긴급대응필요'인 경우도 todayKo (발행일)로 표시
     var dueDateStr = (function(){ // [v450] 최종 납부 기한 = 발행일+3일 이상 (과거 입금예정일 방지)
@@ -4021,8 +4019,8 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
       + '<table class="cm-amt-tbl"><tr><th style="width:30%">계약자</th><th style="width:25%">연체 일수</th><th>미납 금액 (발행일 기준 누적)</th></tr>'
       + '<tr><td>' + (r.nm||'') + '</td><td class="days">' + (r.days||0) + '일</td><td class="amt">금 ' + fmtKRW(r.amt) + '원 정 (₩' + fmtKRW(r.amt) + ')</td></tr>'
       + '</table>'
-      // [v446] 종료(중도퇴실)자 — 위약금·총합계금액 표 + 청구근거는 표 아래 각주(※)로
-      + (_isEnded ? (
+      // [v446] 위약금 대상자 — 위약금·총합계금액 표 + 청구근거는 표 아래 각주(※)로
+      + (_hasPenalty ? (
           '<table class="cm-amt-tbl" style="margin-top:8px">'
           + '<tr><th style="width:30%">위약금액</th><td class="amt">금 ' + fmtKRW(_penalty) + '원 정 (₩' + fmtKRW(_penalty) + ')</td></tr>'
           + '<tr><th style="width:30%;background:#1f2937;color:#fff">총 합계금액</th><td class="amt" style="font-size:12.5pt">금 ' + fmtKRW(_totalDue) + '원 정 (₩' + fmtKRW(_totalDue) + ')</td></tr>'
@@ -4107,14 +4105,12 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
       var _use = (_d && _d.getTime() > _min.getTime()) ? _d : _min;
       return _use.getFullYear() + '. ' + (_use.getMonth()+1) + '. ' + _use.getDate();
     })();
-      // [v447] 종료(중도퇴실)자 — 미납 총 합계(미납+위약금 월세 4개월분) 표시
-      var _cRow = (Array.isArray(contractRawData)?contractRawData:[]).find(function(x){ return String(x['계약번호']||'').trim() === cno; });
-      var _isEnded = !!(_cRow && /종료|해지/.test(String(_cRow['계약상태']||'')));
-      var _rentAmt = _cRow ? (parseFloat(String(_cRow['월세']||_cRow['임대료']||'').replace(/[^0-9.]/g,''))||0) : 0;
-      var _penalty = _isEnded ? Math.round(_rentAmt * 4) : 0;
+      // [v453] 위약금 = 연체표와 동일 규칙(_dlqPenalty). 대상일 때만 총 합계(미납+위약금) 표시
+      var _penalty = (typeof _dlqPenalty === 'function' ? _dlqPenalty(cno) : 0) || 0;
+      var _hasPenalty = _penalty > 0;
       var _totalDue = (r.amt||0) + _penalty;
-      var _amtLine = _isEnded ? ('미납 총 합계금액은 ₩' + fmtKRW(_totalDue) + '원 입니다. (위약금 ₩' + fmtKRW(_penalty) + ' 포함)') : ('미납 금액은 ₩' + fmtKRW(r.amt) + '원 입니다.');
-      var _dueAmt  = _isEnded ? _totalDue : r.amt;
+      var _amtLine = _hasPenalty ? ('미납 총 합계금액은 ₩' + fmtKRW(_totalDue) + '원 입니다. (위약금 ₩' + fmtKRW(_penalty) + ' 포함)') : ('미납 금액은 ₩' + fmtKRW(r.amt) + '원 입니다.');
+      var _dueAmt  = _hasPenalty ? _totalDue : r.amt;
       textPrefixHtml += '<div class="sms-text-block no-print" style="width:210mm;max-width:none;margin:90px auto 24px;padding:25mm 22mm;background:#fff;border:1.5px solid #d1d5db;border-radius:8px;font-family:Noto Sans KR,sans-serif;font-size:14px;line-height:1.95;color:#1a1a1a;box-shadow:0 2px 12px rgba(0,0,0,.06);text-align:center;box-sizing:border-box">'
         + '<div style="font-weight:800;font-size:18pt;color:#7f1d1d;margin-bottom:18px">[민사소송 예정 통보]</div>'
         + '<div class="sms-txt-content" style="white-space:pre-wrap;font-size:14px;color:#1f2937;border-top:1px dashed #d1d5db;padding-top:18px;text-align:left;line-height:2.1">'
