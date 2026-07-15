@@ -5269,7 +5269,21 @@ function renderContractRecord(c, payments, responses = []) {
       </div>
       <div class="cr-info-section">
         <div class="cr-info-title">담당 / 부동산</div>
-        <div class="cr-field"><span class="cr-field-label">계약담당자</span><span class="cr-field-val">${fmt(c['계약담당자'])}</span></div>
+        <div class="cr-field"><span class="cr-field-label">계약담당자</span><span class="cr-field-val">${fmt(c['계약담당자'])}${(function(){
+          /* [v468] 파트너관리와 동일 계산식(calcBrokerage + 1년 미만 0원 + VAT 10%) 중개보수료 표시 */
+          try {
+            var _dep  = cmgParseAmount((__vacRow && __vacRow.deposit) || c['보증금(원)']);
+            var _rent = cmgParseAmount((__vacRow && (__vacRow.monthRent || __vacRow.rent)) || c['월세']);
+            if (!_rent) return '';
+            var _sd = cmgParseStartDate(__vacRow && __vacRow.startDate);
+            var _ed = cmgParseStartDate(__vacRow && __vacRow.endDate);
+            var _m  = (_sd && _ed) ? cmgMonthsBetween(_sd, _ed) : 0;
+            var _short = _m > 0 && _m < 12;
+            var _brk = _short ? 0 : calcBrokerage(_dep, _rent, __vacRow && __vacRow.housingType);
+            var _vat = Math.round(_brk * 1.1);
+            return ' <span style="color:#6B7280;font-size:11.5px;font-weight:600">(중개보수료 ' + _vat.toLocaleString('ko-KR') + '원, 부가세포함' + (_short ? ' · 1년 미만 제외' : '') + ')</span>';
+          } catch(_e) { return ''; }
+        })()}</span></div>
         <div class="cr-field"><span class="cr-field-label">부동산명</span><span class="cr-field-val">${fmt((__vacRow && __vacRow.partnerName) || c['부동산명'])}</span></div>
         <div class="cr-field"><span class="cr-field-label">심사일</span><span class="cr-field-val">${fmt(c['심사일'])}${inspectType ? `<span style="margin-left:6px;font-size:11px;font-weight:700;color:#2563A8;background:#EFF6FF;padding:1px 7px;border-radius:10px;border:1px solid #BFDBFE">${inspectType}</span>` : ''}</span></div>
         <div class="cr-field"><span class="cr-field-label">계약체결일</span><span class="cr-field-val">${fmt(c['계약체결일'])}</span></div>
@@ -7588,7 +7602,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v467</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v468</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
