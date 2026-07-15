@@ -3973,8 +3973,9 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
     var cno = String(r.cno);
     var addr = (contractDetails[cno] && contractDetails[cno].addr) || '';
     // [v453] 위약금 = 연체표와 동일 규칙(_dlqPenalty: 계약 시작일 2025-06-01 이후만 임대료×4). 대상 아니면 위약금·총합계 미표시
+    // [v469] 위약금·총합계는 계약 "종료"자에게만 출력 (제13조② 중도해지 위약벌 — 계약중 대상 발송물에는 미표시)
     var _penalty = (typeof _dlqPenalty === 'function' ? _dlqPenalty(cno) : 0) || 0;
-    var _hasPenalty = _penalty > 0;
+    var _hasPenalty = _penalty > 0 && String(r.contractStatus||'') === '종료';
     var _totalDue = (r.amt||0) + _penalty;
     // [v29] '긴급대응필요'인 경우도 todayKo (발행일)로 표시
     var dueDateStr = (function(){ // [v450] 최종 납부 기한 = 발행일+3일 이상 (과거 입금예정일 방지)
@@ -4106,8 +4107,9 @@ function buildDlqSmsNoticeHtml(rows, contractDetails, options) {
       return _use.getFullYear() + '. ' + (_use.getMonth()+1) + '. ' + _use.getDate();
     })();
       // [v453] 위약금 = 연체표와 동일 규칙(_dlqPenalty). 대상일 때만 총 합계(미납+위약금) 표시
+      // [v469] 위약금·총합계는 계약 "종료"자에게만 출력 (계약중 대상 문자에는 미납금액만)
       var _penalty = (typeof _dlqPenalty === 'function' ? _dlqPenalty(cno) : 0) || 0;
-      var _hasPenalty = _penalty > 0;
+      var _hasPenalty = _penalty > 0 && String(r.contractStatus||'') === '종료';
       var _totalDue = (r.amt||0) + _penalty;
       var _amtLine = _hasPenalty ? ('미납 총 합계금액은 ₩' + fmtKRW(_totalDue) + '원 입니다. (위약금 ₩' + fmtKRW(_penalty) + ' 포함)') : ('미납 금액은 ₩' + fmtKRW(r.amt) + '원 입니다.');
       var _dueAmt  = _hasPenalty ? _totalDue : r.amt;
@@ -7602,7 +7604,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v468</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v469</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
