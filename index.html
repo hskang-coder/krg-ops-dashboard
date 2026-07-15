@@ -7205,7 +7205,7 @@ function dlqGenerateEvictConsent(){
   var dl = new Date(now); dl.setDate(dl.getDate()+3);
   var dlStr = dl.getFullYear() + '년 ' + (dl.getMonth()+1) + '월 ' + dl.getDate() + '일';
   var nowStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  var cards = '', logLines = [];
+  var cards = '';
   rows.forEach(function(r){
     var cno = String(r.cno);
     var vr = (typeof vacancyRawData !== 'undefined' && vacancyRawData) ? vacancyRawData.find(function(v){ return String(v.no||'').trim() === cno; }) : null;
@@ -7225,35 +7225,27 @@ function dlqGenerateEvictConsent(){
       + '기한 내 본 번호로 회신이 없을 경우 위 절차 진행에 이의가 없는 것으로 간주하고 계약 조항에 따라 퇴실 처리하며, 정산내역은 완료 후 통지드립니다.\n'
       + '자진 퇴실 또는 납부 협의를 원하시면 즉시 ☎ 02-6933-0099 로 연락 바랍니다.\n\n'
       + '케이알지그룹(주) 개런티즈 운영팀';
-    logLines.push(nowStr + ' | ' + cno + ' ' + (r.nm||'') + ' | 강제퇴실권한위임(절차개시) 문자 발송 | 수신 ' + (r.tel||'-') + ' | 회신기한 ' + dlStr + ' 18:00');
     cards += '<div class="card">'
       + '<div class="card-hd"><b>' + cno + ' · ' + esc(r.nm) + '</b><span>' + esc(r.tel||'') + ' · 연체 ' + (r.days||0) + '일 · ₩' + krw(r.amt) + '</span>'
       + '<button onclick="copyTa(this)">📋 문자 복사</button></div>'
       + '<textarea readonly>' + esc(msg) + '</textarea></div>';
   });
-  var logTxt = logLines.join('\n');
   var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>강제퇴실권한위임 문자 (' + rows.length + '건)</title><style>'
     + 'body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif;background:#f1f5f9;margin:0;padding:24px}'
     + 'h1{font-size:17px;margin:0 0 4px}.sub{font-size:12px;color:#64748b;margin-bottom:18px}'
     + '.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:14px;overflow:hidden}'
     + '.card-hd{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #f1f5f9;font-size:13px}'
     + '.card-hd span{color:#64748b;font-size:12px;flex:1}'
-    + '.card-hd button,.log button{background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}'
+    + '.card-hd button{background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}'
     + 'textarea{width:100%;height:290px;border:none;padding:14px;font-size:12.5px;line-height:1.7;font-family:inherit;box-sizing:border-box;resize:vertical;background:#fcfdff}'
-    + '.log{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:14px}'
-    + '.log .t{font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:10px}'
-    + '.log .t small{color:#94a3b8;font-weight:400;flex:1}'
-    + '.log pre{margin:8px 0 0;font-size:11.5px;line-height:1.7;white-space:pre-wrap;word-break:break-all}'
     + '.warn{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:10px;padding:10px 14px;font-size:12px;margin-bottom:16px;line-height:1.6}'
     + '</style></head><body>'
     + '<h1>🚪 강제퇴실권한위임 — 절차 개시 통지 문자 (' + rows.length + '건)</h1>'
     + '<div class="sub">생성 ' + nowStr + ' · 회신기한 ' + dlStr + ' 18:00 (발송일+3일) · 근거: 계약서 제6조③·제9조②③·제11조④·제13조②</div>'
-    + '<div class="warn">⚠ 발송 후 아래 <b>대응기록 로그</b>를 복사해 대응기록에 붙여넣어 도달 증빙을 남기세요. 실행(개문·잔여물 처분) 시에는 반드시 사진·목록 기록을 남깁니다.</div>'
+    + '<div class="warn">⚠ 발송 전 주소·계약기간·임대료 치환값을 확인하세요. 실행(개문·잔여물 처분) 시에는 반드시 사진·목록 기록을 남깁니다.</div>'
     + cards
-    + '<div class="log"><div class="t">📝 대응기록 로그 <small>발송 일시·계약·수신번호·기한 — 붙여넣기용</small><button onclick="copyLog()">📋 로그 복사</button></div><pre id="logPre">' + esc(logTxt) + '</pre></div>'
     + '<scr'+'ipt>'
     + 'function copyTa(btn){var ta=btn.closest(".card").querySelector("textarea");ta.select();navigator.clipboard.writeText(ta.value).then(function(){btn.textContent="✅ 복사됨";setTimeout(function(){btn.textContent="📋 문자 복사";},1500);}).catch(function(){document.execCommand("copy");btn.textContent="✅ 복사됨";});}'
-    + 'function copyLog(){var t=document.getElementById("logPre").textContent;navigator.clipboard.writeText(t).then(function(){alert("대응기록 로그가 복사되었습니다.");}).catch(function(){});}'
     + '</scr'+'ipt></body></html>';
   var win = window.open('', '_blank', 'width=920,height=900,scrollbars=yes');
   if (!win) { alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.'); return; }
@@ -7596,7 +7588,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v466</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v467</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
