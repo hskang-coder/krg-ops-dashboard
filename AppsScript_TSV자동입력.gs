@@ -1,5 +1,9 @@
 /**
  * 개런티즈 계약서 — 마스터 시트 자동 입력 Apps Script Web App
+ * v362 (퇴실청소비 AM열 자동 입력 추가)
+ * v357 (계약번호 A열 매칭 1순위 + 매칭 실패 시 append 거부 — 데이터 무결성 강화)
+ * v356 (AU/AV 자동 입력 추가 — append 모드 임차인명/휴대폰 빈값 방지)
+ * v355 (헤더 매칭 광범위 강화 — 활성화 직전 보강)
  * v350 (헤더 중복 대응 + 단독/공동계약 분기 + nth-occurrence 매칭)
  *
  * 역할:
@@ -45,6 +49,12 @@ const CFG_DRY_RUN = true; // 검증 완료 후 false 로 변경
 // 헤더 검증 — 시트 잘못 지정 방지
 const CFG_REQUIRED_HEADER_KEYWORDS = ['계약번호', '임차인명'];
 
+// [v357] 1순위 매칭 키 — 계약번호 (A열) — 가장 안전 (unique 식별자)
+const CFG_MATCH_CONTRACT_NO = {
+  headers: ['계약번호', '계약 번호', '계약No', '계약 No', '계약번호(A열)'],
+  fallbackCol: 'A'
+};
+// [v357] 2순위 매칭 키 — 계약번호 미입력 시 fallback (호환성)
 // 매칭에 사용할 컬럼 — 헤더 이름 우선, 못 찾으면 fallback letter
 // [v350] 매칭 키 정정: 임차인명=AU, 임차인 전화=AV
 const CFG_MATCH_NAME = {
@@ -54,26 +64,96 @@ const CFG_MATCH_NAME = {
 const CFG_MATCH_PHONES = [
   { headers: ['임차인휴대폰', '임차인 휴대폰', '임차인 연락처', '임차인연락처', '전차인 연락처', '전차인연락처'], fallbackCol: 'AV' }
 ];
+// [v357] 계약번호로 매칭 실패 시 정책
+//   'reject' : 에러 반환 (사용자 정책 — 잘못된 새 행 추가 차단)
+//   'fallback' : 이름+전화 매칭으로 fallback
+//   'append' : 새 행 추가 (v356까지 기본값)
+const CFG_NO_MATCH_POLICY = 'reject';
 
 // 쓰기 컬럼 매핑 — 헤더 우선, 못 찾으면 fallbackCol 사용
 // [v350] 헤더 중복 대응: nth=0 (첫번째), nth=1 (두번째) 명시
 // [v350] onlyIfCoName: true → 공동전차인 미입력시 SKIP (단독계약 보호)
+// [v355] headers 배열 광범위 확장 — 헤더 텍스트 변형(임차인/전차인/공동/계약자/명의인 등) 자동 인식
+//        시트의 헤더 라벨이 운영자에 따라 다르게 작성되어도 fallback letter에 의존하지 않도록 강화
 const CFG_FIELDS_MAP = [
+  // ── 임차인 기본 정보 (매칭 + 쓰기 둘 다) ──
+  // [v356] AU/AV도 쓰기 추가 — append 모드에서 빈값 방지. update 모드는 동일값이면 No-op.
+  { field: 'tenantName',  headers: [
+      '임차인명', '임차인 명', '임차인', '전차인명', '전차인 이름', '계약자명', '계약자'
+    ], fallbackCol: 'AU', nth: 0 },
+  { field: 'tenantPhone', headers: [
+      '임차인휴대폰', '임차인 휴대폰', '임차인 연락처', '임차인연락처',
+      '전차인 휴대폰', '전차인휴대폰', '전차인 연락처', '전차인연락처',
+      '계약자 연락처', '계약자 휴대폰', '휴대폰', '핸드폰'
+    ], fallbackCol: 'AV', nth: 0 },
   // ── 항상 쓰는 컬럼 (단독/공동 무관) ──
-  { field: 'doorPwd',     headers: ['현관번호', '현관 비밀번호', '현관비번', '현관'],     fallbackCol: 'F',  nth: 0 },
-  { field: 'tenantIdNo',  headers: ['주민번호'],                                            fallbackCol: 'AW', nth: 0 }, // AW (첫번째 주민번호)
-  { field: 'tenantAddr',  headers: ['주소임차인', '임차인 주소', '전차인 주소'],            fallbackCol: 'AX', nth: 0 },
-  { field: 'emgPhone',    headers: ['긴급연락처', '긴급 연락처'],                            fallbackCol: 'AY', nth: 0 }, // AY (첫번째 긴급연락처)
-  { field: 'emgRelName',  headers: ['관계,이름', '관계, 이름', '관계/이름', '관계이름'],   fallbackCol: 'AZ', nth: 0 }, // AZ (첫번째 관계,이름)
+  { field: 'doorPwd',     headers: [
+      '현관번호', '현관비밀번호', '현관 비밀번호', '현관비번', '현관 비번',
+      '공동현관', '공동현관비번', '공동현관 비번', '공동현관 비밀번호',
+      '건물공동현관비번', '건물 공동현관 비번', '현관 비번 번호', '비밀번호', '비번', '현관'
+    ], fallbackCol: 'F', nth: 0 },
+  // [v362] 퇴실청소비 (AM열) — 파일에 표기된 값 그대로 입력 (예: "12만원", "120,000원", "120,000")
+  { field: 'cleaningFee', headers: [
+      '퇴실청소비', '퇴실 청소비', '청소비', '청소 비용', '퇴실비'
+    ], fallbackCol: 'AM', nth: 0 },
+  { field: 'tenantIdNo',  headers: [
+      '임차인 주민번호', '임차인주민번호', '전차인 주민번호', '전차인주민번호',
+      '임차인 주민등록번호', '임차인주민등록번호', '전차인 주민등록번호',
+      '계약자 주민번호', '계약자주민번호', '주민등록번호', '주민번호'
+    ], fallbackCol: 'AW', nth: 0 }, // AW (첫번째 주민번호)
+  { field: 'tenantAddr',  headers: [
+      '주소임차인', '임차인 주소', '임차인주소', '주소(임차인)', '주소 임차인',
+      '전차인 주소', '전차인주소', '주소(전차인)', '계약자 주소', '계약자주소',
+      '입주자주소', '입주자 주소', '주소'
+    ], fallbackCol: 'AX', nth: 0 },
+  { field: 'emgPhone',    headers: [
+      '임차인 긴급연락처', '임차인긴급연락처', '전차인 긴급연락처', '전차인긴급연락처',
+      '긴급연락처', '긴급 연락처', '비상연락처', '비상 연락처', '비상연락망', '비상 연락망'
+    ], fallbackCol: 'AY', nth: 0 }, // AY (첫번째 긴급연락처)
+  { field: 'emgRelName',  headers: [
+      '임차인 관계,이름', '전차인 관계,이름', '관계,이름', '관계, 이름', '관계/이름',
+      '관계이름', '관계 이름', '관계 / 이름', '관계·이름', '관계와 이름', '관계,성명'
+    ], fallbackCol: 'AZ', nth: 0 }, // AZ (첫번째 관계,이름)
   // ── 공동전차인 입력시만 쓰는 컬럼 (단독계약시 전체 SKIP) ──
-  // [v351] C열(심사자이름)·BA열(공동계약자이름) 헤더 분리에 맞춰 고유 헤더로 매칭 — '이름' 중복으로 C에 잘못 쓰이던 버그 해결.
-  //        헤더 못 찾아도 fallback BA(53열)로 안전 폴백 (이름변경 전/후 모두 정상 동작).
-  { field: 'coName',        headers: ['공동계약자이름', '공동계약자 이름', '계약자2이름', '계약자2(을)이름'], fallbackCol: 'BA', nth: 0, onlyIfCoName: true },
-  { field: 'coPhone',       headers: ['연락처'],        fallbackCol: 'BB', nth: 0, onlyIfCoName: true },
-  { field: 'coIdNo',        headers: ['주민번호'],      fallbackCol: 'BC', nth: 1, onlyIfCoName: true }, // BC (두번째 주민번호)
-  { field: 'coAddr',        headers: ['주소'],          fallbackCol: 'BD', nth: 0, onlyIfCoName: true }, // 주소 (첫번째, 주소임차인과 구분)
-  { field: 'coEmgPhone',    headers: ['긴급연락처'],    fallbackCol: 'BE', nth: 1, onlyIfCoName: true }, // BE (두번째 긴급연락처)
-  { field: 'coEmgRelName',  headers: ['관계,이름'],     fallbackCol: 'BF', nth: 1, onlyIfCoName: true }  // BF (두번째 관계,이름)
+  { field: 'coName',        headers: [
+      '공동전차인 이름', '공동전차인이름', '공동임차인 이름', '공동임차인이름',
+      '공동계약자 이름', '공동계약자이름', '공동명의인 이름', '공동명의인이름',
+      '공동계약자', '공동명의인', '공동임대차인', '공동임차인', '공동전차인',
+      '공동 이름', '공동이름', '연대보증인 이름', '연대보증인이름', '연대보증인',
+      '성명', '이름'
+    ], fallbackCol: 'BA', nth: 0, onlyIfCoName: true },
+  { field: 'coPhone',       headers: [
+      '공동전차인 연락처', '공동전차인연락처', '공동임차인 연락처', '공동임차인연락처',
+      '공동계약자 연락처', '공동계약자연락처', '공동명의인 연락처', '공동명의인연락처',
+      '공동 연락처', '공동연락처', '공동 휴대폰', '공동휴대폰',
+      '연대보증인 연락처', '연대보증인연락처', '휴대폰', '연락처'
+    ], fallbackCol: 'BB', nth: 0, onlyIfCoName: true },
+  { field: 'coIdNo',        headers: [
+      '공동전차인 주민번호', '공동전차인주민번호', '공동임차인 주민번호', '공동임차인주민번호',
+      '공동계약자 주민번호', '공동계약자주민번호', '공동명의인 주민번호', '공동명의인주민번호',
+      '공동전차인 주민등록번호', '공동임차인 주민등록번호', '공동계약자 주민등록번호',
+      '공동 주민번호', '공동주민번호', '공동 주민등록번호',
+      '연대보증인 주민번호', '연대보증인주민번호',
+      '주민등록번호', '주민번호'
+    ], fallbackCol: 'BC', nth: 1, onlyIfCoName: true }, // BC (두번째 주민번호)
+  { field: 'coAddr',        headers: [
+      '공동전차인 주소', '공동전차인주소', '공동임차인 주소', '공동임차인주소',
+      '공동계약자 주소', '공동계약자주소', '공동명의인 주소', '공동명의인주소',
+      '공동 주소', '공동주소', '연대보증인 주소', '연대보증인주소',
+      '주소'
+    ], fallbackCol: 'BD', nth: 0, onlyIfCoName: true }, // BD (BA-BC 다음의 "주소")
+  { field: 'coEmgPhone',    headers: [
+      '공동전차인 긴급연락처', '공동전차인긴급연락처', '공동임차인 긴급연락처',
+      '공동계약자 긴급연락처', '공동명의인 긴급연락처', '공동 긴급연락처', '공동긴급연락처',
+      '공동 비상연락처', '공동비상연락처', '연대보증인 긴급연락처',
+      '긴급연락처', '긴급 연락처', '비상연락처', '비상연락망'
+    ], fallbackCol: 'BE', nth: 1, onlyIfCoName: true }, // BE (두번째 긴급연락처)
+  { field: 'coEmgRelName',  headers: [
+      '공동전차인 관계,이름', '공동전차인관계이름', '공동임차인 관계,이름',
+      '공동계약자 관계,이름', '공동명의인 관계,이름',
+      '공동 관계,이름', '공동관계이름', '연대보증인 관계,이름',
+      '관계,이름', '관계, 이름', '관계/이름', '관계이름', '관계 이름'
+    ], fallbackCol: 'BF', nth: 1, onlyIfCoName: true }  // BF (두번째 관계,이름)
 ];
 
 // fallback 사용 정책 — 헤더 매칭 실패 시 동작
@@ -107,7 +187,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return jsonResp({ status: 'ok', message: 'API ready', dryRun: CFG_DRY_RUN, version: 'v350' });
+  return jsonResp({ status: 'ok', message: 'API ready', dryRun: CFG_DRY_RUN, version: 'v362' });
 }
 
 function upsertContract(data) {
@@ -124,6 +204,8 @@ function upsertContract(data) {
 
 function upsertContractInner(data) {
   var fields = data.fields || {};
+  // [v357] 계약번호 — 시트 A열 매칭 키 (가장 우선)
+  var contractNo = String(fields.contractNo || '').trim();
   var tenantName = String(fields.tenantName || '').trim();
   var tenantPhone = digitsOnly(fields.tenantPhone || '');
   // [v350] 공동전차인 입력 여부 — coName이 비어있으면 단독계약
@@ -159,7 +241,9 @@ function upsertContractInner(data) {
     }
   }
 
-  // 매칭 컬럼 찾기 (헤더 이름 우선)
+  // [v357] 매칭 컬럼 찾기 — 계약번호(A열) 1순위, 이름+전화 2순위
+  var contractColResult = findColumn(headers, CFG_MATCH_CONTRACT_NO.headers, CFG_MATCH_CONTRACT_NO.fallbackCol, 0);
+  var contractColIdx = contractColResult.col;
   var nameColResult = findColumn(headers, CFG_MATCH_NAME.headers, CFG_MATCH_NAME.fallbackCol, 0);
   var nameColIdx = nameColResult.col;
 
@@ -173,28 +257,54 @@ function upsertContractInner(data) {
     }
   });
 
-  // 기존 행 매칭 — [v348-2] 전화 미입력 시 update 거부 → 동명이인 잘못 덮어쓰기 방지
+  // [v357] 기존 행 매칭 — 계약번호 우선
   var lastRow = sheet.getLastRow();
   var matchedRow = 0;
   var matchedReason = '';
-  if (!tenantPhone) {
-    // 전화 미입력 → 강제 append (동명이인 위험 회피)
-    matchedReason = '전화번호 미입력 → append 강제 (동명이인 보호)';
-  } else if (lastRow >= 2) {
-    var maxColForMatch = Math.max(nameColIdx, phoneColIdxList.length ? Math.max.apply(null, phoneColIdxList) : nameColIdx);
-    var rows = sheet.getRange(2, 1, lastRow - 1, maxColForMatch).getValues();
-    for (var r = 0; r < rows.length; r++) {
-      var rowName = String(rows[r][nameColIdx - 1] || '').trim();
-      if (rowName !== tenantName) continue;
-      var phoneMatch = false;
-      for (var p = 0; p < phoneColIdxList.length; p++) {
-        var rowPhone = digitsOnly(rows[r][phoneColIdxList[p] - 1] || '');
-        if (rowPhone && rowPhone === tenantPhone) { phoneMatch = true; break; }
-      }
-      if (phoneMatch) {
+
+  if (contractNo && contractColIdx > 0 && lastRow >= 2) {
+    // ① 계약번호 매칭 (가장 안전 — unique 식별자)
+    var contractRows = sheet.getRange(2, contractColIdx, lastRow - 1, 1).getValues();
+    for (var r = 0; r < contractRows.length; r++) {
+      var rowContractNo = String(contractRows[r][0] || '').trim();
+      if (rowContractNo && rowContractNo === contractNo) {
         matchedRow = r + 2;
-        matchedReason = '이름 + 전화 일치';
+        matchedReason = '계약번호 일치 (' + contractNo + ')';
         break;
+      }
+    }
+    // [v357] 계약번호 입력했는데 매칭 실패 → append 거부 정책
+    if (matchedRow === 0 && CFG_NO_MATCH_POLICY === 'reject') {
+      return jsonResp({
+        status: 'error',
+        message: '계약번호 [' + contractNo + ']에 해당하는 행을 시트에서 찾을 수 없습니다.\n\n확인 사항:\n· 계약번호 오타 여부\n· 마스터 시트(gid=' + CFG_SHEET_GID + ') A열에 미리 등록되어 있는지\n· 미러 시트 동기화 완료 여부',
+        contractNo: contractNo,
+        searchedCol: numToColLetter(contractColIdx),
+        lastRow: lastRow
+      });
+    }
+  }
+
+  // ② 계약번호 매칭 실패 시 fallback — 이름+전화 매칭 (CFG_NO_MATCH_POLICY === 'fallback' 일 때만)
+  if (matchedRow === 0 && (!contractNo || CFG_NO_MATCH_POLICY === 'fallback')) {
+    if (!tenantPhone) {
+      matchedReason = '전화번호 미입력 → append 강제 (동명이인 보호)';
+    } else if (lastRow >= 2) {
+      var maxColForMatch = Math.max(nameColIdx, phoneColIdxList.length ? Math.max.apply(null, phoneColIdxList) : nameColIdx);
+      var rows = sheet.getRange(2, 1, lastRow - 1, maxColForMatch).getValues();
+      for (var r2 = 0; r2 < rows.length; r2++) {
+        var rowName = String(rows[r2][nameColIdx - 1] || '').trim();
+        if (rowName !== tenantName) continue;
+        var phoneMatch = false;
+        for (var p = 0; p < phoneColIdxList.length; p++) {
+          var rowPhone = digitsOnly(rows[r2][phoneColIdxList[p] - 1] || '');
+          if (rowPhone && rowPhone === tenantPhone) { phoneMatch = true; break; }
+        }
+        if (phoneMatch) {
+          matchedRow = r2 + 2;
+          matchedReason = '이름 + 전화 일치 (계약번호 fallback)';
+          break;
+        }
       }
     }
   }
