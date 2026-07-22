@@ -5348,7 +5348,7 @@ function renderContractRecord(c, payments, responses = []) {
             //   사용자 데이터 검증: #50497 row 15 → 청구서명="보증금(5..." 미납=150,000 연체중
             //                       → delinqTotal=150,000, delinqRent=0, delinqFee=0 → 기타=150,000 ✓
             var etcAll = Math.max(0, (effectiveDelinqTotal||0) - (delinqRent||0) - (delinqFee||0));
-            var etcLabel = fromDlqTab ? '연체관리 탭 집계 (항목 미분류)' : '기타 (퇴실정산·기타계약금·계약보증금)';
+            var etcLabel = fromDlqTab ? '연체관리 탭 집계 (항목 미분류)' : '기타 (퇴실정산 외 피해금액)';
             var _etcLate = Math.max(0, (lateFeeAll||0) - (lateFeeRent||0) - (lateFeeFee||0)); // [v455] 기타 지연손해금
             return '<div class="cr-delinq-row"><span class="cr-delinq-row-label">' + etcLabel + '</span><span class="cr-delinq-row-val ' + (etcAll>0?'red':'') + '">' + fmtMoney(etcAll) + '<span style="font-size:10px;color:#9CA3AF;font-weight:500;margin-left:4px">(지연손해금 ' + fmtMoney(_etcLate) + ' 포함)</span></span></div>';
           })()}
