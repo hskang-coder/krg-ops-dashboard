@@ -2572,6 +2572,53 @@ function setRespJobFilter(val) {
   }
 }
 
+// [v459] 대응 요약 박스 — 우선순위(중도퇴실>법무>연체>수납>갱신>입주)별 최신 대응 1건 + 후속일정 경과 감지
+function buildRespSummary(responses){
+  try{
+    if(!responses || !responses.length) return '';
+    var parseD=function(s){ var m=String(s||'').match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; };
+    var today=new Date(); today.setHours(0,0,0,0);
+    var sorted=responses.slice().sort(function(a,b){ return (parseD(b.date)||0)-(parseD(a.date)||0); });
+    var latestDate=sorted[0]&&sorted[0].date?sorted[0].date:'-';
+    // 우선순위 카테고리: 법무=연체 중 법적 하위구분, 연체=법무 제외
+    var cats=[
+      {k:'중도퇴실관리', f:function(r){return String(r.jobType||'').trim()==='중도퇴실관리';}, bg:'#EDE9FE', fg:'#7C3AED'},
+      {k:'법무관리',    f:function(r){return _respIsLegal(r);}, bg:'#FAEEDA', fg:'#854F0B'},
+      {k:'연체관리',    f:function(r){return String(r.jobType||'').trim()==='연체관리' && !_respIsLegal(r);}, bg:'#FEE2E2', fg:'#DC2626'},
+      {k:'수납관리',    f:function(r){return String(r.jobType||'').trim()==='수납관리';}, bg:'#E0F2FE', fg:'#0284C7'},
+      {k:'갱신관리',    f:function(r){return String(r.jobType||'').trim()==='갱신관리';}, bg:'#CCFBF1', fg:'#0F766E'},
+      {k:'입주관리',    f:function(r){return String(r.jobType||'').trim()==='계약(입주)관리';}, bg:'#DCFCE7', fg:'#166534'}
+    ];
+    var lines='', alerts=0;
+    cats.forEach(function(cat){
+      var items=sorted.filter(cat.f);
+      if(!items.length) return;
+      var r=items[0];
+      var cnt=items.length;
+      // 후속 일정(입금예정/재연락) 경과 감지
+      var pd=parseD(r.payDate);
+      var followHtml='';
+      if(r.payDate){
+        if(pd && pd<today){ followHtml=' <span style="background:#FEE2E2;color:#B91C1C;font-weight:800;font-size:10px;padding:1px 6px;border-radius:8px">⚠ 후속기한 경과 '+r.payDate+'</span>'; alerts++; }
+        else { followHtml=' <span style="background:#FEF3C7;color:#92400E;font-weight:700;font-size:10px;padding:1px 6px;border-radius:8px">📅 '+r.payDate+'</span>'; }
+      }
+      var content=String(r.content||'').trim()||'—';
+      lines+='<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px dashed #EEF2F7;font-size:11.5px;line-height:1.5">'
+        +'<span style="background:'+cat.bg+';color:'+cat.fg+';font-weight:800;font-size:10.5px;padding:2px 8px;border-radius:10px;white-space:nowrap;min-width:78px;text-align:center">'+cat.k+(cnt>1?' '+cnt:'')+'</span>'
+        +'<span style="color:#94A3B8;font-size:10.5px;white-space:nowrap;padding-top:1px">'+(r.date||'-')+(r.person?' · '+r.person:'')+'</span>'
+        +'<span style="flex:1;color:#1F2937">'+(r.jobSub?'<b style="color:#475569">['+r.jobSub+']</b> ':'')+content+followHtml+'</span>'
+        +'</div>';
+    });
+    if(!lines) return '';
+    return '<div style="background:#F8FAFF;border:1.5px solid #C7D6F0;border-radius:9px;padding:10px 14px;margin:0 4px 10px">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'
+      +  '<span style="font-size:12px;font-weight:800;color:#1B3976">⚡ 대응 요약</span>'
+      +  '<span style="font-size:10.5px;color:#8A97A8">우선순위별 최신 대응 · 총 '+responses.length+'건 · 최근 '+latestDate+'</span>'
+      +  (alerts>0?'<span style="background:#DC2626;color:#fff;font-size:10px;font-weight:800;padding:1px 8px;border-radius:9px">후속기한 경과 '+alerts+'건</span>':'')
+      +'</div>'+lines+'</div>';
+  }catch(_e){ return ''; }
+}
+
 // [v388] 법무관리 = 연체관리 + 법적 하위구분(법적조치 검토/내용증명 발송/지급명령 진행/보정명령 대응/기타집행)
 function _respIsLegal(r){
   if(String(r.jobType||'').trim()!=='연체관리')return false;
@@ -2609,6 +2656,7 @@ function updateResponseSection(no, responses) {
   if (!section) return;
   section.innerHTML = `
     <div class="cr-card-title">📞 대응 내역 (${responses.length}건)</div>
+    ${buildRespSummary(responses)}
     ${buildJobFilterBar(responses)}
     ${buildResponseTableHTML(responses)}`;
 }
@@ -5428,7 +5476,7 @@ function renderContractRecord(c, payments, responses = []) {
     <div class="cr-card-title">📞 대응 내역 (${responses.length}건${daeungRawData.length===0?' · 로딩 중...':''})</div>
     ${daeungRawData.length === 0
       ? `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">📡 대응내역 로딩 중...</div>`
-      : (window._respCachedNo = String(c['계약번호']||'').trim(), window._respCachedRes = responses, buildJobFilterBar(responses) + buildResponseTableHTML(responses))}
+      : (window._respCachedNo = String(c['계약번호']||'').trim(), window._respCachedRes = responses, buildRespSummary(responses) + buildJobFilterBar(responses) + buildResponseTableHTML(responses))}
   </div>
 
   <div class="cr-card">
