@@ -2595,45 +2595,49 @@ function buildRespSummary(responses){
       {k:'갱신관리',    f:function(r){return String(r.jobType||'').trim()==='갱신관리';}, bg:'#CCFBF1', fg:'#0F766E'},
       {k:'입주관리',    f:function(r){return String(r.jobType||'').trim()==='계약(입주)관리';}, bg:'#DCFCE7', fg:'#166534'}
     ];
-    var lines='', alerts=0;
+    // [v461] 컴팩트 서술형 — 카테고리별 최신 대응을 한 문단으로 연결
+    var hl=function(t){
+      return String(t)
+        .replace(/(\d{4}\s?[.\-\/년]\s?\d{1,2}\s?[.\-\/월]\s?\d{1,2}일?|\d{1,2}월\s?\d{1,2}일|\d{1,2}\/\d{1,2})/g,'<b style="color:#B45309">$1</b>')
+        .replace(/(₩[\d,]+|[\d,]{4,}\s?원|\d+만\s?원)/g,'<b style="color:#B91C1C">$1</b>');
+    };
+    var shorten=function(t,max){
+      t=String(t||'').trim().replace(/\s+/g,' ');
+      var seg=t.split(/\n/)[0];
+      var m=seg.match(/^(.{10,}?(?:다|음|됨|요|함|정|료|절|중)\.)\s/); if(m) seg=m[1];
+      if(seg.length>max) seg=seg.slice(0,max)+'…';
+      return seg.replace(/[.,\s]+$/,'');
+    };
+    var parts=[], alerts=0;
     cats.forEach(function(cat){
       var items=sorted.filter(cat.f);
       if(!items.length) return;
       var r=items[0];
-      var cnt=items.length;
-      // 후속 일정(입금예정/재연락) 경과 감지
+      var name='<b style="color:'+cat.fg+'">'+cat.k.replace('관리','')+'</b>';
       var pd=parseD(r.payDate);
-      var followHtml='';
-      if(r.payDate){
-        if(pd && pd<today){ followHtml=' <span style="background:#FEE2E2;color:#B91C1C;font-weight:800;font-size:10px;padding:1px 6px;border-radius:8px">⚠ 후속기한 경과 '+r.payDate+'</span>'; alerts++; }
-        else { followHtml=' <span style="background:#FEF3C7;color:#92400E;font-weight:700;font-size:10px;padding:1px 6px;border-radius:8px">📅 '+r.payDate+'</span>'; }
+      var overdue=!!(r.payDate && pd && pd<today);
+      if(overdue) alerts++;
+      var s=hl(shorten(r.content, 46));
+      var clause='';
+      if(cat.k==='중도퇴실관리'){ clause='현재 '+name+' 진행 중'+(s&&s!=='—'?' — '+s:''); }
+      else if(cat.k==='법무관리'){ clause=name+'는 '+(r.jobSub?String(r.jobSub).trim():'법적 조치')+' 진행 중'+(s&&s!=='—'?' ('+s+')':''); }
+      else if(cat.k==='연체관리'){
+        if(r.payDate){ clause=name+'는 <b style="color:#B45309">'+r.payDate+'</b>까지 납부 약속'+(overdue?' — <b style="color:#B91C1C">기한 경과, 입금·연락 확인 필요</b>':''); if(s&&s!=='—') clause+=' ('+s+')'; }
+        else { clause=name+'는 '+(s&&s!=='—'?s:'대응 진행 중'); }
       }
-      var content=String(r.content||'').trim()||'—';
-      // [v460] A안: 핵심 패턴 강조(날짜·금액·예정/완료/요청/필요/약속 구문) + 2줄 압축 + 더보기
-      var hl=function(t){
-        return String(t)
-          .replace(/(\d{4}\s?[.\-\/년]\s?\d{1,2}\s?[.\-\/월]\s?\d{1,2}일?|\d{1,2}월\s?\d{1,2}일|\d{1,2}\/\d{1,2})/g,'<b style="color:#B45309">$1</b>')
-          .replace(/(₩[\d,]+|[\d,]{4,}\s?원|\d+만\s?원)/g,'<b style="color:#B91C1C">$1</b>')
-          .replace(/([^\s,.·<>]{1,14}\s?(?:예정|완료|요청|필요|약속|불가|거절))/g,'<b style="color:#1B3976">$1</b>');
-      };
-      var isLong=content.length>90;
-      var cid='rsum_'+cat.k.replace(/[^가-힯 a-z0-9]/gi,'')+'_'+cnt;
-      var contentHtml='<span id="'+cid+'"'+(isLong?' style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden"':'')+'>'+(r.jobSub?'<b style="color:#475569">['+r.jobSub+']</b> ':'')+hl(content)+'</span>'
-        +followHtml
-        +(isLong?' <a href="javascript:void(0)" onclick="_respSumMore(\''+cid+'\',this)" style="font-size:10px;color:#2563EB;font-weight:700;white-space:nowrap">더보기 ▾</a>':'');
-      lines+='<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px dashed #EEF2F7;font-size:11.5px;line-height:1.5">'
-        +'<span style="background:'+cat.bg+';color:'+cat.fg+';font-weight:800;font-size:10.5px;padding:2px 8px;border-radius:10px;white-space:nowrap;min-width:78px;text-align:center">'+cat.k+(cnt>1?' '+cnt:'')+'</span>'
-        +'<span style="color:#94A3B8;font-size:10.5px;white-space:nowrap;padding-top:1px">'+(r.date||'-')+(r.person?' · '+r.person:'')+'</span>'
-        +'<span style="flex:1;color:#1F2937">'+contentHtml+'</span>'
-        +'</div>';
+      else { clause=name+'는 '+(s&&s!=='—'?s:(r.jobSub||'대응')+' 진행'); }
+      parts.push(clause);
     });
-    if(!lines) return '';
+    if(!parts.length) return '';
+    var narrative=parts.join(',&nbsp; ')+'.';
     return '<div style="background:#F8FAFF;border:1.5px solid #C7D6F0;border-radius:9px;padding:10px 14px;margin:0 4px 10px">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
       +  '<span style="font-size:12px;font-weight:800;color:#1B3976">⚡ 대응 요약</span>'
-      +  '<span style="font-size:10.5px;color:#8A97A8">우선순위별 최신 대응 · 총 '+responses.length+'건 · 최근 '+latestDate+'</span>'
+      +  '<span style="font-size:10.5px;color:#8A97A8">총 '+responses.length+'건 · 최근 '+latestDate+'</span>'
       +  (alerts>0?'<span style="background:#DC2626;color:#fff;font-size:10px;font-weight:800;padding:1px 8px;border-radius:9px">후속기한 경과 '+alerts+'건</span>':'')
-      +'</div>'+lines+'</div>';
+      +'</div>'
+      +'<div style="font-size:12px;color:#1F2937;line-height:1.75">'+narrative+'</div>'
+      +'</div>';
   }catch(_e){ return ''; }
 }
 
