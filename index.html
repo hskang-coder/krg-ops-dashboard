@@ -4980,6 +4980,8 @@ function renderContractRecord(c, payments, responses = []) {
   const lateFeeAll  = payments.filter(p => isDelinqStatus(p) && isPastDue(p)).reduce((acc,p)=>acc+(parseFloat(String(p['_col_Z']||'0').replace(/[^0-9.\-]/g,''))||0),0);
   const lateFeeRent = sumLateFee('임대료','수수료');
   const lateFeeFee  = sumLateFee('수수료');
+  // [v458] 연체횟수 = 입금내역 실제 연체 이력 건수(연체납부+연체중+분납중). 시트 '연체횟수' 컬럼이 %값(오정렬)이라 재계산
+  const lateOccurCount = (payments||[]).filter(p => { var s=String(p['납부상태']||'').trim(); return s==='연체납부'||s==='연체중'||s==='분납중'; }).length;
   // [v276] 총 연체 = 모든 연체중/분납중 행의 미납 합계 (잔액 방식)
   //   [v308] 미래 납기일 제외 — 납기 도래 후만 연체로 인정
   const delinqAllSum = (payments||[])
@@ -5112,7 +5114,7 @@ function renderContractRecord(c, payments, responses = []) {
       <div class="cr-stats">
         <div class="cr-stat"><div class="cr-stat-label">청구횟수</div><div class="cr-stat-val">${stripU(c['청구수'])}회</div></div>
         <div class="cr-stat"><div class="cr-stat-label">최장연체</div><div class="cr-stat-val ${parseInt(c['연체최장일'])>0?'warn':''}">${stripU(c['연체최장일'])}일</div></div>
-        <div class="cr-stat"><div class="cr-stat-label">연체횟수</div><div class="cr-stat-val ${parseInt(c['연체횟수'])>0?'warn':''}">${stripU(c['연체횟수'])}회</div></div>
+        <div class="cr-stat"><div class="cr-stat-label">연체횟수</div><div class="cr-stat-val ${lateOccurCount>0?'warn':''}">${lateOccurCount}회</div></div>
         <div class="cr-stat"><div class="cr-stat-label">누적일수</div><div class="cr-stat-val ${_cumLateDays(c['연체누적일'])>0?'warn':''}">${_cumLateDays(c['연체누적일'])}일</div></div>
         <div class="cr-stat"><div class="cr-stat-label">연체율</div><div class="cr-stat-val ${parseFloat(c['연체비율'])>0?'warn':''}">${fmt(c['연체비율'])}</div></div>
       </div>
