@@ -2572,6 +2572,12 @@ function setRespJobFilter(val) {
   }
 }
 
+// [v460] 대응 요약 — 더보기/접기 토글
+function _respSumMore(id, btn){
+  var el=document.getElementById(id); if(!el) return;
+  if(el.dataset.open==='1'){ el.style.display='-webkit-box'; el.style.webkitLineClamp='2'; el.style.webkitBoxOrient='vertical'; el.style.overflow='hidden'; el.dataset.open='0'; btn.textContent='더보기 ▾'; }
+  else { el.style.display='inline'; el.style.overflow='visible'; el.dataset.open='1'; btn.textContent='접기 ▴'; }
+}
 // [v459] 대응 요약 박스 — 우선순위(중도퇴실>법무>연체>수납>갱신>입주)별 최신 대응 1건 + 후속일정 경과 감지
 function buildRespSummary(responses){
   try{
@@ -2603,10 +2609,22 @@ function buildRespSummary(responses){
         else { followHtml=' <span style="background:#FEF3C7;color:#92400E;font-weight:700;font-size:10px;padding:1px 6px;border-radius:8px">📅 '+r.payDate+'</span>'; }
       }
       var content=String(r.content||'').trim()||'—';
+      // [v460] A안: 핵심 패턴 강조(날짜·금액·예정/완료/요청/필요/약속 구문) + 2줄 압축 + 더보기
+      var hl=function(t){
+        return String(t)
+          .replace(/(\d{4}\s?[.\-\/년]\s?\d{1,2}\s?[.\-\/월]\s?\d{1,2}일?|\d{1,2}월\s?\d{1,2}일|\d{1,2}\/\d{1,2})/g,'<b style="color:#B45309">$1</b>')
+          .replace(/(₩[\d,]+|[\d,]{4,}\s?원|\d+만\s?원)/g,'<b style="color:#B91C1C">$1</b>')
+          .replace(/([^\s,.·<>]{1,14}\s?(?:예정|완료|요청|필요|약속|불가|거절))/g,'<b style="color:#1B3976">$1</b>');
+      };
+      var isLong=content.length>90;
+      var cid='rsum_'+cat.k.replace(/[^가-힯 a-z0-9]/gi,'')+'_'+cnt;
+      var contentHtml='<span id="'+cid+'"'+(isLong?' style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden"':'')+'>'+(r.jobSub?'<b style="color:#475569">['+r.jobSub+']</b> ':'')+hl(content)+'</span>'
+        +followHtml
+        +(isLong?' <a href="javascript:void(0)" onclick="_respSumMore(\''+cid+'\',this)" style="font-size:10px;color:#2563EB;font-weight:700;white-space:nowrap">더보기 ▾</a>':'');
       lines+='<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px dashed #EEF2F7;font-size:11.5px;line-height:1.5">'
         +'<span style="background:'+cat.bg+';color:'+cat.fg+';font-weight:800;font-size:10.5px;padding:2px 8px;border-radius:10px;white-space:nowrap;min-width:78px;text-align:center">'+cat.k+(cnt>1?' '+cnt:'')+'</span>'
         +'<span style="color:#94A3B8;font-size:10.5px;white-space:nowrap;padding-top:1px">'+(r.date||'-')+(r.person?' · '+r.person:'')+'</span>'
-        +'<span style="flex:1;color:#1F2937">'+(r.jobSub?'<b style="color:#475569">['+r.jobSub+']</b> ':'')+content+followHtml+'</span>'
+        +'<span style="flex:1;color:#1F2937">'+contentHtml+'</span>'
         +'</div>';
     });
     if(!lines) return '';
