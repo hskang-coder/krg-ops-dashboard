@@ -2603,8 +2603,7 @@ function buildRespSummary(responses){
     };
     var shorten=function(t,max){
       t=String(t||'').trim().replace(/\s+/g,' ');
-      var seg=t.split(/\n/)[0];
-      var m=seg.match(/^(.{10,}?(?:다|음|됨|요|함|정|료|절|중)\.)\s/); if(m) seg=m[1];
+      var seg=t; // [v463] 첫 문장 컷 제거 — max 길이까지 문장 연결 허용
       if(seg.length>max) seg=seg.slice(0,max)+'…';
       return seg.replace(/[.,\s]+$/,'');
     };
@@ -2620,7 +2619,7 @@ function buildRespSummary(responses){
       var pd=parseD(r.payDate);
       var overdue=!!(r.payDate && pd && pd<today);
       if(overdue) alerts++;
-      var s=hl(shorten(r.content, 46));
+      var s=hl(shorten(r.content, 110)); // [v463] 요약 길이 확대 46→110자
       var clause='';
       if(cat.k==='중도퇴실관리'){ clause='현재 '+name+' 진행 중'+(s&&s!=='—'?' — '+s:''); }
       else if(cat.k==='법무관리'){ clause=name+eun+' '+(r.jobSub?String(r.jobSub).trim():'법적 조치')+' 진행 중'+(s&&s!=='—'?' ('+s+')':''); }
