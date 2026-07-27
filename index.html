@@ -2131,6 +2131,8 @@ let outsourceIdx = findColIdx(labels, ['연체외주','연체 외주'], 71);
   const signedIdx    = findColIdx(labels, ['서명'],                84);  // CG
   const origDeliveredIdx= findColIdx(labels, ['원본'],             86);  // CI
   const nasIdx       = findColIdx(labels, ['나스','NAS'],          87);  // CJ
+  const callChkIdx   = findColIdx(labels, ['통화'],                90);  // CM [v466] 통화 확인
+  const smsChkIdx    = findColIdx(labels, ['문자'],                91);  // CN [v466] 문자 확인
   if (noIdx < 0) return [];
   return (rows||[]).map(row => {
     const c = row.c || [];
@@ -2182,6 +2184,8 @@ let outsourceIdx = findColIdx(labels, ['연체외주','연체 외주'], 71);
       // [v76] 계약관리용
       housingType:   cell(housingTypeIdx),   // N열: 주택/상가
       useType:       cell(useTypeIdx),        // [v464] N열(계약형태): 주거용/상업용
+      callChk:    (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[callChkIdx] && (c[callChkIdx].v != null ? c[callChkIdx].v : c[callChkIdx].f)),   // [v466] CM 통화 확인
+      smsChk:     (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[smsChkIdx] && (c[smsChkIdx].v != null ? c[smsChkIdx].v : c[smsChkIdx].f)),      // [v466] CN 문자 확인
       partnerName:   cell(partnerNameIdx),   // BL열: 부동산명
       partnerPerson: cell(partnerPersonIdx), // BM열: 부동산 계약담당자
       // [v81]
@@ -2634,11 +2638,22 @@ function buildRespSummary(responses){
     });
     if(!parts.length) return '';
     var narrative=parts.join(',&nbsp; ')+'.';
+    // [v466] 통화(CM)·문자(CN) 확인 체크박스 — gid=1953907648 (마스터 계약관리 미러)
+    var chkHtml='';
+    try{
+      var _cno=String(window._respCachedNo||'').trim();
+      var _vr=_cno&&Array.isArray(vacancyRawData)?vacancyRawData.find(function(v){return String(v.no||'').trim()===_cno;}):null;
+      if(_vr){
+        var mkChk=function(on,lbl){ return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;color:'+(on?'#15803D':'#94A3B8')+';cursor:default"><input type="checkbox" '+(on?'checked':'')+' disabled style="accent-color:#15803D;width:13px;height:13px;margin:0">'+lbl+'</label>'; };
+        chkHtml='<span style="margin-left:auto;display:inline-flex;gap:10px;align-items:center;background:#fff;border:1px solid #DCE6F7;border-radius:7px;padding:2px 10px">'+mkChk(_vr.callChk,'통화')+mkChk(_vr.smsChk,'문자')+'</span>';
+      }
+    }catch(_c){}
     return '<div style="background:#F8FAFF;border:1.5px solid #C7D6F0;border-radius:9px;padding:10px 14px;margin:0 4px 10px">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
       +  '<span style="font-size:12px;font-weight:800;color:#1B3976">⚡ 대응 요약</span>'
       +  '<span style="font-size:10.5px;color:#8A97A8">총 '+responses.length+'건 · 최근 '+latestDate+'</span>'
       +  (alerts>0?'<span style="background:#DC2626;color:#fff;font-size:10px;font-weight:800;padding:1px 8px;border-radius:9px">후속기한 경과 '+alerts+'건</span>':'')
+      +  chkHtml
       +'</div>'
       +'<div style="font-size:12px;color:#1F2937;line-height:1.75">'+narrative+'</div>'
       +'</div>';
