@@ -2585,9 +2585,33 @@ function _respSumMore(id, btn){
   else { el.style.display='inline'; el.style.overflow='visible'; el.dataset.open='1'; btn.textContent='접기 ▴'; }
 }
 // [v459] 대응 요약 박스 — 우선순위(중도퇴실>법무>연체>수납>갱신>입주)별 최신 대응 1건 + 후속일정 경과 감지
+// [v468] 통화(CM)·문자(CN) 확인 배지 — 대응 내역 유무와 무관하게 사용
+function _respChkBadges(){
+  try{
+    var _cno=String(window._respCachedNo||'').trim();
+    var _vr=_cno&&Array.isArray(vacancyRawData)?vacancyRawData.find(function(v){return String(v.no||'').trim()===_cno;}):null;
+    if(!_vr) return '';
+    var mkChk=function(on,lbl){
+      return on
+        ? '<span style="display:inline-flex;align-items:center;gap:4px;background:#DCFCE7;border:1.5px solid #16A34A;color:#15803D;font-size:11px;font-weight:800;padding:2px 9px;border-radius:12px"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:#16A34A;color:#fff;border-radius:3px;font-size:10px">✓</span>'+lbl+' 완료</span>'
+        : '<span style="display:inline-flex;align-items:center;gap:4px;background:#FEE2E2;border:1.5px solid #DC2626;color:#B91C1C;font-size:11px;font-weight:800;padding:2px 9px;border-radius:12px"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:#DC2626;color:#fff;border-radius:3px;font-size:10px">✕</span>'+lbl+' 미완료</span>';
+    };
+    return '<span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center">'+mkChk(_vr.callChk,'통화')+mkChk(_vr.smsChk,'문자')+'</span>';
+  }catch(_c){ return ''; }
+}
 function buildRespSummary(responses){
   try{
-    if(!responses || !responses.length) return '';
+    if(!responses || !responses.length){
+      // [v468] 대응 내역이 없어도 통화/문자 확인 배지는 표시
+      var _chk0=_respChkBadges();
+      if(!_chk0) return '';
+      return '<div style="background:#F8FAFF;border:1.5px solid #C7D6F0;border-radius:9px;padding:10px 14px;margin:0 4px 10px">'
+        +'<div style="display:flex;align-items:center;gap:8px">'
+        +  '<span style="font-size:12px;font-weight:800;color:#1B3976">⚡ 대응 요약</span>'
+        +  '<span style="font-size:10.5px;color:#8A97A8">대응 내역 없음</span>'
+        +  _chk0
+        +'</div></div>';
+    }
     var parseD=function(s){ var m=String(s||'').match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; };
     var today=new Date(); today.setHours(0,0,0,0);
     var sorted=responses.slice().sort(function(a,b){ return (parseD(b.date)||0)-(parseD(a.date)||0); });
@@ -2638,21 +2662,8 @@ function buildRespSummary(responses){
     });
     if(!parts.length) return '';
     var narrative=parts.join(',&nbsp; ')+'.';
-    // [v466] 통화(CM)·문자(CN) 확인 체크박스 — gid=1953907648 (마스터 계약관리 미러)
-    var chkHtml='';
-    try{
-      var _cno=String(window._respCachedNo||'').trim();
-      var _vr=_cno&&Array.isArray(vacancyRawData)?vacancyRawData.find(function(v){return String(v.no||'').trim()===_cno;}):null;
-      if(_vr){
-        // [v467] 완료=초록(✓) / 미완료=빨강(✕) 배지로 명확 구분
-        var mkChk=function(on,lbl){
-          return on
-            ? '<span style="display:inline-flex;align-items:center;gap:4px;background:#DCFCE7;border:1.5px solid #16A34A;color:#15803D;font-size:11px;font-weight:800;padding:2px 9px;border-radius:12px"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:#16A34A;color:#fff;border-radius:3px;font-size:10px">✓</span>'+lbl+' 완료</span>'
-            : '<span style="display:inline-flex;align-items:center;gap:4px;background:#FEE2E2;border:1.5px solid #DC2626;color:#B91C1C;font-size:11px;font-weight:800;padding:2px 9px;border-radius:12px"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:#DC2626;color:#fff;border-radius:3px;font-size:10px">✕</span>'+lbl+' 미완료</span>';
-        };
-        chkHtml='<span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center">'+mkChk(_vr.callChk,'통화')+mkChk(_vr.smsChk,'문자')+'</span>';
-      }
-    }catch(_c){}
+    // [v466/v468] 통화(CM)·문자(CN) 확인 배지 — 공용 헬퍼 사용
+    var chkHtml=_respChkBadges();
     return '<div style="background:#F8FAFF;border:1.5px solid #C7D6F0;border-radius:9px;padding:10px 14px;margin:0 4px 10px">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
       +  '<span style="font-size:12px;font-weight:800;color:#1B3976">⚡ 대응 요약</span>'
