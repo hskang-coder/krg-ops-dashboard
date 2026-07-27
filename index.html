@@ -18051,11 +18051,12 @@ function sumRenderDailyCard(){
     return '<button class="sum-unit-btn" data-act="' + act + '" onclick="sumSetCfg(\'unit\',\'' + u + '\')">' + lbl + '</button>';
   }).join('');
   var isValid = cfg.view === 'valid';
+  var isUse   = cfg.view === 'usetype';  // [v464] 계약구분(주거/상업)
   var vt = function(v,lbl){ var on=cfg.view===v; return '<button onclick="sumSetCfg(\'view\',\'' + v + '\')" style="padding:5px 12px;border:1px solid ' + (on?'#0EA5E9':'#CBD5E1') + ';background:' + (on?'#0EA5E9':'#fff') + ';color:' + (on?'#fff':'#475569') + ';border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">' + lbl + '</button>'; };
   var html = ''
-    + '<div class="sum-card-title"><span class="dot" style="background:#0EA5E9"></span>① ' + (isValid ? '월별 유효계약수 (입주 기준)' : (unitLabel + ' ' + titleVerb + ' 추이 (' + basisLabel + ')')) + ' <span class="badge sum-badge-sales">SALES</span></div>'
+    + '<div class="sum-card-title"><span class="dot" style="background:#0EA5E9"></span>① ' + (isValid ? '월별 유효계약수 (입주 기준)' : isUse ? ('월별 ' + titleVerb + ' 계약구분 (주거/상업 · N열)') : (unitLabel + ' ' + titleVerb + ' 추이 (' + basisLabel + ')')) + ' <span class="badge sum-badge-sales">SALES</span></div>'
     + '<div class="sum-cfg-row" style="gap:6px">'
-    +   '<span class="sum-cfg-label">보기:</span>' + vt('contract','월별 가계약 추이') + vt('valid','유효계약수 (입주 기준)')
+    +   '<span class="sum-cfg-label">보기:</span>' + vt('contract','월별 가계약 추이') + vt('valid','유효계약수 (입주 기준)') + vt('usetype','계약구분 (상업/주거)')
     + '</div>'
     + '<div class="sum-cfg-row">'
     +   '<span class="sum-cfg-label">단위:</span>' + unitBtns
@@ -18070,6 +18071,7 @@ function sumRenderDailyCard(){
     +   '<input type="date" value="' + cfg.end + '" onchange="sumSetCfg(\'end\',this.value)">'
     + '</div>'
     + (isValid ? '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 막대: 신규 입주(+, 초록) · 만기퇴실(−, 주황) · 중도퇴실(−, 빨강) — 단위 건 · 라인: <b style="color:#185FA5">유효계약수 누적</b>(우측 축, 이전 유효계약 base 포함)</div>'
+    : isUse ? '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 스택 막대 — <b style="color:#F59E0B">주거용</b> · <b style="color:#2E5AAC">상업용</b> (gid=1953907648 N열) · 세그먼트 라벨 = 건수 · 비중%</div>'
     : (unit === 'month' ? ('<div class="sum-cfg-row">'
     +   '<span class="sum-cfg-label">체크포인트:</span>'
     +   '매월 <input type="number" min="0" max="31" value="' + cfg.day1 + '" onchange="sumSetCfg(\'day1\',Math.max(0,Math.min(31,parseInt(this.value)||0)))" style="width:46px">일까지 누적 (0=미사용)'
@@ -18177,9 +18179,100 @@ function sumDrawValidChart(){
       + '<div style="margin-left:auto;color:#9CA3AF;font-size:10px">이탈률 약 '+churn+'%'+(tM>tE?' · 중도퇴실 > 만기퇴실 (중도이탈 관리 필요)':'')+'</div>';
   }
 }
+// [v464] Section ① 계약구분(주거/상업) — N열 기준 월별 스택 (주거=주황, 상업=파랑, 건수·%)
+function sumBuildUseTypeData(){
+  if (!Array.isArray(vacancyRawData)) return [];
+  var cfg = window._sumChartCfg;
+  var basisField = cfg.basis === 'startDate' ? 'startDate' : 'tentativeDate';
+  var pd=function(s){var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);return m?new Date(+m[1],+m[2]-1,+m[3]):null;};
+  var sd=pd(cfg.start), ed=pd(cfg.end);
+  if(!sd||!ed) return [];
+  var months=[], idx={}, cur=new Date(sd.getFullYear(),sd.getMonth(),1), endM=new Date(ed.getFullYear(),ed.getMonth(),1);
+  while(cur<=endM){ idx[cur.getFullYear()+'-'+cur.getMonth()]=months.length; months.push({label:String(cur.getFullYear()).slice(2)+'.'+String(cur.getMonth()+1).padStart(2,'0'),ju:0,sang:0,etc:0}); cur=new Date(cur.getFullYear(),cur.getMonth()+1,1); }
+  vacancyRawData.forEach(function(v){
+    var d=pd(v[basisField]); if(!d||d<sd||d>ed)return;
+    var i=idx[d.getFullYear()+'-'+d.getMonth()]; if(i==null)return;
+    var u=String(v.housingType||'').trim();
+    if(u.indexOf('주거')>=0)months[i].ju++; else if(u.indexOf('상업')>=0)months[i].sang++; else months[i].etc++;
+  });
+  return months;
+}
+function sumDrawUseTypeChart(){
+  var canvas=document.getElementById('sumDailyChart');
+  if(!canvas||typeof Chart==='undefined')return;
+  if(window._sumDailyChartInstance){try{window._sumDailyChartInstance.destroy();}catch(e){}}
+  var rows=sumBuildUseTypeData();
+  var labels=rows.map(function(r){return r.label;});
+  var ju=rows.map(function(r){return r.ju;}), sang=rows.map(function(r){return r.sang;}), etc=rows.map(function(r){return r.etc;});
+  var totals=rows.map(function(r){return r.ju+r.sang+r.etc;});
+  var hasEtc=etc.some(function(v){return v>0;});
+  var pct=function(v,t){return t>0?Math.round(v/t*100):0;};
+  var dl={id:'sumUseTypeLabels',afterDatasetsDraw:function(chart){
+    var ctx=chart.ctx;
+    chart.data.datasets.forEach(function(ds,i){
+      var meta=chart.getDatasetMeta(i);
+      meta.data.forEach(function(pt,x){
+        var v=ds.data[x]; if(!v)return;
+        var h=Math.abs(pt.base-pt.y); if(h<13)return;
+        ctx.save(); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.font='bold 10px Pretendard, "Malgun Gothic", sans-serif';
+        var txt=(h>=24)?(v+'건 · '+pct(v,totals[x])+'%'):String(v);
+        ctx.fillText(txt, pt.x, (pt.y+pt.base)/2);
+        ctx.restore();
+      });
+    });
+    var topMeta=chart.getDatasetMeta(chart.data.datasets.length-1);
+    topMeta.data.forEach(function(pt,x){
+      if(totals[x]==null)return;
+      ctx.save(); ctx.fillStyle='#7C3AED'; ctx.font='bold 12px Pretendard, "Malgun Gothic", sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillText('총 '+totals[x]+'건', pt.x, pt.y-4);
+      ctx.restore();
+    });
+  }};
+  var datasets=[
+    { label:'주거용', data:ju,   backgroundColor:'#F59E0B', stack:'ut', borderRadius:{topLeft:0,topRight:0,bottomLeft:5,bottomRight:5} },
+    { label:'상업용', data:sang, backgroundColor:'#2E5AAC', stack:'ut', borderRadius:hasEtc?0:{topLeft:5,topRight:5,bottomLeft:0,bottomRight:0} }
+  ];
+  if(hasEtc) datasets.push({ label:'미분류', data:etc, backgroundColor:'#CBD5E1', stack:'ut', borderRadius:{topLeft:5,topRight:5,bottomLeft:0,bottomRight:0} });
+  window._sumDailyChartInstance=new Chart(canvas,{
+    type:'bar',
+    data:{ labels:labels, datasets:datasets },
+    options:{
+      maintainAspectRatio:false,
+      layout:{padding:{top:26}},
+      plugins:{
+        legend:{position:'top',align:'center',labels:{boxWidth:12,font:{size:11},padding:10}},
+        tooltip:{mode:'index',intersect:false,callbacks:{
+          label:function(it){ var v=it.raw||0; return it.dataset.label+': '+v+'건 ('+pct(v,totals[it.dataIndex])+'%)'; },
+          footer:function(items){ return items.length?('월 총: '+totals[items[0].dataIndex]+'건'):''; }
+        }}
+      },
+      scales:{
+        x:{stacked:true,ticks:{font:{size:10}},grid:{display:false}},
+        y:{stacked:true,beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'건';}}}
+      }
+    },
+    plugins:[dl]
+  });
+  var ins=document.getElementById('sumDailyInsight');
+  if(ins){
+    var tJ=ju.reduce(function(a,b){return a+b;},0), tS=sang.reduce(function(a,b){return a+b;},0), tE=etc.reduce(function(a,b){return a+b;},0);
+    var tot=tJ+tS+tE;
+    var lastIdx=rows.length-1, last=rows[lastIdx]||{ju:0,sang:0,etc:0};
+    var lastTot=last.ju+last.sang+last.etc;
+    ins.innerHTML=''
+      + '<div><span style="color:#6B7280">기간 합계:</span> <b style="color:#1F2937">'+tot+'건</b></div>'
+      + '<div><span style="color:#6B7280">주거용:</span> <b style="color:#B45309">'+tJ+'건 ('+pct(tJ,tot)+'%)</b></div>'
+      + '<div><span style="color:#6B7280">상업용:</span> <b style="color:#2E5AAC">'+tS+'건 ('+pct(tS,tot)+'%)</b></div>'
+      + (tE>0?'<div><span style="color:#6B7280">미분류:</span> <b style="color:#64748B">'+tE+'건</b></div>':'')
+      + '<div style="margin-left:auto;color:#9CA3AF;font-size:10px">'+(rows.length?('최근 '+last.label+': 주거 '+last.ju+' · 상업 '+last.sang+' (상업 비중 '+pct(last.sang,lastTot)+'%)'):'')+'</div>';
+  }
+}
 // [v105] Section ① 차트 그리기 — 12개월 막대+라인 (커스텀 데이터 라벨)
 function sumDrawDailyChart(){
   if (window._sumChartCfg && window._sumChartCfg.view === 'valid') return sumDrawValidChart();
+  if (window._sumChartCfg && window._sumChartCfg.view === 'usetype') return sumDrawUseTypeChart();
   var canvas = document.getElementById('sumDailyChart');
   if (!canvas || typeof Chart === 'undefined') return;
   if (window._sumDailyChartInstance) {
