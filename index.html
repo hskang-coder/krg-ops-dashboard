@@ -2078,6 +2078,7 @@ function parseVacancySheet(resp) {
   const jIdx           = findColIdx(labels, ['중도퇴실'],          9);   // J
   const contractKindIdx= findColIdx(labels, ['계약상태'],          10);  // K
   const housingTypeIdx = findColIdx(labels, ['주택유형','전대전환'], 13); // N
+  const useTypeIdx     = 13;  // [v464] N열(계약형태) 위치 고정 = 주거용/상업용 — housingType은 라벨매칭으로 12(전대전환)를 가리켜 별도 필드로 분리
   const contractInfoIdx= findColIdx(labels, ['계약정보','계약형태','계약구분'], 14); // O
   const reviewResultIdx= findColIdx(labels, ['계약심사','계약심사결과','심사결과','계약심사 결과'], 17); // R (v313/v315 라벨 매칭 보강)
   const terminateDateIdx= findColIdx(labels, ['계약해지일자','해지일자','해지일','퇴실일'], 25); // [v329/v331] Z열 절대위치 폴백 (사용자 지정 gid=1953907648, Z열)
@@ -2180,6 +2181,7 @@ let outsourceIdx = findColIdx(labels, ['연체외주','연체 외주'], 71);
       nas:        (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[nasIdx] && (c[nasIdx].v != null ? c[nasIdx].v : c[nasIdx].f)),
       // [v76] 계약관리용
       housingType:   cell(housingTypeIdx),   // N열: 주택/상가
+      useType:       cell(useTypeIdx),        // [v464] N열(계약형태): 주거용/상업용
       partnerName:   cell(partnerNameIdx),   // BL열: 부동산명
       partnerPerson: cell(partnerPersonIdx), // BM열: 부동산 계약담당자
       // [v81]
@@ -18192,7 +18194,7 @@ function sumBuildUseTypeData(){
   vacancyRawData.forEach(function(v){
     var d=pd(v[basisField]); if(!d||d<sd||d>ed)return;
     var i=idx[d.getFullYear()+'-'+d.getMonth()]; if(i==null)return;
-    var u=String(v.housingType||'').trim();
+    var u=String(v.useType||'').trim();
     if(u.indexOf('주거')>=0)months[i].ju++; else if(u.indexOf('상업')>=0)months[i].sang++; else months[i].etc++;
   });
   return months;
