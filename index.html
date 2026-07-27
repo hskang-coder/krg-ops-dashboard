@@ -2644,8 +2644,13 @@ function buildRespSummary(responses){
       var _cno=String(window._respCachedNo||'').trim();
       var _vr=_cno&&Array.isArray(vacancyRawData)?vacancyRawData.find(function(v){return String(v.no||'').trim()===_cno;}):null;
       if(_vr){
-        var mkChk=function(on,lbl){ return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;color:'+(on?'#15803D':'#94A3B8')+';cursor:default"><input type="checkbox" '+(on?'checked':'')+' disabled style="accent-color:#15803D;width:13px;height:13px;margin:0">'+lbl+'</label>'; };
-        chkHtml='<span style="margin-left:auto;display:inline-flex;gap:10px;align-items:center;background:#fff;border:1px solid #DCE6F7;border-radius:7px;padding:2px 10px">'+mkChk(_vr.callChk,'통화')+mkChk(_vr.smsChk,'문자')+'</span>';
+        // [v467] 완료=초록(✓) / 미완료=빨강(✕) 배지로 명확 구분
+        var mkChk=function(on,lbl){
+          return on
+            ? '<span style="display:inline-flex;align-items:center;gap:4px;background:#DCFCE7;border:1.5px solid #16A34A;color:#15803D;font-size:11px;font-weight:800;padding:2px 9px;border-radius:12px"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:#16A34A;color:#fff;border-radius:3px;font-size:10px">✓</span>'+lbl+' 완료</span>'
+            : '<span style="display:inline-flex;align-items:center;gap:4px;background:#FEE2E2;border:1.5px solid #DC2626;color:#B91C1C;font-size:11px;font-weight:800;padding:2px 9px;border-radius:12px"><span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:#DC2626;color:#fff;border-radius:3px;font-size:10px">✕</span>'+lbl+' 미완료</span>';
+        };
+        chkHtml='<span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center">'+mkChk(_vr.callChk,'통화')+mkChk(_vr.smsChk,'문자')+'</span>';
       }
     }catch(_c){}
     return '<div style="background:#F8FAFF;border:1.5px solid #C7D6F0;border-radius:9px;padding:10px 14px;margin:0 4px 10px">'
