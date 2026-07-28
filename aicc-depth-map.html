@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AICC 대응 뎁스 — 마인드맵</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+:root{
+  --canvas:#0F3B38; --canvas-2:#0C302E; --ink:#EAF4F2; --sub:#8FB8B2;
+  --node:#F4F8F7; --node-ink:#123734; --link:#2E5F5A;
+  --t1:#6FCF9E; --t2:#F2C879; --t3:#E8938C; --accent:#6ECDC2;
+  --mono:'SF Mono',ui-monospace,Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:radial-gradient(1200px 800px at 18% 30%, #144743 0%, var(--canvas) 55%, var(--canvas-2) 100%);
+  color:var(--ink);font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+header{padding:16px 22px 10px;display:flex;flex-wrap:wrap;gap:14px;align-items:baseline;border-bottom:1px solid rgba(110,205,194,.18)}
+h1{font-size:19px;font-weight:800;letter-spacing:-.02em}
+h1 em{font-style:normal;color:var(--accent)}
+.meta{font-family:var(--mono);font-size:11px;color:var(--sub)}
+.controls{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+button{background:rgba(244,248,247,.08);border:1px solid rgba(110,205,194,.35);color:var(--ink);
+  font-size:11.5px;padding:5px 11px;border-radius:99px;cursor:pointer;font-family:inherit}
+button:hover{background:rgba(110,205,194,.18)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.gchip{font-family:var(--mono);font-weight:700}
+button.gchip.off{opacity:.35}
+.g1{border-color:var(--t1);color:var(--t1)} .g2{border-color:var(--t2);color:var(--t2)} .g3{border-color:var(--t3);color:var(--t3)}
+.legend{padding:6px 22px;font-size:11px;color:var(--sub);display:flex;gap:16px;flex-wrap:wrap}
+.legend b{color:var(--ink);font-weight:600}
+#map{flex:1;cursor:grab}
+#map:active{cursor:grabbing}
+.link{fill:none;stroke:var(--link);stroke-width:1.3px}
+.node-card{cursor:pointer}
+.node-card rect{fill:var(--node);rx:7px}
+.node-card.depth0 rect{fill:var(--accent)}
+.node-card.depth1 rect{fill:#DCEBE8}
+.node-card.depth2 rect{fill:#C7DDD9}
+.node-card text{fill:var(--node-ink);font-size:12px;font-weight:600;pointer-events:none}
+.node-card .cnt{font-family:var(--mono);font-size:10px;font-weight:700;fill:#3E6B66}
+.node-card .dirb{font-family:var(--mono);font-size:9px;font-weight:800;fill:#28524D}
+.node-card circle.dot{stroke:none}
+.node-card .chev{fill:#3E6B66;font-size:10px;font-weight:800}
+.node-card.dim{opacity:.22}
+@media (prefers-reduced-motion: reduce){ .anim *{transition:none !important} }
+footer{padding:6px 22px 10px;font-size:10.5px;color:var(--sub);font-family:var(--mono)}
+</style>
+</head>
+<body>
+<header>
+  <h1>AICC <em>대응 뎁스</em> 마인드맵</h1>
+  <span class="meta">관리구분 13 · 대응 내용 121 · 통화 315건 · 원자료: 통화분석 보고서(대응내용정리)</span>
+  <div class="controls">
+    <button class="gchip g1" data-g="T1">T1 봇 종결</button>
+    <button class="gchip g2" data-g="T2">T2 접수·이관</button>
+    <button class="gchip g3" data-g="T3">T3 상담원</button>
+    <button id="expand">전체 펼치기</button>
+    <button id="collapse">대응자까지 접기</button>
+  </div>
+</header>
+<div class="legend">
+  <span><b>뎁스</b> 관리구분 → 대응자 → 대응 내용</span>
+  <span><b>노드 클릭</b> 펼치기/접기 · <b>드래그</b> 이동 · <b>휠</b> 확대</span>
+  <span><b>등급 칩</b> 클릭 시 해당 등급만 강조</span>
+</div>
+<svg id="map"></svg>
+<footer>KRG Guarantees · AICC 도입 설계(2026.12 목표) · 등급은 초안 — 담당자 검토 후 확정</footer>
+<script>
+const DATA = {"name": "AICC 대응 뎁스", "cnt": 315, "children": [{"name": "상담관리", "dir": "수신", "cnt": 14, "children": [{"name": "임대인", "cnt": 5, "children": [{"name": "서비스 이용 문의", "cnt": 5, "grade": "T1", "stage": "계약전"}]}, {"name": "임차인", "cnt": 4, "children": [{"name": "(미분류)", "cnt": 2, "grade": "T2", "stage": "계약전"}, {"name": "납기일 문의·변경", "cnt": 1, "grade": "T2", "stage": "계약전"}, {"name": "서비스 이용 문의", "cnt": 1, "grade": "T1", "stage": "계약전"}]}, {"name": "부동산", "cnt": 5, "children": [{"name": "계약 관련 확인", "cnt": 1, "grade": "T2", "stage": "계약전"}, {"name": "계약서 수령 확인", "cnt": 1, "grade": "T1", "stage": "계약전"}, {"name": "고방 사이트 문의", "cnt": 1, "grade": "T1", "stage": "계약전"}, {"name": "신규 파트너 계약 안내", "cnt": 1, "grade": "T2", "stage": "계약전"}, {"name": "파트너 소통·확인", "cnt": 1, "grade": "T2", "stage": "계약전"}]}, {"name": "기타", "cnt": 0, "children": [{"name": "업무협업 문의(관공서)", "cnt": 0, "grade": "T2", "stage": "계약전"}, {"name": "업무협업 문의(상업용 프랜차이즈)", "cnt": 0, "grade": "T2", "stage": "계약전"}, {"name": "업무협업 문의(투자사)", "cnt": 0, "grade": "T2", "stage": "계약전"}]}]}, {"name": "심사관리", "dir": "미지정", "cnt": 16, "children": [{"name": "임대인", "cnt": 1, "children": [{"name": "2차 심사 문의", "cnt": 1, "grade": "T2", "stage": "계약전"}]}, {"name": "임차인", "cnt": 2, "children": [{"name": "심사결과 안내", "cnt": 2, "grade": "T2", "stage": "계약전"}]}, {"name": "부동산", "cnt": 13, "children": [{"name": "2차 심사 문의", "cnt": 9, "grade": "T2", "stage": "계약전"}, {"name": "(미분류)", "cnt": 2, "grade": "T2", "stage": "계약전"}, {"name": "계약 가능 여부 확인", "cnt": 1, "grade": "T2", "stage": "계약전"}, {"name": "수수료 분할납부 안내", "cnt": 1, "grade": "T3", "stage": "계약전"}]}]}, {"name": "계약관리", "dir": "발신", "cnt": 70, "children": [{"name": "임대인", "cnt": 3, "children": [{"name": "계약금 입금", "cnt": 1, "grade": "T1", "stage": "계약전"}, {"name": "계약서 발송", "cnt": 1, "grade": "T1", "stage": "계약전"}, {"name": "계약조건 변경(전차인·임대료)", "cnt": 1, "grade": "T3", "stage": "계약후"}]}, {"name": "임차인", "cnt": 45, "children": [{"name": "신규계약 안내", "cnt": 24, "grade": "T2", "stage": "계약전"}, {"name": "납기일 문의·변경", "cnt": 7, "grade": "T2", "stage": "계약후"}, {"name": "전자계약서 문의", "cnt": 6, "grade": "T2", "stage": "계약전"}, {"name": "(미분류)", "cnt": 4, "grade": "T2", "stage": "계약전"}, {"name": "임대차계약서 발급", "cnt": 4, "grade": "T1", "stage": "계약후"}]}, {"name": "부동산", "cnt": 22, "children": [{"name": "(미분류)", "cnt": 9, "grade": "T2", "stage": "계약전"}, {"name": "계약 관련 확인", "cnt": 6, "grade": "T2", "stage": "계약전"}, {"name": "입주일 변경", "cnt": 3, "grade": "T2", "stage": "계약전"}, {"name": "임대인 정보 확인", "cnt": 2, "grade": "T2", "stage": "계약전"}, {"name": "임대료 수납·연체 확인", "cnt": 2, "grade": "T2", "stage": "계약후"}]}]}, {"name": "수납관리", "dir": "발신", "cnt": 30, "children": [{"name": "임대인", "cnt": 5, "children": [{"name": "계약 관련 확인", "cnt": 1, "grade": "T2", "stage": "계약후"}, {"name": "관리비 연체 확인", "cnt": 1, "grade": "T1", "stage": "계약후"}, {"name": "납부계좌 확인·변경", "cnt": 1, "grade": "T1", "stage": "계약후"}, {"name": "수납 안내", "cnt": 1, "grade": "T1", "stage": "계약후"}, {"name": "입금 확인", "cnt": 1, "grade": "T1", "stage": "계약후"}]}, {"name": "임차인", "cnt": 24, "children": [{"name": "수납 안내", "cnt": 13, "grade": "T1", "stage": "계약후"}, {"name": "(미분류)", "cnt": 6, "grade": "T2", "stage": "계약후"}, {"name": "임대료 정산·미입금 문의", "cnt": 5, "grade": "T2", "stage": "계약후"}]}, {"name": "부동산", "cnt": 1, "children": [{"name": "수수료 카드결제 링크", "cnt": 1, "grade": "T1", "stage": "계약후"}]}]}, {"name": "연체관리", "dir": "발신", "cnt": 13, "children": [{"name": "임대인", "cnt": 2, "children": [{"name": "잔여물 처리 문의", "cnt": 1, "grade": "T3", "stage": "계약후"}, {"name": "퇴실정산 체크", "cnt": 1, "grade": "T2", "stage": "계약후"}]}, {"name": "임차인", "cnt": 7, "children": [{"name": "연체 대응·상담", "cnt": 3, "grade": "T3", "stage": "계약후"}, {"name": "납기일 문의·변경", "cnt": 2, "grade": "T2", "stage": "계약후"}, {"name": "가족·관계인 연락 대응", "cnt": 1, "grade": "T3", "stage": "계약후"}, {"name": "미납금 카드결제 링크", "cnt": 1, "grade": "T1", "stage": "계약후"}]}, {"name": "부동산", "cnt": 4, "children": [{"name": "연체 대응·상담", "cnt": 2, "grade": "T3", "stage": "계약후"}, {"name": "계약해지통지 날인", "cnt": 1, "grade": "T3", "stage": "계약후"}, {"name": "연락처 변경", "cnt": 1, "grade": "T1", "stage": "계약후"}]}]}, {"name": "정산관리", "dir": "미지정", "cnt": 20, "children": [{"name": "임대인", "cnt": 9, "children": [{"name": "임대료 정산·미입금 문의", "cnt": 9, "grade": "T2", "stage": "계약후"}]}, {"name": "임차인", "cnt": 6, "children": [{"name": "(미분류)", "cnt": 2, "grade": "T2", "stage": "계약후"}, {"name": "공동전차인 제외·임대료 조정", "cnt": 1, "grade": "T3", "stage": "계약후"}, {"name": "납기일 확인·동의", "cnt": 1, "grade": "T1", "stage": "계약후"}, {"name": "납부지연 협의", "cnt": 1, "grade": "T3", "stage": "계약후"}, {"name": "오입금 처리", "cnt": 1, "grade": "T2", "stage": "계약후"}]}, {"name": "부동산", "cnt": 5, "children": [{"name": "파트너 인센티브 정산", "cnt": 4, "grade": "T2", "stage": "계약후"}, {"name": "임대료 정산·미입금 문의", "cnt": 1, "grade": "T2", "stage": "계약후"}]}]}, {"name": "갱신관리", "dir": "발신", "cnt": 16, "children": [{"name": "임대인", "cnt": 8, "children": [{"name": "갱신 문의", "cnt": 8, "grade": "T2", "stage": "계약후"}]}, {"name": "임차인", "cnt": 7, "children": [{"name": "갱신 문의", "cnt": 5, "grade": "T2", "stage": "계약후"}, {"name": "갱신 수수료·카드결제", "cnt": 1, "grade": "T2", "stage": "계약후"}, {"name": "갱신 심사 문의", "cnt": 1, "grade": "T2", "stage": "계약후"}]}, {"name": "부동산", "cnt": 1, "children": [{"name": "갱신 문의", "cnt": 1, "grade": "T2", "stage": "계약후"}]}]}, {"name": "중도퇴실관리", "dir": "발신", "cnt": 47, "children": [{"name": "임대인", "cnt": 15, "children": [{"name": "(미분류)", "cnt": 6, "grade": "T2", "stage": "계약후"}, {"name": "중도퇴실 문의", "cnt": 3, "grade": "T2", "stage": "계약후"}, {"name": "공과금 정산", "cnt": 2, "grade": "T2", "stage": "계약후"}, {"name": "임대인 협의 연락", "cnt": 2, "grade": "T3", "stage": "계약후"}, {"name": "중도퇴실 정산", "cnt": 2, "grade": "T2", "stage": "계약후"}]}, {"name": "임차인", "cnt": 24, "children": [{"name": "중도퇴실 문의", "cnt": 12, "grade": "T2", "stage": "계약후"}, {"name": "중도퇴실 처리", "cnt": 5, "grade": "T2", "stage": "계약후"}, {"name": "중도퇴실 안내", "cnt": 3, "grade": "T2", "stage": "계약후"}, {"name": "중도퇴실 정산", "cnt": 2, "grade": "T2", "stage": "계약후"}, {"name": "후임 세입자 연결", "cnt": 2, "grade": "T2", "stage": "계약후"}]}, {"name": "부동산", "cnt": 8, "children": [{"name": "(미분류)", "cnt": 2, "grade": "T2", "stage": "계약후"}, {"name": "중도퇴실 처리", "cnt": 2, "grade": "T2", "stage": "계약후"}, {"name": "퇴실 호실 청소·투어 문의", "cnt": 2, "grade": "T2", "stage": "계약후"}, {"name": "개문·마스터키 확인", "cnt": 1, "grade": "T3", "stage": "계약후"}, {"name": "임전대차 계약 문의", "cnt": 1, "grade": "T2", "stage": "계약후"}]}]}, {"name": "퇴실관리", "dir": "미지정", "cnt": 36, "children": [{"name": "임대인", "cnt": 15, "children": [{"name": "(미분류)", "cnt": 5, "grade": "T2", "stage": "계약후"}, {"name": "관리비 정산", "cnt": 2, "grade": "T2", "stage": "계약후"}, {"name": "만기퇴실 문의", "cnt": 2, "grade": "T1", "stage": "계약후"}, {"name": "퇴실정산", "cnt": 2, "grade": "T2", "stage": "계약후"}, {"name": "퇴실정산 문의", "cnt": 2, "grade": "T2", "stage": "계약후"}, {"name": "계약해지 동의", "cnt": 1, "grade": "T3", "stage": "계약후"}, {"name": "공과금 정산", "cnt": 1, "grade": "T2", "stage": "계약후"}]}, {"name": "임차인", "cnt": 14, "children": [{"name": "만기퇴실 청소·일정", "cnt": 6, "grade": "T2", "stage": "계약후"}, {"name": "만기퇴실 고지·정산", "cnt": 2, "grade": "T2", "stage": "계약후"}, {"name": "만기퇴실 문의", "cnt": 2, "grade": "T1", "stage": "계약후"}, {"name": "환급금 문의", "cnt": 2, "grade": "T3", "stage": "계약후"}, {"name": "관리비 정산", "cnt": 1, "grade": "T2", "stage": "계약후"}, {"name": "원상회복(끽연·벽지) 처리", "cnt": 1, "grade": "T3", "stage": "계약후"}]}, {"name": "부동산", "cnt": 7, "children": [{"name": "(미분류)", "cnt": 3, "grade": "T2", "stage": "계약후"}, {"name": "원상회복(끽연·벽지) 처리", "cnt": 2, "grade": "T3", "stage": "계약후"}, {"name": "입주·퇴실 상태 확인", "cnt": 1, "grade": "T2", "stage": "계약후"}, {"name": "청소 의뢰·견적", "cnt": 1, "grade": "T2", "stage": "계약후"}]}]}, {"name": "증빙관리", "dir": "미지정", "cnt": 21, "children": [{"name": "임대인", "cnt": 7, "children": [{"name": "세금계산서 발행·증빙", "cnt": 4, "grade": "T1", "stage": "계약후"}, {"name": "(미분류)", "cnt": 2, "grade": "T2", "stage": "계약후"}, {"name": "보증서 발급·발송", "cnt": 1, "grade": "T1", "stage": "계약후"}]}, {"name": "임차인", "cnt": 12, "children": [{"name": "납입증명·입금내역서 발급", "cnt": 12, "grade": "T1", "stage": "계약후"}]}, {"name": "부동산", "cnt": 2, "children": [{"name": "보증서 발급·발송", "cnt": 1, "grade": "T1", "stage": "계약후"}, {"name": "중개보수료 세금계산서", "cnt": 1, "grade": "T1", "stage": "계약후"}]}]}, {"name": "정보변경관리", "dir": "미지정", "cnt": 7, "children": [{"name": "임대인", "cnt": 4, "children": [{"name": "계약·거주자 정보 확인", "cnt": 2, "grade": "T1", "stage": "계약후"}, {"name": "납부계좌 확인·변경", "cnt": 2, "grade": "T1", "stage": "계약후"}]}, {"name": "임차인", "cnt": 2, "children": [{"name": "연락처 변경", "cnt": 1, "grade": "T1", "stage": "계약후"}, {"name": "임대료 인상 반영", "cnt": 1, "grade": "T2", "stage": "계약후"}]}, {"name": "부동산", "cnt": 1, "children": [{"name": "공동전차인 추가 요청", "cnt": 1, "grade": "T2", "stage": "계약후"}]}]}, {"name": "부동산상담", "dir": "수신", "cnt": 7, "children": [{"name": "부동산", "cnt": 7, "children": [{"name": "카드결제 문의", "cnt": 3, "grade": "T1", "stage": "계약전"}, {"name": "계약서 문의", "cnt": 1, "grade": "T2", "stage": "계약전"}, {"name": "서비스 이용 문의", "cnt": 1, "grade": "T1", "stage": "계약전"}, {"name": "신규계약 검토", "cnt": 1, "grade": "T2", "stage": "계약전"}, {"name": "임전대차 계약 문의", "cnt": 1, "grade": "T2", "stage": "계약전"}]}]}, {"name": "기타(업무 외)", "dir": "미지정", "cnt": 18, "children": [{"name": "임대인", "cnt": 7, "children": [{"name": "부재중·재연락 대응", "cnt": 3, "grade": "T1", "stage": "계약후"}, {"name": "단순 연락·문의", "cnt": 2, "grade": "T1", "stage": "계약후"}, {"name": "관리비 체납 고지 전달", "cnt": 1, "grade": "T3", "stage": "계약후"}, {"name": "시설물·하자 대응", "cnt": 1, "grade": "T3", "stage": "계약후"}]}, {"name": "임차인", "cnt": 6, "children": [{"name": "시설물·하자 대응", "cnt": 4, "grade": "T3", "stage": "계약후"}, {"name": "계약 관련 확인", "cnt": 1, "grade": "T2", "stage": "계약후"}, {"name": "계약·거주자 정보 확인", "cnt": 1, "grade": "T1", "stage": "계약후"}]}, {"name": "부동산", "cnt": 5, "children": [{"name": "보증서 발급·발송", "cnt": 2, "grade": "T1", "stage": "계약후"}, {"name": "내부 연결 요청", "cnt": 1, "grade": "T1", "stage": "계약후"}, {"name": "중개수수료 카드결제 문의", "cnt": 1, "grade": "T1", "stage": "계약후"}, {"name": "특약·개인정보 문구 확인", "cnt": 1, "grade": "T2", "stage": "계약후"}]}]}]};
+const svg = d3.select('#map');
+const g = svg.append('g').attr('class','anim');
+const zoom = d3.zoom().scaleExtent([.3, 2.5]).on('zoom', e => g.attr('transform', e.transform));
+svg.call(zoom);
+
+const GC = {T1:'#6FCF9E', T2:'#F2C879', T3:'#E8938C'};
+let root = d3.hierarchy(DATA);
+root.descendants().forEach((d,i) => { d.id = i; d._children = d.children; });
+// 초기: 대응자(depth2)까지만
+root.descendants().forEach(d => { if (d.depth >= 2) d.children = null; });
+
+const dy = 250, dx = 30;
+const treeLayout = d3.tree().nodeSize([dx, dy]);
+let activeGrades = new Set();
+
+function nodeW(d){
+  const base = d.data.name.length * 12 + 46;
+  return Math.min(Math.max(base + (d.depth===1?52:0) + (d.data.cnt?34:0), 90), 330);
+}
+function update(source){
+  treeLayout(root);
+  let x0 = Infinity, x1 = -Infinity;
+  root.each(d => { if (d.x < x0) x0 = d.x; if (d.x > x1) x1 = d.x; });
+  const H = Math.max(window.innerHeight - 150, x1 - x0 + 80);
+  svg.attr('viewBox', null);
+
+  const nodes = root.descendants(), links = root.links();
+
+  const link = g.selectAll('path.link').data(links, d => d.target.id);
+  link.enter().append('path').attr('class','link')
+    .merge(link)
+    .transition().duration(280)
+    .attr('d', d3.linkHorizontal().x(d => d.y).y(d => d.x));
+  link.exit().remove();
+
+  const node = g.selectAll('g.node-card').data(nodes, d => d.id);
+  const ne = node.enter().append('g')
+    .attr('class', d => 'node-card depth' + d.depth)
+    .attr('transform', d => `translate(${source ? source.y : d.y},${source ? source.x : d.x})`)
+    .on('click', (e,d) => { if (d._children){ d.children = d.children ? null : d._children; update(d); } });
+
+  ne.append('rect').attr('y', -12).attr('height', 24).attr('rx', 7);
+  ne.append('circle').attr('class','dot').attr('r', 4.5).attr('cx', 13).attr('cy', 0)
+    .style('display', d => d.data.grade ? null : 'none')
+    .attr('fill', d => GC[d.data.grade] || 'none');
+  ne.append('text').attr('class','label').attr('dy', 4);
+  ne.append('text').attr('class','cnt').attr('dy', 4);
+  ne.append('text').attr('class','dirb').attr('dy', 4).attr('x', 10)
+    .text(d => d.depth===1 && d.data.dir ? (d.data.dir==='수신' ? '⬇ 수신' : d.data.dir==='발신' ? '⬆ 발신' : '· 미지정') : '');
+  ne.append('text').attr('class','chev').attr('dy', 4);
+
+  const all = ne.merge(node);
+  all.transition().duration(280).attr('transform', d => `translate(${d.y},${d.x})`);
+  all.select('rect').attr('width', d => nodeW(d)).attr('x', 0);
+  all.select('text.label')
+    .attr('x', d => d.data.grade ? 24 : (d.depth===1 ? 58 : 12))
+    .text(d => d.data.name);
+  all.select('text.cnt')
+    .attr('x', d => nodeW(d) - (d._children ? 30 : 12)).attr('text-anchor','end')
+    .text(d => d.data.cnt ? d.data.cnt + '건' : '');
+  all.select('text.chev')
+    .attr('x', d => nodeW(d) - 16)
+    .text(d => d._children ? (d.children ? '−' : '+') : '');
+  all.classed('dim', d => activeGrades.size && d.data.grade && !activeGrades.has(d.data.grade));
+  node.exit().transition().duration(200)
+    .attr('transform', d => `translate(${source ? source.y : d.y},${source ? source.x : d.x})`)
+    .style('opacity', 0).remove();
+}
+function fit(){
+  const b = g.node().getBBox();
+  const W = svg.node().clientWidth, H = svg.node().clientHeight;
+  const s = Math.min(W / (b.width + 80), H / (b.height + 60), 1.4);
+  const t = d3.zoomIdentity.translate(W/2 - s*(b.x + b.width/2), H/2 - s*(b.y + b.height/2)).scale(s);
+  svg.transition().duration(350).call(zoom.transform, t);
+}
+update(); setTimeout(fit, 320);
+
+document.getElementById('expand').onclick = () => {
+  root.descendants().forEach(d => { if (d._children) d.children = d._children; });
+  update(); setTimeout(fit, 320);
+};
+document.getElementById('collapse').onclick = () => {
+  root.descendants().forEach(d => { if (d.depth >= 2) d.children = null; else if (d._children) d.children = d._children; });
+  update(); setTimeout(fit, 320);
+};
+document.querySelectorAll('.gchip').forEach(b => b.onclick = () => {
+  const gr = b.dataset.g;
+  if (activeGrades.has(gr)) { activeGrades.delete(gr); b.classList.add('off'); }
+  else { activeGrades.add(gr); b.classList.remove('off'); }
+  if (![...document.querySelectorAll('.gchip')].some(x => !x.classList.contains('off') && activeGrades.has(x.dataset.g)) && activeGrades.size===0){}
+  update();
+});
+window.addEventListener('resize', () => update());
+</script>
+</body>
+</html>
