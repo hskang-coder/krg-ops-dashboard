@@ -1,0 +1,151 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>개런티즈 AICC — 서비스 흐름 플로우차트 v0.3 (라이트)</title>
+<style>
+:root{--bg:#F4F7F6;--panel:#FFFFFF;--ink:#1B2B28;--sub:#5E7672;--line:#D5E2DF;--teal:#0E8C7F;--teal-soft:#E7F4F2;
+--dash:#0E8C7F;--ai:#1E8F5C;--ai-soft:#E4F4EB;--mix:#B26F0A;--mix-soft:#FBF0DB;--hu:#516864;--hu-soft:#ECF1F0;--ban:#C0392B;--ban-soft:#FBE7E4;
+--recv:#1F6FB5;--send:#B26F0A;--mono:'SF Mono',ui-monospace,Consolas,monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif}
+header{position:sticky;top:0;z-index:5;padding:13px 24px;display:flex;gap:10px 18px;align-items:center;flex-wrap:wrap;
+background:rgba(255,255,255,.94);backdrop-filter:blur(6px);border-bottom:2px solid var(--teal);box-shadow:0 2px 10px rgba(20,60,54,.06)}
+h1{font-size:18px;font-weight:800;letter-spacing:-.02em}
+h1 em{font-style:normal;color:var(--teal)}
+.meta{font-family:var(--mono);font-size:11px;color:var(--sub)}
+.fgroup{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.fgroup .glab{font-size:11px;color:var(--sub);font-weight:800;margin-right:2px}
+button{background:#fff;border:1.5px solid var(--line);color:var(--ink);
+font-size:12px;padding:5px 12px;border-radius:99px;cursor:pointer;font-family:inherit;font-weight:700}
+button:hover{border-color:var(--teal);background:var(--teal-soft)}
+button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+button.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+button.a-ai.on{background:var(--ai);border-color:var(--ai)}
+button.a-mix.on{background:var(--mix);border-color:var(--mix)}
+button.a-human.on{background:var(--hu);border-color:var(--hu)}
+.cnt{font-family:var(--mono);font-size:12px;color:var(--teal);font-weight:800;margin-left:auto}
+.canvas{overflow-x:auto;padding:22px 30px 34px}
+.grid{display:grid;grid-template-columns:repeat(9,352px);gap:0 20px;min-width:3370px}
+.cell{display:flex;flex-direction:column;justify-content:flex-end}
+.grid.bot .cell{justify-content:flex-start}
+.spine{display:grid;grid-template-columns:repeat(9,352px);gap:0 20px;min-width:3370px;position:relative;height:66px;align-items:center}
+.spine:before{content:"";position:absolute;left:0;right:0;top:50%;height:3px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--teal) 4%,var(--teal) 96%,transparent)}
+.dot{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12.5px;font-weight:800;color:var(--ink)}
+.dot b{width:36px;height:36px;border-radius:50%;background:#fff;border:2.5px solid var(--teal);display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 0 0 5px var(--teal-soft)}
+.dot:after{content:"";position:absolute;width:2px;height:18px;background:var(--teal)}
+.dot.up:after{bottom:100%} .dot.down:after{top:100%}
+.tree{border-left:3px solid var(--teal);padding:10px 0 6px 14px;margin:8px 0 8px 12px}
+.stitle{font-size:15px;font-weight:800;margin-bottom:9px}
+.stitle span{display:block;font-size:11px;font-weight:600;color:var(--sub);margin-top:2px}
+.grp{margin:0 0 12px;border-radius:11px;padding:9px 11px;background:var(--panel);box-shadow:0 1px 4px rgba(20,60,54,.06);transition:opacity .18s}
+.grp.aicc{border:1.8px dashed var(--dash);background:linear-gradient(0deg,rgba(14,140,127,.035),rgba(14,140,127,.035)),#fff}
+.grp.plain{border:1px solid var(--line)}
+.glabel{font-size:12px;font-weight:800;color:var(--teal);margin-bottom:6px;letter-spacing:.02em}
+.grp.plain .glabel{color:var(--sub)}
+.glabel em{font-style:normal;color:var(--sub);font-weight:600;font-family:var(--mono);font-size:10px}
+ul{list-style:none}
+li{display:flex;gap:8px;padding:5px 0;border-top:1px solid #EDF3F2;font-size:12.6px;line-height:1.5;transition:opacity .18s}
+li:first-child{border-top:none}
+li.dim{opacity:.14}
+.grp.dim{opacity:.3}
+.ic{flex:0 0 22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;margin-top:1px}
+li.ai .ic{background:var(--ai-soft)} li.mix .ic{background:var(--mix-soft)} li.human .ic{background:var(--hu-soft)} li.ban .ic{background:var(--ban-soft)}
+.t1{font-weight:600}
+.dirb{font-family:var(--mono);font-size:9.5px;font-weight:800;border-radius:4px;padding:1px 5px;margin-right:5px;white-space:nowrap;vertical-align:1px}
+.dirb.수신{color:var(--recv);background:#E8F1FA}
+.dirb.발신{color:var(--send);background:var(--mix-soft)}
+.dirb.내부{color:var(--sub);background:var(--hu-soft)}
+.cyc{font-family:var(--mono);font-size:10px;color:var(--teal);margin-left:5px;white-space:nowrap;font-weight:700}
+.hand{display:block;font-size:11px;color:var(--sub);margin-top:2px;font-weight:500}
+.hand:before{content:"↳ ";color:var(--mix);font-weight:800}
+li.ban .t1{color:var(--ban)}
+li.ban .ic:after{content:"⛔";font-size:8px;margin-left:1px}
+footer{padding:10px 24px 22px;font-family:var(--mono);font-size:10.5px;color:var(--sub)}
+@media print{header{position:static} .canvas{overflow:visible}}
+</style></head><body>
+<header>
+  <h1>개런티즈 <em>AICC 서비스 흐름</em> 플로우차트</h1>
+  <span class="meta">v0.3 · 9단계 77건 · 라이트 · 2026.12 도입 목표</span>
+  <div class="fgroup"><span class="glab">주체</span>
+    <button class="f actor a-ai" data-v="ai">🤖 AI 단독</button>
+    <button class="f actor a-mix" data-v="mix">🤝 AI→사람</button>
+    <button class="f actor a-human" data-v="human,ban">👤 사람</button></div>
+  <div class="fgroup"><span class="glab">대상</span>
+    <button class="f target" data-v="임대인">임대인</button>
+    <button class="f target" data-v="임(전)차인">임(전)차인</button>
+    <button class="f target" data-v="부동산">부동산</button>
+    <button class="f target" data-v="내부·기타">내부·기타</button></div>
+  <div class="fgroup"><span class="glab">묶음</span>
+    <button id="mode" data-m="target">대상별 ▾</button>
+    <button id="reset">초기화</button></div>
+  <span class="cnt" id="cnt"></span>
+</header>
+<div class="canvas">
+  <div class="grid top" id="gtop"></div>
+  <div class="spine" id="spine"></div>
+  <div class="grid bot" id="gbot"></div>
+</div>
+<footer>KRG Guarantees · 원자료: 개런티즈_AICC_서비스흐름별_상세분류_v0_2.xlsx · 점선 박스 = AICC(🤖/🤝) 대응 포함 그룹 · 주체 × 대상 필터는 교집합으로 동작</footer>
+<script>
+const STAGES = [{"name": "① 상담", "sub": "모든 관계의 시작", "icon": "💬", "items": [{"dir": "수신", "tRaw": "임대인", "targets": ["임대인"], "task": "단순서비스문의", "ch": "전화·문자", "cycle": "상시", "actor": "ai", "hand": "스크립트 외 질문 2회 → 이지희"}, {"dir": "수신", "tRaw": "임대인", "targets": ["임대인"], "task": "공실관련문의", "ch": "전화·문자", "cycle": "상시", "actor": "mix", "hand": "상세 상담 → 영업팀"}, {"dir": "수신", "tRaw": "부동산", "targets": ["부동산"], "task": "단순서비스문의", "ch": "전화·문자", "cycle": "상시", "actor": "ai", "hand": "공통 트리거"}, {"dir": "수신", "tRaw": "부동산", "targets": ["부동산"], "task": "서비스이용문의(설명희망)", "ch": "전화·문자", "cycle": "상시", "actor": "mix", "hand": "접수 즉시 → 영업팀 (Slack 일정·내용)"}, {"dir": "수신", "tRaw": "부동산", "targets": ["부동산"], "task": "첫 계약 진행 문의", "ch": "전화·문자", "cycle": "상시", "actor": "mix", "hand": "진행 확정 → 이지희 (첫계약 안내 4단계)"}, {"dir": "수신", "tRaw": "임(전)차인", "targets": ["임(전)차인"], "task": "단순서비스문의", "ch": "전화·문자", "cycle": "상시", "actor": "ai", "hand": "공통 트리거"}, {"dir": "수신", "tRaw": "임(전)차인", "targets": ["임(전)차인"], "task": "심사관련문의", "ch": "전화·문자", "cycle": "상시", "actor": "mix", "hand": "거절 사유 상세 → 고송미"}, {"dir": "수신", "tRaw": "임(전)차인", "targets": ["임(전)차인"], "task": "계약관련문의", "ch": "전화·문자", "cycle": "상시", "actor": "mix", "hand": "특약·조건 협의 → 고송미"}, {"dir": "수신", "tRaw": "업무협업", "targets": ["내부·기타"], "task": "상업용프랜차이즈", "ch": "전화·문자", "cycle": "발생 시", "actor": "mix", "hand": "즉시 → 영업팀/경영진"}, {"dir": "수신", "tRaw": "업무협업", "targets": ["내부·기타"], "task": "투자사", "ch": "전화·문자", "cycle": "발생 시", "actor": "mix", "hand": "즉시 → 경영진"}, {"dir": "수신", "tRaw": "업무협업", "targets": ["내부·기타"], "task": "관공서", "ch": "전화·문자", "cycle": "발생 시", "actor": "human", "hand": "즉시 사람 연결 → 담당 매니저"}]}, {"name": "② 심사", "sub": "시스템 자동 + 조회 응대", "icon": "🔎", "items": [{"dir": "내부", "tRaw": "시스템", "targets": ["내부·기타"], "task": "심사 평가·결과 통보·시트 등록", "ch": "홈버튼", "cycle": "D 09:00", "actor": "ai", "hand": "예외 건 수동 개입 → 고송미"}, {"dir": "수신", "tRaw": "임(전)차인", "targets": ["임(전)차인"], "task": "심사 진행상태 문의", "ch": "전화·문자", "cycle": "상시", "actor": "ai", "hand": "거절 사유 상세 → 고송미"}, {"dir": "수신", "tRaw": "부동산", "targets": ["부동산"], "task": "심사 문의", "ch": "전화·자료", "cycle": "상시", "actor": "ai", "hand": "거절 사유 상세 → 고송미"}, {"dir": "발신", "tRaw": "임(전)차인", "targets": ["임(전)차인"], "task": "가계약 절차 안내 (승인 후)", "ch": "전화·문자", "cycle": "D·승인 시", "actor": "mix", "hand": "가계약일 확정 협의 → 고송미"}]}, {"name": "③ 계약", "sub": "설명·동의·서류의 구간", "icon": "📝", "items": [{"dir": "발신", "tRaw": "계약자", "targets": ["임(전)차인"], "task": "계약정보입수 (입주일·계약기간 등)", "ch": "전화·문자", "cycle": "Daily·1인", "actor": "ai", "hand": "정보 불일치 → 고송미"}, {"dir": "발신", "tRaw": "계약자", "targets": ["임(전)차인"], "task": "서비스 중요사항 설명 (수수료·중도퇴실·퇴실청소비)", "ch": "전화·문자", "cycle": "Daily·1인", "actor": "mix", "hand": "이해 불충분·질문 반복 → 고송미"}, {"dir": "발신", "tRaw": "계약자", "targets": ["임(전)차인"], "task": "납기일 D-3 설명 (YES/NO)", "ch": "전화·문자", "cycle": "Daily·1인", "actor": "ai", "hand": "NO 응답 → 고송미 후속"}, {"dir": "발신", "tRaw": "부동산", "targets": ["부동산"], "task": "파트너특약사항안내", "ch": "전화·자료", "cycle": "건별 (3분)", "actor": "ai", "hand": "특약 해석 → 이지희"}, {"dir": "발신", "tRaw": "부동산", "targets": ["부동산"], "task": "임전대차 계약서 확인", "ch": "전화·자료", "cycle": "건별 (5분)", "actor": "mix", "hand": "서류 내용 검토 → 고송미 (수요일 AM 마감)"}, {"dir": "발신", "tRaw": "계약자", "targets": ["임(전)차인"], "task": "전자계약 서명 독촉", "ch": "문자", "cycle": "건별", "actor": "ai", "hand": "지연 지속 → 고송미"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "계약등록 8단계 (채번~첨부입수)", "ch": "홈버튼·NAS", "cycle": "D+W", "actor": "human", "hand": "고송미"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "입주전관리 5종 체크", "ch": "홈버튼·NAS", "cycle": "D 09:00 (15분)", "actor": "human", "hand": "고송미 / Backup 이지희"}]}, {"name": "④ 입주", "sub": "정형 안내 최다 구간", "icon": "🔑", "items": [{"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "첫납부 안내 (임대료+수수료)", "ch": "문자", "cycle": "D 16:00", "actor": "ai", "hand": "문의 회신 → 수신 플로우"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "퇴실청소비 입금 안내", "ch": "문자", "cycle": "D 16:00", "actor": "ai", "hand": "금액 이견 → 김영철"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "입주 환영·이용 가이드 발송", "ch": "문자·카톡", "cycle": "입주일", "actor": "ai", "hand": ""}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "임대차계약신고 (등록·대응·보정)", "ch": "부동산거래관리시스템", "cycle": "건별", "actor": "human", "hand": "고송미"}]}, {"name": "⑤ 거주관리", "sub": "일상 문의·정산의 구간", "icon": "🏠", "items": [{"dir": "수신", "tRaw": "임대인", "targets": ["임대인"], "task": "임대료정산 문의", "ch": "전화·자료", "cycle": "상시", "actor": "mix", "hand": "금액 이견·계산 요구 → 김준영 (노션)"}, {"dir": "수신", "tRaw": "임대인", "targets": ["임대인"], "task": "세금문의", "ch": "전화·자료", "cycle": "상시", "actor": "human", "hand": "즉시 → 김준영 / 세무 전문가 안내"}, {"dir": "수신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "납기일변경 요청", "ch": "전화·자료", "cycle": "상시", "actor": "mix", "hand": "승인 판단 → 김영철"}, {"dir": "수신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "임대료수납 문의", "ch": "전화·자료", "cycle": "상시", "actor": "ai", "hand": "미매칭 입금 → 김영철"}, {"dir": "수신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "수납/연체문의", "ch": "전화·자료", "cycle": "상시", "actor": "mix", "hand": "감면·분납 협상 → 김영철"}, {"dir": "수신", "tRaw": "부동산", "targets": ["부동산"], "task": "인센티브문의", "ch": "전화·자료", "cycle": "상시", "actor": "mix", "hand": "금액 확정·이견 → 강휘수"}, {"dir": "수신", "tRaw": "부동산", "targets": ["부동산"], "task": "임대인정산 문의", "ch": "전화·자료", "cycle": "상시", "actor": "human", "hand": "즉시 → 이지희"}, {"dir": "수신", "tRaw": "부동산", "targets": ["부동산"], "task": "첫 계약자 대응", "ch": "전화·자료", "cycle": "발생 시", "actor": "human", "hand": "이지희"}, {"dir": "수신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "일반 클레임·기타 문의", "ch": "전화·문자", "cycle": "상시", "actor": "mix", "hand": "6종 분류 후 담당 라우팅 (Slack)"}, {"dir": "발신", "tRaw": "임대인", "targets": ["임대인"], "task": "정산 완료 통보", "ch": "문자", "cycle": "D 14:00 후", "actor": "ai", "hand": "미입금·오류 → 김준영"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "미매칭 입금자 확인", "ch": "문자", "cycle": "D", "actor": "ai", "hand": "회신 없음 → 김영철"}, {"dir": "발신", "tRaw": "부동산", "targets": ["부동산"], "task": "인센티브 지급금액·계산서 안내", "ch": "메일·문자", "cycle": "M", "actor": "mix", "hand": "금액 확정 선행 → 강휘수"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "임대인 정산 (계산·2인검토·입금)", "ch": "노션·홈버튼", "cycle": "D 14:00", "actor": "human", "hand": "김준영·강휘수"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "494계좌·카드결제 입금관리", "ch": "은행·PG", "cycle": "D", "actor": "human", "hand": "김준영·김영철"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "데이터관리 (심사·정산·계약 시트)", "ch": "Sheet", "cycle": "매월 1일 (각 15분)", "actor": "human", "hand": "각 담당"}]}, {"name": "⑥ 갱신관리", "sub": "만기 -1M 사이클", "icon": "🔄", "items": [{"dir": "수신", "tRaw": "임차인·임대인", "targets": ["임(전)차인", "임대인"], "task": "갱신문의 (절차·일정·의사)", "ch": "전화·자료", "cycle": "상시", "actor": "mix", "hand": "심사 결과·조건 협의 → 이지희"}, {"dir": "발신", "tRaw": "시스템", "targets": ["내부·기타"], "task": "갱신대상자 추출 (만기 -1M)", "ch": "내부", "cycle": "M (5분)", "actor": "ai", "hand": ""}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "갱신심사상신 (5건 단위)", "ch": "내부", "cycle": "M (5분)", "actor": "human", "hand": "심사 판단 → 이지희"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "갱신대상 1차 연락", "ch": "전화·문자", "cycle": "M (5분)", "actor": "ai", "hand": "조건 문의 → 이지희"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "갱신 최종안내 (승인건)", "ch": "전화·문자", "cycle": "M (5분)", "actor": "ai", "hand": "이견 → 이지희"}, {"dir": "발신", "tRaw": "임차인·임대인", "targets": ["임(전)차인", "임대인"], "task": "갱신불가·조건부 통보", "ch": "전화·문자", "cycle": "M", "actor": "human", "hand": "사유 설명·통보 → 이지희 (문자→미응답 시 통화)"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "갱신수수료 청구서 발행·입금 확인", "ch": "문자·메일", "cycle": "M (15분)", "actor": "mix", "hand": "금액 확정·검증 선행 → 이지희"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "갱신 계약서 발행·서명 독촉", "ch": "전자계약", "cycle": "M (15분)", "actor": "mix", "hand": "조건 확정 선행 → 이지희"}, {"dir": "발신", "tRaw": "시스템", "targets": ["내부·기타"], "task": "갱신대상 홈버튼 등록 (만기 -1M)", "ch": "홈버튼", "cycle": "M (10분)", "actor": "ai", "hand": "예외건 → 이지희"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "갱신서류 입수·보관·누락 독촉", "ch": "자료", "cycle": "M (10분)", "actor": "ai", "hand": "서류 검토 → 이지희"}]}, {"name": "⑦ 체납관리", "sub": "안내는 AI, 판단·법무는 사람", "icon": "🚨", "items": [{"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "전월/직전월 연체자 사전납부 유도", "ch": "전화·문자", "cycle": "납기일 전", "actor": "ai", "hand": "감면·분납 요청 → 김영철"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "연체 대응 분류 (연락/방문/법적)", "ch": "Sheet", "cycle": "D 09:00", "actor": "human", "hand": "분류 판단 → 오진선 (①연락 1~7일 ②방문 8~30일 ③법적 30일+)"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "연체발생 후 문자대응", "ch": "문자", "cycle": "Daily (15분)", "actor": "ai", "hand": "회신 → 수신 플로우"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "연체발생 후 통화대응 (1~7일)", "ch": "전화", "cycle": "Daily (3분)", "actor": "mix", "hand": "감면·분쟁·법적 언급·2회 무응답 → 김영철"}, {"dir": "수신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "연체 관련 회신·항의 수신", "ch": "전화·문자", "cycle": "상시", "actor": "mix", "hand": "항의·협상·법적 언급 → 김영철/오진선"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "방문 예정 사전 고지", "ch": "문자", "cycle": "방문 전", "actor": "ai", "hand": ""}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "방문 (추출~진행~Report~차회일정)", "ch": "현장", "cycle": "W 주2회 수·금 (330분)", "actor": "human", "hand": "김영철"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "법무 7종 (내용증명·CB조회·지급명령·변론·압류·추심·명도)", "ch": "등기·법원", "cycle": "W·M (10~240분)", "actor": "ban", "hand": "오진선"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "연체패턴 관리·기록", "ch": "노션", "cycle": "상시", "actor": "mix", "hand": "패턴 해석·갱신심사 반영 → 오진선"}]}, {"name": "⑧ 퇴실관리", "sub": "금액 확정 민감 구간", "icon": "🚪", "items": [{"dir": "수신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "중도퇴실 문의 (단순변심)", "ch": "전화·자료", "cycle": "상시", "actor": "mix", "hand": "위약금·정산 금액 확정 → 이지희·고송미"}, {"dir": "수신", "tRaw": "임차인·임대인", "targets": ["임(전)차인", "임대인"], "task": "퇴실문의 (만기·절차)", "ch": "전화·자료", "cycle": "상시", "actor": "mix", "hand": "정산 이슈 → 이지희(만기)/오진선(연체)"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "단순변심 중도퇴실 안내 (5종 책임)", "ch": "전화·문자", "cycle": "W 주2회 수·금 (5분)", "actor": "mix", "hand": "정산 진행·금액 확정 → 이지희·고송미"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "만기 도래 사전 안내 (D-30/D-7)", "ch": "문자", "cycle": "D", "actor": "ai", "hand": "일정 협의 → 이지희"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "강제퇴실 처리 전체 (현장 1차~해지 확정)", "ch": "현장·내부", "cycle": "W 발생 시", "actor": "ban", "hand": "김영철(현장 분기①)·오진선(해지 분기②), 김기성 본부장 보고 라인"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "퇴실정산청구 품의 문자", "ch": "문자", "cycle": "W 발생 시", "actor": "mix", "hand": "품의·금액 산정 선행 → 오진선"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "만기퇴실 정산 확인·이슈 대응", "ch": "노션", "cycle": "D 퇴실 시 (5분)", "actor": "human", "hand": "이지희"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "강제퇴실 정산 3종 (품의~반영)", "ch": "노션·홈버튼", "cycle": "W (각 30분)", "actor": "human", "hand": "오진선"}]}, {"name": "⑨ 종료", "sub": "정산 확정과 관계의 마무리", "icon": "🏁", "items": [{"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "정산 완료·환급 안내", "ch": "문자", "cycle": "건별", "actor": "ai", "hand": "이견 → 오진선/이지희"}, {"dir": "발신", "tRaw": "임대인", "targets": ["임대인"], "task": "계약 종료·정산 결과 통보", "ch": "문자", "cycle": "건별", "actor": "mix", "hand": "금액 확정 선행 → 김준영"}, {"dir": "발신", "tRaw": "임차인", "targets": ["임(전)차인"], "task": "재이용·추천 안내 (졸업 메시지)", "ch": "문자·카톡", "cycle": "종료 후", "actor": "ai", "hand": ""}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "계약해지 확정 처리 (홈버튼 4단계)", "ch": "홈버튼", "cycle": "건별", "actor": "human", "hand": "오진선 (합의해지는 본부장 확인 후 +해지증명서)"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "임대인 최종 정산·Slack 결제요청", "ch": "노션·Slack", "cycle": "건별", "actor": "human", "hand": "오진선→김준영"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "파트너 인센티브 정산 (위탁계약서~품의)", "ch": "노션", "cycle": "M (120분)", "actor": "human", "hand": "강휘수·이지희"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "서류 보관 종결·신분증 폐기 (30일)", "ch": "NAS", "cycle": "건별", "actor": "human", "hand": "고송미"}, {"dir": "내부", "tRaw": "KRG", "targets": ["내부·기타"], "task": "연체·응대 이력 종결 기록", "ch": "노션·운영웹", "cycle": "건별", "actor": "ai", "hand": "예외건 → 각 담당"}]}];
+const AICON = {ai:'🤖', mix:'🤝', human:'👤', ban:'👤'};
+const TORDER = ['임대인','임(전)차인','부동산','내부·기타'];
+const state = {actors:new Set(), targets:new Set(), mode:'target'};
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+function match(it){
+  const aOK = !state.actors.size || state.actors.has(it.actor);
+  const tOK = !state.targets.size || it.targets.some(t => state.targets.has(t));
+  return aOK && tOK;
+}
+function itemHTML(it){
+  const hand = it.hand ? `<span class="hand">${esc(it.hand)}</span>` : '';
+  const cyc = it.cycle ? `<span class="cyc">${esc(it.cycle)}</span>` : '';
+  return `<li class="${it.actor}${match(it)?'':' dim'}"><span class="ic">${AICON[it.actor]}</span><div class="tx"><div class="t1"><span class="dirb ${it.dir}">${it.dir}</span>${esc(it.task)} ${cyc}</div>${hand}</div></li>`;
+}
+function groupHTML(label, items){
+  const hasAI = items.some(i => i.actor==='ai'||i.actor==='mix');
+  const allDim = items.every(i => !match(i));
+  return `<div class="grp ${hasAI?'aicc':'plain'}${allDim?' dim':''}"><div class="glabel">${esc(label)} <em>${items.length}건</em></div><ul>${items.map(itemHTML).join('')}</ul></div>`;
+}
+function render(){
+  const top = [], bot = [], spine = [];
+  let shown = 0;
+  STAGES.forEach((st, si) => {
+    st.items.forEach(it => { if (match(it)) shown++; });
+    let groups;
+    if (state.mode === 'target'){
+      groups = TORDER.map(t => [t, st.items.filter(i => i.targets.includes(t))]).filter(g => g[1].length);
+    } else {
+      groups = ['수신','발신','내부'].map(d => [d==='내부'?'내부 업무':'AICC : '+d, st.items.filter(i => i.dir===d)]).filter(g => g[1].length);
+    }
+    const tree = `<div class="tree"><div class="stitle">${st.icon} ${esc(st.name)}<span>${esc(st.sub)} · ${st.items.length}건</span></div>${groups.map(g=>groupHTML(g[0],g[1])).join('')}</div>`;
+    const pos = si % 2 === 0 ? 'up' : 'down';
+    top.push(`<div class="cell">${pos==='up'?tree:''}</div>`);
+    bot.push(`<div class="cell">${pos==='down'?tree:''}</div>`);
+    spine.push(`<div class="dot ${pos}"><b>${st.icon}</b>${esc(st.name.split(' ').slice(1).join(' ')||st.name)}</div>`);
+  });
+  document.getElementById('gtop').innerHTML = top.join('');
+  document.getElementById('gbot').innerHTML = bot.join('');
+  document.getElementById('spine').innerHTML = spine.join('');
+  const total = STAGES.reduce((s,x)=>s+x.items.length,0);
+  document.getElementById('cnt').textContent = (state.actors.size||state.targets.size) ? `표시 ${shown} / ${total}건` : `전체 ${total}건`;
+}
+document.querySelectorAll('button.f').forEach(b => b.onclick = () => {
+  const vals = b.dataset.v.split(','), set = b.classList.contains('actor') ? state.actors : state.targets;
+  const on = b.classList.toggle('on');
+  vals.forEach(v => on ? set.add(v) : set.delete(v));
+  render();
+});
+document.getElementById('mode').onclick = e => {
+  state.mode = state.mode === 'target' ? 'dir' : 'target';
+  e.target.textContent = state.mode === 'target' ? '대상별 ▾' : '방향별 ▾';
+  render();
+};
+document.getElementById('reset').onclick = () => {
+  state.actors.clear(); state.targets.clear();
+  document.querySelectorAll('button.f.on').forEach(b => b.classList.remove('on'));
+  render();
+};
+render();
+</script>
+</body></html>
