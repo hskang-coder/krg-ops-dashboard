@@ -4670,6 +4670,7 @@ function renderPaymentTargets() {
       <td>${x.name}</td>
       <td style="color:#5A6A8A;font-size:11px">${x.phone}</td>
       <td>${vacancy.billCount ? String(vacancy.billCount).replace(/회+$/,'')+'회' : '—'}</td>
+      <td style="font-weight:700;color:${(function(){var p=_vldPct(vacancy.dlqRate);var n=parseFloat(String(p).replace('%',''))||0;return n>0?'#DC2626':'#94A3B8';})()}">${_vldPct(vacancy.dlqRate)}</td>${''/* [v479] 연체율(BZ열) */}
       <td style="font-size:11px;color:#6B7280">${vacancy.status || '—'}</td>
       ${(()=>{
         const s = r.payStatus || '';
@@ -4716,6 +4717,7 @@ function renderPaymentTargets() {
       '임차인명': x.name,
       '연락처': x.phone,
       '청구횟수': vacancy.billCount ? String(vacancy.billCount).replace(/회+$/,'')+'회' : '—',
+      '연체율': _vldPct(vacancy.dlqRate),
       '공실상태': vacancy.status || '—',
       '당월납부상태': r.payStatus || '—',
       '수납대상여부': catLabel,
@@ -4782,13 +4784,14 @@ function renderPaymentTargets() {
       <div style="padding:10px 20px 4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${chips}<button onclick="ptGenFirstSms()" style="margin-left:auto;background:#0EA5E9;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📩 첫납부문자</button><button onclick="ptGenDelinqSms()" style="background:#DC2626;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📩 전월연체문자</button><button onclick="downloadPtExcel()" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ 엑셀 다운로드</button></div>
       <div style="padding:4px 20px 8px;font-size:11px;color:#8A9AB5">표시 ${display.length}건</div>
       <div style="overflow-x:auto"><table class="pt-table">
-        <colgroup><col style="width:3%"><col style="width:6%"><col style="width:10%"><col style="width:8%"><col style="width:5%"><col style="width:6%"><col style="width:8%"><col style="width:7%"><col style="width:6%"><col style="width:8%"><col style="width:8%"><col style="width:19%"><col style="width:6%"></colgroup>
+        <colgroup><col style="width:3%"><col style="width:6%"><col style="width:9%"><col style="width:8%"><col style="width:5%"><col style="width:5%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:18%"><col style="width:6%"></colgroup>
         <thead><tr>
           <th style="width:30px;text-align:center"><input type="checkbox" onchange="ptSelectAll(this.checked)" title="전체 선택"></th>
           <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">계약번호<span class="pt-sort-arrow"></span></th>
           <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">임(전)차인명<span class="pt-sort-arrow"></span></th>
           <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">연락처<span class="pt-sort-arrow"></span></th>
           <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">청구횟수<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="gid=1953907648 BZ열 연체비율">연체율<span class="pt-sort-arrow"></span></th>
           <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">공실상태<span class="pt-sort-arrow"></span></th>
           <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">당월납부상태<span class="pt-sort-arrow"></span></th>
           <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">수납대상여부<span class="pt-sort-arrow"></span></th>
