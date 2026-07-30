@@ -7720,7 +7720,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v485</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v486</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
@@ -18120,7 +18120,8 @@ function sumRenderDailyCard(){
     +   '<span class="sum-cfg-sep"></span>'
     +   '<span style="color:#6B7280;font-size:10.5px">핑크 라인 = <b style="color:#EC4899">오늘(' + todayDay + '일) 자동</b> 기준 누적</span>'
     + '</div>'
-    + '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 누적 막대 — 진한 색 ' + titleVerb + ' (체크포인트 ' + cfg.day1 + '일까지) · 중간 색 (오늘 ' + todayDay + '일까지) · 연한 색 (오늘 이후, 미래 영업)</div>') : '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 ' + unitLabel + ' ' + titleVerb + ' 건수</div>'))
+    + '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 누적 막대 — 진한 색 ' + titleVerb + ' (체크포인트 ' + cfg.day1 + '일까지) · 중간 색 (오늘 ' + todayDay + '일까지) · 연한 색 (오늘 이후, 미래 영업)</div>'
+    + '<div id="sumTentBrief"></div>') : '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 ' + unitLabel + ' ' + titleVerb + ' 건수</div><div id="sumTentBrief"></div>'))
     + ''
     + '<div style="position:relative;height:380px"><canvas id="sumDailyChart"></canvas></div>'
     + '<div class="sum-insight-row" id="sumDailyInsight"></div>';
@@ -18164,6 +18165,86 @@ function sumBuildValidData(){
   buckets.forEach(function(b){ cum += b.neu - b.exp - b.ear; b.valid = cum; });
   return { rows: buckets, base: base };
 }
+// [v486] 브리핑 공용 헬퍼
+function _bfPd(s){ var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; }
+function _bfNum(x){ return parseFloat(String(x||'').replace(/[^0-9.]/g,''))||0; }
+function _bfMil(n){ return '₩'+(Math.round(n/100000)/10)+'M'; }
+function _bfPct(c,p){ return p? (Math.round((c-p)/p*1000)/10) : 0; }
+function _bfArrow(c,p){ var d=_bfPct(c,p); return (d>0?'▲':d<0?'▼':'–')+Math.abs(d)+'%'; }
+function _bfMM(lb){ var m=String(lb).match(/(\d{2})\.(\d{2})/); return m?{y:2000+ +m[1],m:+m[2]}:null; }
+function _bfInM(d,o){ return d&&d.getFullYear()===o.y&&d.getMonth()===o.m-1; }
+// 영업 한줄 평 — 파트너 증감 + 지역 특징 (dateField: startDate | tentativeDate)
+function _bfSalesLine(A,B,verb){
+  var grp=function(arr,f){var o={};arr.forEach(function(v){var k=(f(v)||'').trim()||'미지정';o[k]=(o[k]||0)+1;});return o;};
+  var pA=grp(A,function(v){return String(v.partnerName||'');}), pB=grp(B,function(v){return String(v.partnerName||'');});
+  var keys={}; Object.keys(pA).forEach(function(k){keys[k]=1;}); Object.keys(pB).forEach(function(k){keys[k]=1;});
+  var D=Object.keys(keys).filter(function(k){return k!=='미지정';}).map(function(k){
+    var c=pA[k]||0,p=pB[k]||0; return {k:k,c:c,p:p,d:c-p,pct:p?Math.round((c-p)/p*100):null};
+  }).sort(function(x,y){return y.d-x.d;});
+  var up=D.filter(function(x){return x.d>0;}).slice(0,2);
+  var dn=D.filter(function(x){return x.d<0;}).sort(function(x,y){return x.d-y.d;}).slice(0,2);
+  var fx=function(x){ return x.k+' '+x.p+'→'+x.c+'건'+(x.pct===null?'(신규)':'('+(x.pct>0?'+':'')+x.pct+'%)'); };
+  var gu=function(v){var a=String(v.propAddr||'');var m=a.match(/([가-힣]{2,}(?:구|시|군))/);return m?m[1]:'';};
+  var gA=grp(A,gu), gB=grp(B,gu);
+  var gk={}; Object.keys(gA).forEach(function(k){gk[k]=1;}); Object.keys(gB).forEach(function(k){gk[k]=1;});
+  var G=Object.keys(gk).filter(function(k){return k!=='미지정';}).map(function(k){return {k:k,d:(gA[k]||0)-(gB[k]||0)};})
+    .sort(function(x,y){return y.d-x.d;}).filter(function(x){return x.d>0;}).slice(0,2);
+  var tp=_bfPct(A.length,B.length);
+  return '<b>전월 대비 '+(verb||'신규입주')+' '+A.length+'건 ('+(tp>=0?'+':'')+tp+'%, '+B.length+'→'+A.length+')</b>. '
+    + (up.length? '성장 '+up.map(fx).join(' · ') : '성장 파트너 없음')
+    + (dn.length? ' / 하락 '+dn.map(fx).join(' · ') : '')
+    + (G.length? ' — 지역은 '+G.map(function(x){return x.k+' +'+x.d+'건';}).join(' · ')+' 집중.' : '.');
+}
+function _bfBox(tag,color,bg,txt,body){
+  return '<div style="background:'+bg+';border-left:4px solid '+color+';border-radius:0 7px 7px 0;padding:7px 11px;font-size:11px;color:'+txt+';line-height:1.6">'
+    +'<span style="display:inline-block;background:'+color+';color:#fff;font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:9px;margin-right:6px">'+tag+'</span>'+body+'</div>';
+}
+
+// [v486] 월별 가계약 추이 상단 2줄 브리핑 — ① 영업 ② 경영(재무 지표 증감)
+function _tentBriefHTML(){
+  try{
+    var V=Array.isArray(vacancyRawData)?vacancyRawData:[];
+    if(!V.length) return '';
+    var cfg=window._sumChartCfg||{};
+    var fld = (cfg.basis==='startDate') ? 'startDate' : 'tentativeDate';
+    var verb= (cfg.basis==='startDate') ? '입주' : '가계약';
+    var endD = (typeof cmgParseStartDate==='function' && cfg.end) ? cmgParseStartDate(cfg.end) : new Date();
+    if(!endD) endD=new Date();
+    var cur={y:endD.getFullYear(), m:endD.getMonth()+1};
+    var pm=new Date(cur.y, cur.m-2, 1), prv={y:pm.getFullYear(), m:pm.getMonth()+1};
+    var pick=function(o){ return V.filter(function(v){ return _bfInM(_bfPd(v[fld]),o); }); };
+    var A=pick(cur), B=pick(prv);
+    if(!A.length && !B.length) return '';
+    var agg=function(arr){
+      var r={cnt:arr.length,rent:0,fee:0,brk:0,dlq:0,rentN:0};
+      arr.forEach(function(v){
+        var rt=_bfNum(v.rent); r.rent+=rt; if(rt>0) r.rentN++;
+        r.fee+=_bfNum(v.fee); r.dlq+=_bfNum(v.dlqAmt);
+        var tm=_vldMonths(v.startDate,v.endDate);
+        if(!(tm!=null&&tm<12) && typeof calcBrokerage==='function'){
+          r.brk += _bfNum(calcBrokerage(_bfNum(v.deposit), rt, v.housingType));
+        }
+      });
+      r.avgRent = r.rentN? Math.round(r.rent/r.rentN) : 0;
+      return r;
+    };
+    var a=agg(A), b=agg(B);
+    var net=a.fee-a.brk, netP=b.fee-b.brk;
+    var line2 = '<b>계약 '+a.cnt+'건 '+_bfArrow(a.cnt,b.cnt)+'</b> · '
+      + '평균 임대료 ₩'+a.avgRent.toLocaleString()+' '+_bfArrow(a.avgRent,b.avgRent)+' · '
+      + '서비스 수수료 '+_bfMil(a.fee)+' '+_bfArrow(a.fee,b.fee)+' · '
+      + '중개보수 지출예정 '+_bfMil(a.brk)+' '+_bfArrow(a.brk,b.brk)+' · '
+      + '임대인 정산예정 임대료 '+_bfMil(a.rent)+' '+_bfArrow(a.rent,b.rent)+' · '
+      + '발생 연체 '+_bfMil(a.dlq)+' '+_bfArrow(a.dlq,b.dlq)
+      + ' → <b>순수익(수수료−중개보수) '+_bfMil(net)+' '+_bfArrow(net,netP)+'</b>'
+      + (net<0 ? ' ⚠ 획득비 초과 — 이번 달 계약은 회수까지 시간 필요.' : '.');
+    return '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:9px">'
+      + _bfBox('영업','#2E9E6B','#F0FDF4','#14532D', _bfSalesLine(A,B,verb))
+      + _bfBox('경영','#1B62D6','#EFF6FF','#1E3A8A', line2)
+      + '</div>';
+  }catch(e){ return ''; }
+}
+
 // [v485] 유효계약수 차트 상단 2줄 브리핑 — ① 영업(파트너·지역) ② 경영(계약 대비 퇴실)
 function _vldBriefHTML(rows){
   try{
@@ -18679,6 +18760,7 @@ function sumDrawDailyChart(){
     try { window._sumDailyChartInstance.destroy(); } catch(e){}
   }
   var months = sumBuildMonthlyData();
+  try{ var _tb=document.getElementById('sumTentBrief'); if(_tb) _tb.innerHTML=_tentBriefHTML(); }catch(e){}   // [v486]
   var cfg = window._sumChartCfg;
   var titleVerb = cfg.basis === 'startDate' ? '입주' : '가계약';
   var today = new Date();
