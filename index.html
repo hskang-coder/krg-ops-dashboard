@@ -18241,6 +18241,16 @@ function sumDrawValidChart(){
       + '<div style="margin-left:auto;color:#9CA3AF;font-size:10px">이탈률 약 '+churn+'%'+(tM>tE?' · 중도퇴실 > 만기퇴실 (중도이탈 관리 필요)':'')+'</div>';
   }
 }
+// [v481] 거주기간(개월) — 시작일~퇴실일. 만기 하루 전 종료도 만월로 계산 (예: 25.6.20~26.6.19 = 12개월)
+function _vldMonths(startRaw, endRaw){
+  var p=function(s){ var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; };
+  var s=p(startRaw), e=p(endRaw);
+  if(!s||!e) return null;
+  var e2=new Date(e.getFullYear(), e.getMonth(), e.getDate()+1);  // 종료일 다음날 기준 = 실제 점유 종료 시점
+  var n=(e2.getFullYear()-s.getFullYear())*12 + (e2.getMonth()-s.getMonth());
+  if(e2.getDate() < s.getDate()) n--;
+  return n<0?0:n;
+}
 // [v478] 연체비율 % 변환 — 시트가 비율을 통화(₩1=100%)나 0.5(=50%) 형태로 저장 → 퍼센트 문자열로 정규화
 function _vldPct(raw){
   var s=String(raw==null?'':raw).trim();
@@ -18278,7 +18288,8 @@ function _vldOpenList(bucketLabel, kind){
       rows.push({cno:_cno, nm:v.tenant1Name||v.tenantName||'-', tel:v.tenantPhone||'-',
         addr:[v.propAddr,v.propBuilding,v.propRoom].filter(Boolean).join(' '),
         start:v.startDate||'-', end:v.endDate||'-', term:v.terminateDate||'-', rent:v.rent||'-',
-        living:v.livingMonths||'-', clean:v.cleanFee||'-',
+        living:(function(){ var m=_vldMonths(v.startDate, v.terminateDate); return m!=null? m : (v.livingMonths||'-'); })(),  // [v481] 만기 기준 재계산
+        clean:v.cleanFee||'-',
         dlqAmt:v.dlqAmt||'-', dlqRate:_vldPct(v.dlqRate), vacStatus:v.status||'-', kindTxt:v.jValue||v.status||''});  // [v475/v476/v478] 연체액=CC열 · 연체비율=BZ열(%변환)
     });
     // [v473] 정렬 — 헤더 클릭 시 오름/내림 (기본: 계약번호 오름차순)
