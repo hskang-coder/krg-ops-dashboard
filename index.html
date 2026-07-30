@@ -18265,8 +18265,20 @@ function _vldOpenList(bucketLabel, kind){
         living:v.livingMonths||'-', clean:v.cleanFee||'-',
         dlqAmt:_c['연체금액']||'-', vacStatus:v.status||'-', kindTxt:v.jValue||v.status||''});
     });
-    rows.sort(function(a,b){ return String(a.cno).localeCompare(String(b.cno)); });
+    // [v473] 정렬 — 헤더 클릭 시 오름/내림 (기본: 계약번호 오름차순)
+    var _sk=(window.__vldSort&&window.__vldSort.key)||'cno', _sd=(window.__vldSort&&window.__vldSort.dir)||'asc';
+    var _numF={living:1,rent:1,clean:1,dlqAmt:1};
+    var _val=function(o,k){ var v=o[k]; if(v==null)return ''; if(_numF[k]) return parseFloat(String(v).replace(/[^0-9.\-]/g,''))||0;
+      if(k==='start'||k==='term'||k==='end'){ var m=String(v).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(+m[1])*10000+(+m[2])*100+(+m[3]):0; }
+      return String(v); };
+    rows.sort(function(a,b){
+      var x=_val(a,_sk), y=_val(b,_sk), r;
+      if(typeof x==='number'&&typeof y==='number') r=x-y; else r=String(x).localeCompare(String(y),'ko');
+      if(r===0) r=String(a.cno).localeCompare(String(b.cno));
+      return _sd==='desc'? -r : r;
+    });
     window.__vldListRows=rows;
+    window.__vldCtx={bucket:bucketLabel, kind:kind};
     var col={'신규입주':'#2E9E6B','만기퇴실':'#E8A33D','중도퇴실':'#E24B4A'}[kind]||'#1B3976';
     var prev=document.getElementById('vldListModal'); if(prev)prev.remove();
     var ov=document.createElement('div'); ov.id='vldListModal';
@@ -18278,7 +18290,11 @@ function _vldOpenList(bucketLabel, kind){
       : (kind==='중도퇴실')
       ? [{h:'시작일',f:'start',a:'left'},{h:'퇴실일',f:'term',a:'left'},{h:'거주기간(M)',f:'living',a:'center'},{h:'연체금액',f:'dlqAmt',a:'right'},{h:'공실상태',f:'vacStatus',a:'left'}]
       : [{h:'입주일',f:'start',a:'left'},{h:'만기일',f:'end',a:'left'},{h:'임대료',f:'rent',a:'right'},{h:'연락처',f:'tel',a:'left'}];
-    var thExtra = COLS.map(function(c){ return '<th style="padding:6px 9px;text-align:'+c.a+'">'+c.h+'</th>'; }).join('');
+    // [v473] 정렬 가능한 헤더 (현재 정렬 컬럼에 ▲/▼)
+    var _arr=function(f){ return _sk===f ? (_sd==='asc'?' ▲':' ▼') : '<span style="opacity:.28">⇅</span>'; };
+    var _th=function(h,f,a){ return '<th onclick="_vldSortBy(\''+f+'\')" style="padding:6px 9px;text-align:'+a+';cursor:pointer;user-select:none;white-space:nowrap"'+(_sk===f?' data-on="1"':'')+'>'+h+_arr(f)+'</th>'; };
+    var thExtra = COLS.map(function(c){ return _th(c.h,c.f,c.a); }).join('');
+    var thFixed = _th('계약번호','cno','left')+_th('임(전)차인','nm','left')+_th('물건지','addr','left');
     var colCount = 4 + COLS.length;
     var body=rows.map(function(r,i){
       var tds = COLS.map(function(c){
@@ -18312,11 +18328,18 @@ function _vldOpenList(bucketLabel, kind){
       +  '</span></div>'
       +'<div style="display:flex;gap:5px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #F1F5F9;background:#FCFDFF"><span style="font-size:10.5px;color:#94A3B8;font-weight:700;align-self:center;margin-right:2px">구분 전환</span>'+tabs+'</div>'
       +'<div style="overflow:auto;padding:0 6px 6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-      +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th><th style="padding:6px 9px;text-align:left">계약번호</th><th style="padding:6px 9px;text-align:left">임(전)차인</th><th style="padding:6px 9px;text-align:left">물건지</th>'+thExtra+'</tr></thead>'
+      +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th>'+thFixed+thExtra+'</tr></thead>'
       +'<tbody>'+body+'</tbody></table></div>'
       +'<div style="padding:7px 16px;border-top:1px solid #EEF2F7;font-size:10.5px;color:#94A3B8">계약번호 클릭 → 계약상세 이동</div></div>';
     document.body.appendChild(ov);
   }catch(e){ console.warn('[vldList]',e); }
+}
+// [v473] 명단 정렬 토글 — 같은 컬럼 재클릭 시 오름/내림 전환
+function _vldSortBy(key){
+  var s=window.__vldSort||{key:'cno',dir:'asc'};
+  window.__vldSort = (s.key===key) ? {key:key, dir:(s.dir==='asc'?'desc':'asc')} : {key:key, dir:'asc'};
+  var ctx=window.__vldCtx||{};
+  if(ctx.bucket && ctx.kind) _vldOpenList(ctx.bucket, ctx.kind);
 }
 function _vldListExcel(){
   var rows=window.__vldListRows||[];
