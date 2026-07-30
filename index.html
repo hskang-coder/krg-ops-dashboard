@@ -2098,6 +2098,7 @@ function parseVacancySheet(resp) {
   const rentIdx        = findColIdx(labels, ['임대료'],            36);  // AK (월세+부가세+관리비 합계)
   const feeIdx         = findColIdx(labels, ['수수료','서비스수수료'], 37); // AL
   const cleanFeeIdx    = findColIdx(labels, ['퇴실청소비'],        38);  // AM [v472] 퇴실청소비
+  const dlqAmtIdx      = 80;  // CC열 [v475] 연체액(금액) — 라벨 '연체금액'(idx81)은 %값이라 위치 고정
   const landlordIdx    = findColIdx(labels, ['임대인명'],          39);  // AO  ← AM열 추가시 자동 보정
   const payMethodIdx   = findColIdx(labels, ['월세납입형태','납부방법','납입형태','선후불'], 40); // AO (v311) 선불/후불
   const landlordPhoneIdx= findColIdx(labels, ['임대인연락처','임대인 연락처'], 41); // AP/AQ
@@ -2186,6 +2187,7 @@ let outsourceIdx = findColIdx(labels, ['연체외주','연체 외주'], 71);
       housingType:   cell(housingTypeIdx),   // N열: 주택/상가
       useType:       cell(useTypeIdx),        // [v464] N열(계약형태): 주거용/상업용
       cleanFee:      cell(cleanFeeIdx),       // [v472] AM열: 퇴실청소비
+      dlqAmt:        cell(dlqAmtIdx),         // [v475] CC열: 연체액(금액)
       callChk:    (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[callChkIdx] && (c[callChkIdx].v != null ? c[callChkIdx].v : c[callChkIdx].f)),   // [v466] CM 통화 확인
       smsChk:     (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[smsChkIdx] && (c[smsChkIdx].v != null ? c[smsChkIdx].v : c[smsChkIdx].f)),      // [v466] CN 문자 확인
       partnerName:   cell(partnerNameIdx),   // BL열: 부동산명
@@ -18258,12 +18260,11 @@ function _vldOpenList(bucketLabel, kind){
       if(kind==='만기퇴실' && isMid(v)) return;
       if(kind==='중도퇴실' && !isMid(v)) return;
       var _cno=String(v.no||'').trim();
-      var _c=(Array.isArray(contractRawData)?contractRawData:[]).find(function(x){ return String(x['계약번호']||'').trim()===_cno; })||{};
       rows.push({cno:_cno, nm:v.tenant1Name||v.tenantName||'-', tel:v.tenantPhone||'-',
         addr:[v.propAddr,v.propBuilding,v.propRoom].filter(Boolean).join(' '),
         start:v.startDate||'-', end:v.endDate||'-', term:v.terminateDate||'-', rent:v.rent||'-',
         living:v.livingMonths||'-', clean:v.cleanFee||'-',
-        dlqAmt:_c['연체금액']||'-', vacStatus:v.status||'-', kindTxt:v.jValue||v.status||''});
+        dlqAmt:v.dlqAmt||'-', vacStatus:v.status||'-', kindTxt:v.jValue||v.status||''});  // [v475] 연체액 = gid=1953907648 CC열
     });
     // [v473] 정렬 — 헤더 클릭 시 오름/내림 (기본: 계약번호 오름차순)
     var _sk=(window.__vldSort&&window.__vldSort.key)||'cno', _sd=(window.__vldSort&&window.__vldSort.dir)||'asc';
