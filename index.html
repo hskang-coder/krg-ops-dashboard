@@ -7720,7 +7720,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v491</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v492</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
@@ -18494,17 +18494,17 @@ function _vldAnalysis(bucketLabel, kind){
         +'<span style="margin-left:auto;background:'+(warn?'#FEE2E2':'#DCFCE7')+';color:'+(warn?'#B91C1C':'#15803D')+';font-size:10px;font-weight:800;padding:2px 9px;border-radius:9px">'+(warn?'⚠ LTV 개선 필요':'LTV 양호')+'</span></div>'
         +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:7px">'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">평균 거주기간</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+aE+'<span style="font-size:10.5px">개월</span></div></div>'
-        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">계약당 LTV</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+mil(ltv)+'</div></div>'
+        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">계약당 LTV <span style="color:#C99A5B">(한 명이 벌어준 총 수수료)</span></div><div style="font-size:16px;font-weight:800;color:#B5730F">'+mil(ltv)+'</div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#92400E">1차 갱신율 ('+rnLbl+' 입주)</div><div style="font-size:16px;font-weight:800;color:'+(rate>=60?'#15803D':'#B91C1C')+'">'+rate+'%<span style="font-size:10.5px;font-weight:700;color:'+(C1.pureRate>=60?'#15803D':'#B5730F')+'"> · 순 '+C1.pureRate+'%</span></div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#92400E">1차 갱신 현황</div><div style="font-size:13px;font-weight:800;color:#374151">대상 '+due+'명 · 갱신 <b style="color:#15803D">'+renew+'</b> · 미갱신 <b style="color:#DC2626">'+(due-renew)+'</b><span style="font-size:9.5px;font-weight:400;color:#94A3B8"> (중도 '+C1.mid+' 제외 시 모수 '+C1.pureDue+')</span></div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">이탈 임대료</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+mil(expRent)+'<span style="font-size:10px">/월</span></div></div>'
         +'</div>'
         + _cohTable
         +'<div style="background:#FFF7ED;border-left:3px solid #E8A33D;padding:6px 10px;font-size:10.5px;color:#9A3412;line-height:1.65">'
-        +'<b>의사결정</b> — 목표 LTV '+TARGET+'개월 대비 <b>'+pctT+'%</b>. '
-        +(warn?('평균 '+aE+'개월은 <b>1회 갱신 전 이탈</b> 구간 → 갱신율 개선이 LTV 최대 레버 (갱신 1건당 약 '+mil(12*avgFee)+' 추가).'):'목표 도달 — 현 갱신 정책 유지.')
-        +'<br><b>퇴실 증가 원인</b> — 1차 모수('+rnLbl+' 입주 '+C1.newIn+'명)가 전년 동월('+(C2?C2.lbl+' '+C2.newIn+'명':'-')+') 대비 <b>'+(volX?volX+'배':'-')+'</b>, 1차 갱신율 <b>'+rate+'%</b>'+(C2?(' (전년 '+C2.rate+'%)'):'')+'. '
-        +(volX>=2 ? '→ <b>모수 확대가 주원인</b>, 갱신율은 '+(C2&&rate>=C2.rate?'개선/유지':'악화')+'.' : '→ <b>갱신율 변화가 주원인</b> — 모수는 유사.')
+        +'<b>쉽게 말하면</b> — 한 명이 오래 살수록 수수료를 오래 받습니다. 목표는 <b>'+TARGET+'개월(2년)</b>인데 지금은 평균 <b>'+aE+'개월</b>, 목표의 <b>'+pctT+'%</b>입니다. '
+        +(warn?('즉 <b>1년 채우고 재계약 직전에 나가는 사람이 많다</b>는 뜻입니다. 재계약 1건을 살리면 1년치 수수료 약 '+mil(12*avgFee)+'이 더 들어옵니다.'):'목표에 도달했습니다 — 지금 방식을 유지하세요.')
+        +'<br><b>이번 달 퇴실이 많은 이유</b> — 1년 전('+rnLbl+') 들어온 사람이 <b>'+C1.newIn+'명</b>으로, 그 전 해('+(C2?C2.lbl+' '+C2.newIn+'명':'-')+')보다 <b>'+(volX?volX+'배':'-')+'</b> 많았습니다. 그때 많이 받았으니 지금 만기도 몰린 것입니다. 재계약 성공률은 <b>'+rate+'%</b>'+(C2?(' (작년 '+C2.rate+'%)'):'')+'. '
+        +(volX>=2 ? '→ <b>사람이 많아져서 생긴 일</b>이고, 재계약률 자체는 '+(C2&&rate>=C2.rate?'나아졌습니다':'나빠졌습니다')+'.' : '→ 인원은 비슷하니 <b>재계약률 변화가 원인</b>입니다.')
         +'</div></div>';
     }
     var aM=avg(midA), aE2=avg(expA)||TARGET, gap=Math.round(Math.max(0,aE2-aM)*10)/10;   // [v491] 부동소수점 반올림
@@ -18517,12 +18517,13 @@ function _vldAnalysis(bucketLabel, kind){
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#B91C1C">평균 거주기간</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+aM+'<span style="font-size:10.5px">개월</span></div></div>'
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#B91C1C">연체 피해액</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(midDlq)+'</div></div>'
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:130px"><div style="font-size:10px;color:#B91C1C">강제퇴실(공실)</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+midForce+'<span style="font-size:10.5px">건</span> <span style="font-size:11px;color:#94A3B8">/ 연체보유 '+midDlqCnt+'</span></div></div>'
-      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:130px"><div style="font-size:10px;color:#B91C1C">LTV 손실(조기이탈)</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(lossLtv)+'</div></div>'
-      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#B91C1C">미회수 획득비</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(cac)+'</div></div>'
+      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:130px"><div style="font-size:10px;color:#B91C1C">LTV 손실 <span style="color:#E08585">(일찍 나가서 못 번 돈)</span></div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(lossLtv)+'</div></div>'
+      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#B91C1C">미회수 획득비 <span style="color:#E08585">(못 건진 중개보수)</span></div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(cac)+'</div></div>'
       +'</div>'
       +'<div style="background:#FEF2F2;border-left:3px solid #E24B4A;padding:6px 10px;font-size:10.5px;color:#991B1B;line-height:1.65">'
-      +'<b>선조치</b> — 중도 '+aM+'개월 vs 만기 '+aE2+'개월 → <b>'+gap+'개월 조기 이탈</b>, 계약당 손실 약 '+mil(gap*avgFee)+'. '
-      +(midDlqCnt>0?('현재 <b>연체 보유 '+midDlqCnt+'건</b>은 피해액 확대 전 즉시 개입 대상 (강제퇴실 '+midForce+'건 발생).'):'연체 미발생 — 자진 퇴실 사유 점검 필요.')
+      +'<b>쉽게 말하면</b> — 계약을 끝까지 채운 사람은 평균 <b>'+aE2+'개월</b> 살았는데, 중간에 나간 사람은 <b>'+aM+'개월</b>만 살았습니다. '
+      +'<b>'+gap+'개월 일찍 나간 셈</b>이라 한 명당 수수료 약 '+mil(gap*avgFee)+'을 못 벌었고, '+midA.length+'명이면 '+mil(lossLtv)+'입니다. '
+      +(midDlqCnt>0?('지금 월세가 밀린 사람이 <b>'+midDlqCnt+'명</b> 있는데, 이미 <b>'+midForce+'명</b>은 못 내서 내보냈습니다. → <b>밀린 돈이 커지기 전에 지금 연락해야 합니다.</b>'):'월세를 밀린 사람은 없습니다 → 왜 스스로 나갔는지 이유를 확인해 보세요.')
       +'</div></div>';
   }catch(e){ return ''; }
 }
