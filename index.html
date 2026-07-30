@@ -7720,7 +7720,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v469</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v483</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
@@ -18266,17 +18266,56 @@ function _vldAnalysis(bucketLabel, kind){
     var avgFee=active?Math.round(actFee/active):0;
     var money=function(n){ return '₩'+Math.round(n).toLocaleString(); };
     var mil=function(n){ return '₩'+(Math.round(n/100000)/10)+'M'; };
-    // [v482] 갱신 기준 — 시작일이 13~14개월 전이고 아직 계약중이면 '갱신', 그 시점 만기 도래 모수 대비
-    var base=new Date(Y,M-1,1);
-    var lo=new Date(base.getFullYear(), base.getMonth()-14, 1), hi=new Date(base.getFullYear(), base.getMonth()-13+1, 0);
-    var due=0, renew=0;
-    V.forEach(function(v){
-      var s=pd(v.startDate); if(!s||s<lo||s>hi) return;
-      due++;
-      var k=String(v.contractKind||'');
-      if(k==='정상'||k==='계약중') renew++;
-    });
-    var rate=due?Math.round(renew/due*1000)/10:0;
+    // [v483] 갱신 차수별 코호트 분석
+    //  · N차 모수 = 버킷월 기준 정확히 12N개월 전 '같은 달'에 입주한 계약
+    //  · 단기계약(계약기간 12개월 미만)은 갱신 대상이 아니므로 제외
+    //  · 직전 차수를 통과한 건(거주 12*(N-1)개월 이상)만 이번 차수 모수에 포함 (조건부 갱신율)
+    //  · 모수 중 현재도 '정상/계약중'이면 갱신, 그 외는 미갱신(중도퇴실 포함)
+    var bEnd=new Date(Y,M,0);
+    var _alive=function(v){ var k=String(v.contractKind||'').trim(); return k==='정상'||k==='계약중'; };
+    var _live=function(v){
+      var t=pd(v.terminateDate);
+      return _vldMonths(v.startDate, (t&&t<=bEnd)? v.terminateDate : (Y+'-'+M+'-'+bEnd.getDate())) || 0;
+    };
+    var COH=[];
+    for(var _n=1;_n<=4;_n++){
+      (function(N){
+        var cm=new Date(Y, M-1-12*N, 1);
+        var clo=new Date(cm.getFullYear(), cm.getMonth(), 1), chi=new Date(cm.getFullYear(), cm.getMonth()+1, 0);
+        var newIn=0, shortEx=0, due=0, rn=0, midOut=0, expOut=0;
+        V.forEach(function(v){
+          var s=pd(v.startDate); if(!s||s<clo||s>chi) return;
+          newIn++;
+          var tm=_vldMonths(v.startDate, v.endDate);
+          if(tm!=null && tm<12){ shortEx++; return; }       // 단기계약 제외
+          if(_live(v) < 12*(N-1)) return;                   // 직전 차수 미통과
+          due++;
+          if(_alive(v)) rn++; else if(isMid(v)) midOut++; else expOut++;
+        });
+        COH.push({ n:N, lbl:String(clo.getFullYear()).slice(2)+'.'+('0'+(clo.getMonth()+1)).slice(-2),
+          newIn:newIn, shortEx:shortEx, due:due, renew:rn, no:due-rn, mid:midOut, exp:expOut,
+          rate: due?Math.round(rn/due*1000)/10:0 });
+      })(_n);
+    }
+    var C1=COH[0], C2=COH[1];
+    var due=C1.due, renew=C1.renew, rate=C1.rate, rnLbl=C1.lbl;
+    // 모수 효과 진단 — 1차 코호트 신규입주가 직전 연도 대비 몇 배인지
+    var volX = (C2 && C2.newIn) ? Math.round(C1.newIn/C2.newIn*10)/10 : 0;
+    var _cohTable = '<div style="background:#fff;border-radius:7px;padding:7px 10px;margin-bottom:7px">'
+      +'<div style="font-size:10px;color:#92400E;font-weight:700;margin-bottom:5px">갱신 차수별 현황 <span style="font-weight:400;color:#94A3B8">· 단기계약 제외 · 직전 차수 통과자 기준</span></div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:10.5px">'
+      +'<tr style="background:#FFFBEB;color:#92400E"><th style="padding:3px 6px;text-align:left">차수</th><th style="padding:3px 6px;text-align:left">입주월</th><th style="padding:3px 6px;text-align:right">신규</th><th style="padding:3px 6px;text-align:right">대상</th><th style="padding:3px 6px;text-align:right">갱신</th><th style="padding:3px 6px;text-align:right">미갱신</th><th style="padding:3px 6px;text-align:right">갱신율</th></tr>'
+      + COH.map(function(c){
+          return '<tr style="border-top:1px solid #F1F5F9">'
+            +'<td style="padding:3px 6px;font-weight:700;color:#B5730F">'+c.n+'차</td>'
+            +'<td style="padding:3px 6px;color:#64748B">'+c.lbl+'</td>'
+            +'<td style="padding:3px 6px;text-align:right;color:#64748B">'+c.newIn+(c.shortEx?'<span style="color:#CBD5E1">(-'+c.shortEx+')</span>':'')+'</td>'
+            +'<td style="padding:3px 6px;text-align:right;font-weight:700">'+c.due+'</td>'
+            +'<td style="padding:3px 6px;text-align:right;font-weight:700;color:#15803D">'+c.renew+'</td>'
+            +'<td style="padding:3px 6px;text-align:right;font-weight:700;color:#DC2626">'+c.no+(c.mid?'<span style="font-size:9px;color:#94A3B8"> (중도'+c.mid+')</span>':'')+'</td>'
+            +'<td style="padding:3px 6px;text-align:right;font-weight:800;color:'+(c.rate>=60?'#15803D':c.rate>=40?'#B5730F':'#DC2626')+'">'+c.rate+'%</td></tr>';
+        }).join('')
+      +'</table></div>';
     var TARGET=24;  // 목표 LTV(개월)
     if(kind==='만기퇴실'){
       var aE=avg(expA), ltv=aE*avgFee, tgt=TARGET*avgFee, pctT=tgt?Math.round(ltv/tgt*1000)/10:0;
@@ -18288,13 +18327,16 @@ function _vldAnalysis(bucketLabel, kind){
         +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:7px">'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">평균 거주기간</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+aE+'<span style="font-size:10.5px">개월</span></div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">계약당 LTV</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+mil(ltv)+'</div></div>'
-        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:130px"><div style="font-size:10px;color:#92400E">갱신율 (13~14개월 전 시작)</div><div style="font-size:16px;font-weight:800;color:'+(rate>=60?'#15803D':'#B91C1C')+'">'+rate+'%</div></div>'
-        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#92400E">갱신 현황</div><div style="font-size:13px;font-weight:800;color:#374151">대상 '+due+'명 · 갱신 <b style="color:#15803D">'+renew+'</b> · 미갱신 <b style="color:#DC2626">'+(due-renew)+'</b></div></div>'
+        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:130px"><div style="font-size:10px;color:#92400E">1차 갱신율 ('+rnLbl+' 입주)</div><div style="font-size:16px;font-weight:800;color:'+(rate>=60?'#15803D':'#B91C1C')+'">'+rate+'%</div></div>'
+        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#92400E">1차 갱신 현황</div><div style="font-size:13px;font-weight:800;color:#374151">대상 '+due+'명 · 갱신 <b style="color:#15803D">'+renew+'</b> · 미갱신 <b style="color:#DC2626">'+(due-renew)+'</b></div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">이탈 임대료</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+mil(expRent)+'<span style="font-size:10px">/월</span></div></div>'
         +'</div>'
+        + _cohTable
         +'<div style="background:#FFF7ED;border-left:3px solid #E8A33D;padding:6px 10px;font-size:10.5px;color:#9A3412;line-height:1.65">'
         +'<b>의사결정</b> — 목표 LTV '+TARGET+'개월 대비 <b>'+pctT+'%</b>. '
         +(warn?('평균 '+aE+'개월은 <b>1회 갱신 전 이탈</b> 구간 → 갱신율 개선이 LTV 최대 레버 (갱신 1건당 약 '+mil(12*avgFee)+' 추가).'):'목표 도달 — 현 갱신 정책 유지.')
+        +'<br><b>퇴실 증가 원인</b> — 1차 모수('+rnLbl+' 입주 '+C1.newIn+'명)가 전년 동월('+(C2?C2.lbl+' '+C2.newIn+'명':'-')+') 대비 <b>'+(volX?volX+'배':'-')+'</b>, 1차 갱신율 <b>'+rate+'%</b>'+(C2?(' (전년 '+C2.rate+'%)'):'')+'. '
+        +(volX>=2 ? '→ <b>모수 확대가 주원인</b>, 갱신율은 '+(C2&&rate>=C2.rate?'개선/유지':'악화')+'.' : '→ <b>갱신율 변화가 주원인</b> — 모수는 유사.')
         +'</div></div>';
     }
     var aM=avg(midA), aE2=avg(expA)||TARGET, gap=Math.max(0,aE2-aM);
