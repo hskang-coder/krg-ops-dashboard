@@ -7720,7 +7720,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v489</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v490</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
@@ -18465,21 +18465,21 @@ function _vldAnalysis(bucketLabel, kind){
     var volX = (C2 && C2.newIn) ? Math.round(C1.newIn/C2.newIn*10)/10 : 0;
     var _cohTable = '<div style="background:#fff;border-radius:7px;padding:7px 10px;margin-bottom:7px">'
       +'<div style="font-size:10px;color:#92400E;font-weight:700;margin-bottom:5px">갱신 차수별 현황 <span style="font-weight:400;color:#94A3B8">· 단기계약 제외 · 직전 차수 통과자 기준 · 대상 5명 미만은 표본부족(회색)</span></div>'
-      +'<table style="width:100%;border-collapse:collapse;font-size:10.5px">'
-      +'<tr style="background:#FFFBEB;color:#92400E"><th style="padding:3px 6px;text-align:left">차수</th><th style="padding:3px 6px;text-align:left">입주월</th><th style="padding:3px 6px;text-align:right">신규</th><th style="padding:3px 6px;text-align:right">대상</th><th style="padding:3px 6px;text-align:right">갱신</th><th style="padding:3px 6px;text-align:right">미갱신</th><th style="padding:3px 6px;text-align:right">갱신율</th><th style="padding:3px 6px;text-align:right;border-left:1px solid #FDE68A">순갱신율<div style="font-weight:400;font-size:8.5px;color:#B5730F">중도퇴실 제외</div></th></tr>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:10.5px;table-layout:fixed">'   /* [v490] 컬럼 폭 균등 */
+      +'<tr style="background:#FFFBEB;color:#92400E"><th style="padding:3px 6px;text-align:center;width:12.5%">차수</th><th style="padding:3px 6px;text-align:center;width:12.5%">입주월</th><th style="padding:3px 6px;text-align:center;width:12.5%">신규</th><th style="padding:3px 6px;text-align:center;width:12.5%">대상</th><th style="padding:3px 6px;text-align:center;width:12.5%">갱신</th><th style="padding:3px 6px;text-align:center;width:12.5%">미갱신</th><th style="padding:3px 6px;text-align:center;width:12.5%">갱신율</th><th style="padding:3px 6px;text-align:center;width:12.5%;border-left:1px solid #FDE68A">순갱신율<div style="font-weight:400;font-size:8.5px;color:#B5730F">중도퇴실 제외</div></th></tr>'
       + COH.map(function(c){
           var G='#9CA3AF';
           var cR = c.thin?G:(c.rate>=60?'#15803D':c.rate>=40?'#B5730F':'#DC2626');
           var cP = c.thin?G:(c.pureRate>=60?'#15803D':c.pureRate>=40?'#B5730F':'#DC2626');
           return '<tr style="border-top:1px solid #F1F5F9'+(c.thin?';background:#FAFAFA;opacity:.72':'')+'">'
-            +'<td style="padding:3px 6px;font-weight:700;color:'+(c.thin?G:'#B5730F')+'">'+c.n+'차</td>'
-            +'<td style="padding:3px 6px;color:'+(c.thin?G:'#64748B')+'">'+c.lbl+'</td>'
-            +'<td style="padding:3px 6px;text-align:right;color:'+(c.thin?G:'#64748B')+'">'+c.newIn+(c.shortEx?'<span style="color:#CBD5E1">(-'+c.shortEx+')</span>':'')+'</td>'
-            +'<td style="padding:3px 6px;text-align:right;font-weight:700;color:'+(c.thin?G:'inherit')+'">'+c.due+'</td>'
-            +'<td style="padding:3px 6px;text-align:right;font-weight:700;color:'+(c.thin?G:'#15803D')+'">'+c.renew+'</td>'
-            +'<td style="padding:3px 6px;text-align:right;font-weight:700;color:'+(c.thin?G:'#DC2626')+'">'+c.no+(c.mid?'<span style="font-size:9px;color:#94A3B8"> (중도'+c.mid+')</span>':'')+'</td>'
-            +'<td style="padding:3px 6px;text-align:right;font-weight:800;color:'+cR+'">'+c.rate+'%</td>'
-            +'<td style="padding:3px 6px;text-align:right;font-weight:800;border-left:1px solid #F1F5F9;color:'+cP+'">'
+            +'<td style="padding:3px 6px;text-align:center;font-weight:700;color:'+(c.thin?G:'#B5730F')+'">'+c.n+'차</td>'
+            +'<td style="padding:3px 6px;text-align:center;color:'+(c.thin?G:'#64748B')+'">'+c.lbl+'</td>'
+            +'<td style="padding:3px 6px;text-align:center;color:'+(c.thin?G:'#64748B')+'">'+c.newIn+(c.shortEx?'<span style="color:#CBD5E1">(-'+c.shortEx+')</span>':'')+'</td>'
+            +'<td style="padding:3px 6px;text-align:center;font-weight:700;color:'+(c.thin?G:'inherit')+'">'+c.due+'</td>'
+            +'<td style="padding:3px 6px;text-align:center;font-weight:700;color:'+(c.thin?G:'#15803D')+'">'+c.renew+'</td>'
+            +'<td style="padding:3px 6px;text-align:center;font-weight:700;color:'+(c.thin?G:'#DC2626')+'">'+c.no+(c.mid?'<span style="font-size:9px;color:#94A3B8"> (중도'+c.mid+')</span>':'')+'</td>'
+            +'<td style="padding:3px 6px;text-align:center;font-weight:800;color:'+cR+'">'+c.rate+'%</td>'
+            +'<td style="padding:3px 6px;text-align:center;font-weight:800;border-left:1px solid #F1F5F9;color:'+cP+'">'
             + (c.thin ? '<span style="font-size:9.5px;font-weight:700">표본부족</span>' : c.pureRate+'%<span style="font-size:9px;color:#94A3B8;font-weight:400"> ('+c.renew+'/'+c.pureDue+')</span>')
             +'</td></tr>';
         }).join('')
