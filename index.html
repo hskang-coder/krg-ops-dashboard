@@ -7720,7 +7720,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v483</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v484</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
@@ -18292,9 +18292,13 @@ function _vldAnalysis(bucketLabel, kind){
           due++;
           if(_alive(v)) rn++; else if(isMid(v)) midOut++; else expOut++;
         });
+        // 순갱신 모수 = 대상 − 중도퇴실(갱신 판단 기회가 없던 건)
+        var pureDue = due - midOut;
         COH.push({ n:N, lbl:String(clo.getFullYear()).slice(2)+'.'+('0'+(clo.getMonth()+1)).slice(-2),
           newIn:newIn, shortEx:shortEx, due:due, renew:rn, no:due-rn, mid:midOut, exp:expOut,
-          rate: due?Math.round(rn/due*1000)/10:0 });
+          rate: due?Math.round(rn/due*1000)/10:0,
+          pureDue: pureDue, pureRate: pureDue>0?Math.round(rn/pureDue*1000)/10:0,
+          thin: due<5 });   // 표본부족 기준: 대상 5명 미만
       })(_n);
     }
     var C1=COH[0], C2=COH[1];
@@ -18302,18 +18306,24 @@ function _vldAnalysis(bucketLabel, kind){
     // 모수 효과 진단 — 1차 코호트 신규입주가 직전 연도 대비 몇 배인지
     var volX = (C2 && C2.newIn) ? Math.round(C1.newIn/C2.newIn*10)/10 : 0;
     var _cohTable = '<div style="background:#fff;border-radius:7px;padding:7px 10px;margin-bottom:7px">'
-      +'<div style="font-size:10px;color:#92400E;font-weight:700;margin-bottom:5px">갱신 차수별 현황 <span style="font-weight:400;color:#94A3B8">· 단기계약 제외 · 직전 차수 통과자 기준</span></div>'
+      +'<div style="font-size:10px;color:#92400E;font-weight:700;margin-bottom:5px">갱신 차수별 현황 <span style="font-weight:400;color:#94A3B8">· 단기계약 제외 · 직전 차수 통과자 기준 · 대상 5명 미만은 표본부족(회색)</span></div>'
       +'<table style="width:100%;border-collapse:collapse;font-size:10.5px">'
-      +'<tr style="background:#FFFBEB;color:#92400E"><th style="padding:3px 6px;text-align:left">차수</th><th style="padding:3px 6px;text-align:left">입주월</th><th style="padding:3px 6px;text-align:right">신규</th><th style="padding:3px 6px;text-align:right">대상</th><th style="padding:3px 6px;text-align:right">갱신</th><th style="padding:3px 6px;text-align:right">미갱신</th><th style="padding:3px 6px;text-align:right">갱신율</th></tr>'
+      +'<tr style="background:#FFFBEB;color:#92400E"><th style="padding:3px 6px;text-align:left">차수</th><th style="padding:3px 6px;text-align:left">입주월</th><th style="padding:3px 6px;text-align:right">신규</th><th style="padding:3px 6px;text-align:right">대상</th><th style="padding:3px 6px;text-align:right">갱신</th><th style="padding:3px 6px;text-align:right">미갱신</th><th style="padding:3px 6px;text-align:right">갱신율</th><th style="padding:3px 6px;text-align:right;border-left:1px solid #FDE68A">순갱신율<div style="font-weight:400;font-size:8.5px;color:#B5730F">중도퇴실 제외</div></th></tr>'
       + COH.map(function(c){
-          return '<tr style="border-top:1px solid #F1F5F9">'
-            +'<td style="padding:3px 6px;font-weight:700;color:#B5730F">'+c.n+'차</td>'
-            +'<td style="padding:3px 6px;color:#64748B">'+c.lbl+'</td>'
-            +'<td style="padding:3px 6px;text-align:right;color:#64748B">'+c.newIn+(c.shortEx?'<span style="color:#CBD5E1">(-'+c.shortEx+')</span>':'')+'</td>'
-            +'<td style="padding:3px 6px;text-align:right;font-weight:700">'+c.due+'</td>'
-            +'<td style="padding:3px 6px;text-align:right;font-weight:700;color:#15803D">'+c.renew+'</td>'
-            +'<td style="padding:3px 6px;text-align:right;font-weight:700;color:#DC2626">'+c.no+(c.mid?'<span style="font-size:9px;color:#94A3B8"> (중도'+c.mid+')</span>':'')+'</td>'
-            +'<td style="padding:3px 6px;text-align:right;font-weight:800;color:'+(c.rate>=60?'#15803D':c.rate>=40?'#B5730F':'#DC2626')+'">'+c.rate+'%</td></tr>';
+          var G='#9CA3AF';
+          var cR = c.thin?G:(c.rate>=60?'#15803D':c.rate>=40?'#B5730F':'#DC2626');
+          var cP = c.thin?G:(c.pureRate>=60?'#15803D':c.pureRate>=40?'#B5730F':'#DC2626');
+          return '<tr style="border-top:1px solid #F1F5F9'+(c.thin?';background:#FAFAFA;opacity:.72':'')+'">'
+            +'<td style="padding:3px 6px;font-weight:700;color:'+(c.thin?G:'#B5730F')+'">'+c.n+'차</td>'
+            +'<td style="padding:3px 6px;color:'+(c.thin?G:'#64748B')+'">'+c.lbl+'</td>'
+            +'<td style="padding:3px 6px;text-align:right;color:'+(c.thin?G:'#64748B')+'">'+c.newIn+(c.shortEx?'<span style="color:#CBD5E1">(-'+c.shortEx+')</span>':'')+'</td>'
+            +'<td style="padding:3px 6px;text-align:right;font-weight:700;color:'+(c.thin?G:'inherit')+'">'+c.due+'</td>'
+            +'<td style="padding:3px 6px;text-align:right;font-weight:700;color:'+(c.thin?G:'#15803D')+'">'+c.renew+'</td>'
+            +'<td style="padding:3px 6px;text-align:right;font-weight:700;color:'+(c.thin?G:'#DC2626')+'">'+c.no+(c.mid?'<span style="font-size:9px;color:#94A3B8"> (중도'+c.mid+')</span>':'')+'</td>'
+            +'<td style="padding:3px 6px;text-align:right;font-weight:800;color:'+cR+'">'+c.rate+'%</td>'
+            +'<td style="padding:3px 6px;text-align:right;font-weight:800;border-left:1px solid #F1F5F9;color:'+cP+'">'
+            + (c.thin ? '<span style="font-size:9.5px;font-weight:700">표본부족</span>' : c.pureRate+'%<span style="font-size:9px;color:#94A3B8;font-weight:400"> ('+c.renew+'/'+c.pureDue+')</span>')
+            +'</td></tr>';
         }).join('')
       +'</table></div>';
     var TARGET=24;  // 목표 LTV(개월)
@@ -18327,8 +18337,8 @@ function _vldAnalysis(bucketLabel, kind){
         +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:7px">'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">평균 거주기간</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+aE+'<span style="font-size:10.5px">개월</span></div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">계약당 LTV</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+mil(ltv)+'</div></div>'
-        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:130px"><div style="font-size:10px;color:#92400E">1차 갱신율 ('+rnLbl+' 입주)</div><div style="font-size:16px;font-weight:800;color:'+(rate>=60?'#15803D':'#B91C1C')+'">'+rate+'%</div></div>'
-        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#92400E">1차 갱신 현황</div><div style="font-size:13px;font-weight:800;color:#374151">대상 '+due+'명 · 갱신 <b style="color:#15803D">'+renew+'</b> · 미갱신 <b style="color:#DC2626">'+(due-renew)+'</b></div></div>'
+        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#92400E">1차 갱신율 ('+rnLbl+' 입주)</div><div style="font-size:16px;font-weight:800;color:'+(rate>=60?'#15803D':'#B91C1C')+'">'+rate+'%<span style="font-size:10.5px;font-weight:700;color:'+(C1.pureRate>=60?'#15803D':'#B5730F')+'"> · 순 '+C1.pureRate+'%</span></div></div>'
+        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#92400E">1차 갱신 현황</div><div style="font-size:13px;font-weight:800;color:#374151">대상 '+due+'명 · 갱신 <b style="color:#15803D">'+renew+'</b> · 미갱신 <b style="color:#DC2626">'+(due-renew)+'</b><span style="font-size:9.5px;font-weight:400;color:#94A3B8"> (중도 '+C1.mid+' 제외 시 모수 '+C1.pureDue+')</span></div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">이탈 임대료</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+mil(expRent)+'<span style="font-size:10px">/월</span></div></div>'
         +'</div>'
         + _cohTable
