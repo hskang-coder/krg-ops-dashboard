@@ -18103,7 +18103,7 @@ function sumRenderDailyCard(){
     +   '<span style="color:#6B7280">~</span>'
     +   '<input type="date" value="' + cfg.end + '" onchange="sumSetCfg(\'end\',this.value)">'
     + '</div>'
-    + (isValid ? '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 막대: 신규 입주(+, 초록) · 만기퇴실(−, 주황) · 중도퇴실(−, 빨강) — 단위 건 · 라인: <b style="color:#185FA5">유효계약수 누적</b>(우측 축, 이전 유효계약 base 포함)</div>'
+    + (isValid ? '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 막대: 신규 입주(+, 초록) · 만기퇴실(−, 주황) · 중도퇴실(−, 빨강) — 단위 건 · 라인: <b style="color:#185FA5">유효계약수 누적</b>(우측 축, 이전 유효계약 base 포함) · <b style="color:#1B62D6">막대 클릭 → 명단 보기</b></div>'
     : isUse ? '<div style="font-size:10.5px;color:#6B7280;margin-bottom:8px">📊 스택 막대 — <b style="color:#F59E0B">주거용</b> · <b style="color:#2E5AAC">상업용</b> (gid=1953907648 N열) · 세그먼트 라벨 = 건수 · 비중%</div>'
     : (unit === 'month' ? ('<div class="sum-cfg-row">'
     +   '<span class="sum-cfg-label">체크포인트:</span>'
@@ -18194,6 +18194,26 @@ function sumDrawValidChart(){
       { type:'line', label:'유효계약수(누적)', data:validv, borderColor:'#185FA5', backgroundColor:'#185FA5', borderWidth:2, pointRadius:2, tension:0.3, yAxisID:'y1' }
     ]},
     options:{ maintainAspectRatio:false, layout:{padding:{top:20}}, interaction:{mode:'index',intersect:false},
+      // [v471] 막대 클릭 → 신규입주/만기퇴실/중도퇴실 명단 (정확조준 우선, 실패 시 구분 선택 팝오버)
+      onHover:function(e,els){ try{ e.native.target.style.cursor = els.length?'pointer':'default'; }catch(_){} },
+      onClick:function(e,els){
+        var ch=window._sumDailyChartInstance; if(!ch) return;
+        var hit=null;
+        try{ var ex=ch.getElementsAtEventForMode(e.native||e,'nearest',{intersect:true},true); if(ex&&ex.length) hit=ex[0]; }catch(_){}
+        var idx = hit? hit.index : (els.length? els[0].index : -1);
+        if(idx<0) return;
+        var lbl=ch.data.labels[idx];
+        var KIND={'신규 입주':'신규입주','만기퇴실':'만기퇴실','중도퇴실':'중도퇴실'};
+        if(hit){ var dl=ch.data.datasets[hit.datasetIndex].label; if(KIND[dl]){ _vldOpenList(lbl, KIND[dl]); return; } }
+        var items=[];
+        ch.data.datasets.forEach(function(ds){
+          if(!KIND[ds.label]) return;
+          var v=Math.abs(ds.data[idx]||0); if(v>0) items.push({label:KIND[ds.label], v:v, color:ds.backgroundColor});
+        });
+        if(!items.length) return;
+        if(items.length===1){ _vldOpenList(lbl, items[0].label); return; }
+        _vldPickKind(lbl, items, e.native||e);
+      },
       plugins:{ legend:{position:'top',align:'center',labels:{boxWidth:12,font:{size:11},padding:10}},
         tooltip:{ callbacks:{ label:function(ctx){ return ctx.dataset.label+': '+Math.abs(ctx.raw)+'건'; } } } },
       scales:{ x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},
@@ -18211,6 +18231,93 @@ function sumDrawValidChart(){
       + '<div><span style="color:#6B7280">만기퇴실:</span> <b style="color:#B5730F">'+tE+'건</b> · <span style="color:#6B7280">중도퇴실:</span> <b style="color:#A32D2D">'+tM+'건</b></div>'
       + '<div style="margin-left:auto;color:#9CA3AF;font-size:10px">이탈률 약 '+churn+'%'+(tM>tE?' · 중도퇴실 > 만기퇴실 (중도이탈 관리 필요)':'')+'</div>';
   }
+}
+// [v471] 유효계약수 차트 — 신규입주/만기퇴실/중도퇴실 명단 모달 (막대 클릭)
+function _vldOpenList(bucketLabel, kind){
+  try{
+    var cfg=window._sumChartCfg||{}, unit=cfg.unit||'month';
+    var pdt=function(s){ return (typeof cmgParseStartDate==='function')? cmgParseStartDate(s) : null; };
+    var lblOf=function(d){
+      if(!d) return '';
+      if(unit==='day') return (d.getMonth()+1)+'/'+d.getDate();
+      if(unit==='week'){ var w=new Date(d); w.setDate(w.getDate()-w.getDay()); return (w.getMonth()+1)+'/'+String(w.getDate()).padStart(2,'0'); }
+      return (d.getFullYear()%100)+'.'+String(d.getMonth()+1).padStart(2,'0');
+    };
+    var isMid=function(v){ return /중도퇴실/.test(String(v.jValue||'')); };
+    var sD=pdt(cfg.start), eD=pdt(cfg.end); if(sD)sD.setHours(0,0,0,0); if(eD)eD.setHours(23,59,59,0);
+    var rows=[];
+    (Array.isArray(vacancyRawData)?vacancyRawData:[]).forEach(function(v){
+      var d=null;
+      if(kind==='신규입주') d=pdt(v.startDate);
+      else d=pdt(v.terminateDate);
+      if(!d) return;
+      if(sD&&d<sD) return; if(eD&&d>eD) return;
+      if(lblOf(d)!==bucketLabel) return;
+      if(kind==='만기퇴실' && isMid(v)) return;
+      if(kind==='중도퇴실' && !isMid(v)) return;
+      rows.push({cno:String(v.no||'').trim(), nm:v.tenant1Name||v.tenantName||'-', tel:v.tenantPhone||'-',
+        addr:[v.propAddr,v.propBuilding,v.propRoom].filter(Boolean).join(' '),
+        start:v.startDate||'-', end:v.endDate||'-', term:v.terminateDate||'-', rent:v.rent||'-', kindTxt:v.jValue||v.status||''});
+    });
+    rows.sort(function(a,b){ return String(a.cno).localeCompare(String(b.cno)); });
+    window.__vldListRows=rows;
+    var col={'신규입주':'#2E9E6B','만기퇴실':'#E8A33D','중도퇴실':'#E24B4A'}[kind]||'#1B3976';
+    var prev=document.getElementById('vldListModal'); if(prev)prev.remove();
+    var ov=document.createElement('div'); ov.id='vldListModal';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    var dateCol = (kind==='신규입주') ? '입주일' : '퇴실일';
+    var body=rows.map(function(r,i){
+      return '<tr style="border-top:1px solid #F1F5F9">'
+        +'<td style="padding:6px 9px;color:#94A3B8;font-size:11px">'+(i+1)+'</td>'
+        +'<td style="padding:6px 9px"><b style="color:#0E7490;cursor:pointer" onclick="document.getElementById(\'vldListModal\').remove();crNavFromView(\''+r.cno+'\',\'summary\')">'+r.cno+'</b></td>'
+        +'<td style="padding:6px 9px">'+r.nm+'</td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:#6B7280">'+r.addr+'</td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:#374151">'+((kind==='신규입주')?r.start:r.term)+'</td>'
+        +'<td style="padding:6px 9px;text-align:right;font-weight:700;color:'+col+'">'+r.rent+'</td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:#6B7280">'+r.tel+'</td></tr>';
+    }).join('')||'<tr><td colspan="7" style="padding:18px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';
+    var tabs=['신규입주','만기퇴실','중도퇴실'].map(function(k){
+      var on=(k===kind), c2={'신규입주':'#2E9E6B','만기퇴실':'#E8A33D','중도퇴실':'#E24B4A'}[k];
+      return '<button onclick="_vldOpenList(\''+bucketLabel+'\',\''+k+'\')" style="background:'+(on?c2:'#fff')+';color:'+(on?'#fff':'#475569')+';border:1.5px solid '+(on?c2:'#E2E8F0')+';border-radius:14px;padding:3px 11px;font-size:11px;font-weight:700;cursor:pointer">'+k+'</button>';
+    }).join('');
+    ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:960px;width:100%;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
+      +'<div style="display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid #EEF2F7">'
+      +  '<span style="width:11px;height:11px;border-radius:3px;background:'+col+'"></span>'
+      +  '<b style="font-size:14px;color:'+col+'">'+kind+' · '+rows.length+'건</b>'
+      +  '<span style="font-size:11.5px;color:#8A97A8">'+bucketLabel+'</span>'
+      +  '<span style="margin-left:auto;display:flex;gap:6px">'
+      +    '<button onclick="_vldListExcel()" style="background:#1d4ed8;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">⬇️ 엑셀</button>'
+      +    '<button onclick="document.getElementById(\'vldListModal\').remove()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">닫기</button>'
+      +  '</span></div>'
+      +'<div style="display:flex;gap:5px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #F1F5F9;background:#FCFDFF"><span style="font-size:10.5px;color:#94A3B8;font-weight:700;align-self:center;margin-right:2px">구분 전환</span>'+tabs+'</div>'
+      +'<div style="overflow:auto;padding:0 6px 6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+      +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th><th style="padding:6px 9px;text-align:left">계약번호</th><th style="padding:6px 9px;text-align:left">임(전)차인</th><th style="padding:6px 9px;text-align:left">물건지</th><th style="padding:6px 9px;text-align:left">'+dateCol+'</th><th style="padding:6px 9px;text-align:right">임대료</th><th style="padding:6px 9px;text-align:left">연락처</th></tr></thead>'
+      +'<tbody>'+body+'</tbody></table></div>'
+      +'<div style="padding:7px 16px;border-top:1px solid #EEF2F7;font-size:10.5px;color:#94A3B8">계약번호 클릭 → 계약상세 이동</div></div>';
+    document.body.appendChild(ov);
+  }catch(e){ console.warn('[vldList]',e); }
+}
+function _vldListExcel(){
+  var rows=window.__vldListRows||[];
+  if(!rows.length||typeof XLSX==='undefined'){ alert('다운로드할 데이터가 없습니다.'); return; }
+  var ws=XLSX.utils.json_to_sheet(rows.map(function(r,i){ return {'No':i+1,'계약번호':r.cno,'임(전)차인':r.nm,'물건지':r.addr,'입주일':r.start,'만기일':r.end,'퇴실일':r.term,'임대료':r.rent,'연락처':r.tel}; }));
+  var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'명단');
+  XLSX.writeFile(wb,'유효계약_명단_'+Date.now()+'.xlsx');
+}
+function _vldPickKind(bucketLabel, items, ev){
+  var prev=document.getElementById('vldPickPop'); if(prev)prev.remove();
+  var x=(ev&&ev.clientX)||120, y=(ev&&ev.clientY)||120;
+  var pop=document.createElement('div'); pop.id='vldPickPop';
+  pop.style.cssText='position:fixed;left:'+Math.min(x+8,window.innerWidth-250)+'px;top:'+Math.min(y+8,window.innerHeight-200)+'px;z-index:100000;background:#fff;border:1.5px solid #CBD5E1;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:8px 10px;min-width:210px';
+  var btns=items.map(function(it){
+    return '<button onclick="document.getElementById(\'vldPickPop\').remove();_vldOpenList(\''+bucketLabel+'\',\''+it.label+'\')" style="display:flex;align-items:center;gap:7px;width:100%;background:#fff;border:1px solid #E2E8F0;border-radius:7px;padding:5px 9px;margin-bottom:4px;cursor:pointer;font-size:12px;font-weight:700;color:#334155;text-align:left">'
+      +'<span style="width:11px;height:11px;border-radius:3px;background:'+it.color+';flex:none"></span><span style="flex:1">'+it.label+'</span><span style="color:#0E7490">'+it.v+'건</span></button>';
+  }).join('');
+  pop.innerHTML='<div style="font-size:11px;color:#64748B;font-weight:700;margin-bottom:6px">'+bucketLabel+' · 구분 선택 <span style="color:#94A3B8;font-weight:500">(명단 보기)</span></div>'+btns
+    +'<button onclick="document.getElementById(\'vldPickPop\').remove()" style="width:100%;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;padding:4px;font-size:11px;color:#64748B;cursor:pointer">닫기</button>';
+  document.body.appendChild(pop);
+  setTimeout(function(){ document.addEventListener('click', function _c(e){ var p=document.getElementById('vldPickPop'); if(p&&!p.contains(e.target)){ p.remove(); document.removeEventListener('click',_c); } }); },10);
 }
 // [v464] Section ① 계약구분(주거/상업) — N열 기준 월별 스택 (주거=주황, 상업=파랑, 건수·%)
 function sumBuildUseTypeData(){
