@@ -2099,6 +2099,7 @@ function parseVacancySheet(resp) {
   const feeIdx         = findColIdx(labels, ['수수료','서비스수수료'], 37); // AL
   const cleanFeeIdx    = findColIdx(labels, ['퇴실청소비'],        38);  // AM [v472] 퇴실청소비
   const dlqAmtIdx      = 80;  // CC열 [v475] 연체액(금액) — 라벨 '연체금액'(idx81)은 %값이라 위치 고정
+  const dlqRateIdx     = 77;  // BZ열 [v476] 연체비율
   const landlordIdx    = findColIdx(labels, ['임대인명'],          39);  // AO  ← AM열 추가시 자동 보정
   const payMethodIdx   = findColIdx(labels, ['월세납입형태','납부방법','납입형태','선후불'], 40); // AO (v311) 선불/후불
   const landlordPhoneIdx= findColIdx(labels, ['임대인연락처','임대인 연락처'], 41); // AP/AQ
@@ -2188,6 +2189,7 @@ let outsourceIdx = findColIdx(labels, ['연체외주','연체 외주'], 71);
       useType:       cell(useTypeIdx),        // [v464] N열(계약형태): 주거용/상업용
       cleanFee:      cell(cleanFeeIdx),       // [v472] AM열: 퇴실청소비
       dlqAmt:        cell(dlqAmtIdx),         // [v475] CC열: 연체액(금액)
+      dlqRate:       cell(dlqRateIdx),        // [v476] BZ열: 연체비율
       callChk:    (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[callChkIdx] && (c[callChkIdx].v != null ? c[callChkIdx].v : c[callChkIdx].f)),   // [v466] CM 통화 확인
       smsChk:     (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[smsChkIdx] && (c[smsChkIdx].v != null ? c[smsChkIdx].v : c[smsChkIdx].f)),      // [v466] CN 문자 확인
       partnerName:   cell(partnerNameIdx),   // BL열: 부동산명
@@ -18264,11 +18266,11 @@ function _vldOpenList(bucketLabel, kind){
         addr:[v.propAddr,v.propBuilding,v.propRoom].filter(Boolean).join(' '),
         start:v.startDate||'-', end:v.endDate||'-', term:v.terminateDate||'-', rent:v.rent||'-',
         living:v.livingMonths||'-', clean:v.cleanFee||'-',
-        dlqAmt:v.dlqAmt||'-', vacStatus:v.status||'-', kindTxt:v.jValue||v.status||''});  // [v475] 연체액 = gid=1953907648 CC열
+        dlqAmt:v.dlqAmt||'-', dlqRate:v.dlqRate||'-', vacStatus:v.status||'-', kindTxt:v.jValue||v.status||''});  // [v475/v476] 연체액=CC열 · 연체비율=BZ열
     });
     // [v473] 정렬 — 헤더 클릭 시 오름/내림 (기본: 계약번호 오름차순)
     var _sk=(window.__vldSort&&window.__vldSort.key)||'cno', _sd=(window.__vldSort&&window.__vldSort.dir)||'asc';
-    var _numF={living:1,rent:1,clean:1,dlqAmt:1};
+    var _numF={living:1,rent:1,clean:1,dlqAmt:1,dlqRate:1};
     var _val=function(o,k){ var v=o[k]; if(v==null)return ''; if(_numF[k]) return parseFloat(String(v).replace(/[^0-9.\-]/g,''))||0;
       if(k==='start'||k==='term'||k==='end'){ var m=String(v).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(+m[1])*10000+(+m[2])*100+(+m[3]):0; }
       return String(v); };
@@ -18287,9 +18289,9 @@ function _vldOpenList(bucketLabel, kind){
     ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
     // [v472] 구분별 컬럼 구성 — 만기퇴실: 시작일·퇴실일·거주기간·임대료·퇴실청소비 / 중도퇴실: 시작일·퇴실일·거주기간·연체금액·공실상태
     var COLS = (kind==='만기퇴실')
-      ? [{h:'시작일',f:'start',a:'left'},{h:'퇴실일',f:'term',a:'left'},{h:'거주기간(M)',f:'living',a:'center'},{h:'임대료',f:'rent',a:'right'},{h:'퇴실청소비',f:'clean',a:'right'}]
+      ? [{h:'시작일',f:'start',a:'left'},{h:'퇴실일',f:'term',a:'left'},{h:'거주기간(M)',f:'living',a:'center'},{h:'연체비율',f:'dlqRate',a:'center'},{h:'임대료',f:'rent',a:'right'},{h:'퇴실청소비',f:'clean',a:'right'}]
       : (kind==='중도퇴실')
-      ? [{h:'시작일',f:'start',a:'left'},{h:'퇴실일',f:'term',a:'left'},{h:'거주기간(M)',f:'living',a:'center'},{h:'연체금액',f:'dlqAmt',a:'right'},{h:'공실상태',f:'vacStatus',a:'left'}]
+      ? [{h:'시작일',f:'start',a:'left'},{h:'퇴실일',f:'term',a:'left'},{h:'거주기간(M)',f:'living',a:'center'},{h:'연체비율',f:'dlqRate',a:'center'},{h:'연체금액',f:'dlqAmt',a:'right'},{h:'공실상태',f:'vacStatus',a:'left'}]
       : [{h:'입주일',f:'start',a:'left'},{h:'만기일',f:'end',a:'left'},{h:'임대료',f:'rent',a:'right'},{h:'연락처',f:'tel',a:'left'}];
     // [v473] 정렬 가능한 헤더 (현재 정렬 컬럼에 ▲/▼)
     var _arr=function(f){ return _sk===f ? (_sd==='asc'?' ▲':' ▼') : '<span style="opacity:.28">⇅</span>'; };
@@ -18345,7 +18347,7 @@ function _vldSortBy(key){
 function _vldListExcel(){
   var rows=window.__vldListRows||[];
   if(!rows.length||typeof XLSX==='undefined'){ alert('다운로드할 데이터가 없습니다.'); return; }
-  var ws=XLSX.utils.json_to_sheet(rows.map(function(r,i){ return {'No':i+1,'계약번호':r.cno,'임(전)차인':r.nm,'물건지':r.addr,'시작일':r.start,'만기일':r.end,'퇴실일':r.term,'거주기간(M)':r.living,'임대료':r.rent,'퇴실청소비':r.clean,'연체금액':r.dlqAmt,'공실상태':r.vacStatus,'연락처':r.tel}; }));
+  var ws=XLSX.utils.json_to_sheet(rows.map(function(r,i){ return {'No':i+1,'계약번호':r.cno,'임(전)차인':r.nm,'물건지':r.addr,'시작일':r.start,'만기일':r.end,'퇴실일':r.term,'거주기간(M)':r.living,'연체비율':r.dlqRate,'임대료':r.rent,'퇴실청소비':r.clean,'연체금액':r.dlqAmt,'공실상태':r.vacStatus,'연락처':r.tel}; }));
   var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'명단');
   XLSX.writeFile(wb,'유효계약_명단_'+Date.now()+'.xlsx');
 }
