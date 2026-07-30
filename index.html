@@ -7720,7 +7720,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v487</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v488</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
@@ -18174,7 +18174,7 @@ function _bfArrow(c,p){ var d=_bfPct(c,p); return (d>0?'▲':d<0?'▼':'–')+Ma
 function _bfMM(lb){ var m=String(lb).match(/(\d{2})\.(\d{2})/); return m?{y:2000+ +m[1],m:+m[2]}:null; }
 function _bfInM(d,o){ return d&&d.getFullYear()===o.y&&d.getMonth()===o.m-1; }
 // 영업 한줄 평 — 파트너 증감 + 지역 특징 (dateField: startDate | tentativeDate)
-function _bfSalesLine(A,B,verb){
+function _bfSalesLine(A,B,verb,cur){
   var grp=function(arr,f){var o={};arr.forEach(function(v){var k=(f(v)||'').trim()||'미지정';o[k]=(o[k]||0)+1;});return o;};
   var pA=grp(A,function(v){return String(v.partnerName||'');}), pB=grp(B,function(v){return String(v.partnerName||'');});
   var keys={}; Object.keys(pA).forEach(function(k){keys[k]=1;}); Object.keys(pB).forEach(function(k){keys[k]=1;});
@@ -18190,10 +18190,44 @@ function _bfSalesLine(A,B,verb){
   var G=Object.keys(gk).filter(function(k){return k!=='미지정';}).map(function(k){return {k:k,d:(gA[k]||0)-(gB[k]||0)};})
     .sort(function(x,y){return y.d-x.d;}).filter(function(x){return x.d>0;}).slice(0,2);
   var tp=_bfPct(A.length,B.length);
-  return '<b>전월 대비 '+(verb||'신규입주')+' '+A.length+'건 ('+(tp>=0?'+':'')+tp+'%, '+B.length+'→'+A.length+')</b>. '
+  var s = '<b>전월 대비 '+(verb||'신규입주')+' '+A.length+'건 ('+(tp>=0?'+':'')+tp+'%, '+B.length+'→'+A.length+')</b>. '
     + (up.length? '성장 '+up.map(fx).join(' · ') : '성장 파트너 없음')
     + (dn.length? ' / 하락 '+dn.map(fx).join(' · ') : '')
-    + (G.length? ' — 지역은 '+G.map(function(x){return x.k+' +'+x.d+'건';}).join(' · ')+' 집중.' : '.');
+    + (G.length? ' — 지역 '+G.map(function(x){return x.k+' +'+x.d;}).join(' · ') : '');
+  // [v488] 차월 BEP 제안
+  var ok = cur && _bfOutlook(cur);
+  if(ok){
+    var gap=A.length-ok.bep;
+    s += ' <span style="color:#B5730F">▶ <b>'+ok.lbl+' 예상 퇴실 '+ok.bep+'건</b>(만기 '+ok.exp+'·중도 '+ok.mid+') → <b>유지 BEP '+ok.bep+'건</b>, '
+      + (gap>=0 ? '현 수준 유지 시 <b>순증 +'+gap+'</b>' : '<b>'+Math.abs(gap)+'건 부족</b>')
+      + ' · 성장 +5% 목표 '+Math.ceil(ok.bep+ok.act*0.05)+'건</span>';
+  }
+  return s;
+}
+// [v488] 차월 전망 — 최근 3개월 실적으로 예상 퇴실 추정, 유효계약 유지 BEP 산출
+function _bfOutlook(cur){
+  try{
+    var V=Array.isArray(vacancyRawData)?vacancyRawData:[];
+    if(!V.length) return null;
+    var isMid=function(v){return /중도퇴실/.test(String(v.jValue||''));};
+    var alive=function(v){var k=String(v.contractKind||'').trim();return k==='정상'||k==='계약중';};
+    var sumExp=0, sumDue=0, sumMid=0;
+    for(var i=2;i>=0;i--){
+      var d=new Date(cur.y, cur.m-1-i, 1), o={y:d.getFullYear(), m:d.getMonth()+1};
+      V.forEach(function(v){
+        if(_bfInM(_bfPd(v.endDate),o)) sumDue++;
+        if(_bfInM(_bfPd(v.terminateDate),o)){ if(isMid(v)) sumMid++; else sumExp++; }
+      });
+    }
+    var nx=new Date(cur.y, cur.m, 1), nxt={y:nx.getFullYear(), m:nx.getMonth()+1};
+    var dueNx=0, act=0;
+    V.forEach(function(v){ if(alive(v)){ act++; if(_bfInM(_bfPd(v.endDate),nxt)) dueNx++; } });
+    var expRate = sumDue? sumExp/sumDue : 0;
+    var midRate = act? (sumMid/3)/act : 0;
+    var expOut=Math.round(dueNx*expRate), midOut=Math.round(act*midRate);
+    return { lbl:String(nxt.y).slice(2)+'.'+('0'+nxt.m).slice(-2), due:dueNx, exp:expOut, mid:midOut,
+      bep:expOut+midOut, expRate:Math.round(expRate*1000)/10, act:act };
+  }catch(e){ return null; }
 }
 function _bfBox(tag,color,bg,txt,body){
   return '<div style="background:'+bg+';border-left:4px solid '+color+';border-radius:0 7px 7px 0;padding:7px 11px;font-size:11px;color:'+txt+';line-height:1.6">'
@@ -18230,16 +18264,17 @@ function _tentBriefHTML(){
     };
     var a=agg(A), b=agg(B);
     var net=a.fee-a.brk, netP=b.fee-b.brk;
-    var line2 = '<b>계약 '+a.cnt+'건 '+_bfArrow(a.cnt,b.cnt)+'</b> · '
-      + '평균 임대료 ₩'+a.avgRent.toLocaleString()+' '+_bfArrow(a.avgRent,b.avgRent)+' · '
-      + '서비스 수수료 '+_bfMil(a.fee)+' '+_bfArrow(a.fee,b.fee)+' · '
-      + '중개보수 지출예정 '+_bfMil(a.brk)+' '+_bfArrow(a.brk,b.brk)+' · '
-      + '임대인 정산예정 임대료 '+_bfMil(a.rent)+' '+_bfArrow(a.rent,b.rent)+' · '
-      + '발생 연체 '+_bfMil(a.dlq)+' '+_bfArrow(a.dlq,b.dlq)
-      + ' → <b>순수익(수수료−중개보수) '+_bfMil(net)+' '+_bfArrow(net,netP)+'</b>'
-      + (net<0 ? ' ⚠ 획득비 초과 — 이번 달 계약은 회수까지 시간 필요.' : '.');
+    // [v488] 한 줄로 압축 — 계약·평균임대료·수수료·중개보수·정산예정·순수익
+    var line2 = '<b>계약 '+a.cnt+' '+_bfArrow(a.cnt,b.cnt)+'</b> · '
+      + '평균임대료 '+Math.round(a.avgRent/1000)+'천 '+_bfArrow(a.avgRent,b.avgRent)+' · '
+      + '수수료 '+_bfMil(a.fee)+' '+_bfArrow(a.fee,b.fee)+' · '
+      + '중개보수 '+_bfMil(a.brk)+' '+_bfArrow(a.brk,b.brk)+' · '
+      + '정산예정 '+_bfMil(a.rent)+' '+_bfArrow(a.rent,b.rent)
+      + (a.dlq>0 ? ' · 연체 '+_bfMil(a.dlq) : '')
+      + ' → <b>순수익 '+_bfMil(net)+' '+_bfArrow(net,netP)+'</b>'
+      + (net<0 ? ' <span style="color:#B45309">⚠ 획득비 초과</span>' : '');
     return '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:9px">'
-      + _bfBox('영업','#2E9E6B','#F0FDF4','#14532D', _bfSalesLine(A,B,verb))
+      + _bfBox('영업','#2E9E6B','#F0FDF4','#14532D', _bfSalesLine(A,B,verb,cur))
       + _bfBox('경영','#1B62D6','#EFF6FF','#1E3A8A', line2)
       + '</div>';
   }catch(e){ return ''; }
@@ -18261,27 +18296,7 @@ function _vldBriefHTML(rows){
     var inM=function(d,o){return d&&d.getFullYear()===o.y&&d.getMonth()===o.m-1;};
     var newIn=function(o){return V.filter(function(v){return inM(pd(v.startDate),o);});};
     var A=newIn(cur), B=newIn(prv);
-    var grp=function(arr,f){var o={};arr.forEach(function(v){var k=(f(v)||'').trim()||'미지정';o[k]=(o[k]||0)+1;});return o;};
-    var pA=grp(A,function(v){return String(v.partnerName||'');}), pB=grp(B,function(v){return String(v.partnerName||'');});
-    var keys={}; Object.keys(pA).forEach(function(k){keys[k]=1;}); Object.keys(pB).forEach(function(k){keys[k]=1;});
-    var D=Object.keys(keys).filter(function(k){return k!=='미지정';}).map(function(k){
-      var c=pA[k]||0, p=pB[k]||0;
-      return {k:k,c:c,p:p,d:c-p,pct:p?Math.round((c-p)/p*100):null};
-    }).sort(function(x,y){return y.d-x.d;});
-    var up=D.filter(function(x){return x.d>0;}).slice(0,2);
-    var dn=D.filter(function(x){return x.d<0;}).sort(function(x,y){return x.d-y.d;}).slice(0,2);
-    var fx=function(x){ return x.k+' '+x.p+'→'+x.c+'건'+(x.pct===null?'(신규)':'('+(x.pct>0?'+':'')+x.pct+'%)'); };
-    // 지역 — 소재지에서 시/구/군 추출
-    var gu=function(v){var a=String(v.propAddr||'');var m=a.match(/([가-힣]{2,}(?:구|시|군))/);return m?m[1]:'';};
-    var gA=grp(A,gu), gB=grp(B,gu);
-    var gk={}; Object.keys(gA).forEach(function(k){gk[k]=1;}); Object.keys(gB).forEach(function(k){gk[k]=1;});
-    var G=Object.keys(gk).filter(function(k){return k!=='미지정';}).map(function(k){return {k:k,c:gA[k]||0,d:(gA[k]||0)-(gB[k]||0)};})
-      .sort(function(x,y){return y.d-x.d;}).filter(function(x){return x.d>0;}).slice(0,2);
-    var totPct = B.length? Math.round((A.length-B.length)/B.length*1000)/10 : 0;
-    var line1 = '<b>전월 대비 신규입주 '+A.length+'건 ('+(totPct>=0?'+':'')+totPct+'%, '+B.length+'→'+A.length+')</b>. '
-      + (up.length? '성장 '+up.map(fx).join(' · ') : '성장 파트너 없음')
-      + (dn.length? ' / 하락 '+dn.map(fx).join(' · ') : '')
-      + (G.length? ' — 지역은 '+G.map(function(x){return x.k+' +'+x.d+'건';}).join(' · ')+' 집중.' : '.');
+    var line1 = _bfSalesLine(A, B, '신규입주', cur);   // [v488] 공용 + 차월 BEP
     // ② 경영 — 계약 대비 퇴실
     var ex=function(o,mid){return V.filter(function(v){return inM(pd(v.terminateDate),o)&&(mid?isMid(v):!isMid(v));});};
     var E=ex(cur,false), Mx=ex(cur,true), Ep=ex(prv,false), Mp=ex(prv,true);
@@ -18293,16 +18308,15 @@ function _vldBriefHTML(rows){
     var cohX= cohP? Math.round(coh/cohP*10)/10 : 0;
     var totOut=E.length+Mx.length, totOutP=Ep.length+Mp.length;
     var outPct = A.length? Math.round(totOut/A.length*1000)/10 : 0;
-    var line2 = '<b>퇴실 '+totOut+'건 (만기 '+E.length+' · 중도 '+Mx.length+', 전월 '+totOutP+'건) · 신규 대비 '+outPct+'%</b>. '
-      + '만기는 12개월 전('+String(cur.y-1).slice(2)+'.'+('0'+cur.m).slice(-2)+') 입주 <b>'+coh+'건</b>이 모수 — 전년 동월 대비 '+(cohX?cohX+'배':'-')+' 확대. '
-      + '중도 '+Mx.length+'건 중 <b>연체 보유 '+dlqN+'건</b>(피해 ₩'+(Math.round(dlqAmt/100000)/10)+'M) · <b>강제퇴실(공실) '+force+'건</b>'
-      + (Mx.length&&dlqN/Mx.length>=0.5 ? ' → 중도퇴실의 절반 이상이 연체發, 초기 연체 개입이 핵심.' : '.');
+    // [v488] 한 줄로 압축
+    var line2 = '<b>퇴실 '+totOut+' (만기 '+E.length+'·중도 '+Mx.length+', 전월 '+totOutP+') · 신규 대비 '+outPct+'%</b> · '
+      + '만기 모수 = 12개월 전('+String(cur.y-1).slice(2)+'.'+('0'+cur.m).slice(-2)+') 입주 '+coh+'건 '+(cohX?cohX+'배':'-')+' · '
+      + '중도 중 <b>연체 '+dlqN+'</b>(피해 '+(Math.round(dlqAmt/100000)/10)+'M) · <b>강제퇴실 '+force+'</b>'
+      + (Mx.length&&dlqN/Mx.length>=0.5 ? ' → 초기 연체 개입 필요' : '');
     return '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:9px">'
-      +'<div style="background:#F0FDF4;border-left:4px solid #2E9E6B;border-radius:0 7px 7px 0;padding:7px 11px;font-size:11px;color:#14532D;line-height:1.6">'
-      +'<span style="display:inline-block;background:#2E9E6B;color:#fff;font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:9px;margin-right:6px">영업</span>'+line1+'</div>'
-      +'<div style="background:#FEF2F2;border-left:4px solid #E24B4A;border-radius:0 7px 7px 0;padding:7px 11px;font-size:11px;color:#7F1D1D;line-height:1.6">'
-      +'<span style="display:inline-block;background:#E24B4A;color:#fff;font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:9px;margin-right:6px">경영</span>'+line2+'</div>'
-      +'</div>';
+      + _bfBox('영업','#2E9E6B','#F0FDF4','#14532D', line1)
+      + _bfBox('경영','#E24B4A','#FEF2F2','#7F1D1D', line2)
+      + '</div>';
   }catch(e){ return ''; }
 }
 
