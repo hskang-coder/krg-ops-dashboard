@@ -22462,6 +22462,20 @@ async function okpi_render(){
             +'<td style="padding:6px 9px;text-align:center;font-weight:700;color:'+(parseInt(r.days)>0?'#DC2626':'#16A34A')+'">'+r.days+'</td>'
             +'<td style="padding:6px 9px;font-size:11px;color:#6B7280">'+r.tel+'</td></tr>';
         }).join('')||'<tr><td colspan="7" style="padding:18px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';
+        // [v470] C — 모달 내 상태 전환 탭 (같은 일자의 다른 상태로 즉시 이동)
+        var _STS=['정상납부','연체납부','연체중','분납중','납부예정'];
+        var _cntByStatus={}; _STS.forEach(function(s){ _cntByStatus[s]=0; });
+        pr.forEach(function(o){
+          var ty2=String(o['납부종류']||'').trim();
+          if(ptSel!=='전체' && ty2.indexOf(ptSel)<0) return;
+          var d2=_ser(o['납기일']); if(d2==null) return;
+          if(String(dueKey).length===8){ if(d2!==+dueKey) return; } else { if(Math.floor(d2/100)!==+dueKey) return; }
+          var s2=String(o['납부상태']||'').trim(); if(_cntByStatus[s2]!=null) _cntByStatus[s2]++;
+        });
+        var tabHtml=_STS.filter(function(s){ return _cntByStatus[s]>0 || s===status; }).map(function(s){
+          var on=(s===status), c2={'정상납부':'#16A34A','연체납부':'#F59E0B','연체중':'#DC2626','분납중':'#7C3AED','납부예정':'#94A3B8'}[s];
+          return '<button onclick="window._dtOpenList(\''+dueKey+'\',\''+s+'\')" style="background:'+(on?c2:'#fff')+';color:'+(on?'#fff':'#475569')+';border:1.5px solid '+(on?c2:'#E2E8F0')+';border-radius:14px;padding:3px 11px;font-size:11px;font-weight:700;cursor:pointer">'+s+' '+_cntByStatus[s]+'</button>';
+        }).join('');
         ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:940px;width:100%;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
           +'<div style="display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid #EEF2F7">'
           +  '<span style="width:11px;height:11px;border-radius:3px;background:'+col+'"></span>'
@@ -22471,12 +22485,29 @@ async function okpi_render(){
           +    '<button onclick="_dtListExcel()" style="background:#1d4ed8;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">⬇️ 엑셀</button>'
           +    '<button onclick="document.getElementById(\'dtListModal\').remove()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">닫기</button>'
           +  '</span></div>'
+          +'<div style="display:flex;gap:5px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #F1F5F9;background:#FCFDFF"><span style="font-size:10.5px;color:#94A3B8;font-weight:700;align-self:center;margin-right:2px">상태 전환</span>'+tabHtml+'</div>'
           +'<div style="overflow:auto;padding:0 6px 6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
           +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th><th style="padding:6px 9px;text-align:left">계약번호</th><th style="padding:6px 9px;text-align:left">임(전)차인</th><th style="padding:6px 9px;text-align:left">청구서명</th><th style="padding:6px 9px;text-align:right">금액</th><th style="padding:6px 9px;text-align:center">연체일</th><th style="padding:6px 9px;text-align:left">연락처</th></tr></thead>'
           +'<tbody>'+body+'</tbody></table></div>'
           +'<div style="padding:7px 16px;border-top:1px solid #EEF2F7;font-size:10.5px;color:#94A3B8">계약번호 클릭 → 계약상세 이동</div></div>';
         document.body.appendChild(ov);
       }catch(e){ console.warn('[dtList]',e); }
+    };
+    // [v470] B — 얇은 세그먼트 대응: 막대 클릭 시 상태 선택 팝오버
+    window._dtPickStatus=function(key, day, items, ev){
+      var prev=document.getElementById('dtPickPop'); if(prev)prev.remove();
+      var x=(ev&&ev.clientX)||120, y=(ev&&ev.clientY)||120;
+      var pop=document.createElement('div'); pop.id='dtPickPop';
+      pop.style.cssText='position:fixed;left:'+Math.min(x+8,window.innerWidth-250)+'px;top:'+Math.min(y+8,window.innerHeight-220)+'px;z-index:100000;background:#fff;border:1.5px solid #CBD5E1;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:8px 10px;min-width:210px';
+      var btns=items.map(function(it){
+        return '<button onclick="document.getElementById(\'dtPickPop\').remove();window._dtOpenList(\''+key+'\',\''+it.label+'\')" style="display:flex;align-items:center;gap:7px;width:100%;background:#fff;border:1px solid #E2E8F0;border-radius:7px;padding:5px 9px;margin-bottom:4px;cursor:pointer;font-size:12px;font-weight:700;color:#334155;text-align:left">'
+          +'<span style="width:11px;height:11px;border-radius:3px;background:'+it.color+';flex:none"></span>'
+          +'<span style="flex:1">'+it.label+'</span><span style="color:#0E7490">'+it.v+'건</span></button>';
+      }).join('');
+      pop.innerHTML='<div style="font-size:11px;color:#64748B;font-weight:700;margin-bottom:6px">'+day+'일 · 상태 선택 <span style="color:#94A3B8;font-weight:500">(명단 보기)</span></div>'+btns
+        +'<button onclick="document.getElementById(\'dtPickPop\').remove()" style="width:100%;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;padding:4px;font-size:11px;color:#64748B;cursor:pointer">닫기</button>';
+      document.body.appendChild(pop);
+      setTimeout(function(){ document.addEventListener('click', function _c(e){ var p=document.getElementById('dtPickPop'); if(p&&!p.contains(e.target)){ p.remove(); document.removeEventListener('click',_c); } }); },10);
     };
     window._dtListExcel=function(){
       var rows=window.__dtListRows||[];
@@ -22525,8 +22556,20 @@ async function okpi_render(){
           var _dtY=recent.y||(recent.label?2000+parseInt(String(recent.label).split('.')[0]):0), _dtM=recent.mo||(recent.label?parseInt(String(recent.label).split('.')[1]):0);
           chart=new Chart(ctx,{type:'bar',data:{labels:days,datasets:[{label:'정상납부',data:sd['정상납부'],backgroundColor:COL.jeong},{label:'연체납부',data:sd['연체납부'],backgroundColor:COL.napbu},{label:'연체중',data:sd['연체중'],backgroundColor:COL.jung},{label:'분납중',data:sd['분납중'],backgroundColor:COL.bunnab},{label:'납부예정',data:sd['납부예정'],backgroundColor:COL.yejeong}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},layout:{padding:{top:14}},
             onHover:function(e,els){ e.native.target.style.cursor = els.length?'pointer':'default'; },
-            onClick:function(e,els){ if(!els.length)return; var el=els[0]; var day=el.index+1; var st=chart.data.datasets[el.datasetIndex].label;
-              if(!_dtY||!_dtM) return; var key=String(_dtY)+String(_dtM).padStart(2,'0')+String(day).padStart(2,'0'); window._dtOpenList(key, st); },
+            onClick:function(e,els){
+              // [v470] A: 정확 조준(intersect) 우선 → 실패 시 B: 상태 선택 팝오버
+              if(!_dtY||!_dtM) return;
+              var hit=null;
+              try{ var ex=chart.getElementsAtEventForMode(e.native||e, 'nearest', {intersect:true}, true); if(ex&&ex.length) hit=ex[0]; }catch(_){}
+              var idx = hit? hit.index : (els.length? els[0].index : -1);
+              if(idx<0) return;
+              var day=idx+1, key=String(_dtY)+String(_dtM).padStart(2,'0')+String(day).padStart(2,'0');
+              if(hit){ window._dtOpenList(key, chart.data.datasets[hit.datasetIndex].label); return; }
+              var items=chart.data.datasets.map(function(ds){ return {label:ds.label, v:(ds.data[idx]||0), color:ds.backgroundColor}; }).filter(function(x){ return x.v>0; });
+              if(!items.length) return;
+              if(items.length===1){ window._dtOpenList(key, items[0].label); return; }
+              window._dtPickStatus(key, day, items, e.native||e);
+            },
             scales:{y:{stacked:true,beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'건';}},grid:{color:'rgba(120,120,120,0.1)'}},x:Object.assign({stacked:true},dayX)},plugins:{legend:{display:false},tooltip:statusTip}},plugins:[totLblPlugin]});
           return;
         }
