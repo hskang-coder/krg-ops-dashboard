@@ -7720,7 +7720,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v490</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v491</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
@@ -18507,7 +18507,7 @@ function _vldAnalysis(bucketLabel, kind){
         +(volX>=2 ? '→ <b>모수 확대가 주원인</b>, 갱신율은 '+(C2&&rate>=C2.rate?'개선/유지':'악화')+'.' : '→ <b>갱신율 변화가 주원인</b> — 모수는 유사.')
         +'</div></div>';
     }
-    var aM=avg(midA), aE2=avg(expA)||TARGET, gap=Math.max(0,aE2-aM);
+    var aM=avg(midA), aE2=avg(expA)||TARGET, gap=Math.round(Math.max(0,aE2-aM)*10)/10;   // [v491] 부동소수점 반올림
     var lossLtv=gap*avgFee*midA.length, cac=259521*midA.length;
     return '<div style="background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:9px;padding:10px 14px;margin:0 0 4px">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><b style="font-size:12.5px;color:#A32D2D">📊 중도퇴실 분석</b>'
@@ -18521,7 +18521,7 @@ function _vldAnalysis(bucketLabel, kind){
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#B91C1C">미회수 획득비</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(cac)+'</div></div>'
       +'</div>'
       +'<div style="background:#FEF2F2;border-left:3px solid #E24B4A;padding:6px 10px;font-size:10.5px;color:#991B1B;line-height:1.65">'
-      +'<b>선조치</b> — 만기퇴실 대비 <b>'+gap+'개월 조기 이탈</b>, 계약당 손실 약 '+mil(gap*avgFee)+'. '
+      +'<b>선조치</b> — 중도 '+aM+'개월 vs 만기 '+aE2+'개월 → <b>'+gap+'개월 조기 이탈</b>, 계약당 손실 약 '+mil(gap*avgFee)+'. '
       +(midDlqCnt>0?('현재 <b>연체 보유 '+midDlqCnt+'건</b>은 피해액 확대 전 즉시 개입 대상 (강제퇴실 '+midForce+'건 발생).'):'연체 미발생 — 자진 퇴실 사유 점검 필요.')
       +'</div></div>';
   }catch(e){ return ''; }
