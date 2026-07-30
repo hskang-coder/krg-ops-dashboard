@@ -7720,7 +7720,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v488</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v489</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
@@ -18174,7 +18174,7 @@ function _bfArrow(c,p){ var d=_bfPct(c,p); return (d>0?'▲':d<0?'▼':'–')+Ma
 function _bfMM(lb){ var m=String(lb).match(/(\d{2})\.(\d{2})/); return m?{y:2000+ +m[1],m:+m[2]}:null; }
 function _bfInM(d,o){ return d&&d.getFullYear()===o.y&&d.getMonth()===o.m-1; }
 // 영업 한줄 평 — 파트너 증감 + 지역 특징 (dateField: startDate | tentativeDate)
-function _bfSalesLine(A,B,verb,cur){
+function _bfSalesLine(A,B,verb,cur,mode){
   var grp=function(arr,f){var o={};arr.forEach(function(v){var k=(f(v)||'').trim()||'미지정';o[k]=(o[k]||0)+1;});return o;};
   var pA=grp(A,function(v){return String(v.partnerName||'');}), pB=grp(B,function(v){return String(v.partnerName||'');});
   var keys={}; Object.keys(pA).forEach(function(k){keys[k]=1;}); Object.keys(pB).forEach(function(k){keys[k]=1;});
@@ -18190,19 +18190,20 @@ function _bfSalesLine(A,B,verb,cur){
   var G=Object.keys(gk).filter(function(k){return k!=='미지정';}).map(function(k){return {k:k,d:(gA[k]||0)-(gB[k]||0)};})
     .sort(function(x,y){return y.d-x.d;}).filter(function(x){return x.d>0;}).slice(0,2);
   var tp=_bfPct(A.length,B.length);
-  var s = '<b>전월 대비 '+(verb||'신규입주')+' '+A.length+'건 ('+(tp>=0?'+':'')+tp+'%, '+B.length+'→'+A.length+')</b>. '
+  // [v489] mode: 'bep' = BEP 전망만 / 그 외 = 파트너·지역 증감만
+  if(mode==='bep'){
+    var ok = cur && _bfOutlook(cur);
+    if(!ok) return '<b>차월 전망 산출 불가</b> — 만기일·퇴실 데이터 부족.';
+    var gap=A.length-ok.bep;
+    return '<b>BEP 달성을 위해 필요한 계약건수 '+ok.bep+'건</b> '
+      + '▶ '+ok.lbl+' 예상 퇴실 <b>'+ok.bep+'건</b>(만기 '+ok.exp+'·중도 '+ok.mid+') → <b>유지 BEP '+ok.bep+'건</b>, '
+      + '현 수준('+A.length+'건) 유지 시 '+(gap>=0?'<b>순증 +'+gap+'</b>':'<b>'+Math.abs(gap)+'건 부족</b>')
+      + ' · 성장 +5% 목표 <b>'+Math.ceil(ok.bep+ok.act*0.05)+'건</b>';
+  }
+  return '<b>전월 대비 '+(verb||'신규입주')+' '+A.length+'건 ('+(tp>=0?'+':'')+tp+'%, '+B.length+'→'+A.length+')</b>. '
     + (up.length? '성장 '+up.map(fx).join(' · ') : '성장 파트너 없음')
     + (dn.length? ' / 하락 '+dn.map(fx).join(' · ') : '')
     + (G.length? ' — 지역 '+G.map(function(x){return x.k+' +'+x.d;}).join(' · ') : '');
-  // [v488] 차월 BEP 제안
-  var ok = cur && _bfOutlook(cur);
-  if(ok){
-    var gap=A.length-ok.bep;
-    s += ' <span style="color:#B5730F">▶ <b>'+ok.lbl+' 예상 퇴실 '+ok.bep+'건</b>(만기 '+ok.exp+'·중도 '+ok.mid+') → <b>유지 BEP '+ok.bep+'건</b>, '
-      + (gap>=0 ? '현 수준 유지 시 <b>순증 +'+gap+'</b>' : '<b>'+Math.abs(gap)+'건 부족</b>')
-      + ' · 성장 +5% 목표 '+Math.ceil(ok.bep+ok.act*0.05)+'건</span>';
-  }
-  return s;
 }
 // [v488] 차월 전망 — 최근 3개월 실적으로 예상 퇴실 추정, 유효계약 유지 BEP 산출
 function _bfOutlook(cur){
@@ -18274,7 +18275,7 @@ function _tentBriefHTML(){
       + ' → <b>순수익 '+_bfMil(net)+' '+_bfArrow(net,netP)+'</b>'
       + (net<0 ? ' <span style="color:#B45309">⚠ 획득비 초과</span>' : '');
     return '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:9px">'
-      + _bfBox('영업','#2E9E6B','#F0FDF4','#14532D', _bfSalesLine(A,B,verb,cur))
+      + _bfBox('영업','#2E9E6B','#F0FDF4','#14532D', _bfSalesLine(A,B,verb,cur,'partner'))   // [v489] 가계약 페이지 = 파트너·지역만
       + _bfBox('경영','#1B62D6','#EFF6FF','#1E3A8A', line2)
       + '</div>';
   }catch(e){ return ''; }
@@ -18296,7 +18297,7 @@ function _vldBriefHTML(rows){
     var inM=function(d,o){return d&&d.getFullYear()===o.y&&d.getMonth()===o.m-1;};
     var newIn=function(o){return V.filter(function(v){return inM(pd(v.startDate),o);});};
     var A=newIn(cur), B=newIn(prv);
-    var line1 = _bfSalesLine(A, B, '신규입주', cur);   // [v488] 공용 + 차월 BEP
+    var line1 = _bfSalesLine(A, B, '신규입주', cur, 'bep');   // [v489] 유효계약수 페이지 = BEP 전망만
     // ② 경영 — 계약 대비 퇴실
     var ex=function(o,mid){return V.filter(function(v){return inM(pd(v.terminateDate),o)&&(mid?isMid(v):!isMid(v));});};
     var E=ex(cur,false), Mx=ex(cur,true), Ep=ex(prv,false), Mp=ex(prv,true);
