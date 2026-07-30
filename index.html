@@ -18241,6 +18241,81 @@ function sumDrawValidChart(){
       + '<div style="margin-left:auto;color:#9CA3AF;font-size:10px">이탈률 약 '+churn+'%'+(tM>tE?' · 중도퇴실 > 만기퇴실 (중도이탈 관리 필요)':'')+'</div>';
   }
 }
+// [v482] 퇴실 분석 박스 — LTV 기준 (만기=갱신율·LTV, 중도=손실·선조치)
+function _vldAnalysis(bucketLabel, kind){
+  try{
+    if(kind!=='만기퇴실' && kind!=='중도퇴실') return '';
+    var V=Array.isArray(vacancyRawData)?vacancyRawData:[];
+    var pd=function(s){var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);return m?new Date(+m[1],+m[2]-1,+m[3]):null;};
+    var num=function(x){return parseFloat(String(x||'').replace(/[^0-9.]/g,''))||0;};
+    var isMid=function(v){return /중도퇴실/.test(String(v.jValue||''));};
+    var mm=String(bucketLabel).match(/(\d{2})\.(\d{2})/); if(!mm) return '';
+    var Y=2000+ +mm[1], M=+mm[2];
+    var inM=function(d){return d&&d.getFullYear()===Y&&d.getMonth()===M-1;};
+    var neu=0, expA=[], midA=[], expRent=0, midRent=0, midDlq=0, midDlqCnt=0, midForce=0;
+    var active=0, actFee=0;
+    V.forEach(function(v){
+      if(inM(pd(v.startDate))) neu++;
+      var k=String(v.contractKind||''); if(k==='정상'||k==='계약중'){ active++; actFee+=num(v.fee); }
+      var t=pd(v.terminateDate); if(!inM(t)) return;
+      var mth=_vldMonths(v.startDate, v.terminateDate)||0;
+      if(isMid(v)){ midA.push(mth); midRent+=num(v.rent); var da=num(v.dlqAmt); midDlq+=da; if(da>0)midDlqCnt++; if(/공실|퇴실상태/.test(String(v.status||'')))midForce++; }
+      else { expA.push(mth); expRent+=num(v.rent); }
+    });
+    var avg=function(a){return a.length?Math.round(a.reduce(function(x,y){return x+y;},0)/a.length*10)/10:0;};
+    var avgFee=active?Math.round(actFee/active):0;
+    var money=function(n){ return '₩'+Math.round(n).toLocaleString(); };
+    var mil=function(n){ return '₩'+(Math.round(n/100000)/10)+'M'; };
+    // [v482] 갱신 기준 — 시작일이 13~14개월 전이고 아직 계약중이면 '갱신', 그 시점 만기 도래 모수 대비
+    var base=new Date(Y,M-1,1);
+    var lo=new Date(base.getFullYear(), base.getMonth()-14, 1), hi=new Date(base.getFullYear(), base.getMonth()-13+1, 0);
+    var due=0, renew=0;
+    V.forEach(function(v){
+      var s=pd(v.startDate); if(!s||s<lo||s>hi) return;
+      due++;
+      var k=String(v.contractKind||'');
+      if(k==='정상'||k==='계약중') renew++;
+    });
+    var rate=due?Math.round(renew/due*1000)/10:0;
+    var TARGET=24;  // 목표 LTV(개월)
+    if(kind==='만기퇴실'){
+      var aE=avg(expA), ltv=aE*avgFee, tgt=TARGET*avgFee, pctT=tgt?Math.round(ltv/tgt*1000)/10:0;
+      var warn = aE<TARGET;
+      return '<div style="background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:9px;padding:10px 14px;margin:0 0 4px">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><b style="font-size:12.5px;color:#B5730F">📊 만기퇴실 분석</b>'
+        +'<span style="font-size:10.5px;color:#92400E">'+bucketLabel+' · 신규입주 '+neu+' · 만기 '+expA.length+' · 중도 '+midA.length+' → 순증 <b>'+(neu-expA.length-midA.length)+'명</b></span>'
+        +'<span style="margin-left:auto;background:'+(warn?'#FEE2E2':'#DCFCE7')+';color:'+(warn?'#B91C1C':'#15803D')+';font-size:10px;font-weight:800;padding:2px 9px;border-radius:9px">'+(warn?'⚠ LTV 개선 필요':'LTV 양호')+'</span></div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:7px">'
+        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">평균 거주기간</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+aE+'<span style="font-size:10.5px">개월</span></div></div>'
+        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">계약당 LTV</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+mil(ltv)+'</div></div>'
+        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:130px"><div style="font-size:10px;color:#92400E">갱신율 (13~14개월 전 시작)</div><div style="font-size:16px;font-weight:800;color:'+(rate>=60?'#15803D':'#B91C1C')+'">'+rate+'%</div></div>'
+        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#92400E">갱신 현황</div><div style="font-size:13px;font-weight:800;color:#374151">대상 '+due+'명 · 갱신 <b style="color:#15803D">'+renew+'</b> · 미갱신 <b style="color:#DC2626">'+(due-renew)+'</b></div></div>'
+        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">이탈 임대료</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+mil(expRent)+'<span style="font-size:10px">/월</span></div></div>'
+        +'</div>'
+        +'<div style="background:#FFF7ED;border-left:3px solid #E8A33D;padding:6px 10px;font-size:10.5px;color:#9A3412;line-height:1.65">'
+        +'<b>의사결정</b> — 목표 LTV '+TARGET+'개월 대비 <b>'+pctT+'%</b>. '
+        +(warn?('평균 '+aE+'개월은 <b>1회 갱신 전 이탈</b> 구간 → 갱신율 개선이 LTV 최대 레버 (갱신 1건당 약 '+mil(12*avgFee)+' 추가).'):'목표 도달 — 현 갱신 정책 유지.')
+        +'</div></div>';
+    }
+    var aM=avg(midA), aE2=avg(expA)||TARGET, gap=Math.max(0,aE2-aM);
+    var lossLtv=gap*avgFee*midA.length, cac=259521*midA.length;
+    return '<div style="background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:9px;padding:10px 14px;margin:0 0 4px">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><b style="font-size:12.5px;color:#A32D2D">📊 중도퇴실 분석</b>'
+      +'<span style="font-size:10.5px;color:#B91C1C">'+bucketLabel+' · 신규입주 '+neu+' · 만기 '+expA.length+' · 중도 '+midA.length+' → 순증 <b>'+(neu-expA.length-midA.length)+'명</b></span>'
+      +'<span style="margin-left:auto;background:'+(midDlqCnt>0?'#FEE2E2':'#DCFCE7')+';color:'+(midDlqCnt>0?'#B91C1C':'#15803D')+';font-size:10px;font-weight:800;padding:2px 9px;border-radius:9px">'+(midDlqCnt>0?'🚨 선조치 대상 '+midDlqCnt+'건':'연체 없음')+'</span></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:7px">'
+      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#B91C1C">평균 거주기간</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+aM+'<span style="font-size:10.5px">개월</span></div></div>'
+      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#B91C1C">연체 피해액</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(midDlq)+'</div></div>'
+      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:130px"><div style="font-size:10px;color:#B91C1C">강제퇴실(공실)</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+midForce+'<span style="font-size:10.5px">건</span> <span style="font-size:11px;color:#94A3B8">/ 연체보유 '+midDlqCnt+'</span></div></div>'
+      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:130px"><div style="font-size:10px;color:#B91C1C">LTV 손실(조기이탈)</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(lossLtv)+'</div></div>'
+      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#B91C1C">미회수 획득비</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(cac)+'</div></div>'
+      +'</div>'
+      +'<div style="background:#FEF2F2;border-left:3px solid #E24B4A;padding:6px 10px;font-size:10.5px;color:#991B1B;line-height:1.65">'
+      +'<b>선조치</b> — 만기퇴실 대비 <b>'+gap+'개월 조기 이탈</b>, 계약당 손실 약 '+mil(gap*avgFee)+'. '
+      +(midDlqCnt>0?('현재 <b>연체 보유 '+midDlqCnt+'건</b>은 피해액 확대 전 즉시 개입 대상 (강제퇴실 '+midForce+'건 발생).'):'연체 미발생 — 자진 퇴실 사유 점검 필요.')
+      +'</div></div>';
+  }catch(e){ return ''; }
+}
 // [v481] 거주기간(개월) — 시작일~퇴실일. 만기 하루 전 종료도 만월로 계산 (예: 25.6.20~26.6.19 = 12개월)
 function _vldMonths(startRaw, endRaw){
   var p=function(s){ var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; };
@@ -18354,6 +18429,7 @@ function _vldOpenList(bucketLabel, kind){
       +    '<button onclick="document.getElementById(\'vldListModal\').remove()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">닫기</button>'
       +  '</span></div>'
       +'<div style="display:flex;gap:5px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #F1F5F9;background:#FCFDFF"><span style="font-size:10.5px;color:#94A3B8;font-weight:700;align-self:center;margin-right:2px">구분 전환</span>'+tabs+'</div>'
+      +(function(){ var a=_vldAnalysis(bucketLabel, kind); return a?('<div style="padding:8px 16px 0">'+a+'</div>'):''; })()  /* [v482] 퇴실 분석 박스 */
       +'<div style="overflow:auto;padding:0 6px 6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
       +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th>'+thFixed+thExtra+'</tr></thead>'
       +'<tbody>'+body+'</tbody></table></div>'
