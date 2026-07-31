@@ -5325,9 +5325,10 @@ function renderContractRecord(c, payments, responses = []) {
     </tr>`;
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:#B0BDCE;padding:20px">입금 내역 없음</td></tr>';
 
-  const totalDelinq = parseFloat(String(c['연체금액']||'0').replace(/[^0-9.-]/g,''))||0;
-  const rentDelinq  = parseFloat(String(c['임대료연체']||'0').replace(/[^0-9.-]/g,''))||0;
-  const feeDelinq   = parseFloat(String(c['수수료연체']||'0').replace(/[^0-9.-]/g,''))||0;
+  // [v496] 전(錢) 표기('825,924/00') 파싱 오류 수정 — parseSafeMoney 사용 (기존 방식은 /00이 붙어 100배로 계산됨)
+  const totalDelinq = parseSafeMoney(c['연체금액']);
+  const rentDelinq  = parseSafeMoney(c['임대료연체']);
+  const feeDelinq   = parseSafeMoney(c['수수료연체']);
 
   document.getElementById('crResult').innerHTML = `
   <div class="cr-header-card">
