@@ -6405,7 +6405,7 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
   const rows = resp.table.rows || [];
   // [v381] 라벨 기반 인덱스 (수납시트 gid=131074722 컬럼 이동 대비, 현재 위치를 fallback) — 동작 불변, 미래 대비
   const _lb = (resp.table.cols || []).map(col => (col.label || col.id || '').trim());
-  const _iTipo=findColIdx(_lb,['구분'],0), _iCno=findColIdx(_lb,['계약번호'],4), _iType=findColIdx(_lb,['납부종류'],5), _iCStat=findColIdx(_lb,['계약상태'],13), _iPayStat=findColIdxLast(_lb,['납부상태'],19), _iAmt=findColIdx(_lb,['미납(연체)금액(원)','미납(연체)금액'],27), _iDays=findColIdx(_lb,['연체일수'],29);
+  const _iTipo=0 /* [v497] A열 고정 — 라벨이 '-'라 findColIdx('구분')가 '증빙구분(과세)'(33)을 오매칭, 그룹이 '-'로 나오던 버그 */, _iCno=findColIdx(_lb,['계약번호'],4), _iType=findColIdx(_lb,['납부종류'],5), _iCStat=findColIdx(_lb,['계약상태'],13), _iPayStat=findColIdxLast(_lb,['납부상태'],19), _iAmt=findColIdx(_lb,['미납(연체)금액(원)','미납(연체)금액'],27), _iDays=findColIdx(_lb,['연체일수'],29);
   const activeMap = {}, endedMap = {};
   let totalContracts = 0;
   const allActiveSet = new Set();
@@ -7902,7 +7902,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v496</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v497</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
