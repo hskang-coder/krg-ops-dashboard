@@ -5325,10 +5325,11 @@ function renderContractRecord(c, payments, responses = []) {
     </tr>`;
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:#B0BDCE;padding:20px">입금 내역 없음</td></tr>';
 
-  // [v496] 전(錢) 표기('825,924/00') 파싱 오류 수정 — parseSafeMoney 사용 (기존 방식은 /00이 붙어 100배로 계산됨)
-  const totalDelinq = parseSafeMoney(c['연체금액']);
-  const rentDelinq  = parseSafeMoney(c['임대료연체']);
-  const feeDelinq   = parseSafeMoney(c['수수료연체']);
+  // [v497] 금액 파싱 보강 — 전(錢) 표기('/00')는 parseSafeMoney가 처리, 퍼센트 서식 셀("82592400%")은 %일 때 ÷100
+  const _wonPct = v => { const s=String(v==null?'':v).trim(); let n=parseSafeMoney(s); if(/%\s*$/.test(s)) n=n/100; return n; };
+  const totalDelinq = _wonPct(c['연체금액']);
+  const rentDelinq  = _wonPct(c['임대료연체']);
+  const feeDelinq   = _wonPct(c['수수료연체']);
 
   document.getElementById('crResult').innerHTML = `
   <div class="cr-header-card">
