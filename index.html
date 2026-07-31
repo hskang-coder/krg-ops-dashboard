@@ -2459,6 +2459,60 @@ function _krNo(r){
 // [v407] 계약번호 비교용 정규화 — '.0' 제거 + trim / [v494] 통화서식(₩, 콤마) 제거
 function _normCno(s){ return String(s == null ? '' : s).trim().replace(/[₩,\s]/g, '').replace(/\.0+$/, ''); }
 
+// [v495] 시트 상태 자동 점검 — 서식/헤더/데이터 이상을 감지해 상단 배너로 경고 (재발 방지)
+//   ① 계약번호 열 통화서식(₩57,136) ② 헤더 라벨 위치 이탈 ③ 최근월 납기일 공란 과다
+function _sheetHealth(resp, name, opt){
+  try{
+    if(!resp || !resp.table) return;
+    opt = opt || {};
+    var cols=(resp.table.cols||[]).map(function(c){return (c.label||c.id||'').trim();});
+    var rows=resp.table.rows||[], issues=[];
+    // ① 계약번호 통화서식 감지 (샘플 최근 400행)
+    var ci = opt.cnoIdx!=null ? opt.cnoIdx : cols.indexOf('계약번호');
+    if(ci>=0){
+      var bad=0, seen=0;
+      for(var i=Math.max(0,rows.length-400); i<rows.length; i++){
+        var cell=(rows[i].c||[])[ci]; if(!cell||cell.v==null) continue;
+        seen++;
+        if(/[₩,]/.test(String(cell.f||''))) bad++;
+      }
+      if(seen>0 && bad/seen>0.3) issues.push(name+' 시트 계약번호 열에 통화서식(₩) 감지 — 시트에서 E열 서식을 "일반 숫자"로 변경 권장 (대시보드는 자동 보정 중)');
+    }
+    // ② 필수 헤더 위치 확인
+    (opt.expect||[]).forEach(function(e){
+      if(cols[e.idx]!==e.label && cols.indexOf(e.label)<0) issues.push(name+' 시트 헤더 "'+e.label+'" 미발견 (예상 위치 '+e.idx+', 실제 "'+(cols[e.idx]||'빈')+'") — 컬럼 이동/삭제 여부 확인');
+    });
+    // ③ 최근월 납기일 공란율
+    if(opt.dueIdx!=null && opt.billIdx!=null){
+      var now=new Date(), ym=now.getFullYear()+'년 '+String(now.getMonth()+1).padStart(2,'0')+'월';
+      var tot=0, empty=0;
+      rows.forEach(function(r){
+        var c=r.c||[]; var b=String((c[opt.billIdx]&&c[opt.billIdx].v)||'');
+        if(b.indexOf(ym)<0) return;
+        tot++;
+        var d=c[opt.dueIdx]; if(!d||d.v==null||String(d.v).trim()==='') empty++;
+      });
+      if(tot>30 && empty/tot>0.5) issues.push(name+' 시트 '+ym+' 납기일 공란 '+empty+'/'+tot+'건 — 납기일 자동수식 확인 필요');
+    }
+    if(issues.length){
+      window._sheetIssues = (window._sheetIssues||[]).filter(function(x){return x.indexOf(name+' ')!==0;}).concat(issues);
+      _renderSheetBanner();
+      issues.forEach(function(x){ console.warn('[sheetHealth]', x); });
+    }
+  }catch(e){ console.warn('[sheetHealth]', e); }
+}
+function _renderSheetBanner(){
+  var iss=window._sheetIssues||[]; if(!iss.length) return;
+  var el=document.getElementById('sheetHealthBanner');
+  if(!el){
+    el=document.createElement('div'); el.id='sheetHealthBanner';
+    el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99990;background:#FEF3C7;border-bottom:2px solid #F59E0B;padding:7px 40px 7px 14px;font-size:12px;color:#92400E;line-height:1.55;box-shadow:0 2px 8px rgba(0,0,0,.08)';
+    document.body.appendChild(el);
+  }
+  el.innerHTML='<b>⚠ 데이터 점검 알림</b> — '+iss.map(function(x){return '<span style="margin-right:14px">'+x+'</span>';}).join('')
+    +'<button onclick="document.getElementById(\'sheetHealthBanner\').remove()" style="position:absolute;right:10px;top:5px;background:none;border:none;font-size:15px;color:#92400E;cursor:pointer">✕</button>';
+}
+
 // [v408] 입금내역 시트 헤더 깨짐 대응 — 라벨 누락 시 positional 컬럼을 표준 라벨로 보정
 //   입금내역(Raw DATA) 시트의 1행에 제목/날짜범위가 들어가 gviz 헤더가 어긋나면
 //   '계약번호','청구서명','납기일','미납금액' 등 라벨이 비어 모든 라벨기반 화면(입금내역·연체현황·수납)이 깨진다.
@@ -6207,7 +6261,7 @@ function parseDelinqV3(resp) {
     const az  = cellStr(azIdx);
     const bc  = cellStr(bcIdx);
     const bf  = cellStr(bfIdx);
-    const cno = cellStr(cnoIdx).replace(/\.0$/, '');
+    const cno = _normCno(cellStr(cnoIdx));   // [v495] 통화서식 방어
     const nm  = cellStr(nmIdx);
     const tel = cellStr(telIdx);
     // [v237] '정상' / '계약중' 둘 다 활성계약으로 인식
@@ -6502,7 +6556,7 @@ function parseDailyForPayDate(resp, delinqRows) {
   const contractLatestRow = {};
   rows.forEach(row => {
     const c = row.c || [];
-    const cno = (noIdx_ >= 0 && c[noIdx_]) ? String(c[noIdx_].f ?? c[noIdx_].v ?? '').replace(/\.0$/,'').trim() : '';
+    const cno = (noIdx_ >= 0 && c[noIdx_]) ? _normCno(c[noIdx_].v ?? c[noIdx_].f ?? '') : '';   // [v495] 통화서식 방어
     if (!delinqSet.has(cno)) return;
     // [v214] 업무구분 필터 — 수납관리/연체관리만 통과 (중도퇴실관리 등 제외)
     const jobType = (jobTypeIdx_ >= 0 && c[jobTypeIdx_]) ? String(c[jobTypeIdx_].f ?? c[jobTypeIdx_].v ?? '').trim() : '';
@@ -6607,7 +6661,7 @@ function parseDailyForPt(resp) {
   const map = {}; // cno → { latestDate, latestDateStr, latestContent }
   rows.forEach(row => {
     const c = row.c || [];
-    const cno = (_noIdx >= 0 && c[_noIdx]) ? String(c[_noIdx].f ?? c[_noIdx].v ?? '').replace(/\.0$/,'').trim() : '';
+    const cno = (_noIdx >= 0 && c[_noIdx]) ? _normCno(c[_noIdx].v ?? c[_noIdx].f ?? '') : '';   // [v495] 통화서식 방어
     if (!cno) return;
     const aCell = _dateIdx >= 0 ? c[_dateIdx] : null;
     let aDate = null;
@@ -6790,6 +6844,9 @@ async function renderDelinquency() {
     }
     _dlqIncomeData   = parseIncomeForDlqV2(r2, dlqV3Data.dlqCnoSet);
     window._delinqDaysMap = _dlqIncomeData.delinqDaysMap || {};
+    // [v495] 입금내역 시트 상태 자동 점검 (통화서식/헤더 이탈/납기일 공란) — 이상 시 상단 배너
+    _sheetHealth(r2, '입금내역', { cnoIdx:4, billIdx:18, dueIdx:28,
+      expect:[{idx:4,label:'계약번호'},{idx:19,label:'납부상태'},{idx:28,label:'납기일'},{idx:29,label:'연체일수'},{idx:27,label:'미납(연체)금액(원)'}] });
     const termCnos = (_dlqContractData.terminatedDelinqRows || [])
       .map(r => ({ cno: String(r.cno).replace(/\.0$/,'').trim() }));
     const dlqRowsForPay = [
@@ -7813,7 +7870,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v494</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v495</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
