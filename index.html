@@ -2501,6 +2501,31 @@ function _sheetHealth(resp, name, opt){
     }
   }catch(e){ console.warn('[sheetHealth]', e); }
 }
+// [v496] 계약별 연체율 — 입금내역 임대료 청구 중 연체(연체납부·연체중·분납중) 비율. 1회 스캔 캐시.
+function _dlqRateOf(cno){
+  try{
+    var P = Array.isArray(paymentRawData) ? paymentRawData : [];
+    if(!P.length) return null;
+    if(!window.__dlqRateMap || window.__dlqRateMap._n !== P.length){
+      var m={_n:P.length};
+      for(var i=0;i<P.length;i++){
+        var p=P[i];
+        if(String(p['납부종류']||'').trim()!=='임대료') continue;
+        var st=String(p['납부상태']||'').trim();
+        if(!st || st==='납부예정') continue;
+        var k=_normCno(p['계약번호']);
+        if(!k) continue;
+        if(!m[k]) m[k]={bill:0,late:0};
+        m[k].bill++;
+        if(st==='연체납부'||st==='연체중'||st==='분납중') m[k].late++;
+      }
+      window.__dlqRateMap=m;
+    }
+    var e=window.__dlqRateMap[_normCno(cno)];
+    if(!e) return null;
+    return {bill:e.bill, late:e.late, rate:e.bill?Math.round(e.late/e.bill*100):0};
+  }catch(_){ return null; }
+}
 function _renderSheetBanner(){
   var iss=window._sheetIssues||[]; if(!iss.length) return;
   var el=document.getElementById('sheetHealthBanner');
@@ -7360,6 +7385,7 @@ function dlqRenderTableRows() {
         <th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>
         <th>계약번호</th><th title="gid=1953907648 BT열 — 연체외주">연체외주</th><th>그룹</th><th>계약정보</th>
         <th>연체일수</th><th>납부구분</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th>
+        <th title="입금내역(gid=131074722) 임대료 청구 중 연체(연체납부·연체중·분납중) 발생 비율">연체율</th>
         <th>연락처</th><th>연체금액</th><th title="시작일 25.6.1 이후 계약자: 임대료 × 4개월 (gid=1953907648 W열 ≥ 2025-06-01, AK열 × 4)">위약금</th><th>대응일</th><th>입금예정일</th><th title="gid=554798125 F열='법적조치 검토' 행의 H열 점수 (숫자)">점수</th><th title="gid=554798125 F열 기재 유무 (내용증명/지급명령/기타집행)">법적진행</th><th>최근 대응 내용</th>
       </tr></thead>
       <tbody>
@@ -7417,6 +7443,12 @@ function dlqRenderTableRows() {
             <td><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:${(r.contractStatus||'계약중')==='계약중'?'#dbeafe':(r.contractStatus==='종료(3개월이내)'?'#fef3c7':'#f3f4f6')};color:${(r.contractStatus||'계약중')==='계약중'?'#1d4ed8':(r.contractStatus==='종료(3개월이내)'?'#d97706':'#6b7280')}">${r.contractStatus||'계약중'}</span></td>
             <td><span style="font-size:11px;font-weight:600;color:#475569">${r.vacancyStatus||'-'}</span></td>
             <td class="dlq-tbl-nm">${r.nm||'-'}</td>
+            <td style="white-space:nowrap;text-align:center;font-size:11.5px">${(function(){
+              var m=_dlqRateOf(r.cno);
+              if(!m||!m.bill) return '<span style="color:#D1D5DB">-</span>';
+              var col=m.rate>=60?'#DC2626':m.rate>=30?'#D97706':'#059669';
+              return '<b style="color:'+col+'">'+m.rate+'%</b> <span style="color:#9CA3AF;font-size:10px">('+m.late+'/'+m.bill+')</span>';
+            })()}</td>
             <td class="dlq-tbl-tel">${r.tel||'-'}</td>
             <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
             <td style="white-space:nowrap;font-size:11px">${penaltyCell}</td>
@@ -7870,7 +7902,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v495</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v496</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
