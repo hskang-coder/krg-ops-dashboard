@@ -439,10 +439,12 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .cr-party-table tr:nth-child(even) td { background: #F8FAFC; }
 
 /* 연체 레코드 */
-.cr-delinq-grid { display: grid; grid-template-columns: 1fr 0.55fr 1fr; gap: 14px; padding: 16px 20px; } /* [v221] 가운데 갱신심사 카드 추가 */
+.cr-delinq-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 16px 20px; } /* [v498] 3카드 동일 폭 */
 @media(max-width:600px){ .cr-delinq-grid { grid-template-columns: 1fr; } }
 .cr-delinq-card { background: #FFF5F5; border: 1px solid #FECACA; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; } /* [v340] flex로 점선 정렬 */
 .cr-delinq-card.safe { background: #F0FDF4; border-color: #BBF7D0; }
+.cr-delinq-card.status-card { background: #EFF6FF; border-color: #BFDBFE; } /* [v498] 계약상태 카드 = 파란톤 */
+.cr-delinq-card.status-card.safe { background: #F0FDF4; border-color: #BBF7D0; }
 .cr-delinq-title { font-size: 10px; font-weight: 700; color: #DC2626; letter-spacing: 0.5px; margin-bottom: 8px; text-transform: uppercase; }
 .cr-delinq-title.safe { color: #16A34A; }
 .cr-delinq-amount { font-size: 22px; font-weight: 900; color: #DC2626; }
@@ -5676,6 +5678,10 @@ function renderContractRecord(c, payments, responses = []) {
             var p = rnwProgressKind(judge, sheetStatus, dday, contractStatus, deadline);
             var pLabel = {hope:'갱신희망', imp:'묵시적갱신', imp_cand:'묵시적갱신대상', exit:'만기퇴실예정', rej:'갱신거절', cond_progress:'조건부승인', ended:'계약종료', na:'미응답'};
             rs = pLabel[p] || '';
+            // [v498] 거주 개월수 — 입주 8개월 전이면 카운트다운, 이후면 심사결과(승인/조건부/거절)
+            var _startRaw = (vRow && vRow.startDate) || c['시작일'];
+            var _lived = (typeof _vldMonths==='function' && _startRaw) ? _vldMonths(_startRaw, new Date().getFullYear()+'-'+(new Date().getMonth()+1)+'-'+new Date().getDate()) : null;
+            window._crRnwCard = { lived:_lived, judge:judge, rs:rs, ended:(rs==='계약종료') };
           }
         } catch(e) { console.warn('renewal card:', e); }
         var rsColor = {
@@ -5688,14 +5694,38 @@ function renderContractRecord(c, payments, responses = []) {
           '계약종료':         {bg:'#F3F4F6',bd:'#9CA3AF',tx:'#374151'},
           '미응답':           {bg:'#F3F4F6',bd:'#D1D5DB',tx:'#6B7280'}
         };
-        var rc = rsColor[rs] || {bg:'#F3F4F6',bd:'#D1D5DB',tx:'#6B7280'};
-        return '<div class="cr-delinq-card" style="background:'+rc.bg+';border:0.5px solid '+rc.bd+';display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:16px 12px">'
+        // [v498] 표시 결정 — ① 계약종료는 그대로 ② 입주 8개월 미만: 갱신까지 카운트다운 ③ 8개월 이상: 심사결과
+        var cardMain = rs || '미진행', cardSub = '', rc;
+        var _cr = window._crRnwCard || {};
+        if (_cr.ended) {
+          rc = rsColor['계약종료'];
+        } else if (_cr.lived != null && _cr.lived < 8) {
+          var remain = Math.max(0, 12 - _cr.lived);
+          cardMain = '갱신까지 ' + remain + 'M 남음';
+          cardSub  = '입주 ' + _cr.lived + '개월차 · 심사는 8개월차 시작';
+          rc = {bg:'#EEEDFE', bd:'#AFA9EC', tx:'#3C3489'};
+        } else if (_cr.lived != null) {
+          var jl = ({app:'승인', approve:'승인', cond:'조건부', conditional:'조건부', deny:'거절'})[_cr.judge] || '';
+          if (jl) {
+            cardMain = jl;
+            cardSub  = '입주 ' + _cr.lived + '개월차 심사결과' + (rs && rs!==jl ? ' · ' + rs : '');
+            rc = jl==='승인' ? {bg:'#E1F5EE',bd:'#5DCAA5',tx:'#0F6E56'}
+               : jl==='조건부' ? {bg:'#FAEEDA',bd:'#EF9F27',tx:'#854F0B'}
+               : {bg:'#FCEBEB',bd:'#F09595',tx:'#A32D2D'};
+          } else {
+            rc = rsColor[rs] || {bg:'#F3F4F6',bd:'#D1D5DB',tx:'#6B7280'};
+          }
+        } else {
+          rc = rsColor[rs] || {bg:'#F3F4F6',bd:'#D1D5DB',tx:'#6B7280'};
+        }
+        return '<div class="cr-delinq-card" style="background:'+rc.bg+';border:1px solid '+rc.bd+';display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:16px 12px">'
           + '<div class="cr-delinq-title" style="color:'+rc.tx+';font-size:12px;font-weight:500;margin-bottom:8px;display:flex;align-items:center;gap:4px">📋 갱신심사</div>'
-          + '<div style="font-size:'+((rs||'').length>5?'14px':'18px')+';font-weight:600;color:'+rc.tx+';line-height:1.3">'+(rs||'미진행')+'</div>'
+          + '<div style="font-size:'+((cardMain||'').length>7?'15px':'18px')+';font-weight:700;color:'+rc.tx+';line-height:1.3">'+cardMain+'</div>'
+          + (cardSub ? '<div style="font-size:10.5px;color:'+rc.tx+';opacity:.75;margin-top:5px">'+cardSub+'</div>' : '')
           + '</div>';
       })()}
-      <div class="cr-delinq-card ${isActive?'safe':''}">
-        <div class="cr-delinq-title ${isActive?'safe':''}">계약 상태</div>
+      <div class="cr-delinq-card status-card ${isActive?'safe':''}">
+        <div class="cr-delinq-title ${isActive?'safe':''}" ${isActive?'':'style="color:#1D4ED8"'}>계약 상태</div>
         <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
           <div class="cr-delinq-amount ${isActive?'safe':''}">${isActive?'계약 중':'계약 종료'}</div>
           ${midExitStatus?`<span style="font-size:13px;font-weight:700;color:#DC2626">(${midExitStatus})</span>`:''}
@@ -7902,7 +7932,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v497</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v498</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
