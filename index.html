@@ -5238,7 +5238,7 @@ async function cG_loadSettleSheet(){
   var map = {};
   (resp.table.rows||[]).forEach(function(r){
     var c=r.c||[]; var g=function(i){ return c[i]?String(c[i].f!=null?c[i].f:(c[i].v!=null?c[i].v:'')).trim():''; };
-    var cno=g(9); var sv=g(21); var mm=g(3).match(/(\d{4})\s*년\s*(\d{1,2})\s*월/); // 계약번호9·정산일V(21)·정산서월3
+    var cno=_normCno(g(9)); var sv=g(21); var mm=g(3).match(/(\d{4})\s*년\s*(\d{1,2})\s*월/); // 계약번호9·정산일V(21)·정산서월3 — [v509] 통화서식 방어
     if(!cno||!sv||!mm) return;
     var key=mm[1]+'-'+String(+mm[2]).padStart(2,'0');
     if(!map[cno]) map[cno]={};
@@ -5267,8 +5267,10 @@ async function renderSettlementView(){
       var vG = await fetchSheetByGid(VACANCY_GID);
       vacancyRawData = parseVacancySheet(vG);
     }
-    if (window.__settleMapAll === undefined) { try{ await cG_loadSettleSheet(); }catch(e){ window.__settleMapAll={}; } }
+    if (window.__settleMapAll === undefined || !Object.keys(window.__settleMapAll||{}).length) { try{ await cG_loadSettleSheet(); }catch(e){ window.__settleMapAll = window.__settleMapAll || {}; } }
     var P = paymentRawData, V = vacancyRawData, SM = window.__settleMapAll || {};
+    // [v509] 정산 시트 미로딩 방어 — 기록이 하나도 없으면 '전부 미정산' 오분류가 되므로 판별 불가로 처리
+    var smOk = Object.keys(SM).length > 0;
     var today = new Date(); today.setHours(0,0,0,0);
     var mil = function(n){ return '₩' + (Math.round(n/100000)/10).toLocaleString() + 'M'; };
     var won = function(n){ return '₩' + Math.round(n).toLocaleString(); };
@@ -5363,7 +5365,7 @@ async function renderSettlementView(){
     var rate=cmBilled? Math.round(cmPaid/cmBilled*1000)/10 : 0;
     var html='';
     html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
-      + kpi('정산 대기 유보금 (수익 아님)', mil(reserve), 'D+3 '+mil(d3.amt)+' · D+6 '+mil(d6.amt)+' · 초과 '+mil(over.amt), '#FFFBEB','#92400E')
+      + kpi('정산 대기 유보금 (수익 아님)', mil(smOk?reserve:(d3.amt+d6.amt)), 'D+3 '+mil(d3.amt)+' · D+6 '+mil(d6.amt)+(smOk?' · 초과 '+mil(over.amt):' · 초과 판별불가'), '#FFFBEB','#92400E')
       + kpi(cmKey.replace('-','.')+' 청구 총액', mil(cmBilled), '입금 '+mil(cmPaid)+' ('+rate+'%) · 연체 미수 '+mil(cmOut)+' · 납기 전 '+mil(cmSched), '#fff')
       + kpi('연체채권 총잔액', mil(totalOut), '계약중 '+mil(outActive)+' · 퇴실채권(종료) '+mil(outEnded), '#FEF2F2','#A32D2D')
       + kpi('퇴실청소비 보관액', mil(cleanHold), cleanN+'건 입력됨 (AM열 공란 다수 — 시트 보완 필요)', '#F0F9FF','#0C4A6E')
@@ -5374,10 +5376,11 @@ async function renderSettlementView(){
       +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
       + pipe('D+3 이내 (정산 준비)', mil(d3.amt), d3.n+'건 · 납부 후 3일 이내')
       + pipe('D+4~6 (1차 시한 경과)', mil(d6.amt), d6.n+'건 · 최종 시한 전 지급 필요')
-      + pipe('⚠ D+6 초과 미정산', mil(over.amt), over.n+'건 · 즉시 확인', true)
+      + (smOk ? pipe('⚠ D+6 초과 미정산', mil(over.amt), over.n+'건 · 즉시 확인', true)
+              : pipe('D+6 초과 — 판별 불가', '—', '정산 시트 미로딩 (새로고침 필요)', true))
       + pipe('퇴실청소비 보관', mil(cleanHold), '입주 시 수취 · 퇴실 시 사용')
       +'</div>'
-      + (over.n? '<div style="margin-top:8px;background:#fff;border-radius:8px;padding:6px 4px;max-height:180px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="color:#92400E"><th style="padding:3px 8px;text-align:left">계약번호</th><th style="padding:3px 8px;text-align:left">청구월</th><th style="padding:3px 8px;text-align:right">금액</th><th style="padding:3px 8px;text-align:right">납부 후 경과</th></tr>'
+      + (smOk && over.n? '<div style="margin-top:8px;background:#fff;border-radius:8px;padding:6px 4px;max-height:180px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="color:#92400E"><th style="padding:3px 8px;text-align:left">계약번호</th><th style="padding:3px 8px;text-align:left">청구월</th><th style="padding:3px 8px;text-align:right">금액</th><th style="padding:3px 8px;text-align:right">납부 후 경과</th></tr>'
         + over.rows.sort(function(a,b){return b.age-a.age;}).map(function(r){ return '<tr style="border-top:1px solid #FDF0D5"><td style="padding:3px 8px"><b style="color:#0E7490;cursor:pointer" onclick="crNavFromView(\''+r.cno+'\',\'settlement\')">'+r.cno+'</b></td><td style="padding:3px 8px">'+r.bm+'</td><td style="padding:3px 8px;text-align:right;font-weight:700">'+won(r.amt)+'</td><td style="padding:3px 8px;text-align:right;color:#DC2626;font-weight:700">'+r.age+'일</td></tr>'; }).join('')
         + '</table></div>' : '')
       +'<div style="font-size:10px;color:#B45309;margin-top:6px">※ 최근 '+CUTOFF_DAYS+'일 입금분 기준 · 정산 시트(gid=1253974103)에 정산일이 기록된 건은 지급 완료로 간주 · 첫 달 임대료(직납)는 제외</div></div>';
@@ -8162,7 +8165,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v508</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v509</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
