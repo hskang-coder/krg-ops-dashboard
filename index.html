@@ -5659,6 +5659,7 @@ function renderContractRecord(c, payments, responses = []) {
       ${(function(){
         // [v222] 갱신심사 = 갱신관리 탭의 진행상태와 동일 (rnwProgressKind 호출)
         var rs = '';
+        window._crRnwCard = null;   // [v500] 이전 계약 값 잔존 방지
         try {
           if (typeof rnwProgressKind === 'function') {
             var cno = String(c['계약번호']||'').trim();
@@ -5668,6 +5669,7 @@ function renderContractRecord(c, payments, responses = []) {
             var today2 = new Date(); today2.setHours(0,0,0,0);
             var dday = endDate ? Math.floor((endDate.getTime() - today2.getTime()) / (24*3600*1000)) : null;
             var contractStatus = vRow ? (vRow.contractKind || '계약중') : (c['계약상태'] || '계약중');
+            if (String(contractStatus).trim() === '정상') contractStatus = '계약중';   // [v500] '정상'도 계약중으로 — 갱신심사 카드가 계약종료로 오분류되던 버그
             var deadline = endDate ? new Date(endDate.getFullYear(), endDate.getMonth()-2, endDate.getDate()) : null;
             var judge = '';
             try {
@@ -7941,7 +7943,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v499</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v500</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
