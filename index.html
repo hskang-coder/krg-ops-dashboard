@@ -5322,10 +5322,12 @@ async function renderSettlementView(){
       if(isFee(p)) compFee+=tot;
       else if(isRent(p)){ if(isFirstMonth(p)) compFirst+=tot; else compRent+=tot; }
       else return;
-      cmBilled+=tot; cmPaid+=num(p['납부금액(원)']);
+      cmBilled+=tot;
       // [v507] 납부예정(납기 미도래)은 미수가 아님 — 분리 집계
-      if(String(p['납부상태']||'').trim()==='납부예정') cmSched+=num(p['미납(연체)금액(원)'])||tot;
-      else cmOut+=num(p['미납(연체)금액(원)']);
+      // [v508] 시트 '납부금액(원)' 열이 0으로 비어 있어 입금 = 청구 − 미납으로 산출
+      var _o=num(p['미납(연체)금액(원)']);
+      if(String(p['납부상태']||'').trim()==='납부예정') cmSched+=_o||tot;
+      else { cmOut+=_o; cmPaid+=Math.max(0, tot-_o); }
     });
 
     // ── ③ 연체 롤포워드 (발생월 고정 코호트, 최근 4개월 + 이전 누적) ──
@@ -5339,8 +5341,11 @@ async function renderSettlementView(){
       var isLate = days>0 || st==='연체중' || st==='분납중';
       if(!isLate) return;
       var bm=billMonth(p); if(!bm) return;
-      var paid=num(p['납부금액(원)']), out=num(p['미납(연체)금액(원)']);
-      var gen=paid+out; if(gen<=0) return;
+      // [v508] 발생 = 최종청구금액(불변) · 회수 = 발생 − 미납 (납부금액 열이 0으로 비어 있어 차감 방식 사용)
+      var out=num(p['미납(연체)금액(원)']);
+      var gen=num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']); if(gen<=0) gen=out;
+      if(gen<=0) return;
+      var paid=Math.max(0, gen-out);
       var ended = String(p['계약상태']||'').trim()==='종료';   // [v507] 계약중/퇴실채권 구분
       if(win.indexOf(bm)>=0){
         if(!coh[bm]) coh[bm]={gen:0,rec:0,out:0,n:0};
@@ -8157,7 +8162,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v507</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v508</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
