@@ -7973,7 +7973,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v504</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v505</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
@@ -18452,7 +18452,13 @@ function _bfPd(s){ var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
 function _bfNum(x){ return parseFloat(String(x||'').replace(/[^0-9.]/g,''))||0; }
 function _bfMil(n){ return '₩'+(Math.round(n/100000)/10)+'M'; }
 function _bfPct(c,p){ return p? (Math.round((c-p)/p*1000)/10) : 0; }
-function _bfArrow(c,p){ var d=_bfPct(c,p); return (d>0?'▲':d<0?'▼':'–')+Math.abs(d)+'%'; }
+// [v505] 화살표 색상 — 상승=초록/하락=빨강 (inv=true면 비용성 지표라 반대), 볼드
+function _bfArrow(c,p,inv){
+  var d=_bfPct(c,p);
+  if(d===0) return '<span style="color:#94A3B8;font-weight:700">–0%</span>';
+  var good = inv ? d<0 : d>0;
+  return '<b style="color:'+(good?'#15803D':'#DC2626')+'">'+(d>0?'▲':'▼')+Math.abs(d)+'%</b>';
+}
 function _bfMM(lb){ var m=String(lb).match(/(\d{2})\.(\d{2})/); return m?{y:2000+ +m[1],m:+m[2]}:null; }
 function _bfInM(d,o){ return d&&d.getFullYear()===o.y&&d.getMonth()===o.m-1; }
 // 영업 한줄 평 — 파트너 증감 + 지역 특징 (dateField: startDate | tentativeDate)
@@ -18465,7 +18471,8 @@ function _bfSalesLine(A,B,verb,cur,mode){
   }).sort(function(x,y){return y.d-x.d;});
   var up=D.filter(function(x){return x.d>0;}).slice(0,2);
   var dn=D.filter(function(x){return x.d<0;}).sort(function(x,y){return x.d-y.d;}).slice(0,2);
-  var fx=function(x){ return x.k+' '+x.p+'→'+x.c+'건'+(x.pct===null?'(신규)':'('+(x.pct>0?'+':'')+x.pct+'%)'); };
+  // [v505] 증감률 색상+볼드 — 상승 초록 / 하락 빨강
+  var fx=function(x){ return x.k+' '+x.p+'→<b>'+x.c+'건</b>'+(x.pct===null?' <b style="color:#15803D">(신규)</b>':' <b style="color:'+(x.pct>0?'#15803D':x.pct<0?'#DC2626':'#94A3B8')+'">('+(x.pct>0?'+':'')+x.pct+'%)</b>'); };
   var gu=function(v){var a=String(v.propAddr||'');var m=a.match(/([가-힣]{2,}(?:구|시|군))/);return m?m[1]:'';};
   var gA=grp(A,gu), gB=grp(B,gu);
   var gk={}; Object.keys(gA).forEach(function(k){gk[k]=1;}); Object.keys(gB).forEach(function(k){gk[k]=1;});
@@ -18482,10 +18489,10 @@ function _bfSalesLine(A,B,verb,cur,mode){
       + '현 수준('+A.length+'건) 유지 시 '+(gap>=0?'<b>순증 +'+gap+'</b>':'<b>'+Math.abs(gap)+'건 부족</b>')
       + ' · 성장 +5% 목표 <b>'+Math.ceil(ok.bep+ok.act*0.05)+'건</b>';
   }
-  return '<b>전월 대비 '+(verb||'신규입주')+' '+A.length+'건 ('+(tp>=0?'+':'')+tp+'%, '+B.length+'→'+A.length+')</b>. '
+  return '<b>전월 대비 '+(verb||'신규입주')+' '+A.length+'건</b> <b style="color:'+(tp>0?'#15803D':tp<0?'#DC2626':'#94A3B8')+'">('+(tp>=0?'+':'')+tp+'%)</b> <span style="color:#64748B">('+B.length+'→'+A.length+')</span>. '
     + (up.length? '성장 '+up.map(fx).join(' · ') : '성장 파트너 없음')
     + (dn.length? ' / 하락 '+dn.map(fx).join(' · ') : '')
-    + (G.length? ' — 지역 '+G.map(function(x){return x.k+' +'+x.d;}).join(' · ') : '');
+    + (G.length? ' — 지역 '+G.map(function(x){return x.k+' <b>+'+x.d+'</b>';}).join(' · ') : '');
 }
 // [v488] 차월 전망 — 최근 3개월 실적으로 예상 퇴실 추정, 유효계약 유지 BEP 산출
 function _bfOutlook(cur){
@@ -18571,7 +18578,7 @@ function _tentBriefCore(cur, fld, verb){
       + (avg3? ' <span style="color:#64748B">(3개월평균 '+avg3+'건 대비 '+_bfArrow(a.cnt,avg3)+')</span>' : '') + ' · '
       + '평균임대료 '+Math.round(a.avgRent/1000)+'천 '+_bfArrow(a.avgRent,b.avgRent)+' · '
       + '수수료 '+_bfMil(a.fee)+' '+_bfArrow(a.fee,b.fee)+' · '
-      + '중개보수 '+_bfMil(a.brk)+' '+_bfArrow(a.brk,b.brk)+' · '
+      + '중개보수 <b>'+_bfMil(a.brk)+'</b> '+_bfArrow(a.brk,b.brk,true)+' · '
       + '정산예정 '+_bfMil(a.rent)+' '+_bfArrow(a.rent,b.rent)
       + (a.dlq>0 ? ' · 연체 '+_bfMil(a.dlq) : '')
       + ' → <b>순수익 '+_bfMil(net)+' '+_bfArrow(net,netP)+'</b>'
