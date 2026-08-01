@@ -5371,9 +5371,12 @@ async function renderSettlementView(){
     var rate=cmBilled? Math.round(cmPaid/cmBilled*1000)/10 : 0;
     var html='';
     // [v510] 조회월 선택기 — 청구총액·청구구성·롤포워드에 적용 (유보금 파이프라인은 오늘 기준)
+    var _mShift=function(base,d){ var m2=new Date(+base.slice(0,4), +base.slice(5,7)-1+d, 1); return m2.getFullYear()+'-'+String(m2.getMonth()+1).padStart(2,'0'); };
     html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;background:#fff;border:1px solid #E2EAF5;border-radius:10px;padding:8px 13px">'
       +'<span style="font-size:12px;font-weight:700;color:#1A3A5C">조회월</span>'
+      +'<button onclick="window._stlMonth=\''+_mShift(cmKey,-1)+'\';renderSettlementView()" title="전월" style="font-size:13px;padding:3px 10px;border:1px solid #D6E0EF;border-radius:6px;background:#F7FAFD;color:#1A3A5C;cursor:pointer;font-weight:700">◀</button>'
       +'<input type="month" value="'+cmKey+'" onchange="window._stlMonth=this.value;renderSettlementView()" style="font-size:12px;padding:4px 8px;border:1px solid #D6E0EF;border-radius:6px">'
+      +'<button onclick="window._stlMonth=\''+_mShift(cmKey,1)+'\';renderSettlementView()" title="차월" style="font-size:13px;padding:3px 10px;border:1px solid #D6E0EF;border-radius:6px;background:#F7FAFD;color:#1A3A5C;cursor:pointer;font-weight:700">▶</button>'
       +'<button onclick="window._stlMonth=null;renderSettlementView()" style="font-size:11px;padding:4px 10px;border:1px solid #D6E0EF;border-radius:6px;background:#F7FAFD;color:#5A6A8A;cursor:pointer">최신</button>'
       +'<span style="font-size:10.5px;color:#8A9AB5">청구 총액 · 청구 구성 · 롤포워드에 적용 — 유보금 파이프라인은 오늘 기준</span></div>';
     html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
@@ -8174,7 +8177,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v510</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v511</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
