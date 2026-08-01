@@ -7973,7 +7973,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v503</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v504</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
@@ -18518,16 +18518,30 @@ function _bfBox(tag,color,bg,txt,body){
 }
 
 // [v486] 월별 가계약 추이 상단 2줄 브리핑 — ① 영업 ② 경영(재무 지표 증감)
+// [v504] 월 지정형 코어 분리 — 차트(최신 유효월)와 부동산별 모달(클릭 월)에서 공용
 function _tentBriefHTML(){
+  var cfg=window._sumChartCfg||{};
+  var fld = (cfg.basis==='startDate') ? 'startDate' : 'tentativeDate';
+  var verb= (cfg.basis==='startDate') ? '입주' : '가계약';
+  var endD = (typeof cmgParseStartDate==='function' && cfg.end) ? cmgParseStartDate(cfg.end) : new Date();
+  if(!endD) endD=new Date();
+  var cur={y:endD.getFullYear(), m:endD.getMonth()+1};
+  // [v504] 당월 데이터가 아직 없으면(월초 등) 데이터가 있는 최근 월로 후퇴 — "0건 ▼100%" 오표시 방지
+  try{
+    var V0=Array.isArray(vacancyRawData)?vacancyRawData:[];
+    for(var s=0;s<2;s++){
+      var has=V0.some(function(v){ return _bfInM(_bfPd(v[fld]),cur); });
+      if(has) break;
+      var pmX=new Date(cur.y, cur.m-2, 1); cur={y:pmX.getFullYear(), m:pmX.getMonth()+1};
+    }
+  }catch(_e){}
+  return _tentBriefCore(cur, fld, verb);
+}
+function _tentBriefCore(cur, fld, verb){
   try{
     var V=Array.isArray(vacancyRawData)?vacancyRawData:[];
-    if(!V.length) return '';
-    var cfg=window._sumChartCfg||{};
-    var fld = (cfg.basis==='startDate') ? 'startDate' : 'tentativeDate';
-    var verb= (cfg.basis==='startDate') ? '입주' : '가계약';
-    var endD = (typeof cmgParseStartDate==='function' && cfg.end) ? cmgParseStartDate(cfg.end) : new Date();
-    if(!endD) endD=new Date();
-    var cur={y:endD.getFullYear(), m:endD.getMonth()+1};
+    if(!V.length||!cur) return '';
+    fld = fld || 'tentativeDate'; verb = verb || '가계약';
     var pm=new Date(cur.y, cur.m-2, 1), prv={y:pm.getFullYear(), m:pm.getMonth()+1};
     var pick=function(o){ return V.filter(function(v){ return _bfInM(_bfPd(v[fld]),o); }); };
     var A=pick(cur), B=pick(prv);
@@ -18547,8 +18561,14 @@ function _tentBriefHTML(){
     };
     var a=agg(A), b=agg(B);
     var net=a.fee-a.brk, netP=b.fee-b.brk;
+    // [v504] 과거 대비 — 직전 3개월 평균 계약건수
+    var avg3=0; try{
+      var s3=0; for(var _k=1;_k<=3;_k++){ var d3=new Date(cur.y, cur.m-1-_k, 1); s3+=pick({y:d3.getFullYear(),m:d3.getMonth()+1}).length; }
+      avg3=Math.round(s3/3);
+    }catch(_e){}
     // [v488] 한 줄로 압축 — 계약·평균임대료·수수료·중개보수·정산예정·순수익
-    var line2 = '<b>계약 '+a.cnt+' '+_bfArrow(a.cnt,b.cnt)+'</b> · '
+    var line2 = '<b>계약 '+a.cnt+' '+_bfArrow(a.cnt,b.cnt)+'</b>'
+      + (avg3? ' <span style="color:#64748B">(3개월평균 '+avg3+'건 대비 '+_bfArrow(a.cnt,avg3)+')</span>' : '') + ' · '
       + '평균임대료 '+Math.round(a.avgRent/1000)+'천 '+_bfArrow(a.avgRent,b.avgRent)+' · '
       + '수수료 '+_bfMil(a.fee)+' '+_bfArrow(a.fee,b.fee)+' · '
       + '중개보수 '+_bfMil(a.brk)+' '+_bfArrow(a.brk,b.brk)+' · '
@@ -19079,6 +19099,7 @@ function _tentOpenPartners(bucketLabel){
       +    '<button onclick="_tentPartnerExcel()" style="background:#1d4ed8;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">⬇️ 엑셀</button>'
       +    '<button onclick="document.getElementById(\'tpModal\').remove()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">닫기</button>'
       +  '</span></div>'
+      +(function(){ var b=_tentBriefCore(o, fld, verb); return b? '<div style="padding:10px 16px 0">'+b+'</div>' : ''; })()   /* [v504] 클릭 월 기준 영업/경영 분석 박스 */
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid #F1F5F9">'
       +  card('계약', T.cur+'건', _bfArrow(T.cur,T.prv))
       +  card('평균 임대료', '₩'+avgAll.toLocaleString(), '')
