@@ -7947,7 +7947,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v501</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v502</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
@@ -15079,7 +15079,29 @@ function openRenewalReport(cno){
 }
 
 // === 직전 10회 청구 기준 연체 산정 (청구일 다음날부터 인정) ===
+// [v502] paymentRawData(객체 배열) 기반 폴백 — 입주관리 카드 등 gviz resp가 없는 화면에서도 심사 판정 가능
+function rnwCalcLateMetricsFromObjects(cno, P){
+  if (!Array.isArray(P) || !P.length) return { count:0, sumDays:0, rate:0, total:0 };
+  var key = _normCno(cno), matches = [];
+  for (var i=0;i<P.length;i++){
+    var p=P[i];
+    if (_krNo(p) !== key) continue;
+    var n13=String(p['계약상태']||'').trim();
+    if (n13==='삭제'||n13==='계약 철회') continue;
+    if (String(p['납부종류']||'').trim()!=='임대료') continue;
+    var days=parseInt(String(p['연체일수']==null?'':p['연체일수']).replace(/[^0-9\-]/g,''),10)||0;
+    var bd=null; try{ bd=rnwParseDate(p['납기일']); }catch(_e){}
+    matches.push({days:days, billDate:bd});
+  }
+  matches.sort(function(a,b){ return (b.billDate||0)-(a.billDate||0); });
+  var top10=matches.slice(0,10), total=top10.length;
+  var late=top10.filter(function(r){return r.days>0;});
+  var sumDays=late.reduce(function(s,r){return s+r.days;},0);
+  return { count:late.length, sumDays:sumDays, rate: total>0?Math.round(late.length/total*100):0, total:total };
+}
 function rnwCalcLateMetrics(cno, incomeResp){
+  // [v502] gviz resp가 아니라 객체 배열(paymentRawData)이 넘어오면 폴백 사용
+  if (Array.isArray(incomeResp)) return rnwCalcLateMetricsFromObjects(cno, incomeResp);
   if (!incomeResp || !incomeResp.table) return { count:0, sumDays:0, rate:0, total:0 };
   var rows = incomeResp.table.rows || [];
   var _ilb = (incomeResp.table.cols || []).map(function(col){return (col.label||col.id||'').trim();});  // [v381] 라벨 기반(현재 인덱스 fallback)
