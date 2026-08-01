@@ -5315,14 +5315,17 @@ async function renderSettlementView(){
     var hasCur=P.some(function(p){ return billMonth(p)===mkKey(cm) && isRent(p); });
     if(!hasCur){ var pmv=new Date(cm.y,cm.m-2,1); cm={y:pmv.getFullYear(),m:pmv.getMonth()+1}; }
     var cmKey=mkKey(cm);
-    var compRent=0, compFirst=0, compFee=0, cmPaid=0, cmBilled=0, cmOut=0;
+    var compRent=0, compFirst=0, compFee=0, cmPaid=0, cmBilled=0, cmOut=0, cmSched=0;
     P.forEach(function(p){
       if(!alive(p) || billMonth(p)!==cmKey) return;
       var tot=num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) || (num(p['납부금액(원)'])+num(p['미납(연체)금액(원)']));
       if(isFee(p)) compFee+=tot;
       else if(isRent(p)){ if(isFirstMonth(p)) compFirst+=tot; else compRent+=tot; }
       else return;
-      cmBilled+=tot; cmPaid+=num(p['납부금액(원)']); cmOut+=num(p['미납(연체)금액(원)']);
+      cmBilled+=tot; cmPaid+=num(p['납부금액(원)']);
+      // [v507] 납부예정(납기 미도래)은 미수가 아님 — 분리 집계
+      if(String(p['납부상태']||'').trim()==='납부예정') cmSched+=num(p['미납(연체)금액(원)'])||tot;
+      else cmOut+=num(p['미납(연체)금액(원)']);
     });
 
     // ── ③ 연체 롤포워드 (발생월 고정 코호트, 최근 4개월 + 이전 누적) ──
@@ -5338,12 +5341,16 @@ async function renderSettlementView(){
       var bm=billMonth(p); if(!bm) return;
       var paid=num(p['납부금액(원)']), out=num(p['미납(연체)금액(원)']);
       var gen=paid+out; if(gen<=0) return;
+      var ended = String(p['계약상태']||'').trim()==='종료';   // [v507] 계약중/퇴실채권 구분
       if(win.indexOf(bm)>=0){
         if(!coh[bm]) coh[bm]={gen:0,rec:0,out:0,n:0};
         coh[bm].gen+=gen; coh[bm].rec+=paid; coh[bm].out+=out; coh[bm].n++;
       } else { prevGen+=gen; prevOut+=out; }
+      if(out>0){ if(ended) window.__stlEndedOut=(window.__stlEndedOut||0)+out; else window.__stlActiveOut=(window.__stlActiveOut||0)+out; }
     });
     var totalOut = prevOut + win.reduce(function(s,m){ return s + ((coh[m]||{}).out||0); },0);
+    var outActive=window.__stlActiveOut||0, outEnded=window.__stlEndedOut||0;
+    window.__stlActiveOut=0; window.__stlEndedOut=0;
 
     // ── 렌더 ──
     var kpi=function(lb,val,sub,bg,tx){ return '<div style="background:'+(bg||'#fff')+';border:1px solid #E2EAF5;border-radius:10px;padding:10px 13px;min-width:150px;flex:1"><div style="font-size:10.5px;color:'+(tx||'#5A6A8A')+'">'+lb+'</div><div style="font-size:19px;font-weight:800;color:'+(tx||'#1A3A5C')+'">'+val+'</div><div style="font-size:10px;color:'+(tx||'#8A9AB5')+';opacity:.85">'+sub+'</div></div>'; };
@@ -5352,8 +5359,8 @@ async function renderSettlementView(){
     var html='';
     html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
       + kpi('정산 대기 유보금 (수익 아님)', mil(reserve), 'D+3 '+mil(d3.amt)+' · D+6 '+mil(d6.amt)+' · 초과 '+mil(over.amt), '#FFFBEB','#92400E')
-      + kpi(cmKey.replace('-','.')+' 청구 총액', mil(cmBilled), '입금 '+mil(cmPaid)+' ('+rate+'%) · 미수 '+mil(cmOut), '#fff')
-      + kpi('연체채권 총잔액', mil(totalOut), '롤포워드 월말 잔액 합계', '#FEF2F2','#A32D2D')
+      + kpi(cmKey.replace('-','.')+' 청구 총액', mil(cmBilled), '입금 '+mil(cmPaid)+' ('+rate+'%) · 연체 미수 '+mil(cmOut)+' · 납기 전 '+mil(cmSched), '#fff')
+      + kpi('연체채권 총잔액', mil(totalOut), '계약중 '+mil(outActive)+' · 퇴실채권(종료) '+mil(outEnded), '#FEF2F2','#A32D2D')
       + kpi('퇴실청소비 보관액', mil(cleanHold), cleanN+'건 입력됨 (AM열 공란 다수 — 시트 보완 필요)', '#F0F9FF','#0C4A6E')
       +'</div>';
     // ① 파이프라인
@@ -8150,7 +8157,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v506</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v507</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
