@@ -2840,6 +2840,29 @@ function buildJobFilterBar(responses) {
   return `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:0 4px 8px">${pill('전체')}${pill('수납관리')}${pill('연체관리')}${pill('갱신관리')}${pill('중도퇴실관리')}${pill('계약(입주)관리')}${pill('법무관리')}</div>`;
 }
 
+// [v503] 갱신심사 카드 지연 재판정 — 입금데이터 로딩 완료 후 승인/조건부/거절 갱신
+function _crxRnwPatch(cno, lived, tryN){
+  try{
+    var el = document.getElementById('crxRnwCard');
+    if (!el) return;                                        // 카드가 사라졌으면 중단(다른 계약으로 이동 등)
+    if (String(window._crCurrentNo||'').trim() !== String(cno)) return;  // 다른 계약 열림
+    var P = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData : [];
+    if (!P.length) { if ((tryN||0) < 20) setTimeout(function(){ _crxRnwPatch(cno, lived, (tryN||0)+1); }, 1500); return; }
+    var m = rnwCalcLateMetrics(cno, P);
+    if (!m || !m.total) return;                             // 청구 이력 자체가 없으면 유지
+    var j = rnwClassify(m);
+    var jl = ({app:'승인', cond:'조건부', deny:'거절'})[j];
+    if (!jl) return;
+    var rc = jl==='승인' ? {bg:'#E1F5EE',bd:'#5DCAA5',tx:'#0F6E56'}
+           : jl==='조건부' ? {bg:'#FAEEDA',bd:'#EF9F27',tx:'#854F0B'}
+           : {bg:'#FCEBEB',bd:'#F09595',tx:'#A32D2D'};
+    el.style.background=rc.bg; el.style.borderColor=rc.bd;
+    el.innerHTML = '<div class="cr-delinq-title" style="color:'+rc.tx+';font-size:12px;font-weight:500;margin-bottom:8px;display:flex;align-items:center;gap:4px">📋 갱신심사</div>'
+      + '<div style="font-size:18px;font-weight:700;color:'+rc.tx+';line-height:1.3">'+jl+'</div>'
+      + '<div style="font-size:10.5px;color:'+rc.tx+';opacity:.75;margin-top:5px">입주 '+lived+'개월차 심사결과 · 연체 '+m.count+'/'+m.total+'회 · 누적 '+m.sumDays+'일</div>';
+  }catch(e){ console.warn('[crxRnwPatch]', e); }
+}
+
 function updateResponseSection(no, responses) {
   // [v494 crx] 로딩 레이스 안전망 — 빈 배열로 호출됐지만 데이터가 이미 로드돼 있으면 직접 재필터
   try {
@@ -5733,7 +5756,10 @@ function renderContractRecord(c, payments, responses = []) {
         } else {
           rc = rsColor[rs] || {bg:'#F3F4F6',bd:'#D1D5DB',tx:'#6B7280'};
         }
-        return '<div class="cr-delinq-card" style="background:'+rc.bg+';border:1px solid '+rc.bd+';display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:16px 12px">'
+        // [v503] 입주 8개월 이상인데 판정 불가(입금데이터 미로딩) → 로딩 완료 후 자동 재판정
+        var _needRetry = !_cr.ended && _cr.lived != null && _cr.lived >= 8 && !(({app:1,approve:1,cond:1,conditional:1,deny:1})[_cr.judge]);
+        if (_needRetry) { try{ setTimeout(function(){ _crxRnwPatch(String(c['계약번호']||'').trim(), _cr.lived, 0); }, 1200); }catch(_e){} }
+        return '<div class="cr-delinq-card" id="crxRnwCard" style="background:'+rc.bg+';border:1px solid '+rc.bd+';display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:16px 12px">'
           + '<div class="cr-delinq-title" style="color:'+rc.tx+';font-size:12px;font-weight:500;margin-bottom:8px;display:flex;align-items:center;gap:4px">📋 갱신심사</div>'
           + '<div style="font-size:'+((cardMain||'').length>7?'15px':'18px')+';font-weight:700;color:'+rc.tx+';line-height:1.3">'+cardMain+'</div>'
           + (cardSub ? '<div style="font-size:10.5px;color:'+rc.tx+';opacity:.75;margin-top:5px">'+cardSub+'</div>' : '')
@@ -7947,7 +7973,7 @@ function _drBuildHtml(){
     + '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: 운영매뉴얼 '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">SOP04 수납/연체관리↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank" style="color:#2563eb;font-weight:700">SOP06 강제퇴실↗</a>'
-    + ' · Daily Report 생성일 '+ds+' · build v502</div>'
+    + ' · Daily Report 생성일 '+ds+' · build v503</div>'
     + '</div>';
 }
 function dlqOpenDailyReport(){
