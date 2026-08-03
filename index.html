@@ -20564,6 +20564,137 @@ function sumBuildSection4(){
   };
 }
 
+// =================================================================
+// [v524] Section ④ 교체 — KRG 손익 (분할 서비스 수수료 카드 대체)
+//   수익 = 수수료 입금 / 지출 = 부동산 중개보수(발생) + 확정 손실(퇴실자 미회수, 수수료 미수 제외)
+//   ※ 수수료 미수는 이미 '입금'에서 빠져 있어 손실에 또 넣으면 이중 차감
+// =================================================================
+function sumBuildPL(){
+  try {
+    if (!Array.isArray(paymentRawData) || !paymentRawData.length) return null;
+    var num = _bfNum, pdt = _bfPd;
+    var today = new Date(); today.setHours(0,0,0,0);
+    var MO = [];
+    for (var k=5;k>=0;k--){ var d=new Date(today.getFullYear(), today.getMonth()-k, 1); MO.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
+    var A = {};
+    MO.forEach(function(m){ A[m] = { fee:0, feePaid:0, brk:0, brkPaid:0, brkUn:0, rent:0, settle:0, clean:0, legal:0, loss:0, net:0 }; });
+
+    // ── 수익(수수료 입금) + 확정 손실(퇴실자 미회수) ──
+    paymentRawData.forEach(function(p){
+      var bill = String(p['청구서명']||'');
+      var kind = String(p['납부종류']||'').trim();
+      var isFee = bill.indexOf('수수료') >= 0;
+      var isRent = kind === '임대료' && !isFee;
+      var isMgmt = kind === '변동관리비';
+      var isEtc  = /법비용|퇴실\s*정산금|청소비/.test(bill);   // [v524] 기타계약금으로 입력된 법비용 등 포함
+      if (!isFee && !isRent && !isMgmt && !isEtc) return;
+      var cst = String(p['계약상태']||'').trim();
+      if (cst === '삭제' || cst === '계약 철회') return;
+      var mm = bill.match(/(\d{4})\s*년\s*(\d{1,2})\s*월/);
+      var due = pdt(p['납기일']);
+      var bm = mm ? (mm[1]+'-'+String(+mm[2]).padStart(2,'0'))
+                  : (due ? due.getFullYear()+'-'+String(due.getMonth()+1).padStart(2,'0') : '');
+      var a = A[bm]; if (!a) return;
+      var out = num(p['미납(연체)금액(원)']);
+      var tot = num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) || (num(p['납부금액(원)']) + out);
+      if (isFee) { a.fee += tot; a.feePaid += Math.max(0, tot - out); }
+      if (cst !== '종료' || out <= 0 || isFee) return;         // 확정 손실 = 퇴실자 미회수 · 수수료 미수 제외
+      var st = String(p['납부상태']||'').trim();
+      var days = parseInt(String(p['연체일수']==null?'':p['연체일수']).replace(/[^0-9\-]/g,''),10) || 0;
+      if (!(days>0 || st==='연체중' || st==='분납중')) return;
+      if (/법비용/.test(bill)) a.legal += out;
+      else if (/청소비/.test(bill)) a.clean += out;
+      else if (/퇴실\s*정산금/.test(bill)) a.settle += out;
+      else if (isRent) a.rent += out;
+      else a.settle += out;                                    // 잔여 변동관리비 = 공과금 성격
+    });
+
+    // ── 지출(부동산 중개보수) — 계약 시작월 기준 발생액 · VAT 포함 ──
+    if (Array.isArray(vacancyRawData) && typeof calcBrokerage === 'function') {
+      var byKey = {};
+      vacancyRawData.forEach(function(v){
+        var pn = String(v.partnerName||'').trim(); if (!pn || pn === '-') return;
+        var sd = cmgParseStartDate(v.startDate); if (!sd) return;
+        var ym = sd.getFullYear()+'-'+String(sd.getMonth()+1).padStart(2,'0');
+        if (!A[ym]) return;
+        var mo = cmgMonthsBetween(sd, cmgParseStartDate(v.endDate));
+        if (mo > 0 && mo < 12) return;                          // 12개월 미만 계약 제외
+        var key = pn+'|'+ym;
+        if (!byKey[key]) byKey[key] = { pn:pn, ym:ym, brk:0 };
+        byKey[key].brk += calcBrokerage(cmgParseAmount(v.deposit), cmgParseAmount(v.monthRent || v.rent), v.housingType);
+      });
+      Object.keys(byKey).forEach(function(key){
+        var o = byKey[key], a = A[o.ym]; if (!a) return;
+        var vat = o.brk * 1.1;
+        a.brk += vat;
+        if (window._cmgPaidMap && window._cmgPaidMap[key]) a.brkPaid += vat; else a.brkUn += vat;
+      });
+    }
+    MO.forEach(function(m){ var a=A[m]; a.loss = a.rent+a.settle+a.clean+a.legal; a.net = a.feePaid - a.brk - a.loss; });
+    return { months: MO, A: A, cur: MO[MO.length-1], prev: MO[MO.length-2] };
+  } catch(e){ console.warn('[v524] sumBuildPL:', e); return null; }
+}
+
+function sumRenderPLCard(){
+  var s = sumBuildPL();
+  var TTL = '<div class="sum-card-title"><span class="dot" style="background:#6366F1"></span>④ KRG 손익 — 수수료 수익 − 중개보수 − 확정 손실 <span class="badge sum-badge-revenue">P&amp;L</span></div>';
+  if (!s) return TTL + '<div class="sum-empty">데이터 로딩 중...</div>';
+  var M = function(n){ n=+n||0; return (n<0?'−₩':'₩') + (Math.round(Math.abs(n)/100000)/10) + 'M'; };
+  var W = function(n){ return '₩' + Math.round(+n||0).toLocaleString(); };
+  var base = s.prev, b = s.A[base];                            // 기준월 = 직전 완료월(당월은 미입금 왜곡)
+  var CAT = [ {k:'rent',n:'대손 임대료',c:'#2a78d6'}, {k:'settle',n:'퇴실 정산금',c:'#eb6834'},
+              {k:'clean',n:'퇴실 청소비',c:'#4a3aa7'}, {k:'legal',n:'법비용',c:'#e87ba4'} ];
+  var mr = b.feePaid ? Math.round(b.net/b.feePaid*100) : 0;
+  var hbar = b.loss>0 ? CAT.filter(function(c){return b[c.k]>0;}).map(function(c){
+      var p = b[c.k]/b.loss*100;
+      return '<div title="'+c.n+' '+W(b[c.k])+'" style="flex:'+Math.max(2,Math.round(p))+';background:'+c.c+';color:#fff;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;border-right:2px solid #fff;font-size:10px;font-weight:700">'+(p>=18?c.n+' '+Math.round(p)+'%':'')+'</div>';
+    }).join('') : '<div style="flex:1;background:#E5E7EB"></div>';
+  var hlg = CAT.map(function(c){
+      var p = b.loss? Math.round(b[c.k]/b.loss*1000)/10 : 0, off = b[c.k]<=0;
+      return '<span style="display:inline-flex;align-items:center;gap:5px;margin:0 14px 3px 0;font-size:10.5px;color:'+(off?'#94A3B8':'#7F1D1D')+'">'
+        +'<span style="width:10px;height:10px;border-radius:3px;background:'+(off?'#E5E7EB':c.c)+'"></span><b>'+c.n+'</b> '+M(b[c.k])+' ('+p+'%)</span>';
+    }).join('');
+  var rows = s.months.slice(0,-1).map(function(m){
+    var a = s.A[m], r2 = a.feePaid? Math.round(a.net/a.feePaid*100):0;
+    return '<tr'+(a.net<0?' style="background:#FEF2F2"':'')+'>'
+      +'<td style="padding:5px 8px;font-weight:700">'+m.replace('-','.')+(a.net<0?' <span style="font-size:9px;color:#DC2626;background:#FEE2E2;border-radius:4px;padding:1px 5px">적자</span>':'')+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;color:#0D9488;font-weight:800">'+M(a.feePaid)+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;color:#7C3AED;font-weight:700">'+M(a.brk)+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;color:#DC2626;font-weight:700">'+M(a.loss)+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;font-weight:800;color:'+(a.net>=0?'#6366F1':'#DC2626')+'">'+M(a.net)+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;font-weight:700;color:'+(r2>=30?'#15803D':(r2>=0?'#B45309':'#DC2626'))+'">'+r2+'%</td></tr>';
+  }).join('');
+  var lossMonths = s.months.slice(0,-1).filter(function(m){ return s.A[m].net < 0; });
+  var alertHtml = lossMonths.length
+    ? '<div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:8px 11px;margin-top:10px;font-size:11px;color:#7F1D1D;line-height:1.6">⚠ <b>적자 월 '+lossMonths.length+'개</b> ('+lossMonths.map(function(m){return m.replace('-','.');}).join(', ')+') — 중개보수가 수수료 수익의 상당 부분을 차지해, 확정 손실이 커지면 적자로 전환됩니다.</div>' : '';
+  var unpaidBrk = s.months.reduce(function(t,m){ return t + s.A[m].brkUn; }, 0);
+  return TTL
+    + '<div class="sum-stat-row">'
+    +   '<div class="sum-stat-box sum-stat-green"><div class="sb-label">수수료 입금 ('+base.replace('-','.')+')</div><div class="sb-val" style="color:#0D9488">'+M(b.feePaid)+'</div></div>'
+    +   '<div class="sum-stat-box sum-stat-blue"><div class="sb-label">중개보수 (지출)</div><div class="sb-val" style="color:#7C3AED">'+M(b.brk)+'</div></div>'
+    +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">확정 손실 (지출)</div><div class="sb-val" style="color:#DC2626">'+M(b.loss)+'</div></div>'
+    +   '<div class="sum-stat-box '+(b.net>=0?'sum-stat-green':'sum-stat-red')+'"><div class="sb-label">순이익</div><div class="sb-val" style="color:'+(b.net>=0?'#6366F1':'#DC2626')+'">'+M(b.net)+'</div></div>'
+    +   '<div class="sum-stat-box sum-stat-amber"><div class="sb-label">이익률</div><div class="sb-val">'+mr+'<span class="sb-unit">%</span></div></div>'
+    + '</div>'
+    + '<div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:9px;padding:9px 11px;margin-bottom:10px">'
+    +   '<div style="font-size:11px;font-weight:700;color:#7F1D1D;margin-bottom:6px">확정 손실 '+M(b.loss)+' 구성 — 퇴실자 미회수 (수수료 미수 제외)</div>'
+    +   '<div style="display:flex;height:26px;border-radius:6px;overflow:hidden">'+hbar+'</div>'
+    +   '<div style="margin-top:7px;display:flex;flex-wrap:wrap">'+hlg+'</div>'
+    + '</div>'
+    + '<div class="sum-sub-title">월별 손익 추이 (최근 5개월)</div>'
+    + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'
+    +   '<tr style="background:#F8FAFC;color:#475569;font-size:10.5px">'
+    +   '<th style="padding:5px 8px;text-align:left">월</th>'
+    +   '<th style="padding:5px 8px;text-align:right">수수료 입금<br><span style="font-weight:400">수익</span></th>'
+    +   '<th style="padding:5px 8px;text-align:right">중개보수<br><span style="font-weight:400">지출</span></th>'
+    +   '<th style="padding:5px 8px;text-align:right">확정 손실<br><span style="font-weight:400">지출</span></th>'
+    +   '<th style="padding:5px 8px;text-align:right">순이익</th><th style="padding:5px 8px;text-align:right">이익률</th></tr>'
+    +   rows + '</table></div>'
+    + alertHtml
+    + '<div class="sum-mini-insight" style="background:#EEF2FF;color:#3730A3">💡 중개보수 미지급 잔액 <b>'+M(unpaidBrk)+'</b> — 곧 나갈 돈이므로 자금 계획에 반영이 필요합니다</div>'
+    + '<div style="font-size:9.5px;color:#94A3B8;margin-top:7px;line-height:1.6">※ 임대료는 임대인에게 전달하는 <b>통과 자금</b>이라 수익이 아닙니다 · 수수료 미수는 이미 입금액에서 빠져 있어 손실에 넣지 않습니다(이중 차감 방지) · 중개보수는 <b>계약 시작월 발생 기준</b>(VAT 포함, 12개월 미만 계약 제외) · 당월은 수수료 미입금이 많아 표에서 제외 · 인건비 등 자체 운영비 미포함(정산사업 공헌이익)</div>';
+}
+
 function sumRenderSection4Card(){
   var s = sumBuildSection4();
   if (!s) return '<div class="sum-card-title"><span class="dot" style="background:#F59E0B"></span>④ 분할 서비스 수수료 누적 추이 <span class="badge sum-badge-revenue">REVENUE</span></div><div class="sum-empty">데이터 로딩 중...</div>';
@@ -20787,7 +20918,7 @@ function sumPlaceholderSections(){
     +   '<div class="sum-card sum-section-1">' + sumRenderDailyCard() + '</div>'
     +   '<div class="sum-card sum-section-3">' + sumRenderSection3Card() + '</div>'
     +   '<div class="sum-card sum-section-2">' + sumRenderSection2Card() + '</div>'
-    +   '<div class="sum-card sum-section-4">' + sumRenderSection4Card() + '</div>'
+    +   '<div class="sum-card sum-section-4">' + sumRenderPLCard() + '</div>'   /* [v524] 분할 서비스 수수료 → KRG 손익으로 교체 */
     + '</div>'
     + '<div class="sum-sticky">' + sumRenderSidebar() + '</div>'
     + '</div>';
