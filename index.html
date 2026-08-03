@@ -5513,13 +5513,33 @@ async function renderSettlementView(){
     // ② 청구 구성
     var compTot=compRent+compFirst+compFee;
     if(compTot>0){
-      var pw=function(x){ return Math.max(3, Math.round(x/compTot*100)); };
+      // [v520] 좁은 구간 라벨 잘림 해결 — 막대 안에는 14% 이상일 때만 표기, 값은 아래 범례에서 항상 노출
+      var _p=function(x){ return compTot? x/compTot*100 : 0; };
+      var _p1=function(x){ return Math.round(_p(x)*10)/10; };
+      var seg=function(x,bg,fg,label){
+        var pv=_p(x); if(pv<=0) return '';
+        return '<div title="'+label+' '+mil(x)+' ('+_p1(x)+'%)" style="flex:'+Math.max(2,Math.round(pv))
+          +';background:'+bg+';color:'+fg+';display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden">'
+          +(pv>=14 ? label+' '+mil(x) : '')+'</div>';
+      };
+      var lgd=function(bg,label,x,note){
+        return '<span style="display:inline-flex;align-items:center;gap:6px;margin:0 16px 4px 0;font-size:11px;color:#475569;white-space:nowrap">'
+          +'<span style="width:11px;height:11px;border-radius:3px;background:'+bg+';flex:none"></span>'
+          +'<b style="color:#1A3A5C">'+label+'</b> '+mil(x)+' <span style="color:#94A3B8">('+_p1(x)+'%)</span>'
+          +(note? ' <span style="color:#94A3B8;font-size:10px">'+note+'</span>':'')+'</span>';
+      };
       html+='<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:12px 14px;margin-bottom:10px">'
         +'<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:8px">② '+cmLbl+' 청구 구성 — 첫 달 직납 분리</div>'
         +'<div style="display:flex;height:26px;border-radius:6px;overflow:hidden;font-size:10.5px;font-weight:700">'
-        +'<div style="flex:'+pw(compRent)+';background:#85B7EB;color:#042C53;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden">기존 임대료 '+mil(compRent)+' (KRG 경유)</div>'
-        +'<div style="flex:'+pw(compFirst)+';background:#CECBF6;color:#26215C;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden">첫달 직납 '+mil(compFirst)+'</div>'
-        +'<div style="flex:'+pw(compFee)+';background:#9FE1CB;color:#04342C;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden">수수료 '+mil(compFee)+'</div>'
+        + seg(compRent,'#85B7EB','#042C53','기존 임대료')
+        + seg(compFirst,'#CECBF6','#26215C','첫달 직납')
+        + seg(compFee,'#9FE1CB','#04342C','수수료')
+        +'</div>'
+        +'<div style="margin-top:8px;display:flex;flex-wrap:wrap;align-items:center">'
+        + lgd('#85B7EB','기존 임대료',compRent,'KRG 경유')
+        + lgd('#CECBF6','첫달 직납',compFirst,'임차인 → 임대인 직접')
+        + lgd('#9FE1CB','수수료',compFee,'KRG 수입')
+        +'<span style="margin-left:auto;font-size:11px;color:#64748B">합계 <b style="color:#1A3A5C">'+mil(compTot)+'</b></span>'
         +'</div>'
         +'<div style="font-size:10.5px;color:#8A9AB5;margin-top:6px">첫 달 임대료는 임차인 → 임대인 <b>직접 입금</b>(KRG 미경유) — 유보금·정산 대상 제외, 수수료만 KRG 수입 인식. 미분리 시 유보금 '+mil(compFirst)+' 과대계상.</div></div>';
     }
