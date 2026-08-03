@@ -18344,6 +18344,12 @@ function renderPartnerMgmtView(){
     + '.sum-cfg-row input[type=number]{padding:3px 5px;font-size:10.5px;border:1px solid #C7D2FE;border-radius:5px;background:#fff;text-align:center}'
     + '.sum-stat-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}'
     + '.sum-stat-box{flex:1;min-width:130px;background:#F9FAFB;border-radius:7px;padding:8px 12px;border:1px solid #EAEEF3}'
+    /* [v525] 손익 KPI — 5장을 항상 1열로 (min-width 해제 + 줄바꿈 금지, 좁은 화면은 가로 스크롤) */
+    + '.sum-stat-row.pl-1row{flex-wrap:nowrap;overflow-x:auto}'
+    + '.sum-stat-row.pl-1row .sum-stat-box{min-width:0;flex:1 1 0}'
+    + '.sum-stat-row.pl-1row .sb-val{font-size:16px;white-space:nowrap}'
+    + '.sum-stat-row.pl-1row .sb-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    + '@media(max-width:900px){.sum-stat-row.pl-1row .sum-stat-box{min-width:118px}}'
     + '.sum-stat-box .sb-label{font-size:10.5px;color:#6B7280;font-weight:700}'
     + '.sum-stat-box .sb-val{font-size:18px;font-weight:800;margin-top:2px;color:#1F2937}'
     + '.sum-stat-box .sb-unit{font-size:11px;font-weight:700;color:#6B7280;margin-left:1px}'
@@ -20669,7 +20675,7 @@ function sumRenderPLCard(){
     ? '<div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:8px 11px;margin-top:10px;font-size:11px;color:#7F1D1D;line-height:1.6">⚠ <b>적자 월 '+lossMonths.length+'개</b> ('+lossMonths.map(function(m){return m.replace('-','.');}).join(', ')+') — 중개보수가 수수료 수익의 상당 부분을 차지해, 확정 손실이 커지면 적자로 전환됩니다.</div>' : '';
   var unpaidBrk = s.months.reduce(function(t,m){ return t + s.A[m].brkUn; }, 0);
   return TTL
-    + '<div class="sum-stat-row">'
+    + '<div class="sum-stat-row pl-1row">'
     +   '<div class="sum-stat-box sum-stat-green"><div class="sb-label">수수료 입금 ('+base.replace('-','.')+')</div><div class="sb-val" style="color:#0D9488">'+M(b.feePaid)+'</div></div>'
     +   '<div class="sum-stat-box sum-stat-blue"><div class="sb-label">중개보수 (지출)</div><div class="sb-val" style="color:#7C3AED">'+M(b.brk)+'</div></div>'
     +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">확정 손실 (지출)</div><div class="sb-val" style="color:#DC2626">'+M(b.loss)+'</div></div>'
