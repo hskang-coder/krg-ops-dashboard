@@ -5524,31 +5524,61 @@ async function renderSettlementView(){
         +'<div style="font-size:10.5px;color:#8A9AB5;margin-top:6px">첫 달 임대료는 임차인 → 임대인 <b>직접 입금</b>(KRG 미경유) — 유보금·정산 대상 제외, 수수료만 KRG 수입 인식. 미분리 시 유보금 '+mil(compFirst)+' 과대계상.</div></div>';
     }
     // ③ 롤포워드
+    // [v519] 처음 보는 사람도 읽을 수 있게 재구성 — 전문용어(롤포워드/코호트/이월) 제거, 행마다 자기 완결형
+    var curRealM = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
+    var rbar=function(pct,col){ return '<span style="display:inline-block;vertical-align:middle;width:48px;height:6px;background:#EDF2F9;border-radius:3px;overflow:hidden;margin-right:6px"><span style="display:block;width:'+Math.min(100,Math.max(0,pct))+'%;height:100%;background:'+col+'"></span></span>'; };
     var rf='', run=prevOut;
-    rf+='<tr style="border-top:1px solid #F1F5F9;color:#94A3B8"><td style="padding:4px 8px">이전 누적</td><td style="padding:4px 8px;text-align:right">—</td><td style="padding:4px 8px;text-align:right">'+mil(prevGen)+'</td><td style="padding:4px 8px;text-align:right">'+mil(prevGen-prevOut)+'</td><td style="padding:4px 8px;text-align:right">0</td><td style="padding:4px 8px;text-align:right;font-weight:700">'+mil(prevOut)+'</td><td style="padding:4px 8px;text-align:right">'+(prevGen?Math.round((prevGen-prevOut)/prevGen*100):0)+'%</td></tr>';
+    rf+='<tr style="border-top:1px solid #F1F5F9;color:#94A3B8">'
+      +'<td style="padding:6px 8px">'+win[0].replace('-','.')+' 이전 전체</td>'
+      +'<td style="padding:6px 8px;text-align:right">'+mil(prevGen)+'</td>'
+      +'<td style="padding:6px 8px;text-align:right">'+mil(prevGen-prevOut)+'</td>'
+      +'<td style="padding:6px 8px;text-align:right">'+(prevGen?Math.round((prevGen-prevOut)/prevGen*100):0)+'%</td>'
+      +'<td style="padding:6px 8px;text-align:right">'+mil(prevOut)+'</td>'
+      +'<td style="padding:6px 8px;text-align:right;font-weight:700">'+mil(prevOut)+'</td></tr>';
     win.forEach(function(m){
       var c2=coh[m]||{gen:0,rec:0,out:0,n:0};
-      var carry=run; run+=c2.out;
+      run+=c2.out;
       var rr=c2.gen? Math.round(c2.rec/c2.gen*100) : 0;
-      rf+='<tr style="border-top:1px solid #F1F5F9'+(m===win[win.length-1]?';background:#EFF6FF':'')+'"><td style="padding:4px 8px;font-weight:700">'+m.replace('-','.')+'</td>'
-        +'<td style="padding:4px 8px;text-align:right;color:#94A3B8">'+mil(carry)+'</td>'
-        +'<td style="padding:4px 8px;text-align:right;color:#DC2626;font-weight:700">+'+mil(c2.gen)+' <span style="font-size:9px;color:#94A3B8">('+c2.n+'건)</span></td>'
-        +'<td style="padding:4px 8px;text-align:right;color:#15803D;font-weight:700">−'+mil(c2.rec)+'</td>'
-        +'<td style="padding:4px 8px;text-align:right;color:#94A3B8">0</td>'
-        +'<td style="padding:4px 8px;text-align:right;font-weight:800">'+mil(run)+'</td>'
-        +'<td style="padding:4px 8px;text-align:right;font-weight:700;color:'+(rr>=70?'#15803D':rr>=40?'#B45309':'#DC2626')+'">'+rr+'%</td></tr>';
+      var col=rr>=70?'#15803D':(rr>=40?'#B45309':'#DC2626');
+      var ing=(m===curRealM);
+      rf+='<tr style="border-top:1px solid #F1F5F9'+(ing?';background:#EFF6FF':'')+'">'
+        +'<td style="padding:6px 8px;font-weight:700;white-space:nowrap">'+m.replace('-','.')+(ing?' <span style="font-size:9px;font-weight:600;color:#2563EB;background:#DBEAFE;border-radius:4px;padding:1px 5px">진행 중</span>':'')+'</td>'
+        +'<td style="padding:6px 8px;text-align:right;color:#DC2626;font-weight:700;white-space:nowrap">'+mil(c2.gen)+' <span style="font-size:9px;color:#94A3B8;font-weight:500">'+c2.n+'건</span></td>'
+        +'<td style="padding:6px 8px;text-align:right;color:#15803D;font-weight:700">'+mil(c2.rec)+'</td>'
+        +'<td style="padding:6px 8px;text-align:right;white-space:nowrap">'+rbar(rr,col)+'<span style="font-weight:700;color:'+col+'">'+rr+'%</span></td>'
+        +'<td style="padding:6px 8px;text-align:right;font-weight:700">'+mil(c2.out)+'</td>'
+        +'<td style="padding:6px 8px;text-align:right;font-weight:800;color:#1A3A5C">'+mil(run)+'</td></tr>';
     });
+    // 읽는 법 예시 — 진행 중인 달은 오해 소지가 있어 직전 완료월로 설명
+    var exM=(win[win.length-1]===curRealM && win.length>=2)? win[win.length-2] : win[win.length-1];
+    var exC=coh[exM]||{gen:0,rec:0,out:0,n:0};
+    var exR=exC.gen? Math.round(exC.rec/exC.gen*100):0;
     html+='<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:12px 14px;margin-bottom:10px">'
-      +'<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:2px">③ 연체 롤포워드 — 발생월 고정 코호트</div>'
-      +'<div style="font-size:10.5px;color:#8A9AB5;margin-bottom:7px">발생액은 발생월 기준 고정(불변) · 회수는 현재까지 누적 · 손실처리 기준 미정 → 0 고정, 잔액 전액 이월 · 임대료+수수료+변동관리비 포함</div>'
-      +'<table style="width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed">'
-      +'<tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:4px 8px;text-align:left">발생월</th><th style="padding:4px 8px;text-align:right">이월 잔액</th><th style="padding:4px 8px;text-align:right">+ 신규 발생</th><th style="padding:4px 8px;text-align:right">− 회수(누적)</th><th style="padding:4px 8px;text-align:right">− 손실처리</th><th style="padding:4px 8px;text-align:right">= 잔액</th><th style="padding:4px 8px;text-align:right">회수율</th></tr>'
-      + rf + '</table></div>';
+      +'<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:3px">③ 월별 연체 발생 · 회수 현황</div>'
+      +'<div style="font-size:11px;color:#5A6A8A;margin-bottom:8px;line-height:1.6">'
+      +'<b>매달 임대료가 얼마나 밀렸고, 그중 지금까지 얼마를 돌려받았는지</b> 보여주는 표입니다. 한 번 밀린 금액은 그 달에 고정되고, 회수액만 시간이 지나며 쌓입니다.'
+      +'</div>'
+      +'<div style="background:#F8FAFC;border-left:3px solid #94A3B8;border-radius:0 6px 6px 0;padding:7px 10px;margin-bottom:9px;font-size:11px;color:#475569;line-height:1.6">'
+      +'📖 <b>읽는 법</b> — '+exM.replace('-','.')+' 줄은 “그 달에 <b style="color:#DC2626">'+mil(exC.gen)+'</b>('+exC.n+'건)이 새로 밀렸는데, 그중 <b style="color:#15803D">'+exR+'%('+mil(exC.rec)+')</b>를 지금까지 회수했고 <b>'+mil(exC.out)+'</b>은 아직 못 받았다”는 뜻입니다. 맨 오른쪽은 그때까지 쌓인 <b>회사 전체 미회수 총액</b>입니다.'
+      +'</div>'
+      +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px;min-width:640px">'
+      +'<tr style="background:#F8FAFC;color:#475569;font-size:11px">'
+      +'<th style="padding:6px 8px;text-align:left">연체 발생월</th>'
+      +'<th style="padding:6px 8px;text-align:right">① 새로 밀린 금액</th>'
+      +'<th style="padding:6px 8px;text-align:right">② 지금까지 회수</th>'
+      +'<th style="padding:6px 8px;text-align:right">회수율 (②÷①)</th>'
+      +'<th style="padding:6px 8px;text-align:right">③ 아직 못 받음 (①−②)</th>'
+      +'<th style="padding:6px 8px;text-align:right">누적 미회수 총액</th></tr>'
+      + rf + '</table></div>'
+      +'<div style="font-size:10px;color:#8A9AB5;margin-top:7px;line-height:1.6">'
+      +'※ <b>이번 달('+curRealM.replace('-','.')+')은 아직 진행 중</b>이라 회수할 시간이 없어 회수율이 낮게 보이는 것이 정상입니다 — 지난달들과 직접 비교하지 마세요.<br>'
+      +'※ 포함 항목: 임대료 + 수수료 + 변동관리비 · 떼인 돈으로 확정(손실처리)하는 기준이 아직 없어 못 받은 금액은 전액 누적됩니다.'
+      +'</div></div>';
     // ④ 오늘의 액션
     html+='<div style="background:#EFF6FF;border-radius:12px;padding:11px 14px;font-size:12px;color:#1E3A8A;line-height:1.8">'
-      +'<b>오늘의 액션</b> — ① D+6 초과 미정산 <b>'+over.n+'건 '+mil(over.amt)+'</b> 즉시 지급 확인 '
-      +'② D+3 도래분 <b>'+mil(d3.amt)+'</b> 자금 준비 '
-      +'③ 연체채권 총잔액 <b>'+mil(totalOut)+'</b>'+(prevOut>0?' (이전 누적분 '+mil(prevOut)+' — 90일 초과분 법무 이관 검토)':'')
+      +'<b>오늘의 액션</b> — ① 임대인 지급이 늦어진 건(입금 후 6일 초과) <b>'+over.n+'건 '+mil(over.amt)+'</b> 즉시 확인 '
+      +'② 임차인 미납이라 회사가 대신 내줘야 하는 돈 <b>'+subro.n+'건 '+won(subro.amt)+'</b> 자금 준비 '
+      +'③ 못 받은 돈 총액 <b>'+mil(totalOut)+'</b>'+(prevOut>0?' (그중 오래된 미회수 '+mil(prevOut)+' — 90일 초과분 법무 이관 검토)':'')
       +'</div>';
     el.innerHTML = html;
   }catch(e){
