@@ -5383,7 +5383,9 @@ async function renderSettlementView(){
     });
 
     // ── ③ 연체 롤포워드 (발생월 고정 코호트, 최근 4개월 + 이전 누적) ──
-    var coh={}, prevOut=0, prevGen=0;
+    // [v521] 계약중(A) / 계약종료·퇴실(E) 그룹 분리 집계 — 회수 성격이 완전히 달라 섞으면 평균의 함정
+    var _z=function(){ return {gen:0,rec:0,out:0,n:0}; };
+    var coh={}, prevG={A:_z(), E:_z()};
     var winLen=Math.max(4,_mKeys.length);   // [v515] 기간이 4개월 초과 시 전체 표시, 이하면 최근 4개월
     var win=[]; for(var k=winLen-1;k>=0;k--){ var d=new Date(+cmKey.slice(0,4), +cmKey.slice(5,7)-1-k, 1); win.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
     P.forEach(function(p){
@@ -5401,13 +5403,19 @@ async function renderSettlementView(){
       if(gen<=0) return;
       var paid=Math.max(0, gen-out);
       var ended = String(p['계약상태']||'').trim()==='종료';   // [v507] 계약중/퇴실채권 구분
-      if(win.indexOf(bm)>=0){
-        if(!coh[bm]) coh[bm]={gen:0,rec:0,out:0,n:0};
-        coh[bm].gen+=gen; coh[bm].rec+=paid; coh[bm].out+=out; coh[bm].n++;
-      } else { prevGen+=gen; prevOut+=out; }
+      var gk = ended ? 'E' : 'A';                              // [v521]
+      var tgt;
+      if(win.indexOf(bm)>=0){ if(!coh[bm]) coh[bm]={A:_z(), E:_z()}; tgt=coh[bm][gk]; }
+      else { tgt=prevG[gk]; }
+      tgt.gen+=gen; tgt.rec+=paid; tgt.out+=out; tgt.n++;
       if(out>0){ if(ended) window.__stlEndedOut=(window.__stlEndedOut||0)+out; else window.__stlActiveOut=(window.__stlActiveOut||0)+out; }
     });
-    var totalOut = prevOut + win.reduce(function(s,m){ return s + ((coh[m]||{}).out||0); },0);
+    // [v521] 그룹별 누적 미회수 (버튼 라벨·표에 사용)
+    var _co=function(m,k){ return ((coh[m]||{})[k]||_z()).out; };
+    var totA = prevG.A.out + win.reduce(function(s,m){ return s+_co(m,'A'); },0);
+    var totE = prevG.E.out + win.reduce(function(s,m){ return s+_co(m,'E'); },0);
+    var prevGen = prevG.A.gen + prevG.E.gen, prevOut = prevG.A.out + prevG.E.out;
+    var totalOut = totA + totE;
     var outActive=window.__stlActiveOut||0, outEnded=window.__stlEndedOut||0;
     window.__stlActiveOut=0; window.__stlEndedOut=0;
 
@@ -5547,16 +5555,21 @@ async function renderSettlementView(){
     // [v519] 처음 보는 사람도 읽을 수 있게 재구성 — 전문용어(롤포워드/코호트/이월) 제거, 행마다 자기 완결형
     var curRealM = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
     var rbar=function(pct,col){ return '<span style="display:inline-block;vertical-align:middle;width:48px;height:6px;background:#EDF2F9;border-radius:3px;overflow:hidden;margin-right:6px"><span style="display:block;width:'+Math.min(100,Math.max(0,pct))+'%;height:100%;background:'+col+'"></span></span>'; };
-    var rf='', run=prevOut;
+    // [v521] 계약중/종료 전환 — 'T'(전체) | 'A'(계약중) | 'E'(계약종료)
+    var dlqK = window._stlDlqK || 'T';
+    var gsum=function(o){ return {gen:o.A.gen+o.E.gen, rec:o.A.rec+o.E.rec, out:o.A.out+o.E.out, n:o.A.n+o.E.n}; };
+    var gpick=function(o){ return dlqK==='T' ? gsum(o) : (o[dlqK]||_z()); };
+    var pv=gpick(prevG);
+    var rf='', run=pv.out;
     rf+='<tr style="border-top:1px solid #F1F5F9;color:#94A3B8">'
       +'<td style="padding:6px 8px">'+win[0].replace('-','.')+' 이전 전체</td>'
-      +'<td style="padding:6px 8px;text-align:right">'+mil(prevGen)+'</td>'
-      +'<td style="padding:6px 8px;text-align:right">'+mil(prevGen-prevOut)+'</td>'
-      +'<td style="padding:6px 8px;text-align:right">'+(prevGen?Math.round((prevGen-prevOut)/prevGen*100):0)+'%</td>'
-      +'<td style="padding:6px 8px;text-align:right">'+mil(prevOut)+'</td>'
-      +'<td style="padding:6px 8px;text-align:right;font-weight:700">'+mil(prevOut)+'</td></tr>';
+      +'<td style="padding:6px 8px;text-align:right">'+mil(pv.gen)+'</td>'
+      +'<td style="padding:6px 8px;text-align:right">'+mil(pv.rec)+'</td>'
+      +'<td style="padding:6px 8px;text-align:right">'+(pv.gen?Math.round(pv.rec/pv.gen*100):0)+'%</td>'
+      +'<td style="padding:6px 8px;text-align:right">'+mil(pv.out)+'</td>'
+      +'<td style="padding:6px 8px;text-align:right;font-weight:700">'+mil(pv.out)+'</td></tr>';
     win.forEach(function(m){
-      var c2=coh[m]||{gen:0,rec:0,out:0,n:0};
+      var c2=gpick(coh[m]||{A:_z(),E:_z()});
       run+=c2.out;
       var rr=c2.gen? Math.round(c2.rec/c2.gen*100) : 0;
       var col=rr>=70?'#15803D':(rr>=40?'#B45309':'#DC2626');
@@ -5571,12 +5584,26 @@ async function renderSettlementView(){
     });
     // 읽는 법 예시 — 진행 중인 달은 오해 소지가 있어 직전 완료월로 설명
     var exM=(win[win.length-1]===curRealM && win.length>=2)? win[win.length-2] : win[win.length-1];
-    var exC=coh[exM]||{gen:0,rec:0,out:0,n:0};
+    var exC=gpick(coh[exM]||{A:_z(),E:_z()});
     var exR=exC.gen? Math.round(exC.rec/exC.gen*100):0;
+    // [v521] 전환 버튼 — 라벨에 금액을 찍어 누르지 않아도 비율이 보이게
+    var DKC={T:'#334155', A:'#2563EB', E:'#D97706'};
+    var dbtn=function(k,label,amt){
+      var on=(dlqK===k);
+      return '<button onclick="stl_setDlq(\''+k+'\')" style="padding:5px 13px;border:1.5px solid '+(on?DKC[k]:'#D1D5DB')+';background:'+(on?DKC[k]:'#fff')+';color:'+(on?'#fff':'#374151')+';border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;font-family:inherit">'+label+' <b>'+mil(amt)+'</b></button>';
+    };
+    var dNote={
+      T:'※ 계약중 + 계약종료 합산입니다. 두 그룹은 회수율이 크게 달라 버튼으로 나눠 보시는 것을 권합니다.',
+      A:'※ <b style="color:#2563EB">계약중(거주 중)</b>만 — 회수율이 높은 정상 관리 범위입니다. 독촉으로 회수 가능한 구간.',
+      E:'※ <b style="color:#D97706">계약종료(퇴실)</b>만 — 이미 나간 임차인 채권이라 회수율이 급락합니다. 90일 초과분은 법적 절차 검토 대상.'
+    }[dlqK];
     html+='<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:12px 14px;margin-bottom:10px">'
       +'<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:3px">③ 월별 연체 발생 · 회수 현황</div>'
       +'<div style="font-size:11px;color:#5A6A8A;margin-bottom:8px;line-height:1.6">'
       +'<b>매달 임대료가 얼마나 밀렸고, 그중 지금까지 얼마를 돌려받았는지</b> 보여주는 표입니다. 한 번 밀린 금액은 그 달에 고정되고, 회수액만 시간이 지나며 쌓입니다.'
+      +'</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px">'
+      + dbtn('T','전체', totA+totE) + dbtn('A','🔵 계약중', totA) + dbtn('E','🟠 계약종료(퇴실)', totE)
       +'</div>'
       +'<div style="background:#F8FAFC;border-left:3px solid #94A3B8;border-radius:0 6px 6px 0;padding:7px 10px;margin-bottom:9px;font-size:11px;color:#475569;line-height:1.6">'
       +'📖 <b>읽는 법</b> — '+exM.replace('-','.')+' 줄은 “그 달에 <b style="color:#DC2626">'+mil(exC.gen)+'</b>('+exC.n+'건)이 새로 밀렸는데, 그중 <b style="color:#15803D">'+exR+'%('+mil(exC.rec)+')</b>를 지금까지 회수했고 <b>'+mil(exC.out)+'</b>은 아직 못 받았다”는 뜻입니다. 맨 오른쪽은 그때까지 쌓인 <b>회사 전체 미회수 총액</b>입니다.'
@@ -5591,8 +5618,9 @@ async function renderSettlementView(){
       +'<th style="padding:6px 8px;text-align:right">누적 미회수 총액</th></tr>'
       + rf + '</table></div>'
       +'<div style="font-size:10px;color:#8A9AB5;margin-top:7px;line-height:1.6">'
+      + dNote + '<br>'
       +'※ <b>이번 달('+curRealM.replace('-','.')+')은 아직 진행 중</b>이라 회수할 시간이 없어 회수율이 낮게 보이는 것이 정상입니다 — 지난달들과 직접 비교하지 마세요.<br>'
-      +'※ 포함 항목: 임대료 + 수수료 + 변동관리비 · 떼인 돈으로 확정(손실처리)하는 기준이 아직 없어 못 받은 금액은 전액 누적됩니다.'
+      +'※ 구분 기준: 계약상태가 <b>“종료”</b>면 계약종료, 그 외는 계약중 · 포함 항목: 임대료 + 수수료 + 변동관리비 · 떼인 돈으로 확정(손실처리)하는 기준이 아직 없어 못 받은 금액은 전액 누적됩니다.'
       +'</div></div>';
     // ④ 오늘의 액션
     html+='<div style="background:#EFF6FF;border-radius:12px;padding:11px 14px;font-size:12px;color:#1E3A8A;line-height:1.8">'
@@ -5616,6 +5644,8 @@ function stl_setRange(){
   if(a && b){ window._stlP.period='range'; renderSettlementView(); }
 }
 function stl_clearRange(){ window._stlP = window._stlP || {period:'day'}; window._stlP.r1=null; window._stlP.r2=null; window._stlP.period='day'; renderSettlementView(); }
+// [v521] ③ 연체 표 — 전체 / 계약중 / 계약종료(퇴실) 전환
+function stl_setDlq(k){ window._stlDlqK = k; renderSettlementView(); }
 
 function renderContractRecord(c, payments, responses = []) {
   // vacancyRawData에서 매칭 행 찾기 (없으면 빈 객체)
