@@ -19890,8 +19890,7 @@ function sumRenderSection2Card(){
     +     '<div class="sum-mini-insight">💡 1차 갱신 유도 = LTV 핵심 (충성도 급상승 구간)</div>'
     +   '</div>'
     + '</div>'
-    + '<div class="sum-sub-title" style="margin-top:14px">입주 후 N개월차 잔존율 (코호트)</div>'
-    + '<div style="position:relative;height:160px"><canvas id="sumS2_retention"></canvas></div>';
+    ;   /* [v526] 입주 후 N개월차 잔존율(코호트) 차트 제거 */
   return html;
 }
 
@@ -19947,43 +19946,8 @@ function sumDrawSection2(){
     });
   }
 
-  // 잔존율 코호트
-  var c2 = document.getElementById('sumS2_retention');
-  if (c2) {
-    if (window._sumS2C2) try { window._sumS2C2.destroy(); } catch(e){}
-    var marks = [0, 3, 6, 9, 12, 18, 24, 30, 36, 42, 48, 60];
-    var pcts = marks.map(function(mk){ return s.count > 0 ? Math.round((s.retention[mk] / s.count) * 1000) / 10 : 0; });
-    window._sumS2C2 = new Chart(c2, {
-      type: 'line',
-      data: {
-        labels: marks.map(function(m){ return m + '개월'; }),
-        datasets: [{
-          label: '잔존율',
-          data: pcts,
-          borderColor: '#4F46E5',
-          backgroundColor: 'rgba(124,58,237,0.12)',
-          tension: 0.3,
-          fill: true,
-          pointRadius: 3,
-          pointBackgroundColor: '#4F46E5',
-          pointBorderColor: '#fff',
-          pointBorderWidth: 1.5,
-          borderWidth: 2.5
-        }]
-      },
-      options: {
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: function(c){ return c.parsed.y + '% (' + s.retention[marks[c.dataIndex]] + '명)'; } } }
-        },
-        scales: {
-          y: { beginAtZero: true, max: 100, ticks: { callback: function(v){ return v + '%'; }, font: { size: 10 } } },
-          x: { ticks: { font: { size: 10 } }, grid: { display: false }, title: { display: true, text: '입주 후 개월', font: { size: 10 } } }
-        }
-      }
-    });
-  }
+  // [v526] 잔존율 코호트 차트 제거 — 캔버스가 사라져 그리기 로직도 함께 삭제
+  if (window._sumS2C2) { try { window._sumS2C2.destroy(); } catch(e){} window._sumS2C2 = null; }
 }
 
 // =================================================================
@@ -20923,8 +20887,8 @@ function sumPlaceholderSections(){
     + '<div class="sum-col-stack">'
     +   '<div class="sum-card sum-section-1">' + sumRenderDailyCard() + '</div>'
     +   '<div class="sum-card sum-section-3">' + sumRenderSection3Card() + '</div>'
+    +   '<div class="sum-card sum-section-4">' + sumRenderPLCard() + '</div>'   /* [v524] 분할 서비스 수수료 → KRG 손익 · [v526] ②와 순서 교체 */
     +   '<div class="sum-card sum-section-2">' + sumRenderSection2Card() + '</div>'
-    +   '<div class="sum-card sum-section-4">' + sumRenderPLCard() + '</div>'   /* [v524] 분할 서비스 수수료 → KRG 손익으로 교체 */
     + '</div>'
     + '<div class="sum-sticky">' + sumRenderSidebar() + '</div>'
     + '</div>';
