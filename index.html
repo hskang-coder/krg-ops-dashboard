@@ -5432,8 +5432,12 @@ async function renderSettlementView(){
     (window.__stlSchedRows||[]).forEach(function(s){
       var vd=_bfPd(s.v); if(!_inR(vd)) return;
       var done = s.state==='완료' || !!s.paidAt;               // N열 완료 또는 X열 실지급일 존재 → 지급됨
-      if(!done && s.amt>0){ sched.n++; sched.amt+=s.amt; }     // 임대인 지급 예정 (T열)
-      var u=unpaidMap[s.cno+'|'+s.mon]; if(u>0){ subro.amt+=u; subro.n++; }  // 정산예정일 도래분 중 임차인 미납 → 대위변제
+      if(done || !(s.amt>0)) return;
+      sched.n++; sched.amt+=s.amt;                             // 임대인 지급 예정 (T열)
+      // [v518] 대위변제 = 정산예정(미지급) 건 중 임차인이 미납인 건 → 정산예정건수/금액의 부분집합
+      //   지급액 상한은 정산금액(T열)이므로 min(미납, T) — 미납에 연체료가 섞여 T를 넘는 케이스 방어
+      var u=unpaidMap[s.cno+'|'+s.mon];
+      if(u>0){ subro.amt+=Math.min(u, s.amt); subro.n++; }
     });
     var tbRate = tb.amt>0 ? Math.round(tb.paid/tb.amt*1000)/10 : 0;
 
@@ -5484,7 +5488,7 @@ async function renderSettlementView(){
       + kpi('청구금액', won(tb.amt), '납기일 '+rlbl, '#fff')
       + kpi('납부금액', won(tb.paid), '납부완료 (청구 − 미납)', '#fff')
       + kpi('정상납부율', tbRate+'%', '납부금액 ÷ 청구금액', '#fff', rateCol)
-      + kpi('대위변제금액', won(subro.amt), subro.n+'건 · 정산예정일(V열) 도래분 중 임차인 미납', '#FEF2F2','#A32D2D')
+      + kpi('대위변제금액', won(subro.amt), subro.n+'건 · 정산예정 '+sched.n+'건 중 임차인 미납 → KRG 선지급', '#FEF2F2','#A32D2D')
       + kpi('정산예정건수', sched.n+'건', '정산예정일 도래 · 미지급(완료 제외)'+(smOk?'':' · 판별불가'), '#F0FDF4','#166534')
       + kpi('정산예정금액', won(sched.amt), '임대인 지급 예정 (정산내역 T열)', '#F0FDF4','#166534')
       +'</div>';
