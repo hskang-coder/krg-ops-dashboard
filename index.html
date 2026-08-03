@@ -3011,6 +3011,13 @@ function filterSearchResults(status) {
   _renderSrTable();
 }
 
+// [v517] 검색 결과 헤더 정렬 — 같은 컬럼 재클릭 시 오름/내림 토글
+function sortSearchResults(key) {
+  const st = window._srSort = window._srSort || { key: null, dir: 1 };
+  if (st.key === key) { st.dir = -st.dir; } else { st.key = key; st.dir = 1; }
+  _renderSrTable();
+}
+
 function _renderSrTable() {
   const gradeColor  = g => ({A:'#16A34A',B:'#4F46E5',C:'#D97706',D:'#DC2626',E:'#4F46E5',F:'#DC2626'}[g]||'#94A3B8');
   const statusColor = s => ({정상:'#16A34A',예정:'#4F46E5',종료:'#94A3B8',해지:'#DC2626',연체:'#D97706'}[s]||'#94A3B8');
@@ -3024,9 +3031,38 @@ function _renderSrTable() {
   const statuses = ['전체', ...Object.keys(statusCounts).sort()];
 
   // 필터 적용
-  const filtered = srStatusFilter === '전체'
+  let filtered = srStatusFilter === '전체'
     ? srMatches
     : srMatches.filter(c => String(c['계약상태']||'기타').trim() === srStatusFilter);
+
+  // [v517] 헤더 클릭 정렬 (오름/내림 토글)
+  const srSt = window._srSort || {};
+  if (srSt.key) {
+    const dnum = s => { const m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? (+m[1])*10000+(+m[2])*100+(+m[3]) : 0; };
+    const val = c => {
+      switch (srSt.key) {
+        case 'no':     return parseFloat(String(c['계약번호']||'').replace(/[^0-9.]/g,'')) || 0;
+        case 'name':   return String(c['임차인명']||c['임차인']||'');
+        case 'bld':    return String(c['건물명']||'') + ' ' + String(c['호수']||'');
+        case 'broker': return String(c['부동산명']||'');
+        case 'agent':  return String(c['계약담당자']||'');
+        case 'period': return dnum(c['시작일']);
+        case 'status': return String(c['계약상태']||'');
+        case 'grade':  return String((c['S등급']||c['연체등급'])||'').replace(/등급$/,'');
+      }
+      return '';
+    };
+    filtered = filtered.slice().sort((a,b) => {
+      const va = val(a), vb = val(b);
+      const r = (typeof va === 'number' && typeof vb === 'number') ? va - vb : String(va).localeCompare(String(vb), 'ko');
+      return r * srSt.dir;
+    });
+  }
+  const srTh = (k, label) => {
+    const on = srSt.key === k;
+    const arrow = on ? (srSt.dir > 0 ? ' ▲' : ' ▼') : ' <span style="opacity:.3;font-size:9px">↕</span>';
+    return `<th style="cursor:pointer;user-select:none;white-space:nowrap" title="클릭 정렬" onclick="sortSearchResults('${k}')">${label}${arrow}</th>`;
+  };
 
   // 필터 pills HTML
   const pills = statuses.map(s => {
@@ -3068,7 +3104,7 @@ function _renderSrTable() {
         <button onclick="crSearchDownloadExcel()" style="margin-left:auto;background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ 엑셀 다운로드</button>
       </div>
       <div style="overflow-x:auto"><table class="cr-list-table">
-        <thead><tr><th>계약번호</th><th>임(전)차인명</th><th>건물명/호수</th><th>부동산</th><th>계약담당자</th><th>계약기간</th><th>계약상태</th><th>등급</th></tr></thead>
+        <thead><tr>${srTh('no','계약번호')}${srTh('name','임(전)차인명')}${srTh('bld','건물명/호수')}${srTh('broker','부동산')}${srTh('agent','계약담당자')}${srTh('period','계약기간')}${srTh('status','계약상태')}${srTh('grade','등급')}</tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
     </div>`;
@@ -5401,6 +5437,24 @@ async function renderSettlementView(){
     });
     var tbRate = tb.amt>0 ? Math.round(tb.paid/tb.amt*1000)/10 : 0;
 
+    // ── [v516] 검색기간 유보금 — 납부일이 기간 내 & 입금완료 & 임대인 미정산 (정산내역 실지급 X열 대조) ──
+    var SR2={}; (window.__stlSchedRows||[]).forEach(function(s){ SR2[s.cno+'|'+s.mon]=s; });
+    var hold={pre:{a:0,n:0}, past:{a:0,n:0}, none:{a:0,n:0}};
+    P.forEach(function(p){
+      if(!isRent(p) || !alive(p)) return;
+      var st3=String(p['납부상태']||'').trim(); if(st3!=='정상납부' && st3!=='연체납부') return;   // 입금 완료 건만
+      var payD3=_bfPd(p['납부일']); if(!_inR(payD3)) return;                                       // 납부일이 검색기간 내
+      if(isFirstMonth(p)) return;                                                                  // 첫달 직납 제외
+      var outA3=num(p['미납(연체)금액(원)']);
+      var tot3=num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) || (num(p['납부금액(원)'])+outA3);
+      var amt3=Math.max(0, tot3-outA3) || num(p['납부금액(원)']); if(amt3<=0) return;
+      var s3=SR2[String(p['계약번호']||'').trim()+'|'+billMonth(p)];
+      if(s3 && (s3.state==='완료' || s3.paidAt)) return;                                           // 임대인 지급 완료 → 유보 아님
+      if(!s3 || !s3.v){ hold.none.a+=amt3; hold.none.n++; }                                        // 정산서 미생성
+      else { var vd3=_bfPd(s3.v); if(vd3 && vd3<today){ hold.past.a+=amt3; hold.past.n++; } else { hold.pre.a+=amt3; hold.pre.n++; } }
+    });
+    var holdTot=hold.pre.a+hold.past.a+hold.none.a, holdN=hold.pre.n+hold.past.n+hold.none.n;
+
     // ── 렌더 ──
     var kpi=function(lb,val,sub,bg,tx){ return '<div style="background:'+(bg||'#fff')+';border:1px solid #E2EAF5;border-radius:10px;padding:10px 13px;min-width:150px;flex:1"><div style="font-size:10.5px;color:'+(tx||'#5A6A8A')+'">'+lb+'</div><div style="font-size:19px;font-weight:800;color:'+(tx||'#1A3A5C')+'">'+val+'</div><div style="font-size:10px;color:'+(tx||'#8A9AB5')+';opacity:.85">'+sub+'</div></div>'; };
     var pipe=function(lb,val,sub,warn){ return '<div style="flex:1;min-width:150px;background:#fff;border-radius:8px;padding:8px 11px;border:1px solid '+(warn?'#F7C1C1':'#EDF2F9')+'"><div style="font-size:10.5px;color:'+(warn?'#A32D2D':'#5A6A8A')+'">'+lb+'</div><div style="font-size:16px;font-weight:800;color:'+(warn?'#A32D2D':'#1A3A5C')+'">'+val+'</div><div style="font-size:10px;color:'+(warn?'#A32D2D':'#8A9AB5')+'">'+sub+'</div></div>'; };
@@ -5436,22 +5490,22 @@ async function renderSettlementView(){
       +'</div>';
     // [v515] 조회월 선택기 제거 — 상단 기간검색으로 통합 (청구총액·청구구성·롤포워드는 기간이 걸친 월 기준)
     html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
-      + kpi('정산 대기 유보금 (수익 아님)', mil(smOk?reserve:(d3.amt+d6.amt)), 'D+3 '+mil(d3.amt)+' · D+6 '+mil(d6.amt)+(smOk?' · 초과 '+mil(over.amt):' · 초과 판별불가'), '#FFFBEB','#92400E')
+      + kpi('기간 유보금 (입금완료·임대인 미정산)', smOk? mil(holdTot) : '판별불가', smOk? (holdN+'건 · 예정일 전 '+mil(hold.pre.a)+' · 예정일 경과 '+mil(hold.past.a)+' · 정산서 미생성 '+mil(hold.none.a)) : '정산내역 시트 미로딩 — 새로고침 필요', '#FFFBEB','#92400E')
       + kpi(cmLbl+' 청구 총액', mil(cmBilled), '입금 '+mil(cmPaid)+' ('+rate+'%) · 연체 미수 '+mil(cmOut)+' · 납기 전 '+mil(cmSched), '#fff')
       + kpi('연체채권 총잔액', mil(totalOut), '계약중 '+mil(outActive)+' · 퇴실채권(종료) '+mil(outEnded), '#FEF2F2','#A32D2D')
       + kpi('퇴실청소비 보관액', mil(cleanHold), cleanN+'건 입력됨 (AM열 공란 다수 — 시트 보완 필요)', '#F0F9FF','#0C4A6E')
       +'</div>';
-    // ① 파이프라인
+    // ① 검색기간 유보금 파이프라인 — [v516] 납부일이 기간 내 & 입금완료 & 임대인 미정산 (정산예정일 V열 기준 분해)
     html+='<div style="background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:12px;padding:12px 14px;margin-bottom:10px">'
-      +'<div style="font-size:13px;font-weight:800;color:#92400E;margin-bottom:8px">① 정산 대기 유보금 — 기준일: 실제 입금일(납부일) · 납부일+3일 1차 정산 · +6일 최종 시한</div>'
+      +'<div style="font-size:13px;font-weight:800;color:#92400E;margin-bottom:8px">① 검색기간 유보금 ('+rlbl+') — 기간 내 입금 완료 & 임대인 미정산 임대료</div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-      + pipe('D+3 이내 (정산 준비)', mil(d3.amt), d3.n+'건 · 납부 후 3일 이내')
-      + pipe('D+4~6 (1차 시한 경과)', mil(d6.amt), d6.n+'건 · 최종 시한 전 지급 필요')
-      + (smOk ? pipe('⚠ D+6 초과 미정산', mil(over.amt), over.n+'건 · 즉시 확인', true)
-              : pipe('D+6 초과 — 판별 불가', '—', '정산 시트 미로딩 (새로고침 필요)', true))
-      + pipe('퇴실청소비 보관', mil(cleanHold), '입주 시 수취 · 퇴실 시 사용')
+      + (smOk ? pipe('정산예정일 미도래 (정상 대기)', mil(hold.pre.a), hold.pre.n+'건 · 예정일에 지급 예정')
+              + pipe('⚠ 정산예정일 경과 (지급 지연)', mil(hold.past.a), hold.past.n+'건 · 즉시 지급 확인', hold.past.n>0)
+              + pipe('정산서 미생성', mil(hold.none.a), hold.none.n+'건 · 정산내역에 해당 월 정산서 없음', hold.none.n>0)
+              : pipe('판별 불가', '—', '정산내역 시트 미로딩 (새로고침 필요)', true))
+      + pipe('퇴실청소비 보관 (총액·기간 무관)', mil(cleanHold), '입주 시 수취 · 퇴실 시 사용')
       +'</div>'
-      +'<div style="font-size:10px;color:#B45309;margin-top:6px">※ 최근 '+CUTOFF_DAYS+'일 입금분 기준 · 정산 시트(gid=1253974103)에 정산일이 기록된 건은 지급 완료로 간주 · 첫 달 임대료(직납)는 제외</div></div>';   /* [v510] 상세 명단 제거 */
+      +'<div style="font-size:10px;color:#B45309;margin-top:6px">※ 납부일이 검색기간 내인 임대료 중 정산내역(gid=1253974103) 실지급일(X열)·정산상태(완료)가 없는 건 · 예정일 = V열 · 첫 달 임대료(직납) 제외 · 참고: 오늘 기준 D+6 초과 지연 '+(smOk? over.n+'건 '+mil(over.amt) : '판별불가')+'</div></div>';
     // ② 청구 구성
     var compTot=compRent+compFirst+compFee;
     if(compTot>0){
