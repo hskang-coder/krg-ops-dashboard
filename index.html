@@ -5315,20 +5315,25 @@ async function renderSettlementView(){
     var cleanHold = 0, cleanN = 0;
     V.forEach(function(v){ var k=String(v.contractKind||'').trim(); if(k!=='정상'&&k!=='계약중')return; var c=num(v.cleanFee); if(c>0){ cleanHold+=c; cleanN++; } });
 
-    // ── ② 조회월 청구 구성 (첫달 직납 분리) — [v510] 월 선택기 (기본: 데이터 있는 최근 월)
-    var mkKey=function(o){ return o.y+'-'+String(o.m).padStart(2,'0'); };
-    var cm;
-    var selM=String(window._stlMonth||'').match(/(\d{4})-(\d{2})/);
-    if(selM){ cm={y:+selM[1], m:+selM[2]}; }
-    else {
-      cm={y:today.getFullYear(), m:today.getMonth()+1};
-      var hasCur=P.some(function(p){ return billMonth(p)===mkKey(cm) && isRent(p); });
-      if(!hasCur){ var pmv=new Date(cm.y,cm.m-2,1); cm={y:pmv.getFullYear(),m:pmv.getMonth()+1}; }
-    }
-    var cmKey=mkKey(cm);
+    // ── [v515] 검색 기준 통합 — 상단 기간검색(일/주/월/날짜~날짜)이 유일한 기준 (조회월 선택기 폐지) ──
+    var _sp = window._stlP || (window._stlP = {period:'day', r1:null, r2:null});
+    var baseD = new Date(); baseD.setHours(0,0,0,0);
+    var rs, re2;
+    if(_sp.period==='range' && _sp.r1 && _sp.r2){ rs=_bfPd(_sp.r1)||new Date(baseD); re2=_bfPd(_sp.r2)||new Date(baseD); if(re2<rs){ var _sw=rs; rs=re2; re2=_sw; } rs.setHours(0,0,0,0); re2.setHours(0,0,0,0); }
+    else if(_sp.period==='week'){ var dw=(baseD.getDay()+6)%7; rs=new Date(baseD); rs.setDate(baseD.getDate()-dw); re2=new Date(rs); re2.setDate(rs.getDate()+6); }
+    else if(_sp.period==='month'){ rs=new Date(baseD.getFullYear(),baseD.getMonth(),1); re2=new Date(baseD.getFullYear(),baseD.getMonth()+1,0); }
+    else { rs=new Date(baseD); re2=new Date(baseD); }
+    var _inR=function(d){ return d && d>=rs && d<=re2; };
+    var _ymd=function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+    // 기간이 걸치는 월 집합 — ② 청구 구성·③ 롤포워드는 청구서가 월 단위라 월로 환산 적용
+    var monthsInR={}, _mc=new Date(rs.getFullYear(),rs.getMonth(),1);
+    while(_mc<=re2){ monthsInR[_mc.getFullYear()+'-'+String(_mc.getMonth()+1).padStart(2,'0')]=1; _mc.setMonth(_mc.getMonth()+1); }
+    var _mKeys=Object.keys(monthsInR).sort();
+    var cmKey=_mKeys[_mKeys.length-1];                       // 기간 마지막 월 = 롤포워드 앵커
+    var cmLbl=_mKeys.length>1? _mKeys[0].replace('-','.')+'~'+cmKey.replace('-','.') : cmKey.replace('-','.');
     var compRent=0, compFirst=0, compFee=0, cmPaid=0, cmBilled=0, cmOut=0, cmSched=0;
     P.forEach(function(p){
-      if(!alive(p) || billMonth(p)!==cmKey) return;
+      if(!alive(p) || !monthsInR[billMonth(p)]) return;   /* [v515] 기간 월 집합 */
       var tot=num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) || (num(p['납부금액(원)'])+num(p['미납(연체)금액(원)']));
       if(isFee(p)) compFee+=tot;
       else if(isRent(p)){ if(isFirstMonth(p)) compFirst+=tot; else compRent+=tot; }
@@ -5343,7 +5348,8 @@ async function renderSettlementView(){
 
     // ── ③ 연체 롤포워드 (발생월 고정 코호트, 최근 4개월 + 이전 누적) ──
     var coh={}, prevOut=0, prevGen=0;
-    var win=[]; for(var k=3;k>=0;k--){ var d=new Date(cm.y, cm.m-1-k, 1); win.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }   // [v510] 조회월 기준 최근 4개월
+    var winLen=Math.max(4,_mKeys.length);   // [v515] 기간이 4개월 초과 시 전체 표시, 이하면 최근 4개월
+    var win=[]; for(var k=winLen-1;k>=0;k--){ var d=new Date(+cmKey.slice(0,4), +cmKey.slice(5,7)-1-k, 1); win.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
     P.forEach(function(p){
       if(!alive(p)) return;
       if(!isRent(p) && !isFee(p) && String(p['납부종류']||'').trim()!=='변동관리비') return;
@@ -5369,16 +5375,7 @@ async function renderSettlementView(){
     var outActive=window.__stlActiveOut||0, outEnded=window.__stlEndedOut||0;
     window.__stlActiveOut=0; window.__stlEndedOut=0;
 
-    // ── [v513] 기간 KPI (일/주/월 · 기준일) — 청구 / 납부 / 대위변제 / 정산예정 ──
-    var _sp = window._stlP || (window._stlP = {period:'day', date:null});
-    var baseD = _sp.date ? _bfPd(_sp.date) : new Date(); if(!baseD) baseD=new Date(); baseD.setHours(0,0,0,0);
-    var rs, re2;
-    if(_sp.period==='range' && _sp.r1 && _sp.r2){ rs=_bfPd(_sp.r1)||new Date(baseD); re2=_bfPd(_sp.r2)||new Date(baseD); if(re2<rs){ var _sw=rs; rs=re2; re2=_sw; } rs.setHours(0,0,0,0); re2.setHours(0,0,0,0); }   // [v514] 날짜~날짜 검색
-    else if(_sp.period==='week'){ var dw=(baseD.getDay()+6)%7; rs=new Date(baseD); rs.setDate(baseD.getDate()-dw); re2=new Date(rs); re2.setDate(rs.getDate()+6); }
-    else if(_sp.period==='month'){ rs=new Date(baseD.getFullYear(),baseD.getMonth(),1); re2=new Date(baseD.getFullYear(),baseD.getMonth()+1,0); }
-    else { rs=new Date(baseD); re2=new Date(baseD); }
-    var _inR=function(d){ return d && d>=rs && d<=re2; };
-    var _ymd=function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+    // ── [v513/v515] 기간 KPI — 청구 / 납부 / 대위변제 / 정산예정 (상단 통합 기간검색 기준) ──
     var tb={rows:0,ctr:{},amt:0,paid:0}, subro={amt:0,n:0}, sched={n:0,amt:0};
     var unpaidMap={};   // [v514] 계약번호|청구월 → 미납 합 (대위변제 매칭용)
     P.forEach(function(p){
@@ -5419,16 +5416,14 @@ async function renderSettlementView(){
       +'<button class="stl-btn'+pfx('day')+'" onclick="stl_setPeriod(\'day\')">일</button>'
       +'<button class="stl-btn'+pfx('week')+'" onclick="stl_setPeriod(\'week\')">주</button>'
       +'<button class="stl-btn'+pfx('month')+'" onclick="stl_setPeriod(\'month\')">월</button>'
-      +'<span style="margin-left:12px;font-size:11px;color:#6B7280">기준일:</span>'
-      +'<input type="date" class="stl-inp" value="'+_ymd(baseD)+'" onchange="stl_setDate(this.value)">'
-      +'<button class="stl-btn" style="margin-left:8px" onclick="stl_setDate(null)">오늘</button>'
-      // [v514] 날짜 ~ 날짜 검색 — 두 날짜 모두 입력 시 즉시 적용
+      // [v515] 기준일 제거 — 일/주/월은 오늘 기준 프리셋, 임의 조회는 기간검색(날짜~날짜)으로 통합
       +'<span style="margin-left:12px;font-size:11px;color:#6B7280">기간검색:</span>'
-      +'<input type="date" id="stlR1" class="stl-inp'+(_sp.period==='range'?' rng-on':'')+'" value="'+(_sp.r1||'')+'" onchange="stl_setRange()">'
+      +'<input type="date" id="stlR1" class="stl-inp'+(_sp.period==='range'?' rng-on':'')+'" value="'+(_sp.period==='range'?(_sp.r1||''):_ymd(rs))+'" onchange="stl_setRange()">'
       +'<span style="color:#9CA3AF;font-size:12px">~</span>'
-      +'<input type="date" id="stlR2" class="stl-inp'+(_sp.period==='range'?' rng-on':'')+'" value="'+(_sp.r2||'')+'" onchange="stl_setRange()">'
+      +'<input type="date" id="stlR2" class="stl-inp'+(_sp.period==='range'?' rng-on':'')+'" value="'+(_sp.period==='range'?(_sp.r2||''):_ymd(re2))+'" onchange="stl_setRange()">'
       +(_sp.period==='range'?'<button class="stl-btn" onclick="stl_clearRange()">해제</button>':'')
-      +'<span style="font-size:10.5px;color:#8A9AB5">'+rlbl+' · 납기일/정산예정일 기준</span></div>';
+      +'<button class="stl-btn" style="margin-left:8px" onclick="stl_clearRange()">오늘</button>'
+      +'<span style="font-size:10.5px;color:#8A9AB5">'+rlbl+' · 납기일/정산예정일/청구월 기준 — 유보금 파이프라인은 오늘 기준</span></div>';
     var rateCol = tbRate>=90?'#0B7A45':(tbRate>=70?'#B45309':'#A32D2D');
     html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
       + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', Object.keys(tb.ctr).length+'명', '임대료 청구 '+tb.rows+'건 · 납기일 기준', '#fff')
@@ -5439,18 +5434,10 @@ async function renderSettlementView(){
       + kpi('정산예정건수', sched.n+'건', '정산예정일 도래 · 미지급(완료 제외)'+(smOk?'':' · 판별불가'), '#F0FDF4','#166534')
       + kpi('정산예정금액', won(sched.amt), '임대인 지급 예정 (정산내역 T열)', '#F0FDF4','#166534')
       +'</div>';
-    // [v510] 조회월 선택기 — 청구총액·청구구성·롤포워드에 적용 (유보금 파이프라인은 오늘 기준)
-    var _mShift=function(base,d){ var m2=new Date(+base.slice(0,4), +base.slice(5,7)-1+d, 1); return m2.getFullYear()+'-'+String(m2.getMonth()+1).padStart(2,'0'); };
-    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;background:#fff;border:1px solid #E2EAF5;border-radius:10px;padding:8px 13px">'
-      +'<span style="font-size:12px;font-weight:700;color:#1A3A5C">조회월</span>'
-      +'<button onclick="window._stlMonth=\''+_mShift(cmKey,-1)+'\';renderSettlementView()" title="전월" style="font-size:13px;padding:3px 10px;border:1px solid #D6E0EF;border-radius:6px;background:#F7FAFD;color:#1A3A5C;cursor:pointer;font-weight:700">◀</button>'
-      +'<input type="month" value="'+cmKey+'" onchange="window._stlMonth=this.value;renderSettlementView()" style="font-size:12px;padding:4px 8px;border:1px solid #D6E0EF;border-radius:6px">'
-      +'<button onclick="window._stlMonth=\''+_mShift(cmKey,1)+'\';renderSettlementView()" title="차월" style="font-size:13px;padding:3px 10px;border:1px solid #D6E0EF;border-radius:6px;background:#F7FAFD;color:#1A3A5C;cursor:pointer;font-weight:700">▶</button>'
-      +'<button onclick="window._stlMonth=null;renderSettlementView()" style="font-size:11px;padding:4px 10px;border:1px solid #D6E0EF;border-radius:6px;background:#F7FAFD;color:#5A6A8A;cursor:pointer">최신</button>'
-      +'<span style="font-size:10.5px;color:#8A9AB5">청구 총액 · 청구 구성 · 롤포워드에 적용 — 유보금 파이프라인은 오늘 기준</span></div>';
+    // [v515] 조회월 선택기 제거 — 상단 기간검색으로 통합 (청구총액·청구구성·롤포워드는 기간이 걸친 월 기준)
     html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
       + kpi('정산 대기 유보금 (수익 아님)', mil(smOk?reserve:(d3.amt+d6.amt)), 'D+3 '+mil(d3.amt)+' · D+6 '+mil(d6.amt)+(smOk?' · 초과 '+mil(over.amt):' · 초과 판별불가'), '#FFFBEB','#92400E')
-      + kpi(cmKey.replace('-','.')+' 청구 총액', mil(cmBilled), '입금 '+mil(cmPaid)+' ('+rate+'%) · 연체 미수 '+mil(cmOut)+' · 납기 전 '+mil(cmSched), '#fff')
+      + kpi(cmLbl+' 청구 총액', mil(cmBilled), '입금 '+mil(cmPaid)+' ('+rate+'%) · 연체 미수 '+mil(cmOut)+' · 납기 전 '+mil(cmSched), '#fff')
       + kpi('연체채권 총잔액', mil(totalOut), '계약중 '+mil(outActive)+' · 퇴실채권(종료) '+mil(outEnded), '#FEF2F2','#A32D2D')
       + kpi('퇴실청소비 보관액', mil(cleanHold), cleanN+'건 입력됨 (AM열 공란 다수 — 시트 보완 필요)', '#F0F9FF','#0C4A6E')
       +'</div>';
@@ -5470,7 +5457,7 @@ async function renderSettlementView(){
     if(compTot>0){
       var pw=function(x){ return Math.max(3, Math.round(x/compTot*100)); };
       html+='<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:12px 14px;margin-bottom:10px">'
-        +'<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:8px">② '+cmKey.replace('-','.')+' 청구 구성 — 첫 달 직납 분리</div>'
+        +'<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:8px">② '+cmLbl+' 청구 구성 — 첫 달 직납 분리</div>'
         +'<div style="display:flex;height:26px;border-radius:6px;overflow:hidden;font-size:10.5px;font-weight:700">'
         +'<div style="flex:'+pw(compRent)+';background:#85B7EB;color:#042C53;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden">기존 임대료 '+mil(compRent)+' (KRG 경유)</div>'
         +'<div style="flex:'+pw(compFirst)+';background:#CECBF6;color:#26215C;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden">첫달 직납 '+mil(compFirst)+'</div>'
@@ -5512,16 +5499,15 @@ async function renderSettlementView(){
   }
 }
 // [v513] 정산관리 기간 선택 핸들러 (운영관리 okpi_setPeriod/okpi_setDate와 동일 패턴)
-function stl_setPeriod(p){ window._stlP = window._stlP || {period:'day',date:null}; window._stlP.period = p; renderSettlementView(); }
-function stl_setDate(v){ window._stlP = window._stlP || {period:'day',date:null}; window._stlP.date = v || null; if(window._stlP.period==='range') window._stlP.period='day'; renderSettlementView(); }
-// [v514] 날짜 ~ 날짜 검색 — 두 날짜가 모두 채워지면 range 모드로 전환
+function stl_setPeriod(p){ window._stlP = window._stlP || {period:'day'}; window._stlP.period = p; renderSettlementView(); }
+// [v514/v515] 날짜 ~ 날짜 검색 — 두 날짜가 모두 채워지면 range 모드로 전환 (기준일 개념 폐지, 일/주/월은 오늘 기준 프리셋)
 function stl_setRange(){
   var a=(document.getElementById('stlR1')||{}).value||'', b=(document.getElementById('stlR2')||{}).value||'';
-  window._stlP = window._stlP || {period:'day',date:null};
+  window._stlP = window._stlP || {period:'day'};
   window._stlP.r1 = a||null; window._stlP.r2 = b||null;
   if(a && b){ window._stlP.period='range'; renderSettlementView(); }
 }
-function stl_clearRange(){ window._stlP = window._stlP || {period:'day',date:null}; window._stlP.r1=null; window._stlP.r2=null; window._stlP.period='day'; renderSettlementView(); }
+function stl_clearRange(){ window._stlP = window._stlP || {period:'day'}; window._stlP.r1=null; window._stlP.r2=null; window._stlP.period='day'; renderSettlementView(); }
 
 function renderContractRecord(c, payments, responses = []) {
   // vacancyRawData에서 매칭 행 찾기 (없으면 빈 객체)
