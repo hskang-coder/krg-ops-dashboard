@@ -5606,6 +5606,13 @@ async function renderSettlementView(){
       var on=(dlqK===k);
       return '<button onclick="stl_setDlq(\''+k+'\')" style="padding:5px 13px;border:1.5px solid '+(on?DKC[k]:'#D1D5DB')+';background:'+(on?DKC[k]:'#fff')+';color:'+(on?'#fff':'#374151')+';border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;font-family:inherit">'+label+' <b>'+mil(amt)+'</b></button>';
     };
+    // [v523] 시점 기준 명시 — 회수·잔액은 시트에 현재 잔액만 있어 언제나 '오늘' 스냅샷 (과거 시점 재구성 불가)
+    var asOfWarn = (re2 < today)
+      ? '<div style="background:#FFF8EC;border:1px solid #F5D9A8;border-radius:8px;padding:8px 11px;margin-bottom:9px;font-size:10.5px;color:#7A4A05;line-height:1.7">'
+        +'⚠ <b>시점 주의</b> — 검색 종료일이 <b>'+_ymd(re2)+'</b>(과거)이지만, <b>② 회수 · ③ 잔액 · 누적은 오늘('+_ymd(today)+') 기준</b> 값입니다. '
+        +'그 이후에 회수된 금액까지 이미 반영돼 있어 <u>'+_ymd(re2)+' 당시의 미회수액과 다릅니다.</u> '
+        +'선택 기간이 적용되는 것은 <b>표에 나오는 발생월 범위</b>뿐이며, 시트에 미납액의 시점별 이력이 없어 과거 시점 재구성은 불가능합니다.</div>'
+      : '';
     var dNote={
       T:'※ 계약중 + 계약종료 합산입니다. 두 그룹은 회수율이 크게 달라 버튼으로 나눠 보시는 것을 권합니다.',
       A:'※ <b style="color:#2563EB">계약중(거주 중)</b>만 — 회수율이 높은 정상 관리 범위입니다. 독촉으로 회수 가능한 구간.',
@@ -5619,6 +5626,7 @@ async function renderSettlementView(){
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px">'
       + dbtn('T','전체', totA+totE) + dbtn('A','🔵 계약중', totA) + dbtn('E','🟠 계약종료(퇴실)', totE)
       +'</div>'
+      + asOfWarn
       +'<div style="background:#F8FAFC;border-left:3px solid #94A3B8;border-radius:0 6px 6px 0;padding:7px 10px;margin-bottom:9px;font-size:11px;color:#475569;line-height:1.6">'
       +'📖 <b>읽는 법</b> — '+exM.replace('-','.')+' 줄은 “그 달에 <b>'+_cn(exC)+'명</b>이 <b style="color:#DC2626">'+mil(exC.gen)+'</b>('+exC.n+'건)을 새로 밀렸는데, 그중 <b style="color:#15803D">'+exR+'%('+mil(exC.rec)+')</b>를 지금까지 회수했고 <b>'+mil(exC.out)+'</b>은 아직 못 받았다”는 뜻입니다. 맨 오른쪽은 그때까지 쌓인 <b>회사 전체 미회수 총액</b>입니다.'
       +'<br><span style="font-size:10.5px;color:#64748B"><b>명</b> = 계약 수 · <b>건</b> = 청구서 줄 수. 한 사람이 같은 달에 임대료·수수료·변동관리비로 나뉘어 청구되면 <b>2~3건</b>이 됩니다 (숫자에 마우스를 올리면 종류별 내역이 보입니다).</span>'
@@ -5627,14 +5635,15 @@ async function renderSettlementView(){
       +'<tr style="background:#F8FAFC;color:#475569;font-size:11px">'
       +'<th style="padding:6px 8px;text-align:left">연체 발생월</th>'
       +'<th style="padding:6px 8px;text-align:right">① 새로 밀린 금액</th>'
-      +'<th style="padding:6px 8px;text-align:right">② 지금까지 회수</th>'
+      +'<th style="padding:6px 8px;text-align:right">② 지금까지 회수<br><span style="font-weight:500;font-size:9.5px;color:#94A3B8">'+_ymd(today)+' 기준</span></th>'
       +'<th style="padding:6px 8px;text-align:right">회수율 (②÷①)</th>'
-      +'<th style="padding:6px 8px;text-align:right">③ 아직 못 받음 (①−②)</th>'
-      +'<th style="padding:6px 8px;text-align:right">누적 미회수 총액</th></tr>'
+      +'<th style="padding:6px 8px;text-align:right">③ 아직 못 받음 (①−②)<br><span style="font-weight:500;font-size:9.5px;color:#94A3B8">'+_ymd(today)+' 기준</span></th>'
+      +'<th style="padding:6px 8px;text-align:right">누적 미회수 총액<br><span style="font-weight:500;font-size:9.5px;color:#94A3B8">'+_ymd(today)+' 기준</span></th></tr>'
       + rf + '</table></div>'
       +'<div style="font-size:10px;color:#8A9AB5;margin-top:7px;line-height:1.6">'
       + dNote + '<br>'
       +'※ <b>이번 달('+curRealM.replace('-','.')+')은 아직 진행 중</b>이라 회수할 시간이 없어 회수율이 낮게 보이는 것이 정상입니다 — 지난달들과 직접 비교하지 마세요.<br>'
+      +'※ <b>기준 시점</b>: ① 발생액·건수는 <b>발생월</b> 기준(고정) · ② 회수 · ③ 잔액 · 누적은 <b>오늘('+_ymd(today)+') 기준</b> 스냅샷입니다. 이번 달 코호트는 납기일이 도래한 건만 잡혀 아직 납기 전인 청구는 포함되지 않습니다.<br>'
       +'※ 구분 기준: 계약상태가 <b>“종료”</b>면 계약종료, 그 외는 계약중 · 포함 항목: 임대료 + 수수료 + 변동관리비 · 떼인 돈으로 확정(손실처리)하는 기준이 아직 없어 못 받은 금액은 전액 누적됩니다.'
       +'</div></div>';
     // ④ 오늘의 액션
