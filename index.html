@@ -5366,11 +5366,71 @@ async function renderSettlementView(){
     var outActive=window.__stlActiveOut||0, outEnded=window.__stlEndedOut||0;
     window.__stlActiveOut=0; window.__stlEndedOut=0;
 
+    // ── [v513] 기간 KPI (일/주/월 · 기준일) — 청구 / 납부 / 대위변제 / 정산예정 ──
+    var _sp = window._stlP || (window._stlP = {period:'day', date:null});
+    var baseD = _sp.date ? _bfPd(_sp.date) : new Date(); if(!baseD) baseD=new Date(); baseD.setHours(0,0,0,0);
+    var rs, re2;
+    if(_sp.period==='week'){ var dw=(baseD.getDay()+6)%7; rs=new Date(baseD); rs.setDate(baseD.getDate()-dw); re2=new Date(rs); re2.setDate(rs.getDate()+6); }
+    else if(_sp.period==='month'){ rs=new Date(baseD.getFullYear(),baseD.getMonth(),1); re2=new Date(baseD.getFullYear(),baseD.getMonth()+1,0); }
+    else { rs=new Date(baseD); re2=new Date(baseD); }
+    var _inR=function(d){ return d && d>=rs && d<=re2; };
+    var _ymd=function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+    var tb={rows:0,ctr:{},amt:0,paid:0}, subro={amt:0,n:0}, sched={n:0,amt:0};
+    P.forEach(function(p){
+      if(!isRent(p) || !alive(p)) return;
+      var tot=num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) || (num(p['납부금액(원)'])+num(p['미납(연체)금액(원)']));
+      var outA=num(p['미납(연체)금액(원)']);
+      var st2=String(p['납부상태']||'').trim();
+      var dueD=_bfPd(p['납기일']), payD2=_bfPd(p['납부일']);
+      var cno2=String(p['계약번호']||'').trim();
+      // 청구/납부: 납기일이 기간 내인 임대료 청구건
+      if(_inR(dueD) && tot>0){
+        tb.rows++; tb.ctr[cno2]=1; tb.amt+=tot;
+        if(st2!=='납부예정') tb.paid+=Math.max(0, tot-outA);   // [v508] 입금 = 청구 − 미납
+      }
+      if(isFirstMonth(p)) return;                              // 첫달 직납 — 정산·대위변제 대상 아님
+      if((st2==='정상납부'||st2==='연체납부') && payD2){
+        var sd=new Date(payD2); sd.setDate(sd.getDate()+3);    // 정산예정일 = 납부일+3 (1차 정산 시한)
+        if(_inR(sd)){
+          var bm3=billMonth(p);
+          if(!(bm3 && SM[cno2] && SM[cno2][bm3])){ var a3=num(p['납부금액(원)'])||Math.max(0,tot-outA); if(a3>0){ sched.n++; sched.amt+=a3; } }
+        }
+      } else if(outA>0 && dueD){
+        var sd2=new Date(dueD); sd2.setDate(sd2.getDate()+3);  // 미납건 정산예정일 = 납기일+3 → 대위변제 필요
+        if(_inR(sd2)){ subro.amt+=outA; subro.n++; }
+      }
+    });
+    var tbRate = tb.amt>0 ? Math.round(tb.paid/tb.amt*1000)/10 : 0;
+
     // ── 렌더 ──
     var kpi=function(lb,val,sub,bg,tx){ return '<div style="background:'+(bg||'#fff')+';border:1px solid #E2EAF5;border-radius:10px;padding:10px 13px;min-width:150px;flex:1"><div style="font-size:10.5px;color:'+(tx||'#5A6A8A')+'">'+lb+'</div><div style="font-size:19px;font-weight:800;color:'+(tx||'#1A3A5C')+'">'+val+'</div><div style="font-size:10px;color:'+(tx||'#8A9AB5')+';opacity:.85">'+sub+'</div></div>'; };
     var pipe=function(lb,val,sub,warn){ return '<div style="flex:1;min-width:150px;background:#fff;border-radius:8px;padding:8px 11px;border:1px solid '+(warn?'#F7C1C1':'#EDF2F9')+'"><div style="font-size:10.5px;color:'+(warn?'#A32D2D':'#5A6A8A')+'">'+lb+'</div><div style="font-size:16px;font-weight:800;color:'+(warn?'#A32D2D':'#1A3A5C')+'">'+val+'</div><div style="font-size:10px;color:'+(warn?'#A32D2D':'#8A9AB5')+'">'+sub+'</div></div>'; };
     var rate=cmBilled? Math.round(cmPaid/cmBilled*1000)/10 : 0;
     var html='';
+    // [v513] 기간 선택 바 (운영관리와 동일 스타일) + 기간 KPI 카드 7종
+    var pfx=function(p){ return _sp.period===p?' active':''; };
+    var plbl=_sp.period==='day'?'일':(_sp.period==='week'?'주':'월');
+    var rlbl=_ymd(rs)+(_ymd(rs)!==_ymd(re2)?' ~ '+_ymd(re2):'');
+    html+='<style>.stl-btn{padding:6px 14px;border:1.5px solid #D1D5DB;background:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;color:#374151}.stl-btn.active{background:#4F46E5;color:#fff;border-color:#4F46E5}.stl-inp{padding:6px 10px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:12px}</style>';
+    html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">'
+      +'<span style="font-size:11px;color:#6B7280;margin-right:4px">기간:</span>'
+      +'<button class="stl-btn'+pfx('day')+'" onclick="stl_setPeriod(\'day\')">일</button>'
+      +'<button class="stl-btn'+pfx('week')+'" onclick="stl_setPeriod(\'week\')">주</button>'
+      +'<button class="stl-btn'+pfx('month')+'" onclick="stl_setPeriod(\'month\')">월</button>'
+      +'<span style="margin-left:12px;font-size:11px;color:#6B7280">기준일:</span>'
+      +'<input type="date" class="stl-inp" value="'+_ymd(baseD)+'" onchange="stl_setDate(this.value)">'
+      +'<button class="stl-btn" style="margin-left:8px" onclick="stl_setDate(null)">오늘</button>'
+      +'<span style="font-size:10.5px;color:#8A9AB5">'+rlbl+' · 납기일/정산예정일 기준</span></div>';
+    var rateCol = tbRate>=90?'#0B7A45':(tbRate>=70?'#B45309':'#A32D2D');
+    html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
+      + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', Object.keys(tb.ctr).length+'명', '임대료 청구 '+tb.rows+'건 · 납기일 기준', '#fff')
+      + kpi('청구금액', won(tb.amt), '납기일 '+rlbl, '#fff')
+      + kpi('납부금액', won(tb.paid), '납부완료 (청구 − 미납)', '#fff')
+      + kpi('정상납부율', tbRate+'%', '납부금액 ÷ 청구금액', '#fff', rateCol)
+      + kpi('대위변제금액', won(subro.amt), subro.n+'건 · 정산예정일(납기일+3) 도래 미납', '#FEF2F2','#A32D2D')
+      + kpi('정산예정건수', sched.n+'건', '납부일+3 도래 · 미정산'+(smOk?'':' · 판별불가'), '#F0FDF4','#166534')
+      + kpi('정산예정금액', won(sched.amt), '임대인 지급 예정', '#F0FDF4','#166534')
+      +'</div>';
     // [v510] 조회월 선택기 — 청구총액·청구구성·롤포워드에 적용 (유보금 파이프라인은 오늘 기준)
     var _mShift=function(base,d){ var m2=new Date(+base.slice(0,4), +base.slice(5,7)-1+d, 1); return m2.getFullYear()+'-'+String(m2.getMonth()+1).padStart(2,'0'); };
     html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;background:#fff;border:1px solid #E2EAF5;border-radius:10px;padding:8px 13px">'
@@ -5443,6 +5503,9 @@ async function renderSettlementView(){
     el.innerHTML = '<div class="cr-empty">⚠ 정산 데이터 로딩 실패: '+e.message+'</div>';
   }
 }
+// [v513] 정산관리 기간 선택 핸들러 (운영관리 okpi_setPeriod/okpi_setDate와 동일 패턴)
+function stl_setPeriod(p){ window._stlP = window._stlP || {period:'day',date:null}; window._stlP.period = p; renderSettlementView(); }
+function stl_setDate(v){ window._stlP = window._stlP || {period:'day',date:null}; window._stlP.date = v || null; renderSettlementView(); }
 
 function renderContractRecord(c, payments, responses = []) {
   // vacancyRawData에서 매칭 행 찾기 (없으면 빈 객체)
