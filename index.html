@@ -19062,9 +19062,60 @@ function _vldBriefHTML(rows){
       + '만기 모수 = 12개월 전('+String(cur.y-1).slice(2)+'.'+('0'+cur.m).slice(-2)+') 입주 '+coh+'건 '+(cohX?cohX+'배':'-')+' · '
       + '중도 중 <b>연체 '+dlqN+'</b>(피해 '+(Math.round(dlqAmt/100000)/10)+'M) · <b>강제퇴실 '+force+'</b>'
       + (Mx.length&&dlqN/Mx.length>=0.5 ? ' → 초기 연체 개입 필요' : '');
+    // [v530] ③ 운영 — 기간 전체 만기·중도 퇴실 추이 해석 (급증 월 + 원인 후보: 건물 집중·갱신불가·강제퇴실)
+    var line3='';
+    try{
+      var buck={}, ord=[];
+      rows.forEach(function(r){ var o=mm(r.label); if(!o) return; ord.push(r.label); buck[r.label]={exp:[],mid:[]}; });
+      if(ord.length>=4){
+        V.forEach(function(v){
+          var t=pd(v.terminateDate); if(!t) return;
+          var lb=('0'+(t.getFullYear()%100)).slice(-2)+'.'+('0'+(t.getMonth()+1)).slice(-2);
+          if(!buck[lb]) return;
+          (isMid(v)?buck[lb].mid:buck[lb].exp).push(v);
+        });
+        var eCnt=ord.map(function(l){return buck[l].exp.length;}), mCnt=ord.map(function(l){return buck[l].mid.length;});
+        var mean=function(a){ return a.length? a.reduce(function(x,y){return x+y;},0)/a.length : 0; };
+        var eAvg=mean(eCnt), mAvg=mean(mCnt);
+        var eSp=[], mSp=[];
+        ord.forEach(function(l,i){
+          if(eCnt[i]>=5 && eCnt[i]>=eAvg*1.4) eSp.push(l);
+          if(mCnt[i]>=5 && mCnt[i]>=mAvg*1.4) mSp.push(l);
+        });
+        var canJ=(typeof rnwCalcLateMetrics==='function'&&typeof rnwClassify==='function'&&typeof paymentRawData!=='undefined'&&Array.isArray(paymentRawData)&&paymentRawData.length>0);
+        var expNote=function(l){
+          var arr=buck[l].exp, top={}, bn='', bc=0;
+          arr.forEach(function(v){ var b=String(v.propBuilding||'').trim(); if(b) top[b]=(top[b]||0)+1; });
+          Object.keys(top).forEach(function(k){ if(top[k]>bc){bn=k;bc=top[k];} });
+          var deny=0; if(canJ) arr.forEach(function(v){ try{ var m2=rnwCalcLateMetrics(String(v.no||'').trim(),paymentRawData); if(m2&&m2.total&&rnwClassify(m2)==='deny') deny++; }catch(_){} });
+          var parts=[];
+          if(bc>=3) parts.push('<b>'+bn+' '+bc+'건</b> 집중 → 임대인 갱신거절 등 확인 필요');
+          if(deny>0) parts.push('갱신불가(심사 거절) '+deny+'건');
+          return '<b>'+l+'</b> '+arr.length+'건'+(parts.length?' — '+parts.join(' · '):'');
+        };
+        var midNote=function(l){
+          var arr=buck[l].mid;
+          var f=arr.filter(function(v){return String(v.status||'').indexOf('강제퇴실')>=0;}).length;
+          var d=arr.filter(function(v){return num(v.dlqAmt)>0;}).length;
+          var parts=[];
+          if(f>0) parts.push('<b>강제퇴실 '+f+'건</b>');
+          if(d>0) parts.push('연체보유 '+d+'건');
+          return '<b>'+l+'</b> '+arr.length+'건'+(parts.length?' — '+parts.join(' · '):'');
+        };
+        if(eSp.length||mSp.length){
+          var seg=[];
+          if(eSp.length) seg.push('<b style="color:#B45309">만기퇴실 급증</b> <span style="color:#92400E">(평균 '+(Math.round(eAvg*10)/10)+'건 대비)</span> : '+eSp.map(expNote).join(' &nbsp;/&nbsp; '));
+          if(mSp.length) seg.push('<b style="color:#B91C1C">중도퇴실 급증</b> <span style="color:#92400E">(평균 '+(Math.round(mAvg*10)/10)+'건 대비)</span> : '+mSp.map(midNote).join(' &nbsp;/&nbsp; '));
+          line3=seg.join('<br>');
+        } else {
+          line3='기간 내 만기·중도퇴실 <b>급증 구간 없음</b> — 만기 평균 '+(Math.round(eAvg*10)/10)+'건 · 중도 평균 '+(Math.round(mAvg*10)/10)+'건 수준 유지';
+        }
+      }
+    }catch(_e){}
     return '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:9px">'
       + _bfBox('영업','#2E9E6B','#F0FDF4','#14532D', line1)
       + _bfBox('경영','#E24B4A','#FEF2F2','#7F1D1D', line2)
+      + (line3? _bfBox('운영','#D97706','#FFFBEB','#78350F', line3) : '')
       + '</div>';
   }catch(e){ return ''; }
 }
