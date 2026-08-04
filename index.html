@@ -5444,7 +5444,7 @@ async function renderSettlementView(){
     // [v514] 정산예정·대위변제 — 정산내역(Raw DATA) V열(정산예정일) 실데이터 기준 (납부일+3 추정 폐기)
     (window.__stlSchedRows||[]).forEach(function(s){
       var vd=_bfPd(s.v); if(!_inR(vd)) return;
-      var done = s.state==='완료' || String(s.state||'').indexOf('예약')>=0 || !!s.paidAt;   // [v531.2] N열 완료·예약(이체예약 걸어둔 건) 또는 X열 실지급일 → 지급 처리
+      var done = s.state==='완료' || String(s.state||'').indexOf('예약')>=0 || s.state==='제외' || !!s.paidAt;   // [v531.2/3] N열 완료·예약(이체예약)·제외(무효 정산서) 또는 X열 실지급일 → 집계 제외
       if(done || !(s.amt>0)) return;
       sched.n++; sched.amt+=s.amt;                             // 임대인 지급 예정 (T열)
       // [v518] 대위변제 = 정산예정(미지급) 건 중 임차인이 미납인 건 → 정산예정건수/금액의 부분집합
