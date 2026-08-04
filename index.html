@@ -19204,6 +19204,7 @@ function _vldAnalysis(bucketLabel, kind){
     var Y=2000+ +mm[1], M=+mm[2];
     var inM=function(d){return d&&d.getFullYear()===Y&&d.getMonth()===M-1;};
     var neu=0, expA=[], midA=[], expRent=0, midRent=0, midDlq=0, midDlqCnt=0, midForceVac=0, midForceDlq=0, mid12=0, midU11=0, mid11=0, exp24=0, exp12=0, expC=[], midC=[];   // [v529][v529.5][v529.6][v530.1]
+    var midDlqRel=0, maxDlq=0, maxDlqNm='', dlqMthSum=0, dlqMthN=0, freeMthSum=0, freeMthN=0;   // [v531] 연체발 중도퇴실 심층 분석용
     var active=0, actFee=0;
     V.forEach(function(v){
       if(inM(pd(v.startDate))) neu++;
@@ -19215,6 +19216,9 @@ function _vldAnalysis(bucketLabel, kind){
         if(vs.indexOf('강제퇴실(공실)')>=0) midForceVac++;
         if(vs.indexOf('강제퇴실(연체)')>=0) midForceDlq++;
         if(mth>=11) mid12++; else midU11++;                            // [v529.1] 거주기간 분포 — 11개월 이상 / 11개월 미만
+        var rel=(da>0||vs.indexOf('강제퇴실(연체)')>=0);               // [v531] 연체 관련 중도퇴실
+        if(rel){ midDlqRel++; dlqMthSum+=mth; dlqMthN++; } else { freeMthSum+=mth; freeMthN++; }
+        if(da>maxDlq){ maxDlq=da; maxDlqNm=v.tenant1Name||v.tenantName||''; }
       }
       else { expA.push(mth); expRent+=num(v.rent); expC.push(String(v.no||'').trim()); if(mth>=24)exp24++; else if(mth>=12)exp12++; }   // [v529.5/6] 만기퇴실 거주기간 구간 + 계약번호 수집
     });
@@ -19341,6 +19345,29 @@ function _vldAnalysis(bucketLabel, kind){
         }
       }catch(_le){ lossOk=false; }
     }
+    // [v531] 최근 6개월 강제퇴실·연체발 중도퇴실 추이 (이번 달 포함)
+    var hist=[];
+    try{
+      for(var hh=5;hh>=0;hh--){
+        var hd=new Date(Y, M-1-hh, 1), hy=hd.getFullYear(), hm=hd.getMonth();
+        var hc=0, hf=0;
+        V.forEach(function(v){
+          var t=pd(v.terminateDate);
+          if(!t||t.getFullYear()!==hy||t.getMonth()!==hm||!isMid(v)) return;
+          hc++; if(String(v.status||'').indexOf('강제퇴실')>=0) hf++;
+        });
+        hist.push({lb:(hy%100)+'.'+('0'+(hm+1)).slice(-2), mid:hc, force:hf});
+      }
+    }catch(_he){ hist=[]; }
+    var fCur=midForceVac+midForceDlq, fAvg5=0, fX=0, fRun=0, histStr='';
+    if(hist.length===6){
+      var fs=0; for(var fi=0;fi<5;fi++) fs+=hist[fi].force;
+      fAvg5=Math.round(fs/5*10)/10;
+      fX=fAvg5>0? Math.round(fCur/fAvg5*10)/10 : 0;
+      for(var ri=5;ri>0;ri--){ if(hist[ri].force>hist[ri-1].force) fRun++; else break; }
+      histStr=hist.map(function(h2){return h2.force;}).join('→')+'건';
+    }
+    var dlqAvgM=dlqMthN?Math.round(dlqMthSum/dlqMthN*10)/10:0, freeAvgM=freeMthN?Math.round(freeMthSum/freeMthN*10)/10:0;
     return '<div style="background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:9px;padding:10px 14px;margin:0 0 4px">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><b style="font-size:12.5px;color:#A32D2D">📊 중도퇴실 분석</b>'
       +'<span style="font-size:10.5px;color:#B91C1C">'+bucketLabel+' · 신규입주 '+neu+' · 만기 '+expA.length+' · 중도 '+midA.length+' → 순증 <b>'+(neu-expA.length-midA.length)+'명</b></span>'
@@ -19360,10 +19387,17 @@ function _vldAnalysis(bucketLabel, kind){
       +  '<div style="background:#fff;border-radius:7px;padding:5px 10px;min-width:120px"><div style="font-size:9.5px;color:#1E40AF">퇴실정산비용 등 <span style="color:#93C5FD">(청소비·법비용·정산금)</span></div><div style="font-size:15px;font-weight:800;color:#1D4ED8">'+(lossOk?mil(lossEtc):'—')+'</div></div>'   /* [v530.3] 미회수 획득비 카드 삭제 */
       +'</div></div>'
       +'</div>'
-      +'<div style="background:#FEF2F2;border-left:3px solid #E24B4A;padding:6px 10px;font-size:10.5px;color:#991B1B;line-height:1.65">'
-      +'계약을 끝까지 채운 사람은 평균 <b>'+aE2+'개월</b> 살았는데, 중간에 나간 사람은 <b>'+aM+'개월</b>만 살았습니다. '
-      +'<b>'+gap+'개월 일찍 나간 셈</b>이라 한 명당 수수료 약 '+mil(gap*avgFee)+'을 못 벌었고, '+midA.length+'명이면 '+mil(lossLtv)+'입니다. '
-      +(midDlqCnt>0?('지금 월세가 밀린 사람이 <b>'+midDlqCnt+'명</b> 있는데, 이미 <b>'+(midForceVac+midForceDlq)+'명</b>은 못 내서 내보냈습니다. → <b>밀린 돈이 커지기 전에 지금 연락해야 합니다.</b>'):'월세를 밀린 사람은 없습니다 → 왜 스스로 나갔는지 이유를 확인해 보세요.')
+      +'<div style="background:#FEF2F2;border-left:3px solid #E24B4A;padding:7px 11px;font-size:10.5px;color:#991B1B;line-height:1.7">'   /* [v531] 심층 분석 */
+      +'<b>① 강제퇴실 추이</b> — 이번 달 <b>'+fCur+'건</b>'
+      +(hist.length===6?(', 직전 5개월 평균 '+fAvg5+'건'+(fX?'의 <b>'+fX+'배</b>':'')+' <span style="opacity:.75">(최근 6개월 '+histStr+')</span>'+(fRun>=2?' · <b>'+fRun+'개월 연속 증가</b>':'')):'')+'. '
+      +(fX>=1.5?'<b>급등 구간입니다</b> — 연체 초기 대응(독촉·분납 협의)이 강제퇴실로 번지기 전에 차단되고 있는지 점검이 필요합니다.':(fX>0&&fX<=0.7?'전월 대비 진정 추세입니다.':'평시 수준입니다.'))
+      +'<br><b>② 연체발 중도퇴실</b> — 중도 '+midA.length+'건 중 <b>연체 관련 '+midDlqRel+'건('+mpc(midDlqRel)+'%)</b>. '
+      +(dlqMthN>0?('연체 퇴실자는 평균 <b>'+dlqAvgM+'개월</b>에 이탈'+(freeMthN>0?('(무연체 '+freeAvgM+'개월)'):'')+' → '+(freeMthN>0&&dlqAvgM<freeAvgM?'입주 초기 연체가 조기 이탈로 직결됩니다 — <b>입주 후 첫 3개월 납부 모니터링</b>이 가장 효과적입니다.':'연체가 거주 전 구간에서 발생하고 있어 상시 모니터링이 필요합니다.')):'')
+      +(maxDlq>0?(' 1인 최대 미회수 <b>'+maxDlqNm+' '+mil(maxDlq)+'</b>.'):'')
+      +'<br><b>③ 손실 구조</b> — 임대료 연체 '+(lossOk?mil(lossRent):'—')+' vs 퇴실정산비용 등 '+(lossOk?mil(lossEtc):'—')+' → '
+      +(lossOk?(lossEtc>lossRent?'<b>퇴실 처리 비용이 임대료 손실을 초과</b>합니다 — 청소비·법비용·퇴실정산금의 청구·회수 절차 관리가 핵심입니다.':'<b>임대료 미납이 주 손실원</b>입니다 — 연체 조기 회수 개입이 핵심입니다.'):'수납 데이터 로딩 후 표시됩니다.')
+      +' <span style="opacity:.75">(조기 이탈 기회손실 LTV '+mil(lossLtv)+' 별도)</span>'
+      +'<br><b>④ 조치</b> — '+(midDlqCnt>0?('연체 보유 <b>'+midDlqCnt+'건</b>은 선조치(연락·분납 협의) 즉시 필요합니다. 이미 <b>'+fCur+'건</b>이 강제퇴실로 종결된 만큼, 남은 연체 건은 금액이 커지기 전에 개입해야 합니다.'):'현재 연체 보유 건이 없습니다 — 자발적 퇴실 사유(시설·가격·계약조건) 확인을 권장합니다.')
       +'<div style="font-size:9.5px;color:#B91C1C;opacity:.72;margin-top:5px;padding-top:4px;border-top:1px dashed #FCA5A5;line-height:1.6">※ 강제퇴실(공실): 강제퇴실 후 개런티즈에서 후임세입자 유입 &nbsp;·&nbsp; 강제퇴실(연체): 연체로 인한 강제퇴실 계약자 후임세입자 유입</div>'   /* [v530.1] 각주 */
       +'</div></div>';
   }catch(e){ return ''; }
