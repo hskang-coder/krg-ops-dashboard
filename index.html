@@ -5427,6 +5427,7 @@ async function renderSettlementView(){
 
     // ── [v513/v515] 기간 KPI — 청구 / 납부 / 대위변제 / 정산예정 (상단 통합 기간검색 기준) ──
     var tb={rows:0,ctr:{},amt:0,paid:0}, subro={amt:0,n:0}, sched={n:0,amt:0};
+    var firstD={n:0,amt:0,paid:0};   // [v532.1] 첫달 직납 (임차인→임대인 직접)
     var unpaidMap={};   // [v514] 계약번호|청구월 → 미납 합 (대위변제 매칭용)
     P.forEach(function(p){
       if(!isRent(p) || !alive(p)) return;
@@ -5439,6 +5440,7 @@ async function renderSettlementView(){
       if(_inR(dueD) && tot>0){
         tb.rows++; tb.ctr[cno2]=1; tb.amt+=tot;
         if(st2!=='납부예정') tb.paid+=Math.max(0, tot-outA);   // [v508] 입금 = 청구 − 미납
+        if(isFirstMonth(p)){ firstD.n++; firstD.amt+=tot; if(st2!=='납부예정') firstD.paid+=Math.max(0, tot-outA); }   // [v532.1]
       }
       if(outA>0 && st2!=='납부예정'){ var k2=cno2+'|'+billMonth(p); unpaidMap[k2]=(unpaidMap[k2]||0)+outA; }
     });
@@ -5500,6 +5502,15 @@ async function renderSettlementView(){
       +'<input type="date" id="stlR2" class="stl-inp'+(_sp.period==='range'?' rng-on':'')+'" value="'+(_sp.period==='range'?(_sp.r2||''):_ymd(re2))+'" onchange="stl_setRange()">'
       +(_sp.period==='range'?'<button class="stl-btn" onclick="stl_clearRange()">해제</button>':'')
       +'<button class="stl-btn" style="margin-left:8px" onclick="stl_clearRange()">오늘</button>'
+      // [v532.1] 월 단위 이동 — ◀ 전월 / YYYY.MM / 다음달 ▶ / 이번달
+      +(function(){ var oneM=(rs.getFullYear()===re2.getFullYear()&&rs.getMonth()===re2.getMonth());
+        var mlbl=oneM? rs.getFullYear()+'.'+String(rs.getMonth()+1).padStart(2,'0') : '기간';
+        return '<span style="margin-left:10px;display:inline-flex;align-items:center;gap:4px;background:#F5F3FF;border:1.5px solid #C7D2FE;border-radius:8px;padding:2px 6px">'
+        +'<button class="stl-btn" style="padding:4px 9px;border:none;background:transparent;color:#4F46E5;font-weight:800" onclick="stl_shiftMonth(-1)" title="전월">◀</button>'
+        +'<span style="font-size:12px;font-weight:800;color:#4F46E5;min-width:56px;text-align:center">'+mlbl+'</span>'
+        +'<button class="stl-btn" style="padding:4px 9px;border:none;background:transparent;color:#4F46E5;font-weight:800" onclick="stl_shiftMonth(1)" title="다음달">▶</button>'
+        +'<button class="stl-btn" style="padding:4px 10px;font-size:11px" onclick="stl_shiftMonth(0)">이번달</button>'
+        +'</span>'; })()
       +'<span style="font-size:10.5px;color:#8A9AB5">'+rlbl+' · 납기일/정산예정일/청구월 기준 — 유보금 파이프라인은 오늘 기준</span></div>';
     var rateCol = tbRate>=90?'#0B7A45':(tbRate>=70?'#B45309':'#A32D2D');
     // [v532] A안 재디자인 — 섹션 헤더
@@ -5509,6 +5520,7 @@ async function renderSettlementView(){
       + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', Object.keys(tb.ctr).length+'명', '임대료 청구 '+tb.rows+'건 · 납기일 기준', '#fff')
       + kpi('청구금액', won(tb.amt), '납기일 '+rlbl, '#fff')
       + kpi('납부금액', won(tb.paid), '납부완료 (청구 − 미납)', '#fff')
+      + kpi('첫달 납부금액 <span style="font-weight:400">(직납)</span>', won(firstD.paid), '임(전)차인 → 임대인 직접 · '+firstD.n+'건 · 납부금액 중 첫달분 (유보금·정산 제외)', '#F5F3FF','#5B21B6')
       + kpi('정상납부율', tbRate+'%', '납부금액 ÷ 청구금액', '#fff', rateCol)
       + kpi('대위변제금액', won(subro.amt), subro.n+'건 · 정산예정 '+sched.n+'건 중 임차인 미납 → KRG 선지급', '#FEF2F2','#A32D2D')
       + kpi('정산예정건수', sched.n+'건', '정산예정일 도래 · 미지급(완료 제외)'+(smOk?'':' · 판별불가'), '#F0FDF4','#166534')
@@ -5654,6 +5666,17 @@ function stl_setRange(){
   if(a && b){ window._stlP.period='range'; renderSettlementView(); }
 }
 function stl_clearRange(){ window._stlP = window._stlP || {period:'day'}; window._stlP.r1=null; window._stlP.r2=null; window._stlP.period='day'; renderSettlementView(); }
+// [v532.1] 월 단위 이동 — delta:-1 전월 / +1 다음달 / 0 이번달. 기간검색을 해당 월 1일~말일로 설정
+function stl_shiftMonth(delta){
+  var P=window._stlP=window._stlP||{period:'day'};
+  var base=new Date();
+  if(delta!==0 && P.period==='range' && P.r1){ var m=String(P.r1).match(/(\d{4})-(\d{2})/); if(m) base=new Date(+m[1], +m[2]-1, 1); }
+  base=new Date(base.getFullYear(), base.getMonth()+(delta===0?0:delta), 1);
+  var e=new Date(base.getFullYear(), base.getMonth()+1, 0);
+  var f=function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  P.period='range'; P.r1=f(base); P.r2=f(e);
+  renderSettlementView();
+}
 // [v521] ③ 연체 표 — 전체 / 계약중 / 계약종료(퇴실) 전환
 function stl_setDlq(k){ window._stlDlqK = k; renderSettlementView(); }
 
