@@ -5502,6 +5502,9 @@ async function renderSettlementView(){
       +'<button class="stl-btn" style="margin-left:8px" onclick="stl_clearRange()">오늘</button>'
       +'<span style="font-size:10.5px;color:#8A9AB5">'+rlbl+' · 납기일/정산예정일/청구월 기준 — 유보금 파이프라인은 오늘 기준</span></div>';
     var rateCol = tbRate>=90?'#0B7A45':(tbRate>=70?'#B45309':'#A32D2D');
+    // [v532] A안 재디자인 — 섹션 헤더
+    var secHd=function(no,title,chip){ return '<div style="display:flex;align-items:center;gap:8px;margin:2px 0 8px"><b style="font-size:13px;color:#1A3A5C">'+no+' '+title+'</b>'+(chip?'<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:9px;background:#EEF2FF;color:#4F46E5">'+chip+'</span>':'')+'<span style="flex:1;height:1px;background:#E2E8F0"></span></div>'; };
+    html+=secHd('①','기간 KPI','기간검색 연동');
     html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
       + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', Object.keys(tb.ctr).length+'명', '임대료 청구 '+tb.rows+'건 · 납기일 기준', '#fff')
       + kpi('청구금액', won(tb.amt), '납기일 '+rlbl, '#fff')
@@ -5511,57 +5514,34 @@ async function renderSettlementView(){
       + kpi('정산예정건수', sched.n+'건', '정산예정일 도래 · 미지급(완료 제외)'+(smOk?'':' · 판별불가'), '#F0FDF4','#166534')
       + kpi('정산예정금액', won(sched.amt), '임대인 지급 예정 (정산내역 T열)', '#F0FDF4','#166534')
       +'</div>';
-    // [v515] 조회월 선택기 제거 — 상단 기간검색으로 통합 (청구총액·청구구성·롤포워드는 기간이 걸친 월 기준)
-    html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
-      + kpi('기간 유보금 (입금완료·임대인 미정산)', smOk? mil(holdTot) : '판별불가', smOk? (holdN+'건 · 예정일 전 '+mil(hold.pre.a)+' · 예정일 경과 '+mil(hold.past.a)+' · 정산서 미생성 '+mil(hold.none.a)) : '정산내역 시트 미로딩 — 새로고침 필요', '#FFFBEB','#92400E')
-      + kpi(cmLbl+' 청구 총액', mil(cmBilled), '입금 '+mil(cmPaid)+' ('+rate+'%) · 연체 미수 '+mil(cmOut)+' · 납기 전 '+mil(cmSched), '#fff')
-      + kpi('연체채권 총잔액', mil(totalOut), '계약중 '+mil(outActive)+' · 퇴실채권(종료) '+mil(outEnded), '#FEF2F2','#A32D2D')
-      + kpi('퇴실청소비 보관액', mil(cleanHold), cleanN+'건 입력됨 (AM열 공란 다수 — 시트 보완 필요)', '#F0F9FF','#0C4A6E')
-      +'</div>';
-    // ① 검색기간 유보금 파이프라인 — [v516] 납부일이 기간 내 & 입금완료 & 임대인 미정산 (정산예정일 V열 기준 분해)
-    html+='<div style="background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:12px;padding:12px 14px;margin-bottom:10px">'
-      +'<div style="font-size:13px;font-weight:800;color:#92400E;margin-bottom:8px">① 검색기간 유보금 ('+rlbl+') — 기간 내 입금 완료 & 임대인 미정산 임대료</div>'
-      +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-      + (smOk ? pipe('정산예정일 미도래 (정상 대기)', mil(hold.pre.a), hold.pre.n+'건 · 예정일에 지급 예정')
-              + pipe('⚠ 정산예정일 경과 (지급 지연)', mil(hold.past.a), hold.past.n+'건 · 즉시 지급 확인', hold.past.n>0)
-              + pipe('정산서 미생성', mil(hold.none.a), hold.none.n+'건 · 정산내역에 해당 월 정산서 없음', hold.none.n>0)
-              : pipe('판별 불가', '—', '정산내역 시트 미로딩 (새로고침 필요)', true))
-      + pipe('퇴실청소비 보관 (총액·기간 무관)', mil(cleanHold), '입주 시 수취 · 퇴실 시 사용')
+    // [v532] ② 자금 현황 — A안 그룹 박스 (기간유보금 카드·청구총액 카드·유보금 파이프라인 박스·청구 구성 막대 통합/삭제)
+    html+=secHd('②','자금 현황','보관 · 채권 · 유보');
+    html+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:stretch">'
+      +'<div style="flex:1;min-width:270px;background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:12px;padding:12px 14px;color:#1E3A8A">'
+      +  '<div style="font-size:12px;font-weight:800;margin-bottom:6px">🧹 퇴실청소비 선입금액</div>'
+      +  '<div style="font-size:24px;font-weight:800">'+mil(cleanHold)+'</div>'
+      +  '<div style="font-size:10.5px;opacity:.8;margin-top:3px">'+cleanN+'건 입금됨 · 입주 시 수취 → 퇴실 시 사용 (총액 · 기간 무관)</div>'
       +'</div>'
-      +'<div style="font-size:10px;color:#B45309;margin-top:6px">※ 납부일이 검색기간 내인 임대료 중 정산내역(gid=1253974103) 실지급일(X열)·정산상태(완료)가 없는 건 · 예정일 = V열 · 첫 달 임대료(직납) 제외 · 참고: 오늘 기준 D+6 초과 지연 '+(smOk? over.n+'건 '+mil(over.amt) : '판별불가')+'</div></div>';
-    // ② 청구 구성
-    var compTot=compRent+compFirst+compFee;
-    if(compTot>0){
-      // [v520] 좁은 구간 라벨 잘림 해결 — 막대 안에는 14% 이상일 때만 표기, 값은 아래 범례에서 항상 노출
-      var _p=function(x){ return compTot? x/compTot*100 : 0; };
-      var _p1=function(x){ return Math.round(_p(x)*10)/10; };
-      var seg=function(x,bg,fg,label){
-        var pv=_p(x); if(pv<=0) return '';
-        return '<div title="'+label+' '+mil(x)+' ('+_p1(x)+'%)" style="flex:'+Math.max(2,Math.round(pv))
-          +';background:'+bg+';color:'+fg+';display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden">'
-          +(pv>=14 ? label+' '+mil(x) : '')+'</div>';
-      };
-      var lgd=function(bg,label,x,note){
-        return '<span style="display:inline-flex;align-items:center;gap:6px;margin:0 16px 4px 0;font-size:11px;color:#475569;white-space:nowrap">'
-          +'<span style="width:11px;height:11px;border-radius:3px;background:'+bg+';flex:none"></span>'
-          +'<b style="color:#1A3A5C">'+label+'</b> '+mil(x)+' <span style="color:#94A3B8">('+_p1(x)+'%)</span>'
-          +(note? ' <span style="color:#94A3B8;font-size:10px">'+note+'</span>':'')+'</span>';
-      };
-      html+='<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:12px 14px;margin-bottom:10px">'
-        +'<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:8px">② '+cmLbl+' 청구 구성 — 첫 달 직납 분리</div>'
-        +'<div style="display:flex;height:26px;border-radius:6px;overflow:hidden;font-size:10.5px;font-weight:700">'
-        + seg(compRent,'#85B7EB','#042C53','기존 임대료')
-        + seg(compFirst,'#CECBF6','#26215C','첫달 직납')
-        + seg(compFee,'#9FE1CB','#04342C','수수료')
+      +'<div style="flex:1.2;min-width:300px;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:12px;padding:12px 14px;color:#7F1D1D">'
+      +  '<div style="font-size:12px;font-weight:800;margin-bottom:6px">📕 연체채권 총액</div>'
+      +  '<div style="font-size:24px;font-weight:800">'+mil(totalOut)+'</div>'
+      +  '<div style="display:flex;gap:8px;margin-top:8px">'
+      +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">계약중</div><div style="font-size:15px;font-weight:800;color:#B45309">'+mil(outActive)+'</div></div>'
+      +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">계약종료 (퇴실채권)</div><div style="font-size:15px;font-weight:800;color:#B91C1C">'+mil(outEnded)+'</div></div>'
+      +  '</div></div>'
+      +'<div style="flex:1.6;min-width:360px;background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:12px;padding:12px 14px;color:#78350F">'
+      +  '<div style="font-size:12px;font-weight:800;margin-bottom:6px">🏦 유보금액 <span style="font-weight:400;font-size:10px">— 납부 완료 · 임대인 미정산 ('+rlbl+' 납부분 · 오늘 기준)</span></div>'
+      +  '<div style="font-size:24px;font-weight:800">'+(smOk?mil(holdTot):'판별불가')+(smOk?'<span style="font-size:12px;font-weight:700;opacity:.7"> · '+holdN+'건</span>':'')+'</div>'
+      +  (smOk?(
+         '<div style="display:flex;gap:8px;margin-top:8px">'
+        +'<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">예정일 미도래 (정상 대기)</div><div style="font-size:15px;font-weight:800;color:#15803D">'+mil(hold.pre.a)+'<span style="font-size:10px;color:#94A3B8;font-weight:600"> '+hold.pre.n+'건</span></div></div>'
+        +'<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">⚠ 예정일 경과 (지급 지연)</div><div style="font-size:15px;font-weight:800;color:#B45309">'+mil(hold.past.a)+'<span style="font-size:10px;color:#94A3B8;font-weight:600"> '+hold.past.n+'건</span></div></div>'
+        +'<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">정산서 미생성</div><div style="font-size:15px;font-weight:800;color:#B91C1C">'+mil(hold.none.a)+'<span style="font-size:10px;color:#94A3B8;font-weight:600"> '+hold.none.n+'건</span></div></div>'
         +'</div>'
-        +'<div style="margin-top:8px;display:flex;flex-wrap:wrap;align-items:center">'
-        + lgd('#85B7EB','기존 임대료',compRent,'KRG 경유')
-        + lgd('#CECBF6','첫달 직납',compFirst,'임차인 → 임대인 직접')
-        + lgd('#9FE1CB','수수료',compFee,'KRG 수입')
-        +'<span style="margin-left:auto;font-size:11px;color:#64748B">합계 <b style="color:#1A3A5C">'+mil(compTot)+'</b></span>'
-        +'</div>'
-        +'<div style="font-size:10.5px;color:#8A9AB5;margin-top:6px">첫 달 임대료는 임차인 → 임대인 <b>직접 입금</b>(KRG 미경유) — 유보금·정산 대상 제외, 수수료만 KRG 수입 인식. 미분리 시 유보금 '+mil(compFirst)+' 과대계상.</div></div>';
-    }
+        +'<div style="font-size:9.5px;color:#B45309;opacity:.85;margin-top:6px">※ 첫 달 임대료(직납) 제외 · 정산내역(gid=1253974103) 실지급일(X열)·정산상태(완료) 대조 · 오늘 기준 D+6 초과 지연 '+over.n+'건 '+mil(over.amt)+'</div>'
+        ):'<div style="font-size:10.5px;margin-top:6px">정산내역 시트 미로딩 — 새로고침 필요</div>')
+      +'</div>'
+      +'</div>';
     // ③ 롤포워드
     // [v519] 처음 보는 사람도 읽을 수 있게 재구성 — 전문용어(롤포워드/코호트/이월) 제거, 행마다 자기 완결형
     var curRealM = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
