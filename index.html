@@ -19169,7 +19169,7 @@ function _vldAnalysis(bucketLabel, kind){
         var vs=String(v.status||'');                                   // [v529] 공실상태(BO열) 값 기준 카운트
         if(vs.indexOf('강제퇴실(공실)')>=0) midForceVac++;
         if(vs.indexOf('강제퇴실(연체)')>=0) midForceDlq++;
-        if(mth>=12) mid12++; else if(mth<11) midU11++; else mid11++;   // [v529] 거주기간 분포 (정확히 11개월은 별도)
+        if(mth>=11) mid12++; else midU11++;                            // [v529.1] 거주기간 분포 — 11개월 이상 / 11개월 미만
       }
       else { expA.push(mth); expRent+=num(v.rent); }
     });
@@ -19270,8 +19270,8 @@ function _vldAnalysis(bucketLabel, kind){
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#B91C1C">평균 거주기간</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+aM+'<span style="font-size:10.5px">개월</span></div></div>'
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#B91C1C">연체 피해액</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(midDlq)+'</div></div>'
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#B91C1C">강제퇴실 <span style="color:#E08585">(공실상태 값 기준)</span></div><div style="font-size:16px;font-weight:800;color:#A32D2D">공실 '+midForceVac+'<span style="font-size:10.5px">건</span> <span style="font-size:12px;color:#DC2626">/ 연체 '+midForceDlq+'<span style="font-size:10.5px">건</span></span></div></div>'   /* [v529] */
-      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#B91C1C">12개월 이상 거주</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mid12+'<span style="font-size:10.5px">명</span></div></div>'   /* [v529] */
-      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#B91C1C">11개월 미만 거주</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+midU11+'<span style="font-size:10.5px">명</span>'+(mid11>0?' <span style="font-size:10px;color:#94A3B8">(11개월 '+mid11+')</span>':'')+'</div></div>'   /* [v529] */
+      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#B91C1C">11개월 이상 거주</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mid12+'<span style="font-size:10.5px">명</span></div></div>'   /* [v529.1] */
+      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#B91C1C">11개월 미만 거주</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+midU11+'<span style="font-size:10.5px">명</span></div></div>'   /* [v529.1] */
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:130px"><div style="font-size:10px;color:#B91C1C">LTV 손실 <span style="color:#E08585">(일찍 나가서 못 번 돈)</span></div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(lossLtv)+'</div></div>'
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#B91C1C">미회수 획득비 <span style="color:#E08585">(못 건진 중개보수)</span></div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(cac)+'</div></div>'
       +'</div>'
