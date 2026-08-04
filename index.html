@@ -19158,7 +19158,7 @@ function _vldAnalysis(bucketLabel, kind){
     var mm=String(bucketLabel).match(/(\d{2})\.(\d{2})/); if(!mm) return '';
     var Y=2000+ +mm[1], M=+mm[2];
     var inM=function(d){return d&&d.getFullYear()===Y&&d.getMonth()===M-1;};
-    var neu=0, expA=[], midA=[], expRent=0, midRent=0, midDlq=0, midDlqCnt=0, midForceVac=0, midForceDlq=0, mid12=0, midU11=0, mid11=0, exp12=0, expU11=0;   // [v529][v529.4]
+    var neu=0, expA=[], midA=[], expRent=0, midRent=0, midDlq=0, midDlqCnt=0, midForceVac=0, midForceDlq=0, mid12=0, midU11=0, mid11=0, exp24=0, exp12=0;   // [v529][v529.5]
     var active=0, actFee=0;
     V.forEach(function(v){
       if(inM(pd(v.startDate))) neu++;
@@ -19171,7 +19171,7 @@ function _vldAnalysis(bucketLabel, kind){
         if(vs.indexOf('강제퇴실(연체)')>=0) midForceDlq++;
         if(mth>=11) mid12++; else midU11++;                            // [v529.1] 거주기간 분포 — 11개월 이상 / 11개월 미만
       }
-      else { expA.push(mth); expRent+=num(v.rent); if(mth>=11)exp12++; else expU11++; }   // [v529.4] 만기퇴실 거주기간 구간
+      else { expA.push(mth); expRent+=num(v.rent); if(mth>=24)exp24++; else if(mth>=12)exp12++; }   // [v529.5] 만기퇴실 거주기간 구간 (12개월 미만 제외)
     });
     var avg=function(a){return a.length?Math.round(a.reduce(function(x,y){return x+y;},0)/a.length*10)/10:0;};
     var avgFee=active?Math.round(actFee/active):0;
@@ -19248,8 +19248,8 @@ function _vldAnalysis(bucketLabel, kind){
         +'<span style="margin-left:auto;background:'+(warn?'#FEE2E2':'#DCFCE7')+';color:'+(warn?'#B91C1C':'#15803D')+';font-size:10px;font-weight:800;padding:2px 9px;border-radius:9px">'+(warn?'⚠ LTV 개선 필요':'LTV 양호')+'</span></div>'
         +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:7px">'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">평균 거주기간</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+aE+'<span style="font-size:10.5px">개월</span></div></div>'
-        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#92400E">11개월 이상 거주</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+exp12+'<span style="font-size:10.5px">명</span> <span style="font-size:11.5px;color:#D97706">('+epc(exp12)+'%)</span></div></div>'   /* [v529.4] */
-        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#92400E">11개월 미만 거주</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+expU11+'<span style="font-size:10.5px">명</span> <span style="font-size:11.5px;color:#D97706">('+epc(expU11)+'%)</span></div></div>'   /* [v529.4] */
+        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#92400E">24개월 이상 거주</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+exp24+'<span style="font-size:10.5px">명</span> <span style="font-size:11.5px;color:#D97706">('+epc(exp24)+'%)</span></div></div>'   /* [v529.5] */
+        +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#92400E">12개월 이상 거주 <span style="color:#C99A5B">(12~23개월)</span></div><div style="font-size:16px;font-weight:800;color:#B5730F">'+exp12+'<span style="font-size:10.5px">명</span> <span style="font-size:11.5px;color:#D97706">('+epc(exp12)+'%)</span></div></div>'   /* [v529.5] 12개월 미만 제외 */
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">계약당 LTV <span style="color:#C99A5B">(한 명이 벌어준 총 수수료)</span></div><div style="font-size:16px;font-weight:800;color:#B5730F">'+mil(ltv)+'</div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#92400E">1차 갱신율 ('+rnLbl+' 입주)</div><div style="font-size:16px;font-weight:800;color:'+(rate>=60?'#15803D':'#B91C1C')+'">'+rate+'%<span style="font-size:10.5px;font-weight:700;color:'+(C1.pureRate>=60?'#15803D':'#B5730F')+'"> · 순 '+C1.pureRate+'%</span></div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#92400E">1차 갱신 현황</div><div style="font-size:13px;font-weight:800;color:#374151">대상 '+due+'명 · 갱신 <b style="color:#15803D">'+renew+'</b> · 미갱신 <b style="color:#DC2626">'+(due-renew)+'</b><span style="font-size:9.5px;font-weight:400;color:#94A3B8"> (중도 '+C1.mid+' 제외 시 모수 '+C1.pureDue+')</span></div></div>'
@@ -19368,6 +19368,10 @@ function _vldOpenList(bucketLabel, kind){
     var thExtra = COLS.map(function(c){ return _th(c.h,c.f,c.a); }).join('');
     var thFixed = _th('계약번호','cno','left')+_th('임(전)차인','nm','left')+_th('물건지','addr','left');
     var colCount = 4 + COLS.length;
+    // [v529.5] 만기퇴실: 갱신심사(rnwClassify) 결과가 '거절'이면 이름 옆에 갱신불가 배지
+    var _rj=(kind==='만기퇴실' && typeof rnwCalcLateMetrics==='function' && typeof rnwClassify==='function' && typeof paymentRawData!=='undefined' && Array.isArray(paymentRawData) && paymentRawData.length)
+      ? function(cno){ try{ var m=rnwCalcLateMetrics(cno, paymentRawData); if(!m||!m.total) return ''; return rnwClassify(m); }catch(e){ return ''; } }
+      : function(){ return ''; };
     var body=rows.map(function(r,i){
       var tds = COLS.map(function(c){
         var val = r[c.f]==null||r[c.f]==='' ? '—' : r[c.f];
@@ -19381,7 +19385,7 @@ function _vldOpenList(bucketLabel, kind){
       return '<tr style="border-top:1px solid #F1F5F9">'
         +'<td style="padding:6px 9px;color:#94A3B8;font-size:11px">'+(i+1)+'</td>'
         +'<td style="padding:6px 9px;white-space:nowrap"><b style="color:#0E7490;cursor:pointer" onclick="document.getElementById(\'vldListModal\').remove();crNavFromView(\''+r.cno+'\',\'summary\')">'+r.cno+'</b></td>'
-        +'<td style="padding:6px 9px;white-space:nowrap">'+r.nm+'</td>'
+        +'<td style="padding:6px 9px;white-space:nowrap">'+r.nm+(_rj(r.cno)==='deny'?' <span title="갱신심사 결과: 거절" style="display:inline-block;background:#DC2626;color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:8px;vertical-align:1px">갱신불가</span>':'')+'</td>'
         +'<td style="padding:6px 9px;font-size:11px;color:#6B7280;min-width:230px">'+r.addr+'</td>'
         +tds+'</tr>';
     }).join('')||'<tr><td colspan="'+colCount+'" style="padding:18px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';
