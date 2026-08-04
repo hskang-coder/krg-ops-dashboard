@@ -19294,6 +19294,10 @@ function _vldAnalysis(bucketLabel, kind){
       // [v529.6] 갱신심사 '거절'(갱신불가) 인원 — 갱신관리 탭과 동일 로직 (최근 청구 10회 기준)
       var expDeny=0, expJudged=(typeof rnwCalcLateMetrics==='function'&&typeof rnwClassify==='function'&&typeof paymentRawData!=='undefined'&&Array.isArray(paymentRawData)&&paymentRawData.length>0);
       if(expJudged){ expC.forEach(function(c){ try{ var m=rnwCalcLateMetrics(c,paymentRawData); if(m&&m.total&&rnwClassify(m)==='deny') expDeny++; }catch(e){} }); }
+      // [v531.1] 최근 6개월 만기퇴실 추이
+      var eHist=[]; try{ for(var hh2=5;hh2>=0;hh2--){ var hd2=new Date(Y,M-1-hh2,1), hy2=hd2.getFullYear(), hm2=hd2.getMonth(); var hc2=0; V.forEach(function(v){ var t2=pd(v.terminateDate); if(!t2||t2.getFullYear()!==hy2||t2.getMonth()!==hm2||isMid(v)) return; hc2++; }); eHist.push(hc2); } }catch(_eh){ eHist=[]; }
+      var eCur2=expA.length, eAvg5=0, eX2=0, eRun2=0, eHistStr='';
+      if(eHist.length===6){ var es2=0; for(var ei=0;ei<5;ei++) es2+=eHist[ei]; eAvg5=Math.round(es2/5*10)/10; eX2=eAvg5>0?Math.round(eCur2/eAvg5*10)/10:0; for(var ri2=5;ri2>0;ri2--){ if(eHist[ri2]>eHist[ri2-1]) eRun2++; else break; } eHistStr=eHist.join('→')+'건'; }
       return '<div style="background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:9px;padding:10px 14px;margin:0 0 4px">'
         +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><b style="font-size:12.5px;color:#B5730F">📊 만기퇴실 분석</b>'
         +'<span style="font-size:10.5px;color:#92400E">'+bucketLabel+' · 신규입주 '+neu+' · 만기 '+expA.length+' · 중도 '+midA.length+' → 순증 <b>'+(neu-expA.length-midA.length)+'명</b></span>'
@@ -19315,14 +19319,17 @@ function _vldAnalysis(bucketLabel, kind){
         +'</div></div>'
         +'</div>'
         + _cohTable
-        +'<div style="background:#FFF7ED;border-left:3px solid #E8A33D;padding:6px 10px;font-size:10.5px;color:#9A3412;line-height:1.65">'
-        /* [v529.8] 종합 분석 — 만기 모수 · 거주기간 분포 · 갱신불가 반영 실질 갱신 가능 모수 */
-        +'<b>이번 달 만기 '+expA.length+'명 구성</b> — 24개월 이상 '+exp24+'명('+epc(exp24)+'%) · 12~23개월 '+exp12+'명('+epc(exp12)+'%) · 12개월 미만 '+(expA.length-exp24-exp12)+'명('+epc(expA.length-exp24-exp12)+'%). '
-        +(expJudged?('이 중 갱신심사 기준 <b style="color:#DC2626">갱신불가(거절) '+expDeny+'명('+epc(expDeny)+'%)</b>은 연체 이력상 재계약이 어려운 인원입니다. 이들을 제외하면 <b>실질 갱신 가능 모수는 '+(expA.length-expDeny)+'명('+epc(expA.length-expDeny)+'%)</b> — 갱신 활동은 이 인원에 집중해야 합니다.'):'갱신심사 데이터(수납)가 로딩되면 갱신불가 인원이 함께 표시됩니다.')
-        +'<br>한 명이 오래 살수록 수수료를 오래 받습니다. 목표는 <b>'+TARGET+'개월(2년)</b>인데 지금은 평균 <b>'+aE+'개월</b>, 목표의 <b>'+pctT+'%</b>입니다. '
-        +(warn?('즉 <b>1년 채우고 재계약 직전에 나가는 사람이 많다</b>는 뜻입니다. 재계약 1건을 살리면 1년치 수수료 약 '+mil(12*avgFee)+'이 더 들어옵니다.'):'목표에 도달했습니다 — 지금 방식을 유지하세요.')
-        +'<br><b>이번 달 퇴실이 많은 이유</b> — 1년 전('+rnLbl+') 들어온 사람이 <b>'+C1.newIn+'명</b>으로, 그 전 해('+(C2?C2.lbl+' '+C2.newIn+'명':'-')+')보다 <b>'+(volX?volX+'배':'-')+'</b> 많았습니다. 그때 많이 받았으니 지금 만기도 몰린 것입니다. 재계약 성공률은 <b>'+rate+'%</b>'+(C2?(' (작년 '+C2.rate+'%)'):'')+'. '
-        +(volX>=2 ? '→ <b>사람이 많아져서 생긴 일</b>이고, 재계약률 자체는 '+(C2&&rate>=C2.rate?'나아졌습니다':'나빠졌습니다')+'.' : '→ 인원은 비슷하니 <b>재계약률 변화가 원인</b>입니다.')
+        +'<div style="background:#FFF7ED;border-left:3px solid #E8A33D;padding:7px 11px;font-size:10.5px;color:#9A3412;line-height:1.7">'   /* [v531.1] 심층 분석 */
+        +'<b>① 만기퇴실 추이</b> — 이번 달 <b>'+eCur2+'건</b>'
+        +(eHist.length===6?(', 직전 5개월 평균 '+eAvg5+'건'+(eX2?'의 <b>'+eX2+'배</b>':'')+' <span style="opacity:.75">(최근 6개월 '+eHistStr+')</span>'+(eRun2>=2?' · <b>'+eRun2+'개월 연속 증가</b>':'')):'')+'. '
+        +'주원인은 <b>모수 효과</b> — 1년 전('+rnLbl+') 입주가 <b>'+C1.newIn+'명</b>으로 전년('+(C2?C2.lbl+' '+C2.newIn+'명':'-')+') 대비 <b>'+(volX?volX+'배':'-')+'</b>였습니다. '
+        +(volX>=2?'입주가 많았던 달의 만기가 몰린 것이며, 재계약률 자체는 '+(C2&&rate>=C2.rate?'개선':'악화')+' 중입니다.':'입주 규모는 비슷해 <b>재계약률 변화가 원인</b>입니다.')
+        +'<br><b>② 만기 모수 구성</b> — '+expA.length+'명 = 24개월 이상 '+exp24+'명('+epc(exp24)+'%) · 12~23개월 '+exp12+'명('+epc(exp12)+'%) · 12개월 미만 '+(expA.length-exp24-exp12)+'명('+epc(expA.length-exp24-exp12)+'%). '
+        +(exp12>=exp24?'<b>1년만 채우고 나가는 유형이 지배적</b>입니다 — 2년차 진입(재계약 시점)이 핵심 이탈 지점입니다.':'2년 이상 장기 거주 후 만기가 다수로, 자연 만기 성격이 큽니다.')
+        +'<br><b>③ 갱신 성과</b> — 1차 갱신율 <b>'+rate+'%</b>'+(C2?(' (작년 '+C2.rate+'%)'):'')+' · 중도퇴실 제외 순갱신율 <b>'+C1.pureRate+'%</b> ('+renew+'/'+C1.pureDue+'). '
+        +(expJudged?('만기자 중 갱신심사 <b style="color:#DC2626">갱신불가(거절) '+expDeny+'명('+epc(expDeny)+'%)</b>은 연체 이력상 재계약이 어려운 인원으로, 이를 제외한 <b>실질 갱신 가능 모수는 '+(expA.length-expDeny)+'명('+epc(expA.length-expDeny)+'%)</b>입니다.'):'갱신심사 데이터(수납)가 로딩되면 갱신불가 인원이 함께 표시됩니다.')
+        +'<br><b>④ LTV·조치</b> — 평균 거주 <b>'+aE+'개월</b>, 목표 '+TARGET+'개월(2년)의 <b>'+pctT+'%</b>. '
+        +(warn?('재계약 1건을 살리면 1년치 수수료 약 <b>'+mil(12*avgFee)+'</b>이 추가됩니다 — 갱신 활동은 실질 가능 모수'+(expJudged?(' <b>'+(expA.length-expDeny)+'명</b>'):'')+'에 집중하고, 갱신불가 인원은 미납 회수·퇴실 정산 절차로 전환하세요.'):'목표에 도달했습니다 — 현재 방식을 유지하세요.')
         +'</div></div>';
     }
     var aM=avg(midA), aE2=avg(expA)||TARGET, gap=Math.round(Math.max(0,aE2-aM)*10)/10;   // [v491] 부동소수점 반올림
