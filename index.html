@@ -19083,33 +19083,27 @@ function _vldBriefHTML(rows){
           if(mCnt[i]>=5 && mCnt[i]>=mAvg*1.4) mSp.push(l);
         });
         var canJ=(typeof rnwCalcLateMetrics==='function'&&typeof rnwClassify==='function'&&typeof paymentRawData!=='undefined'&&Array.isArray(paymentRawData)&&paymentRawData.length>0);
-        var expNote=function(l){
-          var arr=buck[l].exp, top={}, bn='', bc=0;
-          arr.forEach(function(v){ var b=String(v.propBuilding||'').trim(); if(b) top[b]=(top[b]||0)+1; });
-          Object.keys(top).forEach(function(k){ if(top[k]>bc){bn=k;bc=top[k];} });
-          var deny=0; if(canJ) arr.forEach(function(v){ try{ var m2=rnwCalcLateMetrics(String(v.no||'').trim(),paymentRawData); if(m2&&m2.total&&rnwClassify(m2)==='deny') deny++; }catch(_){} });
-          var parts=[];
-          if(bc>=3) parts.push('<b>'+bn+' '+bc+'건</b> 집중 → 임대인 갱신거절 등 확인 필요');
-          if(deny>0) parts.push('갱신불가(심사 거절) '+deny+'건');
-          return '<b>'+l+'</b> '+arr.length+'건'+(parts.length?' — '+parts.join(' · '):'');
-        };
-        var midNote=function(l){
-          var arr=buck[l].mid;
-          var f=arr.filter(function(v){return String(v.status||'').indexOf('강제퇴실')>=0;}).length;
-          var d=arr.filter(function(v){return num(v.dlqAmt)>0;}).length;
-          var parts=[];
-          if(f>0) parts.push('<b>강제퇴실 '+f+'건</b>');
-          if(d>0) parts.push('연체보유 '+d+'건');
-          return '<b>'+l+'</b> '+arr.length+'건'+(parts.length?' — '+parts.join(' · '):'');
-        };
-        if(eSp.length||mSp.length){
-          var seg=[];
-          if(eSp.length) seg.push('<b style="color:#B45309">만기퇴실 급증</b> <span style="color:#92400E">(평균 '+(Math.round(eAvg*10)/10)+'건 대비)</span> : '+eSp.map(expNote).join(' &nbsp;/&nbsp; '));
-          if(mSp.length) seg.push('<b style="color:#B91C1C">중도퇴실 급증</b> <span style="color:#92400E">(평균 '+(Math.round(mAvg*10)/10)+'건 대비)</span> : '+mSp.map(midNote).join(' &nbsp;/&nbsp; '));
-          line3=seg.join('<br>');
-        } else {
-          line3='기간 내 만기·중도퇴실 <b>급증 구간 없음</b> — 만기 평균 '+(Math.round(eAvg*10)/10)+'건 · 중도 평균 '+(Math.round(mAvg*10)/10)+'건 수준 유지';
+        // [v530.2] 한 줄 압축 — 급증 월(건수) 나열 + 원인은 수치 요약. 건물명은 한 달 한 건물 5건 이상(명백한 이상치)만 표기
+        var eTxt='', mTxt='';
+        if(eSp.length){
+          var eLb=eSp.map(function(l){return l+'('+buck[l].exp.length+')';}).join('·');
+          var eCause=[];
+          eSp.forEach(function(l){ var top={},bn='',bc=0; buck[l].exp.forEach(function(v){var b2=String(v.propBuilding||'').trim(); if(b2)top[b2]=(top[b2]||0)+1;}); Object.keys(top).forEach(function(k2){if(top[k2]>bc){bn=k2;bc=top[k2];}}); if(bc>=5) eCause.push(bn+' '+bc+'건 집중'); });
+          if(canJ){ var dT=0,eT=0; eSp.forEach(function(l){ eT+=buck[l].exp.length; buck[l].exp.forEach(function(v){ try{var m2=rnwCalcLateMetrics(String(v.no||'').trim(),paymentRawData); if(m2&&m2.total&&rnwClassify(m2)==='deny') dT++; }catch(_){} }); });
+            if(dT>0&&eT>0&&dT/eT>=0.15) eCause.push('갱신불가 '+dT+'건('+Math.round(dT/eT*100)+'%)'); }
+          eTxt='<b>만기퇴실 급증</b> '+eLb+' <span style="color:#B45309">평균 '+(Math.round(eAvg*10)/10)+'건 대비</span>'+(eCause.length?' — '+eCause.join(' · '):'');
         }
+        if(mSp.length){
+          var mLb=mSp.map(function(l){return l+'('+buck[l].mid.length+')';}).join('·');
+          var fT=0,dN=0,mT=0;
+          mSp.forEach(function(l){ mT+=buck[l].mid.length; buck[l].mid.forEach(function(v){ if(String(v.status||'').indexOf('강제퇴실')>=0)fT++; if(num(v.dlqAmt)>0)dN++; }); });
+          var mCause=[];
+          if(fT>0&&mT>0&&fT/mT>=0.3) mCause.push('강제퇴실 '+fT+'건('+Math.round(fT/mT*100)+'%) 증가');
+          else if(dN>0&&mT>0&&dN/mT>=0.4) mCause.push('연체보유 '+dN+'건('+Math.round(dN/mT*100)+'%) 증가');
+          mTxt='<b>중도퇴실 급증</b> '+mLb+' <span style="color:#B91C1C">평균 '+(Math.round(mAvg*10)/10)+'건 대비</span>'+(mCause.length?' — '+mCause.join(' · '):'');
+        }
+        line3 = (eTxt||mTxt) ? [eTxt,mTxt].filter(Boolean).join(' &nbsp;·&nbsp; ')
+          : '퇴실 추이 안정 — 급증 구간 없음 (만기 평균 '+(Math.round(eAvg*10)/10)+'건 · 중도 평균 '+(Math.round(mAvg*10)/10)+'건)';
       }
     }catch(_e){}
     return '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:9px">'
