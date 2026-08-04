@@ -19158,14 +19158,19 @@ function _vldAnalysis(bucketLabel, kind){
     var mm=String(bucketLabel).match(/(\d{2})\.(\d{2})/); if(!mm) return '';
     var Y=2000+ +mm[1], M=+mm[2];
     var inM=function(d){return d&&d.getFullYear()===Y&&d.getMonth()===M-1;};
-    var neu=0, expA=[], midA=[], expRent=0, midRent=0, midDlq=0, midDlqCnt=0, midForce=0;
+    var neu=0, expA=[], midA=[], expRent=0, midRent=0, midDlq=0, midDlqCnt=0, midForceVac=0, midForceDlq=0, mid12=0, midU11=0, mid11=0;   // [v529]
     var active=0, actFee=0;
     V.forEach(function(v){
       if(inM(pd(v.startDate))) neu++;
       var k=String(v.contractKind||''); if(k==='정상'||k==='계약중'){ active++; actFee+=num(v.fee); }
       var t=pd(v.terminateDate); if(!inM(t)) return;
       var mth=_vldMonths(v.startDate, v.terminateDate)||0;
-      if(isMid(v)){ midA.push(mth); midRent+=num(v.rent); var da=num(v.dlqAmt); midDlq+=da; if(da>0)midDlqCnt++; if(/공실|퇴실상태/.test(String(v.status||'')))midForce++; }
+      if(isMid(v)){ midA.push(mth); midRent+=num(v.rent); var da=num(v.dlqAmt); midDlq+=da; if(da>0)midDlqCnt++;
+        var vs=String(v.status||'');                                   // [v529] 공실상태(BO열) 값 기준 카운트
+        if(vs.indexOf('강제퇴실(공실)')>=0) midForceVac++;
+        if(vs.indexOf('강제퇴실(연체)')>=0) midForceDlq++;
+        if(mth>=12) mid12++; else if(mth<11) midU11++; else mid11++;   // [v529] 거주기간 분포 (정확히 11개월은 별도)
+      }
       else { expA.push(mth); expRent+=num(v.rent); }
     });
     var avg=function(a){return a.length?Math.round(a.reduce(function(x,y){return x+y;},0)/a.length*10)/10:0;};
@@ -19264,14 +19269,16 @@ function _vldAnalysis(bucketLabel, kind){
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:7px">'
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#B91C1C">평균 거주기간</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+aM+'<span style="font-size:10.5px">개월</span></div></div>'
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#B91C1C">연체 피해액</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(midDlq)+'</div></div>'
-      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:130px"><div style="font-size:10px;color:#B91C1C">강제퇴실(공실)</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+midForce+'<span style="font-size:10.5px">건</span> <span style="font-size:11px;color:#94A3B8">/ 연체보유 '+midDlqCnt+'</span></div></div>'
+      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#B91C1C">강제퇴실 <span style="color:#E08585">(공실상태 값 기준)</span></div><div style="font-size:16px;font-weight:800;color:#A32D2D">공실 '+midForceVac+'<span style="font-size:10.5px">건</span> <span style="font-size:12px;color:#DC2626">/ 연체 '+midForceDlq+'<span style="font-size:10.5px">건</span></span></div></div>'   /* [v529] */
+      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#B91C1C">12개월 이상 거주</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mid12+'<span style="font-size:10.5px">명</span></div></div>'   /* [v529] */
+      +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#B91C1C">11개월 미만 거주</div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+midU11+'<span style="font-size:10.5px">명</span>'+(mid11>0?' <span style="font-size:10px;color:#94A3B8">(11개월 '+mid11+')</span>':'')+'</div></div>'   /* [v529] */
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:130px"><div style="font-size:10px;color:#B91C1C">LTV 손실 <span style="color:#E08585">(일찍 나가서 못 번 돈)</span></div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(lossLtv)+'</div></div>'
       +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#B91C1C">미회수 획득비 <span style="color:#E08585">(못 건진 중개보수)</span></div><div style="font-size:16px;font-weight:800;color:#A32D2D">'+mil(cac)+'</div></div>'
       +'</div>'
       +'<div style="background:#FEF2F2;border-left:3px solid #E24B4A;padding:6px 10px;font-size:10.5px;color:#991B1B;line-height:1.65">'
       +'계약을 끝까지 채운 사람은 평균 <b>'+aE2+'개월</b> 살았는데, 중간에 나간 사람은 <b>'+aM+'개월</b>만 살았습니다. '
       +'<b>'+gap+'개월 일찍 나간 셈</b>이라 한 명당 수수료 약 '+mil(gap*avgFee)+'을 못 벌었고, '+midA.length+'명이면 '+mil(lossLtv)+'입니다. '
-      +(midDlqCnt>0?('지금 월세가 밀린 사람이 <b>'+midDlqCnt+'명</b> 있는데, 이미 <b>'+midForce+'명</b>은 못 내서 내보냈습니다. → <b>밀린 돈이 커지기 전에 지금 연락해야 합니다.</b>'):'월세를 밀린 사람은 없습니다 → 왜 스스로 나갔는지 이유를 확인해 보세요.')
+      +(midDlqCnt>0?('지금 월세가 밀린 사람이 <b>'+midDlqCnt+'명</b> 있는데, 이미 <b>'+(midForceVac+midForceDlq)+'명</b>은 못 내서 내보냈습니다. → <b>밀린 돈이 커지기 전에 지금 연락해야 합니다.</b>'):'월세를 밀린 사람은 없습니다 → 왜 스스로 나갔는지 이유를 확인해 보세요.')
       +'</div></div>';
   }catch(e){ return ''; }
 }
@@ -19347,7 +19354,7 @@ function _vldOpenList(bucketLabel, kind){
     ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
     // [v472] 구분별 컬럼 구성 — 만기퇴실: 시작일·퇴실일·거주기간·임대료·퇴실청소비 / 중도퇴실: 시작일·퇴실일·거주기간·연체금액·공실상태
     var COLS = (kind==='만기퇴실')
-      ? [{h:'시작일',f:'start',a:'left'},{h:'퇴실일',f:'term',a:'left'},{h:'거주기간(M)',f:'living',a:'center'},{h:'연체비율',f:'dlqRate',a:'center'},{h:'임대료',f:'rent',a:'right'},{h:'퇴실청소비',f:'clean',a:'right'}]
+      ? [{h:'시작일',f:'start',a:'left'},{h:'퇴실일',f:'term',a:'left'},{h:'거주기간(M)',f:'living',a:'center'},{h:'연체비율',f:'dlqRate',a:'center'},{h:'임대료',f:'rent',a:'right'},{h:'연체금액',f:'dlqAmt',a:'right'}]   /* [v529] 퇴실청소비 → 연체금액 */
       : (kind==='중도퇴실')
       ? [{h:'시작일',f:'start',a:'left'},{h:'퇴실일',f:'term',a:'left'},{h:'거주기간(M)',f:'living',a:'center'},{h:'연체비율',f:'dlqRate',a:'center'},{h:'연체금액',f:'dlqAmt',a:'right'},{h:'공실상태',f:'vacStatus',a:'left'}]
       : [{h:'입주일',f:'start',a:'left'},{h:'만기일',f:'end',a:'left'},{h:'임대료',f:'rent',a:'right'},{h:'연락처',f:'tel',a:'left'}];
