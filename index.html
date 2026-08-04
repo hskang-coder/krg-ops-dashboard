@@ -5276,10 +5276,11 @@ async function cG_loadSettleSheet(){
   (resp.table.rows||[]).forEach(function(r){
     var c=r.c||[]; var g=function(i){ return c[i]?String(c[i].f!=null?c[i].f:(c[i].v!=null?c[i].v:'')).trim():''; };
     var cno=_normCno(g(9)); var sv=g(21); var mm=g(3).match(/(\d{4})\s*년\s*(\d{1,2})\s*월/); // 계약번호9·정산일V(21)·정산서월3 — [v509] 통화서식 방어
-    if(!cno||!sv||!mm) return;
+    if(!cno||!mm) return;   // [v531.6] V열 공란 행도 schedRows에 보존 — 예정일 공란+정산완료 행이 유보금 '정산서 미생성'으로 오분류되던 버그 수정
     var key=mm[1]+'-'+String(+mm[2]).padStart(2,'0');
     // [v514] 정산내역 원본행 보존 — V(21)=정산예정일 · N(13)=정산상태 · T(19)=정산금액 · X(23)=실지급일 · I(8)=임차인 · K(10)=임대인
     schedRows.push({cno:cno, mon:key, v:sv, state:g(13), amt:parseFloat(String(g(19)).replace(/[^0-9.]/g,''))||0, paidAt:g(23), tenant:g(8), landlord:g(10)});
+    if(!sv) return;         // map(정산일 조회용)은 기존대로 V열 있는 행만 등록
     if(!map[cno]) map[cno]={};
     map[cno][key]=sv;
     if(!map[cno].__latestKey || key > map[cno].__latestKey){ map[cno].__latest=sv; map[cno].__latestKey=key; }
@@ -5455,7 +5456,12 @@ async function renderSettlementView(){
     var tbRate = tb.amt>0 ? Math.round(tb.paid/tb.amt*1000)/10 : 0;
 
     // ── [v516] 검색기간 유보금 — 납부일이 기간 내 & 입금완료 & 임대인 미정산 (정산내역 실지급 X열 대조) ──
-    var SR2={}; (window.__stlSchedRows||[]).forEach(function(s){ SR2[s.cno+'|'+s.mon]=s; });
+    // [v531.6] 같은 계약·월에 행이 여럿(재발행 등)이면 '정산완료(완료/실지급)' 행 우선, 그다음 예정일 있는 행 우선
+    var SR2={}; (window.__stlSchedRows||[]).forEach(function(s){
+      var k=s.cno+'|'+s.mon, cur=SR2[k];
+      var sDone=(s.state==='완료'||!!s.paidAt), cDone=cur&&(cur.state==='완료'||!!cur.paidAt);
+      if(!cur || (sDone&&!cDone) || (!sDone&&!cDone&&s.v&&!cur.v)) SR2[k]=s;
+    });
     var hold={pre:{a:0,n:0}, past:{a:0,n:0}, none:{a:0,n:0}};
     P.forEach(function(p){
       if(!isRent(p) || !alive(p)) return;
