@@ -19339,7 +19339,10 @@ function _vldOpenList(bucketLabel, kind){
         start:v.startDate||'-', end:v.endDate||'-', term:v.terminateDate||'-', rent:v.rent||'-',
         living:(function(){ var m=_vldMonths(v.startDate, v.terminateDate); return m!=null? m : (v.livingMonths||'-'); })(),  // [v481] 만기 기준 재계산
         clean:v.cleanFee||'-',
-        dlqAmt:v.dlqAmt||'-', dlqRate:_vldPct(v.dlqRate), vacStatus:v.status||'-', kindTxt:v.jValue||v.status||''});  // [v475/v476/v478] 연체액=CC열 · 연체비율=BZ열(%변환)
+        dlqAmt:v.dlqAmt||'-',
+        // [v529.7] 연체비율 — 입금내역 실계산 우선(계약상세·갱신심사와 동일 기준). 종료 계약은 BZ열이 0/공란으로 남는 문제 보정
+        dlqRate:(function(){ try{ if(typeof _dlqRateOf==='function'){ var dr=_dlqRateOf(_cno); if(dr&&dr.bill>0) return dr.rate+'%'; } }catch(e){} return _vldPct(v.dlqRate); })(),
+        vacStatus:v.status||'-', kindTxt:v.jValue||v.status||''});  // [v475/v476/v478] 연체액=CC열
     });
     // [v473] 정렬 — 헤더 클릭 시 오름/내림 (기본: 계약번호 오름차순)
     var _sk=(window.__vldSort&&window.__vldSort.key)||'cno', _sd=(window.__vldSort&&window.__vldSort.dir)||'asc';
