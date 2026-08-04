@@ -20630,7 +20630,7 @@ function sumRenderPLCard(){
     return '<tr'+(a.net<0?' style="background:#FEF2F2"':'')+'>'
       +'<td style="padding:5px 8px;font-weight:700">'+m.replace('-','.')+(a.net<0?' <span style="font-size:9px;color:#DC2626;background:#FEE2E2;border-radius:4px;padding:1px 5px">적자</span>':'')+'</td>'
       +'<td style="padding:5px 8px;text-align:right;color:#0D9488;font-weight:800">'+M(a.feePaid)+'</td>'
-      +'<td style="padding:5px 8px;text-align:right;color:#7C3AED;font-weight:700">'+M(a.brk)+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;color:#7C3AED;font-weight:700">'+M(a.brk)+'<div style="font-size:9px;font-weight:500;color:#94A3B8;white-space:nowrap">지급완료 '+M(a.brkPaid)+'</div></td>'
       +'<td style="padding:5px 8px;text-align:right;color:#DC2626;font-weight:700">'+M(a.loss)+'</td>'
       +'<td style="padding:5px 8px;text-align:right;font-weight:800;color:'+(a.net>=0?'#6366F1':'#DC2626')+'">'+M(a.net)+'</td>'
       +'<td style="padding:5px 8px;text-align:right;font-weight:700;color:'+(r2>=30?'#15803D':(r2>=0?'#B45309':'#DC2626'))+'">'+r2+'%</td></tr>';
@@ -20641,9 +20641,10 @@ function sumRenderPLCard(){
   var unpaidBrk = s.months.reduce(function(t,m){ return t + s.A[m].brkUn; }, 0);
   return TTL
     + '<div class="sum-stat-row pl-1row">'
-    +   '<div class="sum-stat-box sum-stat-green"><div class="sb-label">수수료 입금 ('+base.replace('-','.')+')</div><div class="sb-val" style="color:#0D9488">'+M(b.feePaid)+'</div></div>'
-    +   '<div class="sum-stat-box sum-stat-blue"><div class="sb-label">중개보수 (지출)</div><div class="sb-val" style="color:#7C3AED">'+M(b.brk)+'</div></div>'
-    +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">확정 손실 (지출)</div><div class="sb-val" style="color:#DC2626">'+M(b.loss)+'</div></div>'
+    /* [v528] 정의 명시 — 실수령/발생/오늘 기준 + 중개보수 지급 상태 병기 */
+    +   '<div class="sum-stat-box sum-stat-green"><div class="sb-label">수수료 입금(실수령) · '+base.replace('-','.')+'</div><div class="sb-val" style="color:#0D9488">'+M(b.feePaid)+'</div><div style="font-size:9.5px;color:#94A3B8;margin-top:1px;white-space:nowrap">청구 '+M(b.fee)+' − 미수 '+M(b.fee-b.feePaid)+'</div></div>'
+    +   '<div class="sum-stat-box sum-stat-blue"><div class="sb-label">중개보수(발생)</div><div class="sb-val" style="color:#7C3AED">'+M(b.brk)+'</div><div style="font-size:9.5px;color:#94A3B8;margin-top:1px;white-space:nowrap">지급완료 '+M(b.brkPaid)+' · 미지급 '+M(b.brkUn)+'</div></div>'
+    +   '<div class="sum-stat-box sum-stat-red"><div class="sb-label">확정 손실(오늘 기준)</div><div class="sb-val" style="color:#DC2626">'+M(b.loss)+'</div><div style="font-size:9.5px;color:#94A3B8;margin-top:1px;white-space:nowrap">퇴실 발생 시 변동</div></div>'
     +   '<div class="sum-stat-box '+(b.net>=0?'sum-stat-green':'sum-stat-red')+'"><div class="sb-label">순이익</div><div class="sb-val" style="color:'+(b.net>=0?'#6366F1':'#DC2626')+'">'+M(b.net)+'</div></div>'
     +   '<div class="sum-stat-box sum-stat-amber"><div class="sb-label">이익률</div><div class="sb-val">'+mr+'<span class="sb-unit">%</span></div></div>'
     + '</div>'
@@ -20653,12 +20654,14 @@ function sumRenderPLCard(){
     +   '<div style="margin-top:7px;display:flex;flex-wrap:wrap">'+hlg+'</div>'
     + '</div>'
     + '<div class="sum-sub-title">월별 손익 추이 (최근 5개월)</div>'
+    /* [v528] 스냅샷 안내 — 과거 월도 사후 변동됨을 명시 */
+    + '<div style="background:#FFF8EC;border:1px solid #F5D9A8;border-radius:7px;padding:7px 10px;margin-bottom:8px;font-size:10.5px;color:#7A4A05;line-height:1.6">⚠ 손익은 <b>오늘 기준 스냅샷</b>입니다 — 계약중 임차인이 퇴실하면 미납액이 확정 손실로 옮겨와 <b>과거 월 숫자도 사후에 변동</b>됩니다. 중개보수는 <b>발생 기준</b>(지급 여부 무관)입니다.</div>'
     + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'
     +   '<tr style="background:#F8FAFC;color:#475569;font-size:10.5px">'
     +   '<th style="padding:5px 8px;text-align:left">월</th>'
-    +   '<th style="padding:5px 8px;text-align:right">수수료 입금<br><span style="font-weight:400">수익</span></th>'
-    +   '<th style="padding:5px 8px;text-align:right">중개보수<br><span style="font-weight:400">지출</span></th>'
-    +   '<th style="padding:5px 8px;text-align:right">확정 손실<br><span style="font-weight:400">지출</span></th>'
+    +   '<th style="padding:5px 8px;text-align:right">수수료 입금(실수령)<br><span style="font-weight:400">수익</span></th>'
+    +   '<th style="padding:5px 8px;text-align:right">중개보수(발생)<br><span style="font-weight:400">지출</span></th>'
+    +   '<th style="padding:5px 8px;text-align:right">확정 손실(오늘 기준)<br><span style="font-weight:400">지출 · 변동</span></th>'
     +   '<th style="padding:5px 8px;text-align:right">순이익</th><th style="padding:5px 8px;text-align:right">이익률</th></tr>'
     +   rows + '</table></div>'
     + alertHtml
