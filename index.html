@@ -19158,7 +19158,7 @@ function _vldAnalysis(bucketLabel, kind){
     var mm=String(bucketLabel).match(/(\d{2})\.(\d{2})/); if(!mm) return '';
     var Y=2000+ +mm[1], M=+mm[2];
     var inM=function(d){return d&&d.getFullYear()===Y&&d.getMonth()===M-1;};
-    var neu=0, expA=[], midA=[], expRent=0, midRent=0, midDlq=0, midDlqCnt=0, midForceVac=0, midForceDlq=0, mid12=0, midU11=0, mid11=0, exp24=0, exp12=0;   // [v529][v529.5]
+    var neu=0, expA=[], midA=[], expRent=0, midRent=0, midDlq=0, midDlqCnt=0, midForceVac=0, midForceDlq=0, mid12=0, midU11=0, mid11=0, exp24=0, exp12=0, expC=[];   // [v529][v529.5][v529.6]
     var active=0, actFee=0;
     V.forEach(function(v){
       if(inM(pd(v.startDate))) neu++;
@@ -19171,7 +19171,7 @@ function _vldAnalysis(bucketLabel, kind){
         if(vs.indexOf('강제퇴실(연체)')>=0) midForceDlq++;
         if(mth>=11) mid12++; else midU11++;                            // [v529.1] 거주기간 분포 — 11개월 이상 / 11개월 미만
       }
-      else { expA.push(mth); expRent+=num(v.rent); if(mth>=24)exp24++; else if(mth>=12)exp12++; }   // [v529.5] 만기퇴실 거주기간 구간 (12개월 미만 제외)
+      else { expA.push(mth); expRent+=num(v.rent); expC.push(String(v.no||'').trim()); if(mth>=24)exp24++; else if(mth>=12)exp12++; }   // [v529.5/6] 만기퇴실 거주기간 구간 + 계약번호 수집
     });
     var avg=function(a){return a.length?Math.round(a.reduce(function(x,y){return x+y;},0)/a.length*10)/10:0;};
     var avgFee=active?Math.round(actFee/active):0;
@@ -19242,6 +19242,9 @@ function _vldAnalysis(bucketLabel, kind){
       var aE=avg(expA), ltv=aE*avgFee, tgt=TARGET*avgFee, pctT=tgt?Math.round(ltv/tgt*1000)/10:0;
       var warn = aE<TARGET;
       var epc=function(n){ return expA.length?Math.round(n/expA.length*1000)/10:0; };   // [v529.4] 전체 만기퇴실 대비 %
+      // [v529.6] 갱신심사 '거절'(갱신불가) 인원 — 갱신관리 탭과 동일 로직 (최근 청구 10회 기준)
+      var expDeny=0, expJudged=(typeof rnwCalcLateMetrics==='function'&&typeof rnwClassify==='function'&&typeof paymentRawData!=='undefined'&&Array.isArray(paymentRawData)&&paymentRawData.length>0);
+      if(expJudged){ expC.forEach(function(c){ try{ var m=rnwCalcLateMetrics(c,paymentRawData); if(m&&m.total&&rnwClassify(m)==='deny') expDeny++; }catch(e){} }); }
       return '<div style="background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:9px;padding:10px 14px;margin:0 0 4px">'
         +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><b style="font-size:12.5px;color:#B5730F">📊 만기퇴실 분석</b>'
         +'<span style="font-size:10.5px;color:#92400E">'+bucketLabel+' · 신규입주 '+neu+' · 만기 '+expA.length+' · 중도 '+midA.length+' → 순증 <b>'+(neu-expA.length-midA.length)+'명</b></span>'
@@ -19250,6 +19253,7 @@ function _vldAnalysis(bucketLabel, kind){
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">평균 거주기간</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+aE+'<span style="font-size:10.5px">개월</span></div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#92400E">24개월 이상 거주</div><div style="font-size:16px;font-weight:800;color:#B5730F">'+exp24+'<span style="font-size:10.5px">명</span> <span style="font-size:11.5px;color:#D97706">('+epc(exp24)+'%)</span></div></div>'   /* [v529.5] */
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px"><div style="font-size:10px;color:#92400E">12개월 이상 거주 <span style="color:#C99A5B">(12~23개월)</span></div><div style="font-size:16px;font-weight:800;color:#B5730F">'+exp12+'<span style="font-size:10.5px">명</span> <span style="font-size:11.5px;color:#D97706">('+epc(exp12)+'%)</span></div></div>'   /* [v529.5] 12개월 미만 제외 */
+        +  '<div title="갱신심사 결과 거절 인원 (최근 임대료 청구 10회 중 연체 7회↑ 또는 누적 30일 초과 또는 연체율 60%↑)" style="background:#fff;border-radius:7px;padding:6px 11px;min-width:120px;cursor:help"><div style="font-size:10px;color:#B91C1C">갱신불가 <span style="color:#E08585">(갱신심사 거절)</span></div><div style="font-size:16px;font-weight:800;color:#DC2626">'+(expJudged?(expDeny+'<span style="font-size:10.5px">명</span> <span style="font-size:11.5px">('+epc(expDeny)+'%)</span>'):'—')+'</div></div>'   /* [v529.6] */
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:110px"><div style="font-size:10px;color:#92400E">계약당 LTV <span style="color:#C99A5B">(한 명이 벌어준 총 수수료)</span></div><div style="font-size:16px;font-weight:800;color:#B5730F">'+mil(ltv)+'</div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#92400E">1차 갱신율 ('+rnLbl+' 입주)</div><div style="font-size:16px;font-weight:800;color:'+(rate>=60?'#15803D':'#B91C1C')+'">'+rate+'%<span style="font-size:10.5px;font-weight:700;color:'+(C1.pureRate>=60?'#15803D':'#B5730F')+'"> · 순 '+C1.pureRate+'%</span></div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:6px 11px;min-width:150px"><div style="font-size:10px;color:#92400E">1차 갱신 현황</div><div style="font-size:13px;font-weight:800;color:#374151">대상 '+due+'명 · 갱신 <b style="color:#15803D">'+renew+'</b> · 미갱신 <b style="color:#DC2626">'+(due-renew)+'</b><span style="font-size:9.5px;font-weight:400;color:#94A3B8"> (중도 '+C1.mid+' 제외 시 모수 '+C1.pureDue+')</span></div></div>'
