@@ -5473,9 +5473,10 @@ async function renderSettlementView(){
     };
     var _pm1=new Date(rs.getFullYear(), rs.getMonth()-1, 1), _pm2=new Date(rs.getFullYear(), rs.getMonth()-2, 1);
     var ctrM1=_mCnt(_pm1), ctrM2=_mCnt(_pm2), ctrCur=Object.keys(tb.ctr).length;
-    var _dTag=function(prev,mD){
+    var _dTag=function(prev){
       var d=ctrCur-prev, cl=d>0?'#0B7A45':(d<0?'#A32D2D':'#8A9AB5'), ar=d>0?'▲':(d<0?'▼':'—');
-      return (mD.getMonth()+1)+'월 '+prev.toLocaleString()+'명 <b style="color:'+cl+'">'+ar+(d===0?'':Math.abs(d).toLocaleString())+'</b>';
+      var pct=prev>0? Math.round(Math.abs(d)/prev*1000)/10 : 0;
+      return '<b style="color:'+cl+'">'+ar+(d===0?'0':Math.abs(d).toLocaleString())+'('+pct+'%)</b>';
     };
 
     // ── [v516] 검색기간 유보금 — 납부일이 기간 내 & 입금완료 & 임대인 미정산 (정산내역 실지급 X열 대조) ──
@@ -5568,7 +5569,7 @@ async function renderSettlementView(){
     var secHd=function(no,title,chip){ return '<div style="display:flex;align-items:center;gap:8px;margin:2px 0 8px"><b style="font-size:13px;color:#1A3A5C">'+no+' '+title+'</b>'+(chip?'<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:9px;background:#EEF2FF;color:#4F46E5">'+chip+'</span>':'')+'<span style="flex:1;height:1px;background:#E2E8F0"></span></div>'; };
     html+=secHd('①','기간 KPI','기간검색 연동');
     html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
-      + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', ctrCur.toLocaleString()+'명', '임대료 청구 '+tb.rows+'건 · 납기일 기준<br>전월 '+_dTag(ctrM1,_pm1)+' · 전전월 '+_dTag(ctrM2,_pm2), '#fff')
+      + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', ctrCur.toLocaleString()+'명', '임대료 청구 '+tb.rows+'건 · 납기일 기준<br>전월 '+_dTag(ctrM1)+' · 전전월 '+_dTag(ctrM2), '#fff')
       + kpi('청구금액', won(tb.amt), '납기일 '+rlbl+' · 첫달 직납 포함', '#fff')
       + kpi('납부금액', won(tb.paid), '납부완료 (청구 − 미납) · 첫달 직납 포함', '#fff')
       + kpi('첫달 납부금액 <span style="font-weight:400">(직납)</span>', won(firstD.paid), '', '#F5F3FF','#5B21B6')
