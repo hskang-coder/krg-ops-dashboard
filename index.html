@@ -5518,14 +5518,15 @@ async function renderSettlementView(){
         +'</span>'; })()
       +'<span style="font-size:10.5px;color:#8A9AB5">'+rlbl+' · 납기일/정산예정일/청구월 기준 — 유보금 파이프라인은 오늘 기준</span></div>';
     var rateCol = tbRate>=90?'#0B7A45':(tbRate>=70?'#B45309':'#A32D2D');
-    // [v534] 퇴실청소비 실입금액 — 입금내역(gid=131074722) 청구서명 '청소' 건의 실입금(청구 U열 − 미납 AB열) 합, 납부예정 제외
-    var cleanPaid={a:0,n:0,c:{}};
+    // [v534] 퇴실청소비 — 입금내역(gid=131074722) 청구서명 '청소' 건. [v534.3] 검색기간 연동 (납기일 기준)
+    var cleanPaid={a:0,n:0,b:0,c:{}};
     P.forEach(function(p){
       if(String(p['청구서명']||'').indexOf('청소')<0) return;
       if(!alive(p)) return;
-      var st9=String(p['납부상태']||'').trim(); if(!st9||st9==='납부예정') return;
+      var dueC=_bfPd(p['납기일']); if(!_inR(dueC)) return;          // [v534.3] 납기일이 검색기간 내인 청구만
       var t9=num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']), o9=num(p['미납(연체)금액(원)']);
-      if(t9>0) cleanPaid.b=(cleanPaid.b||0)+t9;                     // [v534.1] 납기 도래 청구액 합 (대비 기준)
+      if(t9>0) cleanPaid.b+=t9;                                      // 청구 금액 (기간 내 전체)
+      var st9=String(p['납부상태']||'').trim(); if(!st9||st9==='납부예정') return;
       var a9=Math.max(0, t9-o9); if(a9<=0) return;
       cleanPaid.a+=a9; cleanPaid.n++; cleanPaid.c[String(p['계약번호']||'').trim()]=1;
     });
@@ -5569,7 +5570,7 @@ async function renderSettlementView(){
       +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">청구 금액</div><div style="font-size:15px;font-weight:800;color:#1E40AF">'+mil(cleanPaid.b||0)+'</div></div>'
       +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">실입금액</div><div style="font-size:15px;font-weight:800;color:#1D4ED8">'+mil(cleanPaid.a)+'<span style="font-size:10px;color:#94A3B8;font-weight:600"> '+cleanPaid.n+'건</span></div></div>'
       +  '</div>'
-      +  '<div style="font-size:9.5px;opacity:.6;margin-top:5px">입금내역(gid=131074722) 청소비 청구 기준 · 실입금 = 청구 − 미납 · 납부예정 제외 (총액 · 기간 무관)</div>'
+      +  '<div style="font-size:9.5px;opacity:.6;margin-top:5px">입금내역(gid=131074722) 청소비 청구 · 납기일 '+rlbl+' (검색기간 연동) · 실입금 = 청구 − 미납 (납부예정 제외)</div>'
       +  '</div>'
       +'<div style="flex:1.2;min-width:300px;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:12px;padding:12px 14px;color:#7F1D1D">'
       +  '<div style="font-size:12px;font-weight:800;margin-bottom:6px">📕 연체채권 총액</div>'
