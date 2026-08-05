@@ -2160,6 +2160,7 @@ function parseVacancySheet(resp) {
   const cleanFeeIdx    = findColIdx(labels, ['퇴실청소비'],        38);  // AM [v472] 퇴실청소비
   const dlqAmtIdx      = 80;  // CC열 [v475] 연체액(금액) — 라벨 '연체금액'(idx81)은 %값이라 위치 고정
   const dlqRateIdx     = 77;  // BZ열 [v476] 연체비율
+  const rentReportIdx  = findColIdx(labels, ['임대차신고'], 93); // [v535] 원본 DQ열=미러 CP열(93): 임대차신고 체크 (TRUE/FALSE) — 미러는 95열(A~CQ)까지만 동기화되어 라벨 매칭 사용
   const landlordIdx    = findColIdx(labels, ['임대인명'],          39);  // AO  ← AM열 추가시 자동 보정
   const payMethodIdx   = findColIdx(labels, ['월세납입형태','납부방법','납입형태','선후불'], 40); // AO (v311) 선불/후불
   const landlordPhoneIdx= findColIdx(labels, ['임대인연락처','임대인 연락처'], 41); // AP/AQ
@@ -2250,6 +2251,7 @@ let outsourceIdx = findColIdx(labels, ['연체외주','연체 외주'], 71);
       cleanFee:      cell(cleanFeeIdx),       // [v472] AM열: 퇴실청소비
       dlqAmt:        cell(dlqAmtIdx),         // [v475] CC열: 연체액(금액)
       dlqRate:       cell(dlqRateIdx),        // [v476] BZ열: 연체비율
+      rentReport:    cell(rentReportIdx),     // [v535] 원본 DQ열(미러 CP열): 임대차신고 (TRUE/FALSE)
       callChk:    (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[callChkIdx] && (c[callChkIdx].v != null ? c[callChkIdx].v : c[callChkIdx].f)),   // [v466] CM 통화 확인
       smsChk:     (function(v){ return v === true || String(v).toUpperCase() === 'TRUE'; })(c[smsChkIdx] && (c[smsChkIdx].v != null ? c[smsChkIdx].v : c[smsChkIdx].f)),      // [v466] CN 문자 확인
       partnerName:   cell(partnerNameIdx),   // BL열: 부동산명
@@ -16613,6 +16615,12 @@ function cmgSetProgSort(val){
   window._cmgProgSort = val;
   renderContractMgmtView();
 }
+// [v535] 진척 체크리스트 — 정렬 방향 (asc=오름차순 / desc=내림차순, ''=기준별 디폴트)
+window._cmgProgSortDir = window._cmgProgSortDir || '';
+function cmgSetProgSortDir(val){
+  window._cmgProgSortDir = val;
+  renderContractMgmtView();
+}
 
 // [v140] 진척 체크리스트 엑셀 다운로드
 function cmgProgDownloadExcel(){
@@ -16644,12 +16652,13 @@ function cmgProgDownloadExcel(){
       '서명': r.checks[3] ? '✓' : '',
       'NAS': r.checks[4] ? '✓' : '',
       '미완 항목': ['홈버튼','전자계약','수수료','서명','NAS'].filter(function(_,j){ return !r.checks[j]; }).join(', ') || '—',
-      '진척률(%)': r.pct
+      '진척률(%)': r.pct,
+      '임대차신고': (function(v){ var s = String(v == null ? '' : v).trim(); if (s.toUpperCase() === 'TRUE') return '✓'; if (s.toUpperCase() === 'FALSE') return '미신고'; return s; })(r.rentReport)  // [v535] 원본 DQ열
     };
   });
   var ws = XLSX.utils.json_to_sheet(data);
-  // [v235] 컬럼 폭 — '주소' 추가로 18개
-  ws['!cols'] = [{wch:5},{wch:10},{wch:10},{wch:14},{wch:36},{wch:12},{wch:12},{wch:12},{wch:14},{wch:18},{wch:10},{wch:7},{wch:8},{wch:7},{wch:6},{wch:6},{wch:24},{wch:9}];
+  // [v235] 컬럼 폭 — '주소' 추가로 18개 / [v535] '임대차신고' 추가로 19개
+  ws['!cols'] = [{wch:5},{wch:10},{wch:10},{wch:14},{wch:36},{wch:12},{wch:12},{wch:12},{wch:14},{wch:18},{wch:10},{wch:7},{wch:8},{wch:7},{wch:6},{wch:6},{wch:24},{wch:9},{wch:12}];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '진척체크리스트');
   var today = (function(){ var d=new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); })();
@@ -16667,6 +16676,7 @@ function cmgProgResetAll(){
   window._cmgProgUnchecked = 'all';
   window._cmgProgKpiFilter = 'all';
   window._cmgProgSort = 'cno';
+  window._cmgProgSortDir = '';  // [v535] 정렬 방향도 디폴트로
   renderContractMgmtView();
 }
 // [v82] 진척 체크리스트 — 입주일 기준 기간 (디폴트: 1개월 후까지)
@@ -18015,7 +18025,8 @@ function cmgBuildProgress(){
       contractStatus: c ? (c['계약상태']||'') : '',
       checks: checks,
       trueCnt: trueCnt,
-      pct: pct
+      pct: pct,
+      rentReport: v.rentReport || ''                                                 // [v535] DQ열 임대차신고
     });
   });
   // [v88/v140] 미완료 항목 필터 — 다중선택 OR 조건 (선택된 항목 중 하나라도 false면 표시)
@@ -18051,25 +18062,19 @@ function cmgBuildProgress(){
   // [v91] 계약번호 숫자 비교 + 날짜는 timestamp 비교
   var cnoNum = function(c){ var n = parseInt(String(c||'').replace(/[^0-9]/g,''), 10); return isNaN(n) ? 0 : n; };
   var dateTs = function(raw){ var d = cmgParseStartDate(raw); return d ? d.getTime() : -Infinity; };
+  // [v535] 정렬 방향 (오름/내림) — 미선택 시 기존 디폴트 방향 유지 (cno/날짜=내림, 진척률=오름)
+  var _defDir = { cno:'desc', tentative:'desc', startDate:'desc', pct:'asc' };
+  var dir = window._cmgProgSortDir || _defDir[sortKey] || 'desc';
+  var sgn = (dir === 'asc') ? 1 : -1;
+  var _cmp = function(x, y){ return x === y ? 0 : (x < y ? -1 : 1); }; // -Infinity 안전 비교
   rows.sort(function(a, b){
-    if (sortKey === 'tentative') {
-      // 늦은 일자 우선 (descending)
-      var at = dateTs(a.tentativeDate);
-      var bt = dateTs(b.tentativeDate);
-      return bt - at || cnoNum(b.cno) - cnoNum(a.cno);
-    }
-    if (sortKey === 'startDate') {
-      // 늦은 일자 우선 (descending)
-      var ad = a.startDate ? a.startDate.getTime() : -Infinity;
-      var bd = b.startDate ? b.startDate.getTime() : -Infinity;
-      return bd - ad || cnoNum(b.cno) - cnoNum(a.cno);
-    }
-    if (sortKey === 'pct') {
-      // 미완 우선 (ascending)
-      return a.pct - b.pct || cnoNum(b.cno) - cnoNum(a.cno);
-    }
-    // 디폴트: 큰 계약번호 우선 (descending)
-    return cnoNum(b.cno) - cnoNum(a.cno);
+    var res;
+    if (sortKey === 'tentative')      res = _cmp(dateTs(a.tentativeDate), dateTs(b.tentativeDate));
+    else if (sortKey === 'startDate') res = _cmp(a.startDate ? a.startDate.getTime() : -Infinity, b.startDate ? b.startDate.getTime() : -Infinity);
+    else if (sortKey === 'pct')       res = _cmp(a.pct, b.pct);
+    else                              res = _cmp(cnoNum(a.cno), cnoNum(b.cno));
+    if (res !== 0) return sgn * res;
+    return cnoNum(b.cno) - cnoNum(a.cno); // 동률: 큰 계약번호 우선
   });
   return rows;
 }
@@ -18228,6 +18233,13 @@ function renderContractMgmtView(){
         + '<input type="radio" name="cmgProgSort" ' + (sf===val?'checked':'') + ' onchange="cmgSetProgSort(\'' + val + '\')"> ' + label
         + '</label>';
     };
+    // [v535] 정렬 방향 (오름/내림) — 미선택 시 기준별 디폴트 (cno/날짜=내림, 진척률=오름)
+    var sd = window._cmgProgSortDir || ({ cno:'desc', tentative:'desc', startDate:'desc', pct:'asc' })[sf] || 'desc';
+    var sdBtn = function(val, label){
+      return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;font-weight:' + (sd===val?'700':'500') + ';color:' + (sd===val?'#0E7490':'#374151') + '">'
+        + '<input type="radio" name="cmgProgSortDir" ' + (sd===val?'checked':'') + ' onchange="cmgSetProgSortDir(\'' + val + '\')"> ' + label
+        + '</label>';
+    };
     var filterHtml = '<div class="cmg-period-row" style="background:#FEF2F2;flex-wrap:wrap">'
       + '<span style="font-size:12px;color:#991B1B;font-weight:700;margin-right:4px">미완료 항목:</span>'
       + ufBtn('all', '전체')
@@ -18244,6 +18256,9 @@ function renderContractMgmtView(){
       + sfBtn('tentative', '가계약일')
       + sfBtn('startDate', '시작일')
       + sfBtn('pct', '진척률')
+      + '<span style="width:1px;height:14px;background:#DDD6FE;margin:0 6px;display:inline-block"></span>'
+      + sdBtn('asc', '오름차순 ↑')
+      + sdBtn('desc', '내림차순 ↓')
       + '<button onclick="cmgProgDownloadExcel()" style="margin-left:auto;background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ 엑셀 다운로드</button>'
       + '</div>';
     window._cmgProgDisplayRows = rows; // [v140] 엑셀 다운로드용
@@ -18257,6 +18272,7 @@ function renderContractMgmtView(){
       + '<th style="text-align:center">홈버튼</th><th style="text-align:center">전자계약</th>'
       + '<th style="text-align:center">수수료</th><th style="text-align:center">서명</th>'
       + '<th style="text-align:center">NAS</th><th>미완 항목</th><th>진척률</th>'
+      + '<th style="text-align:center">임대차신고</th>'
       + '</tr></thead><tbody>'
       + rows.map(function(r, i){
           var chk = function(b){ return b ? '<span class="cmg-chk-yes">✓</span>' : '<span class="cmg-chk-no">·</span>'; };
@@ -18286,6 +18302,14 @@ function renderContractMgmtView(){
                 return miss.length ? miss.join('') : '<span style="color:#16A34A;font-size:10px;font-weight:700">완료</span>';
               })(r.checks) + '</td>'
             + '<td><span class="cmg-pct-bar"><span class="cmg-pct-fill" style="width:' + r.pct + '%;background:' + color + '"></span></span><span style="font-weight:700;color:' + color + '">' + r.pct + '%</span></td>'
+            + '<td style="text-align:center;font-size:11px">' + (function(v){
+                var s = String(v == null ? '' : v).trim();
+                if (!s) return '<span style="color:#CBD5E1">—</span>';
+                if (s.toUpperCase() === 'TRUE')  return '<span class="cmg-chk-yes">✓</span>';
+                if (s.toUpperCase() === 'FALSE') return '<span class="cmg-miss-chip">미신고</span>';
+                var ok = /완료|접수|승인/.test(s);
+                return '<span style="font-weight:700;color:' + (ok ? '#16A34A' : '#B45309') + '">' + s + '</span>';
+              })(r.rentReport) + '</td>'
             + '</tr>';
         }).join('')
       + '</tbody></table></div>';
