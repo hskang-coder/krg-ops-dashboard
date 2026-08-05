@@ -16653,7 +16653,7 @@ function cmgProgDownloadExcel(){
       'NAS': r.checks[4] ? '✓' : '',
       '미완 항목': ['홈버튼','전자계약','수수료','서명','NAS'].filter(function(_,j){ return !r.checks[j]; }).join(', ') || '—',
       '진척률(%)': r.pct,
-      '임대차신고': (function(v){ var s = String(v == null ? '' : v).trim(); if (s.toUpperCase() === 'TRUE') return '✓'; if (s.toUpperCase() === 'FALSE') return '미신고'; return s; })(r.rentReport)  // [v535] 원본 DQ열
+      '임대차신고': (function(v){ var s = String(v == null ? '' : v).trim(); if (!s || s === '-') return ''; if (s.toUpperCase() === 'TRUE') return '✓'; if (s.toUpperCase() === 'FALSE') return '미신고'; return s; })(r.rentReport)  // [v535.1] CQ열 KRG임대차
     };
   });
   var ws = XLSX.utils.json_to_sheet(data);
@@ -18026,7 +18026,7 @@ function cmgBuildProgress(){
       checks: checks,
       trueCnt: trueCnt,
       pct: pct,
-      rentReport: v.rentReport || ''                                                 // [v535] DQ열 임대차신고
+      rentReport: v.imdaeShingo || ''                                                // [v535.1] CQ열 KRG임대차 상태값 (완료/접수완료/신고제외/-)
     });
   });
   // [v88/v140] 미완료 항목 필터 — 다중선택 OR 조건 (선택된 항목 중 하나라도 false면 표시)
@@ -18304,9 +18304,10 @@ function renderContractMgmtView(){
             + '<td><span class="cmg-pct-bar"><span class="cmg-pct-fill" style="width:' + r.pct + '%;background:' + color + '"></span></span><span style="font-weight:700;color:' + color + '">' + r.pct + '%</span></td>'
             + '<td style="text-align:center;font-size:11px">' + (function(v){
                 var s = String(v == null ? '' : v).trim();
-                if (!s) return '<span style="color:#CBD5E1">—</span>';
+                if (!s || s === '-') return '<span style="color:#CBD5E1">—</span>';
                 if (s.toUpperCase() === 'TRUE')  return '<span class="cmg-chk-yes">✓</span>';
                 if (s.toUpperCase() === 'FALSE') return '<span class="cmg-miss-chip">미신고</span>';
+                if (/신고제외|삭제/.test(s)) return '<span style="font-weight:600;color:#6B7280">' + s + '</span>';
                 var ok = /완료|접수|승인/.test(s);
                 return '<span style="font-weight:700;color:' + (ok ? '#16A34A' : '#B45309') + '">' + s + '</span>';
               })(r.rentReport) + '</td>'
