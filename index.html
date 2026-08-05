@@ -5494,7 +5494,7 @@ async function renderSettlementView(){
       return r;
     };
     var W1=_cmpWin(1), W2=_cmpWin(2);
-    var K1=_kpiIn(W1), K2=_kpiIn(W2), S1=_schedIn(W1), S2=_schedIn(W2);
+    var K1=_kpiIn(W1), K2=_kpiIn(W2);
     var ctrCur=Object.keys(tb.ctr).length;
     // [v536] C안 트렌드 빌더 — badge(직전 구간 대비 %) + 구분선 한 줄 상세. inv=true면 증가=빨강 (대위변제 등 악화 지표)
     var _dm=function(cur,prev){ var d=cur-prev; return {d:d,up:d>0,dn:d<0,pct:prev>0? Math.round(Math.abs(d)/prev*1000)/10 : 0}; };
@@ -5540,7 +5540,8 @@ async function renderSettlementView(){
     var holdTot=hold.pre.a+hold.past.a+hold.none.a, holdN=hold.pre.n+hold.past.n+hold.none.n;
 
     // ── 렌더 ──
-    var kpi=function(lb,val,sub,bg,tx){ return '<div style="background:'+(bg||'#fff')+';border:1px solid #E2EAF5;border-radius:10px;padding:10px 13px;min-width:150px;flex:1"><div style="font-size:10.5px;color:'+(tx||'#5A6A8A')+'">'+lb+'</div><div style="font-size:19px;font-weight:800;color:'+(tx||'#1A3A5C')+'">'+val+'</div><div style="font-size:10px;color:'+(tx||'#8A9AB5')+';opacity:.85">'+sub+'</div></div>'; };
+    // [v536.1] 카드 통일 레이아웃 — 라벨 / 큰 숫자 / 구분선 / 설명 (숫자·텍스트 영역 분리로 번잡함 제거)
+    var kpi=function(lb,val,sub,bg,tx){ return '<div style="background:'+(bg||'#fff')+';border:1px solid #E2EAF5;border-radius:10px;padding:10px 13px;min-width:150px;flex:1;display:flex;flex-direction:column"><div style="font-size:10.5px;color:'+(tx||'#5A6A8A')+';font-weight:700">'+lb+'</div><div style="font-size:19px;font-weight:800;color:'+(tx||'#1A3A5C')+';margin-top:1px;flex:1">'+val+'</div>'+(sub?'<div style="font-size:10px;color:'+(tx||'#8A9AB5')+';opacity:.8;margin-top:7px;padding-top:5px;border-top:1px solid rgba(148,163,184,.28);line-height:1.5">'+sub+'</div>':'')+'</div>'; };
     var pipe=function(lb,val,sub,warn){ return '<div style="flex:1;min-width:150px;background:#fff;border-radius:8px;padding:8px 11px;border:1px solid '+(warn?'#F7C1C1':'#EDF2F9')+'"><div style="font-size:10.5px;color:'+(warn?'#A32D2D':'#5A6A8A')+'">'+lb+'</div><div style="font-size:16px;font-weight:800;color:'+(warn?'#A32D2D':'#1A3A5C')+'">'+val+'</div><div style="font-size:10px;color:'+(warn?'#A32D2D':'#8A9AB5')+'">'+sub+'</div></div>'; };
     var rate=cmBilled? Math.round(cmPaid/cmBilled*1000)/10 : 0;
     var html='';
@@ -5599,34 +5600,24 @@ async function renderSettlementView(){
     }
     // [v532] A안 재디자인 — 섹션 헤더
     var secHd=function(no,title,chip){ return '<div style="display:flex;align-items:center;gap:8px;margin:2px 0 8px"><b style="font-size:13px;color:#1A3A5C">'+no+' '+title+'</b>'+(chip?'<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:9px;background:#EEF2FF;color:#4F46E5">'+chip+'</span>':'')+'<span style="flex:1;height:1px;background:#E2E8F0"></span></div>'; };
-    // [v536] 전 카드 C안 트렌드 — 값 옆 배지(직전 구간 대비) + 구분선 아래 상세
-    var tCtr  =_trend(ctrCur,      K1.n,         K2.n,         _fN);
-    var tAmt  =_trend(tb.amt,      K1.amt,       K2.amt,       _fM);
-    var tPaid =_trend(tb.paid,     K1.paid,      K2.paid,      _fM);
-    var tFirst=_trend(firstD.paid, K1.firstPaid, K2.firstPaid, _fM);
-    var tSubro=_trend(isPast? subroX.amt : subro.amt, S1.samt, S2.samt, _fM, true);   // 대위변제 증가 = 악화(빨강)
-    var tSchN =_trend(isPast? doneS.n   : sched.n,   S1.n,    S2.n,    _fN);
-    var tSchA =_trend(isPast? doneS.amt : sched.amt, S1.amt,  S2.amt,  _fM);
-    // 정상납부율 — %p 차이로 비교 (비율의 %증감은 왜곡되므로 %p 표기)
-    var _rpB=function(v){ var up=v>0,dn=v<0; return {txt:(up?'▲':(dn?'▼':'—'))+Math.abs(v)+'%p', cl:up?'#0B7A45':(dn?'#A32D2D':'#6B7280'), bg:up?'#ECFDF5':(dn?'#FEF2F2':'#F3F4F6')}; };
-    var _rp1=_rpB(Math.round((tbRate-K1.rate)*10)/10), _rp2=_rpB(Math.round((tbRate-K2.rate)*10)/10);
-    var tRateBadge=' <span style="font-size:11px;font-weight:800;color:'+_rp1.cl+';background:'+_rp1.bg+';border-radius:6px;padding:2px 6px;vertical-align:2px;white-space:nowrap">'+_rp1.txt+'</span>';
-    var tRateLine='<div style="margin-top:6px;padding-top:5px;border-top:1px solid #EEF2F7;font-size:10px;color:#8A9AB5;white-space:nowrap">'+_lblK[0]+' <b style="color:'+_rp1.cl+'">'+_rp1.txt+'</b> · '+_lblK[1]+' <b style="color:'+_rp2.cl+'">'+_rp2.txt+'</b></div>';
+    // [v536.1] 트렌드는 청구인원 카드에만 유지 — 나머지 카드는 깔끔한 통일 레이아웃 (배지·비교줄 제거)
+    var tCtr=_trend(ctrCur, K1.n, K2.n, _fN);
+    var tCtrLine=tCtr.line.replace('margin-top:6px;padding-top:5px;border-top:1px solid #EEF2F7;','margin-top:2px;');   // kpi()가 구분선을 그리므로 중복 제거
     html+=secHd('①','기간 KPI','기간검색 연동');
     html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
-      + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', ctrCur.toLocaleString()+'명'+tCtr.badge, '임대료 청구 '+tb.rows.toLocaleString()+'건 · 납기일 기준'+tCtr.line, '#fff')
-      + kpi('청구금액', won(tb.amt)+tAmt.badge, '납기일 '+rlbl+' · 첫달 직납 포함'+tAmt.line, '#fff')
-      + kpi('납부금액', won(tb.paid)+tPaid.badge, '납부완료 (청구 − 미납) · 첫달 직납 포함'+tPaid.line, '#fff')
-      + kpi('첫달 납부금액 <span style="font-weight:400">(직납)</span>', won(firstD.paid)+tFirst.badge, tFirst.line.replace('margin-top:6px;padding-top:5px;border-top:1px solid #EEF2F7;',''), '#F5F3FF','#5B21B6')
-      + kpi('정상납부율', tbRate+'%'+tRateBadge, '납부금액 ÷ 청구금액'+tRateLine, '#fff', rateCol)
+      + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', ctrCur.toLocaleString()+'명'+tCtr.badge, '임대료 청구 '+tb.rows.toLocaleString()+'건 · 납기일 기준'+tCtrLine, '#fff')
+      + kpi('청구금액', won(tb.amt), '납기일 '+rlbl+' · 첫달 직납 포함', '#fff')
+      + kpi('납부금액', won(tb.paid), '납부완료 (청구 − 미납) · 첫달 직납 포함', '#fff')
+      + kpi('첫달 납부금액 <span style="font-weight:400">(직납)</span>', won(firstD.paid), '임(전)차인 → 임대인 직접 · '+firstD.n+'건', '#F5F3FF','#5B21B6')
+      + kpi('정상납부율', tbRate+'%', '납부금액 ÷ 청구금액', '#fff', rateCol)
       // [v533] 과거 기간 = 실행 실적(완료 기준) ↔ 현재/미래 기간 = 예정 기준 자동 전환
       + (isPast
-        ? kpi('대위변제금액 <span style="font-weight:400">(실행)</span>', won(subroX.amt)+tSubro.badge, subroX.n+'건 · 기간 내 실지급 정산 중 임차인 미납(오늘 기준) → KRG 선지급'+tSubro.line, '#FEF2F2','#A32D2D')
-        + kpi('정산완료건수', doneS.n+'건'+tSchN.badge, '기간 내 임대인 실지급(X열) 완료 · 과거 기간이라 완료 기준 표시'+tSchN.line, '#F0FDF4','#166534')
-        + kpi('정산완료금액', won(doneS.amt)+tSchA.badge, '기간 내 임대인 지급 완료 (정산내역 T열)'+tSchA.line, '#F0FDF4','#166534')
-        : kpi('대위변제금액 <span style="font-weight:400">(예정)</span>', won(subro.amt)+tSubro.badge, subro.n+'건 · 정산예정 '+sched.n+'건 중 임차인 미납 → KRG 선지급 예정'+tSubro.line, '#FEF2F2','#A32D2D')
-        + kpi('정산예정건수', sched.n+'건'+tSchN.badge, '정산예정일 도래 · 미지급(완료·예약·제외 제외)'+(smOk?'':' · 판별불가')+tSchN.line, '#F0FDF4','#166534')
-        + kpi('정산예정금액', won(sched.amt)+tSchA.badge, '임대인 지급 예정 (정산내역 T열)'+tSchA.line, '#F0FDF4','#166534'))
+        ? kpi('대위변제금액 <span style="font-weight:400">(실행)</span>', won(subroX.amt), subroX.n+'건 · 기간 내 실지급 정산 중 임차인 미납 → KRG 선지급', '#FEF2F2','#A32D2D')
+        + kpi('정산완료건수', doneS.n+'건', '기간 내 임대인 실지급(X열) 완료', '#F0FDF4','#166534')
+        + kpi('정산완료금액', won(doneS.amt), '기간 내 임대인 지급 완료 (정산내역 T열)', '#F0FDF4','#166534')
+        : kpi('대위변제금액 <span style="font-weight:400">(예정)</span>', won(subro.amt), subro.n+'건 · 정산예정 중 임차인 미납 → KRG 선지급 예정', '#FEF2F2','#A32D2D')
+        + kpi('정산예정건수', sched.n+'건', '정산예정일 도래 · 미지급'+(smOk?'':' · 판별불가'), '#F0FDF4','#166534')
+        + kpi('정산예정금액', won(sched.amt), '임대인 지급 예정 (정산내역 T열)', '#F0FDF4','#166534'))
       +'</div>';
     // [v532] ② 자금 현황 — A안 그룹 박스 (기간유보금 카드·청구총액 카드·유보금 파이프라인 박스·청구 구성 막대 통합/삭제)
     html+=secHd('②','자금 현황','보관 · 채권 · 유보');
