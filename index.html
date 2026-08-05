@@ -5458,6 +5458,25 @@ async function renderSettlementView(){
       if(u>0){ subro.amt+=Math.min(u, s.amt); subro.n++; }
     });
     var tbRate = tb.amt>0 ? Math.round(tb.paid/tb.amt*1000)/10 : 0;
+    // [v535.3] 청구인원 전월/전전월 비교 — 검색 시작월 기준 직전 2개 달력월 (동일 조건: 임대료·유효·납기일)
+    var _mCnt=function(m0){
+      var mE=new Date(m0.getFullYear(), m0.getMonth()+1, 0, 23,59,59);
+      var c={};
+      P.forEach(function(p){
+        if(!isRent(p) || !alive(p)) return;
+        var t=num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) || (num(p['납부금액(원)'])+num(p['미납(연체)금액(원)']));
+        if(t<=0) return;
+        var d=_bfPd(p['납기일']); if(!d || d<m0 || d>mE) return;
+        c[String(p['계약번호']||'').trim()]=1;
+      });
+      return Object.keys(c).length;
+    };
+    var _pm1=new Date(rs.getFullYear(), rs.getMonth()-1, 1), _pm2=new Date(rs.getFullYear(), rs.getMonth()-2, 1);
+    var ctrM1=_mCnt(_pm1), ctrM2=_mCnt(_pm2), ctrCur=Object.keys(tb.ctr).length;
+    var _dTag=function(prev,mD){
+      var d=ctrCur-prev, cl=d>0?'#0B7A45':(d<0?'#A32D2D':'#8A9AB5'), ar=d>0?'▲':(d<0?'▼':'—');
+      return (mD.getMonth()+1)+'월 '+prev.toLocaleString()+'명 <b style="color:'+cl+'">'+ar+(d===0?'':Math.abs(d).toLocaleString())+'</b>';
+    };
 
     // ── [v516] 검색기간 유보금 — 납부일이 기간 내 & 입금완료 & 임대인 미정산 (정산내역 실지급 X열 대조) ──
     // [v531.6] 같은 계약·월에 행이 여럿(재발행 등)이면 '정산완료(완료/실지급)' 행 우선, 그다음 예정일 있는 행 우선
@@ -5549,10 +5568,10 @@ async function renderSettlementView(){
     var secHd=function(no,title,chip){ return '<div style="display:flex;align-items:center;gap:8px;margin:2px 0 8px"><b style="font-size:13px;color:#1A3A5C">'+no+' '+title+'</b>'+(chip?'<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:9px;background:#EEF2FF;color:#4F46E5">'+chip+'</span>':'')+'<span style="flex:1;height:1px;background:#E2E8F0"></span></div>'; };
     html+=secHd('①','기간 KPI','기간검색 연동');
     html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
-      + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', Object.keys(tb.ctr).length+'명', '임대료 청구 '+tb.rows+'건 · 납기일 기준', '#fff')
+      + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', ctrCur.toLocaleString()+'명', '임대료 청구 '+tb.rows+'건 · 납기일 기준<br>전월 '+_dTag(ctrM1,_pm1)+' · 전전월 '+_dTag(ctrM2,_pm2), '#fff')
       + kpi('청구금액', won(tb.amt), '납기일 '+rlbl+' · 첫달 직납 포함', '#fff')
       + kpi('납부금액', won(tb.paid), '납부완료 (청구 − 미납) · 첫달 직납 포함', '#fff')
-      + kpi('첫달 납부금액 <span style="font-weight:400">(직납)</span>', won(firstD.paid), '임(전)차인 → 임대인 직접 · '+firstD.n+'건 · 납부금액 중 첫달분 (유보금·정산 제외)', '#F5F3FF','#5B21B6')
+      + kpi('첫달 납부금액 <span style="font-weight:400">(직납)</span>', won(firstD.paid), '', '#F5F3FF','#5B21B6')
       + kpi('정상납부율', tbRate+'%', '납부금액 ÷ 청구금액', '#fff', rateCol)
       // [v533] 과거 기간 = 실행 실적(완료 기준) ↔ 현재/미래 기간 = 예정 기준 자동 전환
       + (isPast
