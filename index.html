@@ -5564,8 +5564,11 @@ async function renderSettlementView(){
     html+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:stretch">'
       +'<div style="flex:1;min-width:270px;background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:12px;padding:12px 14px;color:#1E3A8A">'
       +  '<div style="font-size:12px;font-weight:800;margin-bottom:6px">🧹 퇴실청소비 선입금액</div>'
-      +  '<div style="font-size:24px;font-weight:800">'+mil(cleanPaid.a)+'</div>'   /* [v534.1] 실입금액만 표시 — 등록 보관액(AM열) 제거 */
-      +  '<div style="font-size:10.5px;opacity:.8;margin-top:3px">청구 '+mil(cleanPaid.b||0)+' 대비 <b>'+((cleanPaid.b||0)>0?Math.round(cleanPaid.a/cleanPaid.b*1000)/10:0)+'%</b> 입금 · '+cleanPaid.n+'건 · '+Object.keys(cleanPaid.c).length+'계약</div>'
+      +  '<div style="font-size:24px;font-weight:800">'+mil(cleanPaid.a)+'<span style="font-size:12px;font-weight:700;opacity:.7"> · 입금률 '+((cleanPaid.b||0)>0?Math.round(cleanPaid.a/cleanPaid.b*1000)/10:0)+'%</span></div>'   /* [v534.2] 청구 금액 | 실입금액 병기 */
+      +  '<div style="display:flex;gap:8px;margin-top:8px">'
+      +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">청구 금액</div><div style="font-size:15px;font-weight:800;color:#1E40AF">'+mil(cleanPaid.b||0)+'</div></div>'
+      +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">실입금액</div><div style="font-size:15px;font-weight:800;color:#1D4ED8">'+mil(cleanPaid.a)+'<span style="font-size:10px;color:#94A3B8;font-weight:600"> '+cleanPaid.n+'건</span></div></div>'
+      +  '</div>'
       +  '<div style="font-size:9.5px;opacity:.6;margin-top:5px">입금내역(gid=131074722) 청소비 청구 기준 · 실입금 = 청구 − 미납 · 납부예정 제외 (총액 · 기간 무관)</div>'
       +  '</div>'
       +'<div style="flex:1.2;min-width:300px;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:12px;padding:12px 14px;color:#7F1D1D">'
