@@ -5289,6 +5289,18 @@ async function cG_loadSettleSheet(){
   });
   window.__settleMapAll = map;
   window.__stlSchedRows = schedRows;
+  // [v539] 갱신심사 D+E용 정산일 맵 — cno|YYYY-MM → 정산일 time (실지급일 X열 우선, 없으면 정산예정일 V열)
+  var _pt=function(s){ var d=new Date(String(s||'').trim().replace(/\./g,'-')); return isNaN(d)?null:d.getTime(); };
+  var _rs={};
+  schedRows.forEach(function(s){
+    var rk=s.cno+'|'+s.mon, cur=_rs[rk]||{};
+    var pT=_pt(s.paidAt), vT=_pt(s.v);
+    if(pT && !cur.p) cur.p=pT;
+    if(vT && !cur.v) cur.v=vT;
+    _rs[rk]=cur;
+  });
+  var _flat={}; Object.keys(_rs).forEach(function(k){ var x=_rs[k], t=x.p||x.v; if(t) _flat[k]=t; });
+  window.__rnwSettleMap = _flat;
 }
 
 // ═══════════════ [v506] 정산관리 탭 ═══════════════
@@ -15704,8 +15716,55 @@ function _rnwRegular(top){
   var maxLate = 0; top.forEach(function(x){ if((x.days||0) > maxLate) maxLate = x.days||0; });
   return (inBand / pays.length >= 0.8) && maxLate <= 40;
 }
+// [v539] D+E 심사 공통 로직 — 유효연체(정산일 기준) 산정 + 성실 가점 플래그
+//   유효연체: 납부일이 정산일(임대인 실지급일 X열 우선 → 정산예정일 V열 → 기록 없으면 납기+6일)보다 늦은 건만.
+//   회사가 임대인에게 지급하기 전에 들어온 돈은 회사 손실(대위변제)이 없으므로 연체로 보지 않음.
+function _rnwSettleRef(cno, bd){
+  try{
+    var mon=bd.getFullYear()+'-'+String(bd.getMonth()+1).padStart(2,'0');
+    var m=window.__rnwSettleMap;
+    if(m){ var t=m[String(cno).replace(/\.0$/,'').trim()+'|'+mon]; if(t) return new Date(t); }
+  }catch(_e){}
+  return new Date(bd.getTime()+6*86400000);
+}
+// [v539] 약속 이행율 — 연체관리(Daily Report) 입금예정일(D열) 최근 1년 3건 이상 & 약속일 ±1일 내 납부 80% 이상
+function _rnwPromiseOk(cno, payTimes){
+  try{
+    if(!Array.isArray(daeungRawData)||!daeungRawData.length) return false;
+    var key=String(cno).replace(/\.0$/,'').trim();
+    var yearAgo=new Date(); yearAgo.setFullYear(yearAgo.getFullYear()-1);
+    var DAY=86400000, ps=[];
+    daeungRawData.forEach(function(d){
+      if(String(d.no||'').replace(/\.0$/,'').trim()!==key) return;
+      var pdt=null; try{ pdt=rnwParseDate(d.payDate); }catch(_e){}
+      if(!pdt||pdt<yearAgo) return;
+      ps.push(pdt.getTime());
+    });
+    if(ps.length<3) return false;
+    var kept=0; ps.forEach(function(pt){ for(var i=0;i<(payTimes||[]).length;i++){ if(Math.abs(payTimes[i]-pt)<=DAY){ kept++; break; } } });
+    return kept/ps.length>=0.8;
+  }catch(_e){ return false; }
+}
+function _rnwFinishMetrics(cno, matches){
+  matches.sort(function(a,b){ return (b.billDate||0)-(a.billDate||0); });
+  var top10=matches.slice(0,10), total=top10.length;
+  var DAY=86400000, eff=0, effSum=0, rawLate=0, rawSum=0;
+  top10.forEach(function(r){
+    if(r.days>0){ rawLate++; rawSum+=r.days; }
+    if(!r.billDate) return;
+    var ref=_rnwSettleRef(cno, r.billDate);
+    if(r.payD){ if(r.payD>ref){ eff++; effSum+=Math.max(1,Math.round((r.payD-ref)/DAY)); } }        // 정산일 이후 납부만 유효연체
+    else if(r.days>0 || r.unpaid>0){ eff++; effSum+=r.days; }                                        // 미납·연체중은 그대로 연체
+  });
+  var payTimes=matches.map(function(r){ return r.payD?r.payD.getTime():null; }).filter(function(x){ return x!=null; });
+  var topC=top10.map(function(r){ return {days:r.days, payDay:r.payD?r.payD.getDate():null}; });
+  var recent3 = total>=3 && top10.slice(0,3).every(function(r){ return (r.days||0)<=0; });            // B: 최근 3회 연속 정상(납기 기준)
+  return { count:eff, sumDays:effSum, rate: total>0?Math.round(eff/total*100):0, total:total,
+    rawCount:rawLate, rawSumDays:rawSum,
+    regular:_rnwRegular(topC), recent3:recent3, promiseOk:_rnwPromiseOk(cno, payTimes) };
+}
 function rnwCalcLateMetricsFromObjects(cno, P){
-  if (!Array.isArray(P) || !P.length) return { count:0, sumDays:0, rate:0, total:0, regular:false };
+  if (!Array.isArray(P) || !P.length) return { count:0, sumDays:0, rate:0, total:0, regular:false, recent3:false, promiseOk:false };
   var key = _normCno(cno), matches = [];
   for (var i=0;i<P.length;i++){
     var p=P[i];
@@ -15715,22 +15774,20 @@ function rnwCalcLateMetricsFromObjects(cno, P){
     if (String(p['납부종류']||'').trim()!=='임대료') continue;
     var days=parseInt(String(p['연체일수']==null?'':p['연체일수']).replace(/[^0-9\-]/g,''),10)||0;
     var bd=null; try{ bd=rnwParseDate(p['납기일']); }catch(_e){}
-    var payd=null; try{ var _pp=rnwParseDate(p['납부일']); if(_pp) payd=_pp.getDate(); }catch(_e2){}
-    matches.push({days:days, billDate:bd, payDay:payd});
+    var payD=null; try{ payD=rnwParseDate(p['납부일']); }catch(_e2){}
+    var unpaid=parseFloat(String(p['미납(연체)금액(원)']==null?'':p['미납(연체)금액(원)']).replace(/[^0-9.\-]/g,''))||0;
+    matches.push({days:days, billDate:bd, payD:payD, unpaid:unpaid});
   }
-  matches.sort(function(a,b){ return (b.billDate||0)-(a.billDate||0); });
-  var top10=matches.slice(0,10), total=top10.length;
-  var late=top10.filter(function(r){return r.days>0;});
-  var sumDays=late.reduce(function(s,r){return s+r.days;},0);
-  return { count:late.length, sumDays:sumDays, rate: total>0?Math.round(late.length/total*100):0, total:total, regular:_rnwRegular(top10) };
+  return _rnwFinishMetrics(cno, matches);
 }
 function rnwCalcLateMetrics(cno, incomeResp){
   // [v502] gviz resp가 아니라 객체 배열(paymentRawData)이 넘어오면 폴백 사용
   if (Array.isArray(incomeResp)) return rnwCalcLateMetricsFromObjects(cno, incomeResp);
-  if (!incomeResp || !incomeResp.table) return { count:0, sumDays:0, rate:0, total:0 };
+  if (!incomeResp || !incomeResp.table) return { count:0, sumDays:0, rate:0, total:0, regular:false, recent3:false, promiseOk:false };
   var rows = incomeResp.table.rows || [];
   var _ilb = (incomeResp.table.cols || []).map(function(col){return (col.label||col.id||'').trim();});  // [v381] 라벨 기반(현재 인덱스 fallback)
   var _iCno2=findColIdx(_ilb,['계약번호'],4), _iCStat2=findColIdx(_ilb,['계약상태'],13), _iType2=findColIdx(_ilb,['납부종류'],5), _iDays2=findColIdx(_ilb,['연체일수'],29), _iDue2=findColIdx(_ilb,['납기일'],28);
+  var _iPay2=findColIdx(_ilb,['납부일'],30), _iUnp2=findColIdx(_ilb,['미납(연체)금액(원)','미납(연체)금액'],27);   // [v539]
   var matches = [];
   rows.forEach(function(row){
     var c = row.c || [];
@@ -15743,24 +15800,26 @@ function rnwCalcLateMetrics(cno, incomeResp){
     var ad29 = c[_iDays2] ? Number(c[_iDays2].v ?? 0) : 0;
     var billDate = null;
     if (c[_iDue2] && c[_iDue2].v != null) billDate = rnwParseDate(c[_iDue2].v) || rnwParseDate(c[_iDue2].f);
-    matches.push({ days: ad29, billDate: billDate });
+    var payD = null;
+    if (c[_iPay2] && c[_iPay2].v != null) payD = rnwParseDate(c[_iPay2].v) || rnwParseDate(c[_iPay2].f);
+    var unpaid = c[_iUnp2] ? (parseFloat(String(c[_iUnp2].v ?? c[_iUnp2].f ?? '').replace(/[^0-9.\-]/g,''))||0) : 0;
+    matches.push({ days: ad29, billDate: billDate, payD: payD, unpaid: unpaid });
   });
-  matches.sort(function(a,b){ return (b.billDate||0) - (a.billDate||0); });
-  var top10 = matches.slice(0, 10);
-  var total = top10.length;
-  var lateRows = top10.filter(function(r){ return r.days > 0; });
-  var count = lateRows.length;
-  var sumDays = lateRows.reduce(function(s,r){ return s + r.days; }, 0);
-  var rate = total > 0 ? Math.round(count / total * 100) : 0;
-  return { count: count, sumDays: sumDays, rate: rate, total: total };
+  return _rnwFinishMetrics(cno, matches);
 }
 
-// === 심사 분류 (Claude 제안안) ===
+// === 심사 분류 — [v539] D+E안 채택 (2026-08) ===
+//   연체 산정: 유효연체(정산일 기준 — 회사가 임대인에게 지급하기 전 입금은 연체 아님)
+//   문턱: 거절 = 8회↑ / 45일 초과 / 80%↑ · 조건부 = 6회↑ / 30일↑
+//   가점: 최근 3개월 연속 정상납부 · 정기납부(매월 동일일 ±3) · 약속 이행율 80%↑ 중 하나면 한 단계 상향
 function rnwClassify(metrics){
   if (!metrics || metrics.total === 0) return 'none';
-  if (metrics.count >= 7 || metrics.sumDays > 30 || metrics.rate >= 60) return 'deny';
-  if (metrics.count >= 5 || metrics.sumDays >= 21) return 'cond';
-  return 'app';
+  var j;
+  if (metrics.count >= 8 || metrics.sumDays > 45 || metrics.rate >= 80) j = 'deny';
+  else if (metrics.count >= 6 || metrics.sumDays >= 30) j = 'cond';
+  else j = 'app';
+  if (j !== 'app' && (metrics.recent3 || metrics.regular || metrics.promiseOk)) j = (j === 'deny') ? 'cond' : 'app';
+  return j;
 }
 
 // === 진행상태 판정 ===
@@ -15978,10 +16037,12 @@ function renderRenewalView(){
   var needLoad = !window._rnwIncomeRaw
     || !Array.isArray(vacancyRawData) || !vacancyRawData.length
     || !Array.isArray(daeungRawData) || !daeungRawData.length
+    || !window.__rnwSettleMap
     || !crLoaded;
   if (needLoad) {
     wrap.innerHTML = '<div class="rnw-empty">📡 갱신관리 데이터 로딩 중...</div>';
     var promises = [];
+    if (!window.__rnwSettleMap) promises.push(cG_loadSettleSheet().catch(function(e){ window.__rnwSettleMap = window.__rnwSettleMap || {}; }));   // [v539] D+E 심사용 정산일 맵
     if (!window._rnwIncomeRaw) promises.push(fetchSheetByGid(INCOME_GID).then(function(r){ window._rnwIncomeRaw = r; }));
     if (!Array.isArray(vacancyRawData) || !vacancyRawData.length) promises.push(fetchSheetByGid(VACANCY_GID).then(function(r){ vacancyRawData = parseVacancySheet(r); }));
     if (!Array.isArray(daeungRawData) || !daeungRawData.length) promises.push(fetchSheetByGid(DAILY_RPT_GID).then(function(r){ daeungRawData = parseDailyReport(r); }));
@@ -19542,7 +19603,7 @@ function _vldAnalysis(bucketLabel, kind){
         +'<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:6px 9px 8px"><div style="font-size:9.5px;font-weight:800;color:#15803D;margin-bottom:5px">🔄 갱신</div><div style="display:flex;gap:7px;flex-wrap:wrap">'
         +  '<div style="background:#fff;border-radius:7px;padding:5px 10px;min-width:118px"><div style="font-size:9.5px;color:#166534">1차 갱신율 ('+rnLbl+' 입주)</div><div style="font-size:15px;font-weight:800;color:'+(rate>=60?'#15803D':'#B91C1C')+'">'+rate+'%<span style="font-size:10px;font-weight:700;color:'+(C1.pureRate>=60?'#15803D':'#B5730F')+'"> · 순 '+C1.pureRate+'%</span></div></div>'
         +  '<div style="background:#fff;border-radius:7px;padding:5px 10px;min-width:150px"><div style="font-size:9.5px;color:#166534">1차 갱신 현황</div><div style="font-size:12px;font-weight:800;color:#374151;padding-top:2px">대상 '+due+' · 갱신 <b style="color:#15803D">'+renew+'</b> · 미갱신 <b style="color:#DC2626">'+(due-renew)+'</b><span style="font-size:9px;font-weight:400;color:#94A3B8"> (중도 '+C1.mid+' 제외 시 '+C1.pureDue+')</span></div></div>'
-        +  '<div title="갱신심사 결과 거절 인원 (최근 임대료 청구 10회 중 연체 7회↑ 또는 누적 30일 초과 또는 연체율 60%↑)" style="background:#FEF2F2;border:1px solid #FECACA;border-radius:7px;padding:5px 10px;min-width:108px;cursor:help"><div style="font-size:9.5px;color:#B91C1C">갱신불가 (심사 거절)</div><div style="font-size:15px;font-weight:800;color:#DC2626">'+(expJudged?(expDeny+'<span style="font-size:10px">명</span> <span style="font-size:11px">('+epc(expDeny)+'%)</span>'):'—')+'</div></div>'
+        +  '<div title="갱신심사 결과 거절 인원 — D+E 기준: 유효연체(정산일 이후 납부만) 8회↑/누적 45일 초과/80%↑, 성실 가점(최근 3개월 정상·정기납부·약속 이행) 시 한 단계 상향" style="background:#FEF2F2;border:1px solid #FECACA;border-radius:7px;padding:5px 10px;min-width:108px;cursor:help"><div style="font-size:9.5px;color:#B91C1C">갱신불가 (심사 거절)</div><div style="font-size:15px;font-weight:800;color:#DC2626">'+(expJudged?(expDeny+'<span style="font-size:10px">명</span> <span style="font-size:11px">('+epc(expDeny)+'%)</span>'):'—')+'</div></div>'
         +'</div></div>'
         +'<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:6px 9px 8px"><div style="font-size:9.5px;font-weight:800;color:#1D4ED8;margin-bottom:5px">💰 재무</div><div style="display:flex;gap:7px;flex-wrap:wrap">'
         +  '<div style="background:#fff;border-radius:7px;padding:5px 10px;min-width:100px"><div style="font-size:9.5px;color:#1E40AF">계약당 LTV <span style="color:#93C5FD">(1명 총 수수료)</span></div><div style="font-size:15px;font-weight:800;color:#1D4ED8">'+mil(ltv)+'</div></div>'
