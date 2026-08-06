@@ -15748,13 +15748,14 @@ function _rnwPromiseOk(cno, payTimes){
 function _rnwFinishMetrics(cno, matches){
   matches.sort(function(a,b){ return (b.billDate||0)-(a.billDate||0); });
   var top10=matches.slice(0,10), total=top10.length;
-  var DAY=86400000, eff=0, effSum=0, rawLate=0, rawSum=0;
+  var DAY=86400000, eff=0, effSum=0, rawLate=0, rawSum=0, _today=new Date();
   top10.forEach(function(r){
     if(r.days>0){ rawLate++; rawSum+=r.days; }
     if(!r.billDate) return;
     var ref=_rnwSettleRef(cno, r.billDate);
+    if(ref<r.billDate) ref=r.billDate;                                                               // [v539.1] 정산일이 납기보다 이르면 납기일 기준 (월 어긋남 방어)
     if(r.payD){ if(r.payD>ref){ eff++; effSum+=Math.max(1,Math.round((r.payD-ref)/DAY)); } }        // 정산일 이후 납부만 유효연체
-    else if(r.days>0 || r.unpaid>0){ eff++; effSum+=r.days; }                                        // 미납·연체중은 그대로 연체
+    else if(r.days>0 || (r.unpaid>0 && r.billDate<_today)){ eff++; effSum+=r.days; }                 // 미납·연체중은 그대로 연체 — [v539.1] 미래 납기(납부예정)는 제외
   });
   var payTimes=matches.map(function(r){ return r.payD?r.payD.getTime():null; }).filter(function(x){ return x!=null; });
   var topC=top10.map(function(r){ return {days:r.days, payDay:r.payD?r.payD.getDate():null}; });
