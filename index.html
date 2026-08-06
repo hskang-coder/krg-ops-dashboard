@@ -19411,6 +19411,7 @@ function _vldAnalysis(bucketLabel, kind){
     var inM=function(d){return d&&d.getFullYear()===Y&&d.getMonth()===M-1;};
     var neu=0, expA=[], midA=[], expRent=0, midRent=0, midDlq=0, midDlqCnt=0, midForceVac=0, midForceDlq=0, mid12=0, midU11=0, mid11=0, exp24=0, exp12=0, expC=[], midC=[];   // [v529][v529.5][v529.6][v530.1]
     var midDlqRel=0, maxDlq=0, maxDlqNm='', dlqMthSum=0, dlqMthN=0, freeMthSum=0, freeMthN=0;   // [v531] 연체발 중도퇴실 심층 분석용
+    var midDeath=0, midOwner=0;   // [v538] 사망 · 임대인사유퇴실 (BO열 공실상태 값 기준)
     var active=0, actFee=0;
     V.forEach(function(v){
       if(inM(pd(v.startDate))) neu++;
@@ -19421,6 +19422,8 @@ function _vldAnalysis(bucketLabel, kind){
         var vs=String(v.status||'');                                   // [v529] 공실상태(BO열) 값 기준 카운트
         if(vs.indexOf('강제퇴실(공실)')>=0) midForceVac++;
         if(vs.indexOf('강제퇴실(연체)')>=0) midForceDlq++;
+        if(vs.indexOf('사망')>=0) midDeath++;                          // [v538]
+        if(vs.indexOf('임대인사유')>=0) midOwner++;                    // [v538]
         if(mth>=11) mid12++; else midU11++;                            // [v529.1] 거주기간 분포 — 11개월 이상 / 11개월 미만
         var rel=(da>0||vs.indexOf('강제퇴실(연체)')>=0);               // [v531] 연체 관련 중도퇴실
         if(rel){ midDlqRel++; dlqMthSum+=mth; dlqMthN++; } else { freeMthSum+=mth; freeMthN++; }
@@ -19594,6 +19597,7 @@ function _vldAnalysis(bucketLabel, kind){
       +'<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:6px 9px 8px"><div style="font-size:9.5px;font-weight:800;color:#B91C1C;margin-bottom:5px">🚨 연체·강제퇴실</div><div style="display:flex;gap:7px;flex-wrap:wrap">'
       +  '<div style="background:#fff;border-radius:7px;padding:5px 10px;min-width:96px"><div style="font-size:9.5px;color:#B91C1C">연체 피해액</div><div style="font-size:15px;font-weight:800;color:#A32D2D">'+mil(midDlq)+'</div></div>'
       +  '<div title="강제퇴실(공실): 강제퇴실 후 개런티즈에서 후임세입자 유입&#10;강제퇴실(연체): 연체로 인한 강제퇴실 계약자 후임세입자 유입" style="background:#fff;border-radius:7px;padding:5px 10px;min-width:165px;cursor:help"><div style="font-size:9.5px;color:#B91C1C">강제퇴실 토탈 <span style="color:#E08585">(공실상태 값 기준)</span></div><div style="font-size:15px;font-weight:800;color:#A32D2D">'+(midForceVac+midForceDlq)+'<span style="font-size:10px">건</span> <span style="font-size:11px;color:#DC2626">('+mpc(midForceVac+midForceDlq)+'%)</span> <span style="font-size:10.5px;font-weight:700;color:#94A3B8">= 공실 '+midForceVac+' + 연체 '+midForceDlq+'</span></div></div>'   /* [v530.1] 정의는 하단 각주로 이동 */
+      +  '<div style="background:#fff;border-radius:7px;padding:5px 10px;min-width:150px"><div style="font-size:9.5px;color:#B91C1C">사망 · 임대인사유퇴실</div><div style="font-size:15px;font-weight:800;color:#A32D2D">'+(midDeath+midOwner)+'<span style="font-size:10px">건</span> <span style="font-size:11px;color:#DC2626">('+mpc(midDeath+midOwner)+'%)</span> <span style="font-size:10.5px;font-weight:700;color:#94A3B8">= 사망 '+midDeath+' + 임대인 '+midOwner+'</span></div></div>'   /* [v538] */
       +'</div></div>'
       +'<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:6px 9px 8px"><div style="font-size:9.5px;font-weight:800;color:#1D4ED8;margin-bottom:5px">💰 손실 <span style="font-weight:400;color:#60A5FA">(미회수 연체금액 기준)</span></div><div style="display:flex;gap:7px;flex-wrap:wrap">'   /* [v530.1] LTV → 연체금액 기준 */
       +  '<div style="background:#fff;border-radius:7px;padding:5px 10px;min-width:100px"><div style="font-size:9.5px;color:#1E40AF">임대료 연체</div><div style="font-size:15px;font-weight:800;color:#1D4ED8">'+(lossOk?mil(lossRent):'—')+'</div></div>'
