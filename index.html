@@ -5428,11 +5428,17 @@ async function renderSettlementView(){
     window.__stlActiveOut=0; window.__stlEndedOut=0;
 
     // ── [v513/v515] 기간 KPI — 청구 / 납부 / 대위변제 / 정산예정 (상단 통합 기간검색 기준) ──
+    // [v537] 주거용/상업용/TOTAL 구분 필터 (계약관리 N열 계약형태 기준, 디폴트 TOTAL)
+    var useMap={};
+    V.forEach(function(v){ var u=String(v.useType||'').trim(); if(u) useMap[String(v.no).trim()]=u; });
+    var _useF=window._stlUse||'total';
+    var _useOk=function(cno){ if(_useF==='total') return true; var u=useMap[String(cno||'').trim()]||''; return _useF==='res'? u.indexOf('주거')>=0 : (u.indexOf('상업')>=0||u.indexOf('상가')>=0); };
     var tb={rows:0,ctr:{},amt:0,paid:0}, subro={amt:0,n:0}, sched={n:0,amt:0};
     var firstD={n:0,amt:0,paid:0};   // [v532.1] 첫달 직납 (임차인→임대인 직접)
     var unpaidMap={};   // [v514] 계약번호|청구월 → 미납 합 (대위변제 매칭용)
     P.forEach(function(p){
       if(!isRent(p) || !alive(p)) return;
+      if(!_useOk(p['계약번호'])) return;   // [v537] 주거/상업 필터
       var tot=num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) || (num(p['납부금액(원)'])+num(p['미납(연체)금액(원)']));
       var outA=num(p['미납(연체)금액(원)']);
       var st2=String(p['납부상태']||'').trim();
@@ -5448,6 +5454,7 @@ async function renderSettlementView(){
     });
     // [v514] 정산예정·대위변제 — 정산내역(Raw DATA) V열(정산예정일) 실데이터 기준 (납부일+3 추정 폐기)
     (window.__stlSchedRows||[]).forEach(function(s){
+      if(!_useOk(s.cno)) return;   // [v537] 주거/상업 필터
       var vd=_bfPd(s.v); if(!_inR(vd)) return;
       var done = s.state==='완료' || String(s.state||'').indexOf('예약')>=0 || s.state==='제외' || !!s.paidAt;   // [v531.2/3] N열 완료·예약(이체예약)·제외(무효 정산서) 또는 X열 실지급일 → 집계 제외
       if(done || !(s.amt>0)) return;
@@ -5473,6 +5480,7 @@ async function renderSettlementView(){
       var s=w[0], e=w[1], r={c:{},rows:0,amt:0,paid:0,firstPaid:0};
       P.forEach(function(p){
         if(!isRent(p) || !alive(p)) return;
+        if(!_useOk(p['계약번호'])) return;   // [v537] 주거/상업 필터 (비교 구간도 동일 조건)
         var t=num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) || (num(p['납부금액(원)'])+num(p['미납(연체)금액(원)']));
         if(t<=0) return;
         var d=_bfPd(p['납기일']); if(!d || d<s || d>e) return;
@@ -5487,6 +5495,7 @@ async function renderSettlementView(){
     var _schedIn=function(w){
       var s=w[0], e=w[1], r={n:0,amt:0,sn:0,samt:0};
       (window.__stlSchedRows||[]).forEach(function(x){
+        if(!_useOk(x.cno)) return;   // [v537] 주거/상업 필터
         var pd=_bfPd(x.paidAt); if(!pd || pd<s || pd>e || !(x.amt>0)) return;
         r.n++; r.amt+=x.amt;
         var u=unpaidMap[x.cno+'|'+x.mon]; if(u>0){ r.samt+=Math.min(u,x.amt); r.sn++; }
@@ -5591,6 +5600,7 @@ async function renderSettlementView(){
     var doneS={n:0,amt:0}, subroX={n:0,amt:0};
     if(isPast){
       (window.__stlSchedRows||[]).forEach(function(s){
+        if(!_useOk(s.cno)) return;   // [v537] 주거/상업 필터
         var pdt2=_bfPd(s.paidAt); if(!pdt2||!_inR(pdt2)) return;
         if(!(s.amt>0)) return;
         doneS.n++; doneS.amt+=s.amt;
@@ -5603,7 +5613,13 @@ async function renderSettlementView(){
     // [v536.1] 트렌드는 청구인원 카드에만 유지 — 나머지 카드는 깔끔한 통일 레이아웃 (배지·비교줄 제거)
     var tCtr=_trend(ctrCur, K1.n, K2.n, _fN);
     var tCtrLine=tCtr.line.replace('margin-top:6px;padding-top:5px;border-top:1px solid #EEF2F7;','margin-top:2px;');   // kpi()가 구분선을 그리므로 중복 제거
-    html+=secHd('①','기간 KPI','기간검색 연동');
+    // [v537] ① 헤더 — 주거용/상업용/TOTAL 구분 토글 (디폴트 TOTAL)
+    var _useBtn=function(val,label){ var on=_useF===val; return '<button onclick="stl_setUse(\''+val+'\')" style="padding:3px 12px;border-radius:14px;border:1.5px solid '+(on?'#4F46E5':'#D1D5DB')+';background:'+(on?'#4F46E5':'#fff')+';color:'+(on?'#fff':'#374151')+';font-size:11px;font-weight:700;cursor:pointer">'+label+'</button>'; };
+    html+='<div style="display:flex;align-items:center;gap:8px;margin:2px 0 8px"><b style="font-size:13px;color:#1A3A5C">① 기간 KPI</b>'
+      +'<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:9px;background:#EEF2FF;color:#4F46E5">기간검색 연동</span>'
+      +'<span style="display:inline-flex;gap:4px;margin-left:6px">'+_useBtn('res','주거용')+_useBtn('com','상업용')+_useBtn('total','TOTAL')+'</span>'
+      +(_useF!=='total'?'<span style="font-size:10px;color:#B45309;font-weight:700">'+(_useF==='res'?'주거용':'상업용')+' 계약만 집계 중</span>':'')
+      +'<span style="flex:1;height:1px;background:#E2E8F0"></span></div>';
     html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
       + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', ctrCur.toLocaleString()+'명'+tCtr.badge, '<span style="white-space:nowrap">임대료 청구 '+tb.rows.toLocaleString()+'건 · 납기일 기준</span>'+tCtrLine, '#fff')
       + kpi('청구금액', won(tb.amt), '납기일 '+rlbl+' · 첫달 직납 포함', '#fff')
@@ -5754,6 +5770,8 @@ async function renderSettlementView(){
 }
 // [v513] 정산관리 기간 선택 핸들러 (운영관리 okpi_setPeriod/okpi_setDate와 동일 패턴)
 function stl_setPeriod(p){ window._stlP = window._stlP || {period:'day'}; window._stlP.period = p; renderSettlementView(); }
+// [v537] 기간 KPI 주거용/상업용/TOTAL 구분 필터 (디폴트 total)
+function stl_setUse(v){ window._stlUse = v; renderSettlementView(); }
 // [v514/v515] 날짜 ~ 날짜 검색 — 두 날짜가 모두 채워지면 range 모드로 전환 (기준일 개념 폐지, 일/주/월은 오늘 기준 프리셋)
 function stl_setRange(){
   var a=(document.getElementById('stlR1')||{}).value||'', b=(document.getElementById('stlR2')||{}).value||'';
