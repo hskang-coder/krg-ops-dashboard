@@ -15249,17 +15249,33 @@ window._rnwSheetMap = window._rnwSheetMap || null; // null=미로드, {}=로드�
 })();
 
 function rnwSetFilter(val){ window._rnwFilter = val; renderRenewalView(); }
-// [v157] 계약자 검색 (임(전)차인명/계약번호/연락처) — 200ms 디바운스 + focus 보존
+// [v157] 계약자 검색 (임(전)차인명/계약번호/연락처) — 디바운스 + focus 보존
+// [v537.1] 한글 IME 보호 — 조합(composition) 중 재렌더가 입력을 끊어 글자가 깨지던 문제 수정:
+//   타이핑 중에는 렌더하지 않고, 입력이 멈춰 값이 안정된 뒤에만 1회 검색 실행 (Enter는 즉시)
 window._rnwSearch = window._rnwSearch || '';
 window._rnwSearchTimer = null;
 function rnwSetSearch(val){
   window._rnwSearch = String(val||'').trim();
   clearTimeout(window._rnwSearchTimer);
-  window._rnwSearchTimer = setTimeout(function(){
+  var run = function(){
+    var el0 = document.getElementById('rnwSearchInput');
+    // 한글 조합 중 + 값이 아직 변하는 중이면 안정될 때까지 대기
+    if (window._rnwIME && el0 && document.activeElement === el0 && window._rnwLastVal !== el0.value) {
+      window._rnwLastVal = el0.value;
+      window._rnwSearchTimer = setTimeout(run, 350);
+      return;
+    }
+    window._rnwSearch = String((el0 ? el0.value : window._rnwSearch) || '').trim();
     renderRenewalView();
     var el = document.getElementById('rnwSearchInput');
-    if (el) { el.focus(); var v = el.value; el.setSelectionRange(v.length, v.length); }
-  }, 200);
+    if (el) { el.focus(); var v = el.value; try { el.setSelectionRange(v.length, v.length); } catch(e){} }
+  };
+  window._rnwLastVal = null;
+  window._rnwSearchTimer = setTimeout(run, 400);
+}
+// [v537.1] Enter 즉시 검색
+function rnwSearchEnter(ev, el){
+  if (ev && ev.key === 'Enter') { window._rnwIME = false; clearTimeout(window._rnwSearchTimer); window._rnwSearch = String(el.value||'').trim(); renderRenewalView(); }
 }
 // [v163] 필터 모드 — 'review' (심사진행기간, +3월 오프셋) | 'endDate' (계약종료일, 직접 매칭)
 window._rnwFilterMode = window._rnwFilterMode || 'review';
@@ -16060,7 +16076,7 @@ function renderRenewalView(){
     +     '</div>'
     +     '<div style="display:flex;align-items:center;gap:6px">'
     +       '<span style="font-size:11px;font-weight:700;color:#374151">🔍 검색</span>'
-    +       '<input id="rnwSearchInput" type="text" value="' + String(window._rnwSearch||'').replace(/"/g,'&quot;') + '" oninput="rnwSetSearch(this.value)" placeholder="계약자명·번호·연락처" style="padding:0 10px;border:1.5px solid #D1D5DB;border-radius:5px;font-size:11.5px;height:28px;outline:none;background:#fff;width:170px">'
+    +       '<input id="rnwSearchInput" type="text" value="' + String(window._rnwSearch||'').replace(/"/g,'&quot;') + '" oninput="rnwSetSearch(this.value)" oncompositionstart="window._rnwIME=true" oncompositionend="window._rnwIME=false" onkeydown="rnwSearchEnter(event, this)" placeholder="계약자명·번호·연락처 (Enter 검색)" style="padding:0 10px;border:1.5px solid #D1D5DB;border-radius:5px;font-size:11.5px;height:28px;outline:none;background:#fff;width:170px">'
     +       '<label style="' + togStyle + '"><input type="checkbox"' + (searchAll?' checked':'') + ' onchange="rnwToggleSearchAll(this.checked)" style="margin:0">계약자 전체</label>'
     +     '</div>'
     +   '</div>'
