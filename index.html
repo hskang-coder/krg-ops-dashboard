@@ -15683,8 +15683,20 @@ function openRenewalReport(cno){
 
 // === 직전 10회 청구 기준 연체 산정 (청구일 다음날부터 인정) ===
 // [v502] paymentRawData(객체 배열) 기반 폴백 — 입주관리 카드 등 gviz resp가 없는 화면에서도 심사 판정 가능
+// [v538] 정기납부 판정 — 최근 청구의 납부일(일자)이 매월 동일한 날 ±3일 안에 80% 이상 몰려 있고
+//   건당 연체가 40일 이하(다음 달로 밀리지 않는 수준)면 "정기납부자"로 인정 (급여일 맞춤 납부 등)
+function _rnwRegular(top){
+  var pays = top.map(function(x){ return x.payDay; }).filter(function(x){ return x != null; });
+  if (pays.length < 6) return false;                                    // 표본 6건 이상일 때만
+  var sorted = pays.slice().sort(function(a,b){ return a-b; });
+  var med = sorted[Math.floor(sorted.length/2)];
+  var wrap = function(a,b){ var d=Math.abs(a-b); return Math.min(d, 31-d); };  // 월말↔월초 순환 거리
+  var inBand = pays.filter(function(pd){ return wrap(pd, med) <= 3; }).length;
+  var maxLate = 0; top.forEach(function(x){ if((x.days||0) > maxLate) maxLate = x.days||0; });
+  return (inBand / pays.length >= 0.8) && maxLate <= 40;
+}
 function rnwCalcLateMetricsFromObjects(cno, P){
-  if (!Array.isArray(P) || !P.length) return { count:0, sumDays:0, rate:0, total:0 };
+  if (!Array.isArray(P) || !P.length) return { count:0, sumDays:0, rate:0, total:0, regular:false };
   var key = _normCno(cno), matches = [];
   for (var i=0;i<P.length;i++){
     var p=P[i];
@@ -15694,13 +15706,14 @@ function rnwCalcLateMetricsFromObjects(cno, P){
     if (String(p['납부종류']||'').trim()!=='임대료') continue;
     var days=parseInt(String(p['연체일수']==null?'':p['연체일수']).replace(/[^0-9\-]/g,''),10)||0;
     var bd=null; try{ bd=rnwParseDate(p['납기일']); }catch(_e){}
-    matches.push({days:days, billDate:bd});
+    var payd=null; try{ var _pp=rnwParseDate(p['납부일']); if(_pp) payd=_pp.getDate(); }catch(_e2){}
+    matches.push({days:days, billDate:bd, payDay:payd});
   }
   matches.sort(function(a,b){ return (b.billDate||0)-(a.billDate||0); });
   var top10=matches.slice(0,10), total=top10.length;
   var late=top10.filter(function(r){return r.days>0;});
   var sumDays=late.reduce(function(s,r){return s+r.days;},0);
-  return { count:late.length, sumDays:sumDays, rate: total>0?Math.round(late.length/total*100):0, total:total };
+  return { count:late.length, sumDays:sumDays, rate: total>0?Math.round(late.length/total*100):0, total:total, regular:_rnwRegular(top10) };
 }
 function rnwCalcLateMetrics(cno, incomeResp){
   // [v502] gviz resp가 아니라 객체 배열(paymentRawData)이 넘어오면 폴백 사용
