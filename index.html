@@ -5540,8 +5540,8 @@ async function renderSettlementView(){
     var holdTot=hold.pre.a+hold.past.a+hold.none.a, holdN=hold.pre.n+hold.past.n+hold.none.n;
 
     // ── 렌더 ──
-    // [v536.1] 카드 통일 레이아웃 — 라벨 / 큰 숫자 / 구분선 / 설명 (숫자·텍스트 영역 분리로 번잡함 제거)
-    var kpi=function(lb,val,sub,bg,tx){ return '<div style="background:'+(bg||'#fff')+';border:1px solid #E2EAF5;border-radius:10px;padding:10px 13px;min-width:150px;flex:1;display:flex;flex-direction:column"><div style="font-size:10.5px;color:'+(tx||'#5A6A8A')+';font-weight:700">'+lb+'</div><div style="font-size:19px;font-weight:800;color:'+(tx||'#1A3A5C')+';margin-top:1px;flex:1">'+val+'</div>'+(sub?'<div style="font-size:10px;color:'+(tx||'#8A9AB5')+';opacity:.8;margin-top:7px;padding-top:5px;border-top:1px solid rgba(148,163,184,.28);line-height:1.5">'+sub+'</div>':'')+'</div>'; };
+    // [v536.2] 설명 영역 높이 고정(2줄) — 카드마다 달랐던 구분선 위치를 일직선으로 통일
+    var kpi=function(lb,val,sub,bg,tx){ return '<div style="background:'+(bg||'#fff')+';border:1px solid #E2EAF5;border-radius:10px;padding:10px 13px;min-width:150px;flex:1;display:flex;flex-direction:column"><div style="font-size:10.5px;color:'+(tx||'#5A6A8A')+';font-weight:700;white-space:nowrap">'+lb+'</div><div style="font-size:19px;font-weight:800;color:'+(tx||'#1A3A5C')+';margin-top:1px;flex:1;white-space:nowrap">'+val+'</div><div style="font-size:10px;color:'+(tx||'#8A9AB5')+';opacity:.8;margin-top:7px;padding-top:5px;border-top:1px solid rgba(148,163,184,.28);line-height:1.5;min-height:35px">'+(sub||'')+'</div></div>'; };
     var pipe=function(lb,val,sub,warn){ return '<div style="flex:1;min-width:150px;background:#fff;border-radius:8px;padding:8px 11px;border:1px solid '+(warn?'#F7C1C1':'#EDF2F9')+'"><div style="font-size:10.5px;color:'+(warn?'#A32D2D':'#5A6A8A')+'">'+lb+'</div><div style="font-size:16px;font-weight:800;color:'+(warn?'#A32D2D':'#1A3A5C')+'">'+val+'</div><div style="font-size:10px;color:'+(warn?'#A32D2D':'#8A9AB5')+'">'+sub+'</div></div>'; };
     var rate=cmBilled? Math.round(cmPaid/cmBilled*1000)/10 : 0;
     var html='';
@@ -5605,7 +5605,7 @@ async function renderSettlementView(){
     var tCtrLine=tCtr.line.replace('margin-top:6px;padding-top:5px;border-top:1px solid #EEF2F7;','margin-top:2px;');   // kpi()가 구분선을 그리므로 중복 제거
     html+=secHd('①','기간 KPI','기간검색 연동');
     html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
-      + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', ctrCur.toLocaleString()+'명'+tCtr.badge, '임대료 청구 '+tb.rows.toLocaleString()+'건 · 납기일 기준'+tCtrLine, '#fff')
+      + kpi('청구인원 <span style="font-weight:400">('+plbl+')</span>', ctrCur.toLocaleString()+'명'+tCtr.badge, '<span style="white-space:nowrap">임대료 청구 '+tb.rows.toLocaleString()+'건 · 납기일 기준</span>'+tCtrLine, '#fff')
       + kpi('청구금액', won(tb.amt), '납기일 '+rlbl+' · 첫달 직납 포함', '#fff')
       + kpi('납부금액', won(tb.paid), '납부완료 (청구 − 미납) · 첫달 직납 포함', '#fff')
       + kpi('첫달 납부금액 <span style="font-weight:400">(직납)</span>', won(firstD.paid), '임(전)차인 → 임대인 직접 · '+firstD.n+'건', '#F5F3FF','#5B21B6')
