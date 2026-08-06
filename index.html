@@ -5884,7 +5884,16 @@ function renderContractRecord(c, payments, responses = []) {
   const lateFeeRent = sumLateFee('임대료','수수료');
   const lateFeeFee  = sumLateFee('수수료');
   // [v458] 연체횟수 = 입금내역 실제 연체 이력 건수(연체납부+연체중+분납중). 시트 '연체횟수' 컬럼이 %값(오정렬)이라 재계산
-  const lateOccurCount = (payments||[]).filter(p => { var s=String(p['납부상태']||'').trim(); return s==='연체납부'||s==='연체중'||s==='분납중'; }).length;
+  // [v538.2] 연체 지표를 임대료 청구 기준으로 통일 — 청구수(임대료 한정)와 분모·분자 불일치 해소
+  //   (기존: 연체횟수가 변동관리비·기타계약금 연체까지 합산되어 연체율이 100%를 초과하는 왜곡 발생)
+  const _isRentRow = p => String(p['납부종류']||'').trim()==='임대료' && String(p['청구서명']||'').indexOf('수수료')<0;
+  const _rentRows = (payments||[]).filter(_isRentRow);
+  const _pDays = p => { var d=parseInt(String(p['연체일수']==null?'':p['연체일수']).replace(/[^0-9\-]/g,''),10)||0; return d>0?d:0; };
+  const lateOccurCount = _rentRows.filter(p => { var s=String(p['납부상태']||'').trim(); return s==='연체납부'||s==='연체중'||s==='분납중'; }).length;
+  const rentCumDays = _rentRows.reduce((a,p)=>a+_pDays(p), 0);
+  const rentMaxDays = _rentRows.reduce((a,p)=>Math.max(a,_pDays(p)), 0);
+  const dispCumDays = _rentRows.length ? rentCumDays : _cumLateDays(c['연체누적일']);   // 입금내역 미로딩 시 시트값 폴백
+  const dispMaxDays = _rentRows.length ? rentMaxDays : (parseInt(c['연체최장일'])||0);
   // [v276] 총 연체 = 모든 연체중/분납중 행의 미납 합계 (잔액 방식)
   //   [v308] 미래 납기일 제외 — 납기 도래 후만 연체로 인정
   const delinqAllSum = (payments||[])
@@ -6018,11 +6027,11 @@ function renderContractRecord(c, payments, responses = []) {
         </div>
         <div style="font-size:12px;color:#64748B;margin-top:4px;font-weight:600">${fmt(c['임차인명'])} · ${fmt(c['건물명'])} ${fmt(c['호수'])}</div>
       </div>
-      <div class="crx-stats">
-        <div class="crx-stat"><div class="l">청구횟수</div><div class="v">${stripU(c['청구수'])}회</div></div>
-        <div class="crx-stat"><div class="l">최장연체</div><div class="v ${parseInt(c['연체최장일'])>0?'warn':''}">${stripU(c['연체최장일'])}일</div></div>
+      <div class="crx-stats" title="임대료 청구 기준 (수수료·관리비 제외) — [v538.2] 청구횟수와 동일 기준으로 통일">
+        <div class="crx-stat"><div class="l">청구횟수 <span style="font-weight:400;color:#B4BDCB">(임대료)</span></div><div class="v">${stripU(c['청구수'])}회</div></div>
+        <div class="crx-stat"><div class="l">최장연체</div><div class="v ${dispMaxDays>0?'warn':''}">${dispMaxDays}일</div></div>
         <div class="crx-stat"><div class="l">연체횟수</div><div class="v ${lateOccurCount>0?'warn':''}">${lateOccurCount}회</div></div>
-        <div class="crx-stat"><div class="l">누적일수</div><div class="v ${_cumLateDays(c['연체누적일'])>0?'warn':''}">${_cumLateDays(c['연체누적일'])}일</div></div>
+        <div class="crx-stat"><div class="l">누적일수</div><div class="v ${dispCumDays>0?'warn':''}">${dispCumDays}일</div></div>
         ${(function(){var b=parseFloat(String(c['청구수']==null?'':c['청구수']).replace(/[^0-9.]/g,''))||0;var r=(b>0&&isFinite(lateOccurCount))?Math.round(lateOccurCount/b*1000)/10:_lateRateNum(c);return '<div class="crx-stat rate"><div class="l">연체율</div><div class="v">'+(r==null?'—':r.toFixed(1)+'%')+'</div></div>';})()}
         <div class="crx-stat score"><div class="l">점수</div><div class="v" style="${_kcbScore(c)?'':'color:#D1D5DB'}">${_kcbScore(c)||'-'}</div></div>
       </div>
