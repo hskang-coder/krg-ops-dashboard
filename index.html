@@ -2046,6 +2046,50 @@ function parseDailyReport(resp) {
   }).filter(Boolean);
 }
 
+// ═══════════════════════════════════════════
+// [v540] 공실상태 하이브리드 — Daily Report(중도퇴실관리) 최신 상태값 우선 + BO열 폴백
+//   입력: 입주관리 빠른 메모 (1차=중도퇴실관리, 2차=상태확정 9종) → kpi_log → DR F열
+//   판정: 계약별 중도퇴실관리 행 중 최신(대응일, 동일일이면 시트 행 인덱스)의 F값이
+//         상태 9종에 해당하면 그 값을 공실상태로 사용, 없으면 기존 BO열(_boStatus) 유지
+//   검증(2026-08-14 실데이터): DR 상태값 보유 87계약 전원 BO와 일치 → 기존 수치 불변,
+//         54558(BO='-')만 '강제퇴실(공실)'로 신규 반영
+// ═══════════════════════════════════════════
+window._VAC_STAT9 = ['퇴실완료','중도퇴실','강제퇴실(공실)','강제퇴실(연체)','만기퇴실예정','강제퇴실(갱신불가)','임대인사유퇴실','대위변제퇴실','사망'];
+function _vacDrOverride(vacArr, daeArr){
+  try {
+    if (!Array.isArray(vacArr) || !vacArr.length) return;
+    if (!Array.isArray(daeArr) || !daeArr.length) return;
+    var map = {};
+    for (var i = 0; i < daeArr.length; i++) {
+      var r = daeArr[i];
+      if (String(r.jobType||'').indexOf('중도퇴실관리') === -1) continue;
+      var f = String(r.jobSub||'').trim();
+      if (window._VAC_STAT9.indexOf(f) === -1) continue;
+      var cno = String(r.no||'').trim();
+      if (!cno) continue;
+      var d = cG_dateNum(r.date) || 0, ix = r._idx || 0;
+      var prev = map[cno];
+      if (!prev || d > prev.d || (d === prev.d && ix >= prev.i)) map[cno] = { d:d, i:ix, f:f };
+    }
+    var applied = 0;
+    for (var j = 0; j < vacArr.length; j++) {
+      var v = vacArr[j];
+      if (v._boStatus === undefined) v._boStatus = v.status;  // 원본 BO열 값 보존
+      var m = map[String(v.no||'').trim()];
+      var next = m ? m.f : v._boStatus;
+      if (v.status !== next) v.status = next;
+      if (m) applied++;
+    }
+    window.__drVacApplied = applied;
+  } catch(e) { console.warn('[v540] _vacDrOverride:', e); }
+}
+// [v540] 파서 래핑 — 두 데이터셋 중 어느 쪽이 나중에 로드되든 동기 적용 (모든 로드 경로 커버)
+(function(){
+  var _pv = parseVacancySheet, _pd = parseDailyReport;
+  parseVacancySheet = function(r){ var out = _pv(r); try { _vacDrOverride(out, daeungRawData); } catch(_e){} return out; };
+  parseDailyReport  = function(r){ var out = _pd(r); try { _vacDrOverride(vacancyRawData, out); } catch(_e){} return out; };
+})();
+
 // [v224] 대응 내역 정렬 — 날짜 내림차순, 동일 날짜면 시트 행 인덱스가 큰(최근 입력) 게 위
 function cG_sortResponsesNewest(a, b) {
   const d = cG_dateNum(b.date) - cG_dateNum(a.date);
@@ -18782,6 +18826,15 @@ function renderSummaryDashboard(){
     }
   }
 
+  // [v540] 공실상태 하이브리드 — DR(중도퇴실관리) 상태 반영을 위해 daeung 백그라운드 로드 (1회) 후 재렌더
+  if ((!Array.isArray(daeungRawData) || !daeungRawData.length) && !window._sumDaeFetching) {
+    window._sumDaeFetching = true;
+    fetchSheetByGid(DAILY_RPT_GID).then(function(r){
+      daeungRawData = _keepBig(daeungRawData, parseDailyReport(r));
+      try { renderSummaryDashboard(); } catch(_e){}
+    }).catch(function(){});
+  }
+
   // KPI 계산
   var kpi = sumCalcKpi();
 
@@ -22282,7 +22335,8 @@ window._okpiCat = {
   //   그룹2: 법적 절차 (검토 → 발송 → 진행 → 집행)
   //   그룹3: 종료/기타
   '연체관리':    ['전화응대','내용증명이미지발송','현장방문','---','법적 조치 검토','내용증명 발송','지급명령 진행','보정명령 대응','기타집행','---','중도퇴실 처리','계약 종료자 대응','기타'],
-  '중도퇴실관리':['중도퇴실 신청 접수','정산서 발행','후임 세입자 모색','정산 협의','퇴실 확정','보증금 반환','전화응대','기타']
+  // [v540] 상태확정 그룹 추가 — 선택 시 DR F열에 저장되어 공실상태로 대시보드에 즉시 반영 (_vacDrOverride)
+  '중도퇴실관리':['중도퇴실 신청 접수','정산서 발행','후임 세입자 모색','정산 협의','퇴실 확정','보증금 반환','전화응대','기타','---','중도퇴실','퇴실완료','만기퇴실예정','강제퇴실(공실)','강제퇴실(연체)','강제퇴실(갱신불가)','임대인사유퇴실','대위변제퇴실','사망']
 };
 
 function okpi_form_cat2Options(cat1){
