@@ -23095,9 +23095,9 @@ function exm_pd(s){ var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/)
 function exm_num(x){ return parseFloat(String(x||'').replace(/[^0-9.\-]/g,''))||0; }
 function exm_isMid(v){ return /중도퇴실/.test(String(v.jValue||'')); }
 function exm_group(v){
-  if(!exm_isMid(v)) return 'exp';
   var s=String(v.status||'');
-  if(s.indexOf('강제퇴실')>=0) return 'gz';
+  if(s.indexOf('강제퇴실')>=0||s.indexOf('대위변제')>=0) return 'gz';   /* [v549.5] 강제 상태 최우선 — J열(중도퇴실 여부) 미기재여도 강제로 분류 */
+  if(!exm_isMid(v)) return 'exp';
   if(s.indexOf('사망')>=0||s.indexOf('임대인사유')>=0||s.indexOf('물건하자')>=0||s.indexOf('월세부담')>=0) return 'god';
   return 'vol';
 }
@@ -23298,6 +23298,8 @@ function renderExitMgmtView(){
     if(String(v.status||'').indexOf('만기퇴실예정')>=0&&(_sk==='정상'||_sk==='계약중')){ expSched++; schedList.push({cno:String(v.no||'').trim(), nm:v.tenant1Name||v.tenantName||'-', addr:[v.propAddr,v.propBuilding,v.propRoom].filter(Boolean).join(' '), end:String(v.endDate||'').trim()||'-'}); }
     var _cnoX=String(v.no||'').trim();
     var _realX=(drReal[_cnoX]?drReal[_cnoX].v:String(v.exitDate||'').trim());
+    // [v549.5] 강제퇴실 + 계약중 + 계약해지일 미확정 → '강제퇴실 진행' 카드 소관 — 월 확정 상세·추이에서 제외
+    if(String(v.status||'').indexOf('강제퇴실')>=0&&(_sk==='정상'||_sk==='계약중')&&!exm_pd(v.terminateDate)) return;
     var t=exm_pd(_realX)||exm_pd(v.terminateDate); if(!t) return;   /* [v549.3] 퇴실일 = 실퇴실일(DR D열·BP열) 우선, 없으면 계약해지일 — 실퇴실일만 확정된 건도 월 상세·추이에 포함 */
     var key=t.getFullYear()*100+(t.getMonth()+1), g=exm_group(v);
     if(mIdx[key]!=null){ months[mIdx[key]][g]++; }
