@@ -6035,7 +6035,21 @@ function renderContractRecord(c, payments, responses = []) {
   // 공실현황 시트에서 공실상태 + 실제 퇴실일 + J열 조회
   const vacancyInfo    = vacancyRawData.find(v => String(v.no).trim() === String(c['계약번호']||'').trim()) || {};
   const vacancyStatus  = vacancyInfo.status   || '';
-  const actualExitDate = vacancyInfo.exitDate || '';
+  // [v546] 실제 퇴실(공실) — Daily Report 중도퇴실관리 실퇴실일(D열) 최신값 우선, 없으면 기존 BP열 데이터 병합 (퇴실관리탭 실퇴실일과 동일 기준)
+  const actualExitDate = (function(){
+    try{
+      var _cn=String(c['계약번호']||'').trim(), best=null;
+      (daeungRawData||[]).forEach(function(r){
+        if(String(r.no||'').trim()!==_cn) return;
+        if(String(r.jobType||'').indexOf('중도퇴실관리')===-1) return;
+        var pd=String(r.payDate||'').trim(); if(!pd||!/\d{4}\D+\d{1,2}\D+\d{1,2}/.test(pd)) return;
+        var d=cG_dateNum(r.date)||0, ix=r._idx||0;
+        if(!best||d>best.d||(d===best.d&&ix>=best.i)) best={d:d,i:ix,v:pd};
+      });
+      if(best) return best.v;
+    }catch(_e){}
+    return vacancyInfo.exitDate || '';
+  })();
   const vacancyJValue  = vacancyInfo.jValue      || '';
   const inspectType    = vacancyInfo.inspectType || '';
   // [v154] 종합연체 시트(gid=418937767) CV열 — 중도퇴실 상태. 있을 경우 우선 표시
