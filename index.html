@@ -23508,12 +23508,15 @@ function renderExitMgmtView(){
       +'<div style="font-size:10.5px;color:'+lbCol+';font-weight:700">'+lb+'</div>'
       +'<div style="font-size:22px;font-weight:800;color:'+vCol+'">'+val+'</div>'
       +'<div style="font-size:10px;color:#5A6A8A;margin-top:3px;line-height:1.5">'+sub+'</div></div>'; };
+  // [v549.8] 총 퇴실 대비 구성비 — 사유 구성 %를 KPI 카드에도 표시
+  var pc=function(n){ return cur.tot?Math.round(n/cur.tot*100):0; };
+  var pctb=function(n,cl){ return cur.tot?' <span style="font-size:12.5px;font-weight:800;color:'+cl+';background:'+cl+'14;border-radius:6px;padding:1.5px 7px;vertical-align:3px">'+pc(n)+'%</span>':''; };
   var kpiHtml='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:10px;margin-bottom:14px">'
     +kpi('총 퇴실', cur.tot+'명', badge(cur.tot,prev.tot), '전월 '+prev.tot+'명 · 만기 '+cur.exp+' / 중도 '+(cur.tot-cur.exp))
-    +kpi('만기퇴실', cur.exp+'명', badge(cur.exp,prev.exp), '만기퇴실예정(계약중) '+expSched+'건')   /* [v547.5] 종료 제외 */
-    +kpi('자진 중도퇴실', cur.vol+'명', badge(cur.vol,prev.vol), '단순 자진 '+rs.volPlain+' · 기타 사유 '+rs.volEtc)
-    +kpi('불가항력', cur.god+'명', badge(cur.god,prev.god), '사망 '+rs.death+' · 임대인 '+rs.owner+' · 하자 '+rs.flaw+' · 월세부담 '+rs.burden)
-    +kpi('개런티즈 조치 (강제)', cur.gz+'명', badge(cur.gz,prev.gz), '공실 '+rs.vac+' · 연체 '+rs.dlq+' · 갱신불가 '+rs.rnw+' · 계약위반 '+rs.brk, '#B91C1C')
+    +kpi('만기퇴실', cur.exp+'명'+pctb(cur.exp,'#1D4ED8'), badge(cur.exp,prev.exp), '만기퇴실예정(계약중) '+expSched+'건')   /* [v547.5] 종료 제외 */
+    +kpi('자진 중도퇴실', cur.vol+'명'+pctb(cur.vol,'#B45309'), badge(cur.vol,prev.vol), '단순 자진 '+rs.volPlain+' · 기타 사유 '+rs.volEtc)
+    +kpi('불가항력', cur.god+'명'+pctb(cur.god,'#6D28D9'), badge(cur.god,prev.god), '사망 '+rs.death+' · 임대인 '+rs.owner+' · 하자 '+rs.flaw+' · 월세부담 '+rs.burden)
+    +kpi('개런티즈 조치 (강제)', cur.gz+'명'+pctb(cur.gz,'#B91C1C'), badge(cur.gz,prev.gz), '공실 '+rs.vac+' · 연체 '+rs.dlq+' · 갱신불가 '+rs.rnw+' · 계약위반 '+rs.brk, '#B91C1C')
     +kpi('선조치 대상 (연체 보유)', curDlqCnt+'건', '', '중도퇴실자 연체 합계 '+mil2(curDlqSum), '#B45309')
     +'</div>';
   // ── 사유 구성 박스 ──
