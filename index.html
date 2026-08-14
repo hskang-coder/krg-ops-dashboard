@@ -23082,10 +23082,10 @@ function exm_excel(){
   try{
     if(typeof XLSX==='undefined'){ alert('엑셀 모듈 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
     var rows=window._exmRows||[];
-    var aoa=[['계약번호','임(전)차인','물건지','구분','주체','공실상태(사유)','시작일','퇴실일','거주기간(M)','연체금액']];
-    rows.forEach(function(r){ aoa.push([r.cno,r.nm,r.addr,r.kind,r.grpNm,r.st,r.start,r.term,r.living,r.dlq]); });
+    var aoa=[['계약번호','임(전)차인','물건지','계약종료','구분','주체','공실상태(사유)','시작일','퇴실일','거주기간(M)','연체금액']];   /* [v542.5] 계약종료 열 추가 */
+    rows.forEach(function(r){ aoa.push([r.cno,r.nm,r.addr,r.ck||'-',r.kind,r.grpNm,r.st,r.start,r.term,r.living,r.dlq]); });
     var wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols']=[{wch:9},{wch:16},{wch:42},{wch:6},{wch:12},{wch:16},{wch:11},{wch:11},{wch:9},{wch:12}];
+    ws['!cols']=[{wch:9},{wch:16},{wch:42},{wch:9},{wch:6},{wch:12},{wch:16},{wch:11},{wch:11},{wch:9},{wch:12}];
     XLSX.utils.book_append_sheet(wb, ws, '퇴실상세');
     XLSX.writeFile(wb, '퇴실관리_'+window._exm.y+'-'+('0'+window._exm.m).slice(-2)+'.xlsx');
   }catch(e){ console.warn('[exm] excel:', e); }
@@ -23131,6 +23131,7 @@ function renderExitMgmtView(){
       curRows.push({ cno:cno, nm:v.tenant1Name||v.tenantName||'-',
         addr:[v.propAddr,v.propBuilding,v.propRoom].filter(Boolean).join(' '),
         kind:(g==='exp'?'만기':'중도'), grp:g, grpNm:GRP_NM[g],
+        ck:(function(){ var k=String(v.contractKind||'').trim(); if(k.indexOf('종료')>=0) return '종료'; if(k==='정상'||k==='계약중') return '계약중'; return k||'-'; })(),   /* [v542.5] 계약 종료 여부 (계약상태) */
         st:(g==='exp'?(String(v.status||'').trim()||'계약만기'):(String(v.status||'').trim()||'미기재')),
         start:v.startDate||'-', term:v.terminateDate||'-', termD:+t,
         living:(function(){ var m2=_vldMonths(v.startDate, v.terminateDate); return m2!=null?m2:''; })(),
@@ -23209,13 +23210,14 @@ function renderExitMgmtView(){
       +'<td style="padding:7px 8px;white-space:nowrap"><b style="color:#4F46E5;cursor:pointer" onclick="crNavFromView(\''+r.cno+'\',\'exitMgmt\')">'+r.cno+'</b></td>'
       +'<td style="padding:7px 8px;white-space:nowrap">'+r.nm+'</td>'
       +'<td style="padding:7px 8px;font-size:11px;color:#6B7280;min-width:220px">'+r.addr+'</td>'
+      +'<td style="padding:7px 8px;white-space:nowrap"><span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+(r.ck==='종료'?'background:#F1F5F9;color:#64748B':(r.ck==='계약중'?'background:#ECFDF5;color:#0B7A45':'background:#F8FAFC;color:#94A3B8'))+'">'+r.ck+'</span></td>'   /* [v542.5] 계약 종료 여부 */
       +'<td style="padding:7px 8px"><span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+(r.kind==='만기'?tagStyle.exp:tagStyle.vol)+'">'+r.kind+'</span></td>'
       +'<td style="padding:7px 8px;white-space:nowrap"><span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+tagStyle[r.grp]+'">'+r.grpNm+'</span></td>'
       +'<td style="padding:7px 8px;white-space:nowrap;'+(r.st==='미기재'?'color:#94A3B8':'')+'">'+r.st+'</td>'
       +'<td style="padding:7px 8px;white-space:nowrap;color:#64748B">'+r.term+'</td>'
       +'<td style="padding:7px 8px;text-align:center;font-weight:700;color:#0E7490">'+r.living+'</td>'
       +'<td style="padding:7px 8px;text-align:right;font-weight:'+(r.dlq>0?'800;color:#DC2626':'400;color:#94A3B8')+'">'+(r.dlq>0?'₩'+r.dlq.toLocaleString():'₩0')+'</td></tr>';
-  }).join('')||'<tr><td colspan="10" style="padding:20px;text-align:center;color:#94A3B8">해당 월 퇴실 건이 없습니다.</td></tr>';
+  }).join('')||'<tr><td colspan="11" style="padding:20px;text-align:center;color:#94A3B8">해당 월 퇴실 건이 없습니다.</td></tr>';
   // ── 레이아웃 ──
   wrap.innerHTML=''
     +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:13px">'
@@ -23259,7 +23261,7 @@ function renderExitMgmtView(){
     +  '<button onclick="exm_excel()" style="margin-left:auto;background:#2563EB;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:11.5px;font-weight:800;cursor:pointer">⬇ 엑셀</button></div>'
     +  '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">'
     +  '<thead><tr><th style="background:#F8FAFC;color:#475569;font-weight:700;padding:7px 8px;text-align:left;border-bottom:1.5px solid #E2EAF5">No</th>'
-    +  th2('계약번호','cno')+th2('임(전)차인','nm')+th2('물건지','addr')+th2('구분','kind')+th2('주체','grpNm')+th2('공실상태(사유)','st')+th2('퇴실일','term')+th2('거주(M)','living')+th2('연체금액','dlq')
+    +  th2('계약번호','cno')+th2('임(전)차인','nm')+th2('물건지','addr')+th2('계약종료','ck')+th2('구분','kind')+th2('주체','grpNm')+th2('공실상태(사유)','st')+th2('퇴실일','term')+th2('거주(M)','living')+th2('연체금액','dlq')
     +  '</tr></thead><tbody>'+tbody+'</tbody></table></div>'
     +  '<div style="font-size:10px;color:#8A9AB5;line-height:1.7;border-top:1px dashed #D7DFEC;padding-top:8px;margin-top:10px">'
     +  '· <b>구분</b>: 만기/중도 = 계약관리 시트 중도퇴실 여부(J열) 기준 &nbsp;· <b>주체</b>: 공실상태 값 3그룹 자동 분류 — 개런티즈 조치(강제퇴실 4종) / 불가항력(사망·임대인사유·물건하자·월세부담) / 자진(중도퇴실·기타)<br>'
