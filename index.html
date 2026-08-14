@@ -1395,7 +1395,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 
   <!-- [v542] 퇴실관리 — 월 단위 만기/중도/강제퇴실 파악 -->
   <div id="exitMgmtView" class="view-content">
-    <div class="exm-inner" style="max-width:1280px;margin:0 auto;padding:16px 18px"><div class="cr-empty">🚪 퇴실 데이터 로딩 중...</div></div>
+    <div class="exm-inner" style="max-width:1500px;margin:0 auto;padding:16px 22px"><div class="cr-empty">🚪 퇴실 데이터 로딩 중...</div></div><!-- [v542.4] 파트너관리(.cmg-inner 1500px)와 폭 통일 -->
   </div>
 </div>
 
@@ -23186,11 +23186,11 @@ function renderExitMgmtView(){
   // ── 사유 구성 박스 ──
   var maxN=Math.max(1,cur.exp,rs.volPlain,rs.volEtc,rs.owner,rs.death,rs.flaw,rs.burden,rs.vac,rs.dlq,rs.rnw,rs.brk);
   var rrow=function(nm,n,cl,op,tip){ var w=Math.round(n/maxN*100);   /* [v542.3] 행 간격·바 높이 압축 */
-    return '<div'+(tip?' title="'+tip+'"':'')+' style="display:flex;align-items:center;gap:8px;font-size:11px;padding:1.5px 0'+(tip?';cursor:help':'')+'"><span style="width:114px;color:#475569;font-weight:600">'+nm+'</span>'
+    return '<div'+(tip?' title="'+tip+'"':'')+' style="display:flex;align-items:center;gap:8px;font-size:11px;padding:1px 0'+(tip?';cursor:help':'')+'"><span style="width:114px;color:#475569;font-weight:600">'+nm+'</span>'
     +'<div style="flex:1;height:7px;background:#F1F5F9;border-radius:4px;overflow:hidden"><i style="display:block;height:100%;border-radius:4px;width:'+w+'%;background:'+cl+';opacity:'+(op||1)+'"></i></div>'
     +'<b style="width:50px;text-align:right;'+(n===0?'color:#94A3B8':'')+'">'+n+'명</b></div>'; };
   var pct2=function(n){ return cur.tot?Math.round(n/cur.tot*100):0; };
-  var grpBox=function(bg,bd,cl,ttl,inner){ return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:9px;padding:6px 12px 7px;margin-bottom:6px"><div style="font-size:10.5px;font-weight:800;color:'+cl+';margin-bottom:3px">'+ttl+'</div>'+inner+'</div>'; };   /* [v542.3] 그룹 박스 여백 압축 */
+  var grpBox=function(bg,bd,cl,ttl,inner){ return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:9px;padding:5px 11px 6px;margin-bottom:5px"><div style="font-size:10.5px;font-weight:800;color:'+cl+';margin-bottom:2px">'+ttl+'</div>'+inner+'</div>'; };   /* [v542.3/4] 그룹 박스 여백 압축 */
   var compHtml=grpBox('#EFF6FF','#BFDBFE','#1D4ED8','📅 만기퇴실 — '+cur.exp+'명 ('+pct2(cur.exp)+'%)', rrow('계약만기 종료',cur.exp,GRP_CL.exp))
     +grpBox('#FFFBEB','#FDE68A','#B45309','🚶 자진 — '+cur.vol+'명 ('+pct2(cur.vol)+'%)', rrow('중도퇴실(자진)',rs.volPlain,GRP_CL.vol)+rrow('기타(직장·개인 등)',rs.volEtc,GRP_CL.vol,.55,volEtcTip))
     +grpBox('#F5F3FF','#DDD6FE','#6D28D9','⚖️ 불가항력 — '+cur.god+'명 ('+pct2(cur.god)+'%)', rrow('임대인사유퇴실',rs.owner,GRP_CL.god)+rrow('사망',rs.death,GRP_CL.god,.7)+rrow('물건하자',rs.flaw,GRP_CL.god,.55)+rrow('월세부담',rs.burden,GRP_CL.god,.4))
@@ -23227,13 +23227,13 @@ function renderExitMgmtView(){
     +'</div>'
     +kpiHtml
     +'<div style="display:grid;grid-template-columns:1.35fr 1fr;gap:14px;margin-bottom:14px;align-items:stretch">'   /* [v542.1] 좌우 카드 높이 통일 */
-    +  '<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column">'
-    +    '<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:10px">📈 월별 퇴실 추이 <span style="font-size:10px;color:#8A9AB5;font-weight:400">최근 12개월 · 스택 = 퇴실 주체 구분</span></div>'
-    +    '<div style="flex:1;min-height:210px;position:relative"><canvas id="exmTrend"></canvas></div>'   /* [v542.1] 차트가 사유 구성 높이에 맞춰 확장 · [v542.3] 최소 높이 압축 */
+    +  '<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:11px 14px;display:flex;flex-direction:column">'
+    +    '<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:8px">📈 월별 퇴실 추이 <span style="font-size:10px;color:#8A9AB5;font-weight:400">최근 12개월 · 스택 = 퇴실 주체 구분</span></div>'
+    +    '<div style="flex:1;min-height:185px;position:relative"><canvas id="exmTrend"></canvas></div>'   /* [v542.1] 차트가 사유 구성 높이에 맞춰 확장 · [v542.3/4] 최소 높이 압축 */
     +    '<div style="font-size:10px;color:#8A9AB5;line-height:1.7;border-top:1px dashed #D7DFEC;padding-top:8px;margin-top:10px">막대 위 숫자 = 월 총 퇴실. 강제퇴실(빨강) 비중이 커지는 달은 연체 초기 대응 점검 신호입니다.</div>'
     +  '</div>'
-    +  '<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:14px 16px">'
-    +    '<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:10px">🧭 '+M+'월 퇴실 사유 구성 <span style="font-size:10px;color:#8A9AB5;font-weight:400">공실상태 값 기준 · '+cur.tot+'명</span></div>'
+    +  '<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:11px 14px">'
+    +    '<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:7px">🧭 '+M+'월 퇴실 사유 구성 <span style="font-size:10px;color:#8A9AB5;font-weight:400">공실상태 값 기준 · '+cur.tot+'명</span></div>'
     +    compHtml
     +  '</div>'
     +'</div>'
