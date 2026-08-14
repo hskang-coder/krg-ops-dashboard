@@ -22408,6 +22408,7 @@ function okpi_form_progressOptions(cat1){
 // D열 라벨 동적 변경
 function okpi_form_dueLabel(cat1){
   if (cat1 === '수납관리' || cat1 === '연체관리') return '입금예정일';
+  if (cat1 === '중도퇴실관리') return '실퇴실일';   // [v544] D열 = 실퇴실일 (퇴실관리탭 표시)
   return '재연락일정';
 }
 
@@ -23082,10 +23083,10 @@ function exm_excel(){
   try{
     if(typeof XLSX==='undefined'){ alert('엑셀 모듈 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
     var rows=window._exmRows||[];
-    var aoa=[['계약번호','임(전)차인','물건지','계약종료','구분','주체','공실상태(사유)','시작일','퇴실일','거주기간(M)','연체금액']];   /* [v542.5] 계약종료 열 추가 */
-    rows.forEach(function(r){ aoa.push([r.cno,r.nm,r.addr,r.ck||'-',r.kind,r.grpNm,r.st,r.start,r.term,r.living,r.dlq]); });
+    var aoa=[['계약번호','임(전)차인','물건지','계약종료','구분','주체','공실상태(사유)','시작일','실퇴실일','퇴실일','거주기간(M)','연체금액']];   /* [v542.5] 계약종료 · [v544] 실퇴실일 */
+    rows.forEach(function(r){ aoa.push([r.cno,r.nm,r.addr,r.ck||'-',r.kind,r.grpNm,r.st,r.start,r.realTerm||'-',r.term,r.living,r.dlq]); });
     var wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols']=[{wch:9},{wch:16},{wch:42},{wch:9},{wch:6},{wch:12},{wch:16},{wch:11},{wch:11},{wch:9},{wch:12}];
+    ws['!cols']=[{wch:9},{wch:16},{wch:42},{wch:9},{wch:6},{wch:12},{wch:16},{wch:11},{wch:11},{wch:11},{wch:9},{wch:12}];
     XLSX.utils.book_append_sheet(wb, ws, '퇴실상세');
     XLSX.writeFile(wb, '퇴실관리_'+window._exm.y+'-'+('0'+window._exm.m).slice(-2)+'.xlsx');
   }catch(e){ console.warn('[exm] excel:', e); }
@@ -23115,6 +23116,17 @@ function renderExitMgmtView(){
   // ── 최근 12개월 버킷 (선택월 포함) ──
   var months=[]; for(var i=11;i>=0;i--){ var d=new Date(Y, M-1-i, 1); months.push({y:d.getFullYear(), m:d.getMonth()+1, lb:(d.getFullYear()%100)+'.'+('0'+(d.getMonth()+1)).slice(-2), exp:0, vol:0, god:0, gz:0}); }
   var mIdx={}; months.forEach(function(b,ix){ mIdx[b.y*100+b.m]=ix; });
+  // [v544] 실퇴실일 맵 — DR(중도퇴실관리) D열 기재 행 중 최신(대응일·행순) 값 우선, 없으면 BP열(실제퇴실일) 폴백
+  var drReal={};
+  try{
+    (Array.isArray(daeungRawData)?daeungRawData:[]).forEach(function(r){
+      if(String(r.jobType||'').indexOf('중도퇴실관리')===-1) return;
+      var pd2=String(r.payDate||'').trim(); if(!pd2) return;
+      var cno2=String(r.no||'').trim(); if(!cno2) return;
+      var d2=cG_dateNum(r.date)||0, ix2=r._idx||0, p3=drReal[cno2];
+      if(!p3||d2>p3.d||(d2===p3.d&&ix2>=p3.i)) drReal[cno2]={d:d2,i:ix2,v:pd2};
+    });
+  }catch(_re){}
   var curRows=[], prev={exp:0,vol:0,god:0,gz:0,tot:0}, cur={exp:0,vol:0,god:0,gz:0,tot:0}, curDlqCnt=0, curDlqSum=0, expSched=0;
   var prevKey=(function(){ var d=new Date(Y, M-2, 1); return d.getFullYear()*100+(d.getMonth()+1); })();
   V.forEach(function(v){
@@ -23133,6 +23145,8 @@ function renderExitMgmtView(){
         kind:(g==='exp'?'만기':'중도'), grp:g, grpNm:GRP_NM[g],
         ck:(function(){ var k=String(v.contractKind||'').trim(); if(k.indexOf('종료')>=0) return '종료'; if(k==='정상'||k==='계약중') return '계약중'; return k||'-'; })(),   /* [v542.5] 계약 종료 여부 (계약상태) */
         st:(g==='exp'?(String(v.status||'').trim()||'계약만기'):(String(v.status||'').trim()||'미기재')),
+        realTerm:(drReal[cno]?drReal[cno].v:(String(v.exitDate||'').trim()||'-')),   /* [v544] 실퇴실일: DR D열 우선 + BP열 폴백 */
+        realSrc:(drReal[cno]?'DR':(String(v.exitDate||'').trim()?'BP':'')),
         start:v.startDate||'-', term:v.terminateDate||'-', termD:+t,
         living:(function(){ var m2=_vldMonths(v.startDate, v.terminateDate); return m2!=null?m2:''; })(),
         dlq:exm_num(v.dlqAmt) });
@@ -23198,7 +23212,7 @@ function renderExitMgmtView(){
     +grpBox('#FEF2F2','#FECACA','#B91C1C','🚨 개런티즈 조치 — '+cur.gz+'명 ('+pct2(cur.gz)+'%)', rrow('강제퇴실(공실)',rs.vac,GRP_CL.gz)+rrow('강제퇴실(연체)',rs.dlq,GRP_CL.gz,.7)+rrow('갱신불가',rs.rnw,GRP_CL.gz,.55)+rrow('계약위반',rs.brk,GRP_CL.gz,.4));
   // ── 상세 테이블 (정렬) ──
   var s2=window._exmSort||{key:'term',dir:'asc'};
-  var val2=function(o,k){ if(k==='living'||k==='dlq') return exm_num(o[k]); if(k==='term'||k==='start'){ var m3=String(o[k]).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m3?(+m3[1])*10000+(+m3[2])*100+(+m3[3]):0; } return String(o[k]||''); };
+  var val2=function(o,k){ if(k==='living'||k==='dlq') return exm_num(o[k]); if(k==='term'||k==='start'||k==='realTerm'){ var m3=String(o[k]).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m3?(+m3[1])*10000+(+m3[2])*100+(+m3[3]):0; } return String(o[k]||''); };
   curRows.sort(function(a,b){ var x=val2(a,s2.key), y=val2(b,s2.key), r2; if(typeof x==='number'&&typeof y==='number') r2=x-y; else r2=String(x).localeCompare(String(y),'ko'); if(r2===0) r2=String(a.cno).localeCompare(String(b.cno)); return s2.dir==='desc'?-r2:r2; });
   window._exmRows=curRows;
   var arr2=function(k){ return s2.key===k?(s2.dir==='asc'?' ▲':' ▼'):' <span style="opacity:.3">⇅</span>'; };
@@ -23214,10 +23228,11 @@ function renderExitMgmtView(){
       +'<td style="padding:7px 8px"><span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+(r.kind==='만기'?tagStyle.exp:tagStyle.vol)+'">'+r.kind+'</span></td>'
       +'<td style="padding:7px 8px;white-space:nowrap"><span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+tagStyle[r.grp]+'">'+r.grpNm+'</span></td>'
       +'<td style="padding:7px 8px;white-space:nowrap;'+(r.st==='미기재'?'color:#94A3B8':'')+'">'+r.st+'</td>'
+      +'<td title="'+(r.realSrc==='DR'?'Daily Report 실퇴실일(D열) 기록':(r.realSrc==='BP'?'계약관리 실제퇴실일(BP열)':''))+'" style="padding:7px 8px;white-space:nowrap;font-weight:700;color:'+(r.realTerm==='-'?'#94A3B8':'#0E7490')+'">'+r.realTerm+'</td>'   /* [v544] 실퇴실일 */
       +'<td style="padding:7px 8px;white-space:nowrap;color:#64748B">'+r.term+'</td>'
       +'<td style="padding:7px 8px;text-align:center;font-weight:700;color:#0E7490">'+r.living+'</td>'
       +'<td style="padding:7px 8px;text-align:right;font-weight:'+(r.dlq>0?'800;color:#DC2626':'400;color:#94A3B8')+'">'+(r.dlq>0?'₩'+r.dlq.toLocaleString():'₩0')+'</td></tr>';
-  }).join('')||'<tr><td colspan="11" style="padding:20px;text-align:center;color:#94A3B8">해당 월 퇴실 건이 없습니다.</td></tr>';
+  }).join('')||'<tr><td colspan="12" style="padding:20px;text-align:center;color:#94A3B8">해당 월 퇴실 건이 없습니다.</td></tr>';
   // ── 레이아웃 ──
   wrap.innerHTML=''
     +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:13px">'
@@ -23261,11 +23276,11 @@ function renderExitMgmtView(){
     +  '<button onclick="exm_excel()" style="margin-left:auto;background:#2563EB;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:11.5px;font-weight:800;cursor:pointer">⬇ 엑셀</button></div>'
     +  '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">'
     +  '<thead><tr><th style="background:#F8FAFC;color:#475569;font-weight:700;padding:7px 8px;text-align:left;border-bottom:1.5px solid #E2EAF5">No</th>'
-    +  th2('계약번호','cno')+th2('임(전)차인','nm')+th2('물건지','addr')+th2('계약종료','ck')+th2('구분','kind')+th2('주체','grpNm')+th2('공실상태(사유)','st')+th2('퇴실일','term')+th2('거주(M)','living')+th2('연체금액','dlq')
+    +  th2('계약번호','cno')+th2('임(전)차인','nm')+th2('물건지','addr')+th2('계약종료','ck')+th2('구분','kind')+th2('주체','grpNm')+th2('공실상태(사유)','st')+th2('실퇴실일','realTerm')+th2('퇴실일','term')+th2('거주(M)','living')+th2('연체금액','dlq')
     +  '</tr></thead><tbody>'+tbody+'</tbody></table></div>'
     +  '<div style="font-size:10px;color:#8A9AB5;line-height:1.7;border-top:1px dashed #D7DFEC;padding-top:8px;margin-top:10px">'
     +  '· <b>구분</b>: 만기/중도 = 계약관리 시트 중도퇴실 여부(J열) 기준 &nbsp;· <b>주체</b>: 공실상태 값 3그룹 자동 분류 — 개런티즈 조치(강제퇴실 4종) / 불가항력(사망·임대인사유·물건하자·월세부담) / 자진(중도퇴실·기타)<br>'
-    +  '· 상태 미기재 건은 자진(기타)로 집계되며, 입주관리 빠른 메모(중도퇴실관리 → 상태확정)로 즉시 보정할 수 있습니다.'
+    +  '· 상태 미기재 건은 자진(기타)로 집계되며, 입주관리 빠른 메모(중도퇴실관리 → 상태확정)로 즉시 보정할 수 있습니다. &nbsp;· <b>실퇴실일</b>: Daily Report 중도퇴실관리 실퇴실일(D열) 기록 우선, 없으면 계약관리 실제퇴실일(BP열) — 빠른 메모의 실퇴실일 입력란으로 등록 가능'
     +  '</div>'
     +'</div>';
   // ── 차트 ──
