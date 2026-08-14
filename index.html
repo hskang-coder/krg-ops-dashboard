@@ -23182,13 +23182,14 @@ function renderExitMgmtView(){
     });
   }catch(_fe){}
   // [v544.1] 퇴실대기 중 — 계약상태 '계약중/정상'인데 ① 퇴실일(계약해지일) 기재 또는 ② DR 진행 단계(최근 90일, 상태확정 전)
+  // [v544.2] ②는 실퇴실일(DR D열 또는 BP열) 기재 건만 집계 — 실퇴실일 미기재 진행 건은 제외
   var waitTot=0, waitTermCnt=0, waitDrCnt=0;
   try{
     var aliveOf={};
-    V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c3=String(v.no||'').trim(); if(c3) aliveOf[c3]=String(v.terminateDate||'').trim(); } });
+    V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c3=String(v.no||'').trim(); if(c3) aliveOf[c3]={ t:String(v.terminateDate||'').trim(), r:(drReal[c3]?drReal[c3].v:String(v.exitDate||'').trim()) }; } });
     var waitSet={};
-    Object.keys(aliveOf).forEach(function(c3){ if(aliveOf[c3]&&exm_pd(aliveOf[c3])){ waitSet[c3]=1; waitTermCnt++; } });
-    Object.keys(funCnos).forEach(function(c3){ if(aliveOf[c3]!==undefined&&!waitSet[c3]){ waitSet[c3]=1; waitDrCnt++; } });
+    Object.keys(aliveOf).forEach(function(c3){ if(aliveOf[c3].t&&exm_pd(aliveOf[c3].t)){ waitSet[c3]=1; waitTermCnt++; } });
+    Object.keys(funCnos).forEach(function(c3){ if(aliveOf[c3]!==undefined&&!waitSet[c3]&&aliveOf[c3].r&&exm_pd(aliveOf[c3].r)){ waitSet[c3]=1; waitDrCnt++; } });
     waitTot=Object.keys(waitSet).length;
   }catch(_we){}
   // ── KPI 카드 ──
@@ -23274,10 +23275,10 @@ function renderExitMgmtView(){
                +(ix2<3?'<span style="position:absolute;right:-7px;top:50%;transform:translateY(-50%);color:#C0CBDD;font-weight:800">›</span>':'')+'</div>';
            }).join('')
     +    '</div>'
-    +    '<div title="계약상태가 아직 계약중인데 퇴실일이 확정됐거나 중도퇴실 진행 기록(최근 90일)이 있는 계약" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:10px 12px;cursor:help">'   /* [v544.1] 퇴실대기 중 */
+    +    '<div title="계약상태가 아직 계약중인데 ① 퇴실일(계약해지일)이 확정됐거나 ② 중도퇴실 진행 기록(최근 90일) + 실퇴실일(DR D열·BP열) 기재된 계약&#10;※ 실퇴실일 미기재 진행 건은 제외" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:10px 12px;cursor:help">'   /* [v544.1/2] 퇴실대기 중 */
     +      '<div style="font-size:10.5px;color:#B45309;font-weight:700">퇴실대기 중</div>'
     +      '<div style="font-size:22px;font-weight:800;color:#D97706">'+waitTot+'건</div>'
-    +      '<div style="font-size:10px;color:#5A6A8A;margin-top:3px">계약중 · 퇴실일 확정 '+waitTermCnt+' / 진행 기록 '+waitDrCnt+'</div>'
+    +      '<div style="font-size:10px;color:#5A6A8A;margin-top:3px">계약중 · 퇴실일 확정 '+waitTermCnt+' / 실퇴실일 기재 '+waitDrCnt+'</div>'
     +    '</div>'
     +    '<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 12px">'
     +      '<div style="font-size:10.5px;color:#1E40AF;font-weight:700">만기퇴실예정</div>'
