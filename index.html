@@ -23139,7 +23139,9 @@ function exm_leadModal(kind, ix){
             {h:'공실상태(사유)',k:'st',f:function(r){ return r.st==='-'?'<span style="color:#94A3B8">-</span>':r.st; }},
             {h:'퇴실일',k:'eff',f:function(r){ return r.eff||'-'; }},{h:'만기일',k:'end',f:function(r){ return r.end||'-'; }}]; }
     else if(kind==='exp60'){ rows=L.exp60||[]; title='60일 내 만기 도래'; color='#0D9488';   /* [v548] */
-      cols=[{h:'만기일',k:'end',f:function(r){ return r.end; }},{h:'D-DAY',k:'dday',f:function(r){ return '<b style="color:#0D9488">D-'+r.dday+'</b>'; }}]; }
+      cols=[{h:'만기일',k:'end',f:function(r){ return r.end; }},{h:'D-DAY',k:'dday',f:function(r){ return '<b style="color:#0D9488">D-'+r.dday+'</b>'; }},
+            {h:'갱신심사',k:'judge',f:function(r){ var J={app:['승인','#ECFDF5','#0B7A45'],cond:['조건부','#FFFBEB','#B45309'],deny:['거절','#FEF2F2','#B91C1C'],none:['이력없음','#F1F5F9','#64748B']}[r.judge]; return J?'<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:'+J[1]+';color:'+J[2]+'">'+J[0]+'</span>':'<span style="color:#94A3B8" title="입금데이터 로딩 중">-</span>'; }},   /* [v548.1] */
+            {h:'연체금액',k:'dlq',f:function(r){ return r.dlq?'<b style="color:#B91C1C">₩'+Number(r.dlq).toLocaleString()+'</b>':'<span style="color:#94A3B8">-</span>'; }}]; }   /* [v548.1] */
     else { rows=L.sched||[]; title='만기퇴실예정'; color='#1D4ED8';
       cols=[{h:'만기일',k:'end',f:function(r){ return r.end; }}]; }
     // [v547.4] 헤더 클릭 정렬
@@ -23148,7 +23150,9 @@ function exm_leadModal(kind, ix){
     if(!(S&&S.kind===kind&&S.ix===ix&&S.key)) S=null;
     if(S){
       var _DK={real:1,term:1,end:1,eff:1};   /* [v548] eff 추가 */
-      var dv=function(o,k5){ var v=o[k5]; if(k5==='d'||k5==='age'||k5==='dday') return +v||0; var s5=String(v==null?'':v);   /* [v548] 숫자키 확장 */
+      var dv=function(o,k5){ var v=o[k5]; if(k5==='d'||k5==='age'||k5==='dday'||k5==='dlq') return +v||0;
+        if(k5==='judge'){ var _jr={deny:0,cond:1,app:2,none:3}; return _jr[v]!=null?_jr[v]:9; }   /* [v548.1] 거절→조건부→승인 순 */
+        var s5=String(v==null?'':v);   /* [v548] 숫자키 확장 */
         if(_DK[k5]){ var m5=s5.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m5?(+m5[1])*10000+(+m5[2])*100+(+m5[3]):99999999; }
         return s5; };
       rows=rows.slice().sort(function(a,b){ var x=dv(a,S.key), y=dv(b,S.key), r5;
@@ -23191,7 +23195,7 @@ function exm_leadModal(kind, ix){
       if(kind==='act'||kind==='forced') return [r.cno,r.nm,r.addr,r.f,exm_fmtD8(r.d),r.real];   /* [v548] */
       if(kind==='stall') return [r.cno,r.nm,r.addr,r.f,exm_fmtD8(r.d),r.age+'일',r.real];   /* [v548] */
       if(kind==='fore') return [r.cno,r.nm,r.addr,r.exit||'-',r.st||'-',r.eff||'-',r.end||'-'];   /* [v548] */
-      if(kind==='exp60') return [r.cno,r.nm,r.addr,r.end,'D-'+r.dday];   /* [v548] */
+      if(kind==='exp60') return [r.cno,r.nm,r.addr,r.end,'D-'+r.dday,({app:'승인',cond:'조건부승인',deny:'거절',none:'이력없음'}[r.judge]||'-'),(r.dlq||0)];   /* [v548/548.1] */
       return [r.cno,r.nm,r.addr,r.end];
     });
     window._exmLeadRows.hdr=(kind==='stage')?['계약번호','계약자','물건지','계약상태','최신 기록','기록일','실퇴실일']
@@ -23199,7 +23203,7 @@ function exm_leadModal(kind, ix){
       :(kind==='act'||kind==='forced')?['계약번호','계약자','물건지','최신 기록','기록일','실퇴실일']   /* [v548] */
       :(kind==='stall')?['계약번호','계약자','물건지','최신 기록','기록일','경과일','실퇴실일']   /* [v548] */
       :(kind==='fore')?['계약번호','계약자','물건지','퇴실구분','공실상태(사유)','퇴실일','만기일']   /* [v548] */
-      :(kind==='exp60')?['계약번호','계약자','물건지','만기일','D-DAY']   /* [v548] */
+      :(kind==='exp60')?['계약번호','계약자','물건지','만기일','D-DAY','갱신심사','연체금액']   /* [v548/548.1] */
       :['계약번호','계약자','물건지','만기일'];   /* [v547.2/3] */
   }catch(e){ console.warn('[exm] leadModal:', e); }
 }
@@ -23240,6 +23244,16 @@ function renderExitMgmtView(){
   if(!daeReady&&!window._exmDaeFetching){
     window._exmDaeFetching=true;
     fetchSheetByGid(DAILY_RPT_GID).then(function(r){ daeungRawData=_keepBig(daeungRawData, parseDailyReport(r)); if(document.querySelector('#exitMgmtView.active')) renderExitMgmtView(); }).catch(function(){});
+  }
+  // [v548.1] 갱신심사(60일 내 만기 모달)용 입금데이터 — 없으면 백그라운드 로드 후 재렌더
+  if(!(typeof paymentRawData!=='undefined'&&Array.isArray(paymentRawData)&&paymentRawData.length)&&!window._exmIncomeFetching){
+    window._exmIncomeFetching=true;
+    fetchSheetByName(INCOME_SHEET).then(function(g){
+      paymentRawData=_keepBig(paymentRawData, gvizToObjects(g).filter(function(x){return _krNo(x);}));
+      _normPaymentRows(paymentRawData);
+      window._exmIncomeFetching=false;
+      if(document.querySelector('#exitMgmtView.active')) renderExitMgmtView();
+    }).catch(function(){ window._exmIncomeFetching=false; });
   }
   var V=vacancyRawData, Y=window._exm.y, M=window._exm.m;
   var vMap={}; V.forEach(function(v){ var c0=String(v.no||'').trim(); if(c0&&!vMap[c0]) vMap[c0]=v; });   // [v545.1] 모달 명단용
@@ -23371,6 +23385,9 @@ function renderExitMgmtView(){
         st:(_st2&&_st2!=='-'?_st2:'-'), end:(String(_v2.endDate||'').trim()||'-')};
       for(var k9 in (extra||{})) o[k9]=extra[k9]; return o; };
     var _zalive={}; V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c=String(v.no||'').trim(); if(c) _zalive[c]=1; } });
+    // [v548.1] 갱신심사 판정 헬퍼 (입금데이터 로딩 전이면 '' → '-' 표시, 로드 완료 시 자동 재렌더)
+    var _zjOK=(typeof rnwCalcLateMetrics==='function'&&typeof rnwClassify==='function'&&typeof paymentRawData!=='undefined'&&Array.isArray(paymentRawData)&&paymentRawData.length>0);
+    var _zj=function(cno){ if(!_zjOK) return ''; try{ var m=rnwCalcLateMetrics(cno, paymentRawData); if(!m||!m.total) return 'none'; return rnwClassify(m); }catch(e){ return ''; } };
     var _zsum=0;
     Object.keys(_zrec).forEach(function(cno){
       var R=_zrec[cno];
@@ -23398,7 +23415,7 @@ function renderExitMgmtView(){
         else if(ym===_zymX) zFore[1].push(_zrow(cno,{eff:effS}));
       }
       var ed=exm_pd(_v5.endDate);
-      if(ed&&ed>=_ztd&&_zdays(ed,_ztd)<=60) zExp60.push(_zrow(cno,{dday:_zdays(ed,_ztd)}));
+      if(ed&&ed>=_ztd&&_zdays(ed,_ztd)<=60) zExp60.push(_zrow(cno,{dday:_zdays(ed,_ztd), judge:_zj(cno), dlq:exm_num(_v5.dlqAmt)||0}));   /* [v548.1] 갱신심사·연체금액 */
     });
     zAct.sort(function(a,b){ return (b.d||0)-(a.d||0); });
     zStall.sort(function(a,b){ return (b.age||0)-(a.age||0); });
