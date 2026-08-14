@@ -23243,7 +23243,8 @@ function renderExitMgmtView(){
   var schedList=[];   // [v545.1] 만기퇴실예정 명단
   var prevKey=(function(){ var d=new Date(Y, M-2, 1); return d.getFullYear()*100+(d.getMonth()+1); })();
   V.forEach(function(v){
-    if(String(v.status||'').indexOf('만기퇴실예정')>=0){ expSched++; schedList.push({cno:String(v.no||'').trim(), nm:v.tenant1Name||v.tenantName||'-', addr:[v.propAddr,v.propBuilding,v.propRoom].filter(Boolean).join(' '), end:String(v.endDate||'').trim()||'-'}); }
+    var _sk=String(v.contractKind||'').trim();   /* [v547.5] 종료 건 제외 — BO 잔존값(이미 퇴실 완료) 미집계 */
+    if(String(v.status||'').indexOf('만기퇴실예정')>=0&&(_sk==='정상'||_sk==='계약중')){ expSched++; schedList.push({cno:String(v.no||'').trim(), nm:v.tenant1Name||v.tenantName||'-', addr:[v.propAddr,v.propBuilding,v.propRoom].filter(Boolean).join(' '), end:String(v.endDate||'').trim()||'-'}); }
     var t=exm_pd(v.terminateDate); if(!t) return;
     var key=t.getFullYear()*100+(t.getMonth()+1), g=exm_group(v);
     if(mIdx[key]!=null){ months[mIdx[key]][g]++; }
@@ -23307,6 +23308,7 @@ function renderExitMgmtView(){
   // [v544.1] 퇴실대기 중 — 계약상태 '계약중/정상'인데 ① 퇴실일(계약해지일) 기재 또는 ② DR 진행 단계(최근 90일, 상태확정 전)
   // [v544.2] ②는 실퇴실일(DR D열 또는 BP열) 기재 건만 집계 — 실퇴실일 미기재 진행 건은 제외
   var waitTot=0, waitTermCnt=0, waitDrCnt=0, waitList=[];   // [v545.1] waitList = 모달 명단
+  var waitEx={'만기퇴실':0,'중도퇴실':0,'강제퇴실':0};   // [v547.5] 퇴실구분별 집계
   try{
     var aliveOf={};
     V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c3=String(v.no||'').trim(); if(c3) aliveOf[c3]={ t:String(v.terminateDate||'').trim(), r:(drReal[c3]?drReal[c3].v:String(v.exitDate||'').trim()) }; } });
@@ -23320,6 +23322,7 @@ function renderExitMgmtView(){
     Object.keys(aliveOf).forEach(function(c3){ var td=aliveOf[c3].t?exm_pd(aliveOf[c3].t):null; if(td&&(td.getFullYear()*100+(td.getMonth()+1))!==(Y*100+M)){ waitSet[c3]=1; waitTermCnt++; waitList.push(_wRow(c3,'퇴실일 확정')); } });
     Object.keys(funCnos).forEach(function(c3){ if(aliveOf[c3]!==undefined&&!waitSet[c3]&&aliveOf[c3].r&&exm_pd(aliveOf[c3].r)){ waitSet[c3]=1; waitDrCnt++; waitList.push(_wRow(c3,'실퇴실일 기재')); } });
     waitTot=Object.keys(waitSet).length;
+    waitList.forEach(function(w){ if(waitEx[w.exit]!==undefined) waitEx[w.exit]++; });   /* [v547.5] */
   }catch(_we){}
   // [v545.1] 진행 현황 모달 데이터 저장
   try{
@@ -23339,7 +23342,7 @@ function renderExitMgmtView(){
   var mil2=function(n){ return '₩'+(Math.round(n/100000)/10)+'M'; };
   var kpiHtml='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:10px;margin-bottom:14px">'
     +kpi('총 퇴실', cur.tot+'명', badge(cur.tot,prev.tot), '전월 '+prev.tot+'명 · 만기 '+cur.exp+' / 중도 '+(cur.tot-cur.exp))
-    +kpi('만기퇴실', cur.exp+'명', badge(cur.exp,prev.exp), '만기퇴실예정(전체) '+expSched+'건')
+    +kpi('만기퇴실', cur.exp+'명', badge(cur.exp,prev.exp), '만기퇴실예정(계약중) '+expSched+'건')   /* [v547.5] 종료 제외 */
     +kpi('자진 중도퇴실', cur.vol+'명', badge(cur.vol,prev.vol), '단순 자진 '+rs.volPlain+' · 기타 사유 '+rs.volEtc)
     +kpi('불가항력', cur.god+'명', badge(cur.god,prev.god), '사망 '+rs.death+' · 임대인 '+rs.owner+' · 하자 '+rs.flaw+' · 월세부담 '+rs.burden)
     +kpi('개런티즈 조치 (강제)', cur.gz+'명', badge(cur.gz,prev.gz), '공실 '+rs.vac+' · 연체 '+rs.dlq+' · 갱신불가 '+rs.rnw+' · 계약위반 '+rs.brk, '#B91C1C')
@@ -23414,12 +23417,12 @@ function renderExitMgmtView(){
     +    '<div onclick="exm_leadModal(\'wait\')" title="계약상태가 아직 계약중인데 ① 퇴실일(계약해지일)이 확정됐거나(당월 퇴실 상세 표시 건 제외) ② 중도퇴실 진행 기록(최근 90일) + 실퇴실일(DR D열·BP열) 기재된 계약&#10;※ 실퇴실일 미기재 진행 건은 제외 · 클릭 시 명단" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:10px 12px;cursor:pointer">'   /* [v544.1/2] 퇴실대기 중 · [v545.1] 클릭 → 명단 모달 · [v547.1] 당월 확정 제외 */
     +      '<div style="font-size:10.5px;color:#B45309;font-weight:700">퇴실대기 중</div>'
     +      '<div style="font-size:22px;font-weight:800;color:#D97706">'+waitTot+'건</div>'
-    +      '<div style="font-size:10px;color:#5A6A8A;margin-top:3px">계약중 · 퇴실일 확정 '+waitTermCnt+' / 실퇴실일 기재 '+waitDrCnt+'</div>'
+    +      '<div style="font-size:10px;color:#5A6A8A;margin-top:3px">만기퇴실 '+waitEx['만기퇴실']+' · 중도퇴실 '+waitEx['중도퇴실']+' · 강제퇴실 '+waitEx['강제퇴실']+'</div>'   /* [v547.5] 퇴실구분별 */
     +    '</div>'
     +    '<div onclick="exm_leadModal(\'sched\')" style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 12px;cursor:pointer">'   /* [v545.1] 클릭 → 명단 모달 */
     +      '<div style="font-size:10.5px;color:#1E40AF;font-weight:700">만기퇴실예정</div>'
     +      '<div style="font-size:22px;font-weight:800;color:#1D4ED8">'+expSched+'건</div>'
-    +      '<div style="font-size:10px;color:#5A6A8A;margin-top:3px">공실상태 값 기준 (전체)</div>'
+    +      '<div style="font-size:10px;color:#5A6A8A;margin-top:3px">공실상태 값 기준 · 계약중만 (종료 제외)</div>'   /* [v547.5] */
     +    '</div>'
     +  '</div>'
     +'</div>'
