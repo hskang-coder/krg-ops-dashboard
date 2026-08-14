@@ -19551,6 +19551,7 @@ function _vldAnalysis(bucketLabel, kind){
     var neu=0, expA=[], midA=[], expRent=0, midRent=0, midDlq=0, midDlqCnt=0, midForceVac=0, midForceDlq=0, mid12=0, midU11=0, mid11=0, exp24=0, exp12=0, expC=[], midC=[];   // [v529][v529.5][v529.6][v530.1]
     var midDlqRel=0, maxDlq=0, maxDlqNm='', dlqMthSum=0, dlqMthN=0, freeMthSum=0, freeMthN=0;   // [v531] 연체발 중도퇴실 심층 분석용
     var midDeath=0, midOwner=0;   // [v538] 사망 · 임대인사유퇴실 (BO열 공실상태 값 기준)
+    var midForceAll=0, midForceRnw=0, midForceBrk=0, midFlaw=0, midBurden=0;   // [v541] 개런티즈 조치 토탈(강제퇴실 전체) · 갱신불가 · 계약위반 · 물건하자 · 월세부담
     var active=0, actFee=0;
     V.forEach(function(v){
       if(inM(pd(v.startDate))) neu++;
@@ -19561,6 +19562,11 @@ function _vldAnalysis(bucketLabel, kind){
         var vs=String(v.status||'');                                   // [v529] 공실상태(BO열) 값 기준 카운트
         if(vs.indexOf('강제퇴실(공실)')>=0) midForceVac++;
         if(vs.indexOf('강제퇴실(연체)')>=0) midForceDlq++;
+        if(vs.indexOf('강제퇴실')>=0) midForceAll++;                   // [v541] 강제퇴실 전체 (공실·연체·갱신불가·계약위반 포함)
+        if(vs.indexOf('강제퇴실(갱신불가)')>=0) midForceRnw++;          // [v541]
+        if(vs.indexOf('강제퇴실(계약위반)')>=0) midForceBrk++;          // [v541]
+        if(vs.indexOf('물건하자')>=0) midFlaw++;                       // [v541] '계약물건하자' 포함 매칭
+        if(vs.indexOf('월세부담')>=0) midBurden++;                     // [v541]
         if(vs.indexOf('사망')>=0) midDeath++;                          // [v538]
         if(vs.indexOf('임대인사유')>=0) midOwner++;                    // [v538]
         if(mth>=11) mid12++; else midU11++;                            // [v529.1] 거주기간 분포 — 11개월 이상 / 11개월 미만
@@ -19714,7 +19720,7 @@ function _vldAnalysis(bucketLabel, kind){
         hist.push({lb:(hy%100)+'.'+('0'+(hm+1)).slice(-2), mid:hc, force:hf});
       }
     }catch(_he){ hist=[]; }
-    var fCur=midForceVac+midForceDlq, fAvg5=0, fX=0, fRun=0, histStr='';
+    var fCur=midForceAll, fAvg5=0, fX=0, fRun=0, histStr='';   // [v541] 강제퇴실 전체 기준 (추이 hist와 동일 기준)
     if(hist.length===6){
       var fs=0; for(var fi=0;fi<5;fi++) fs+=hist[fi].force;
       fAvg5=Math.round(fs/5*10)/10;
@@ -19723,6 +19729,11 @@ function _vldAnalysis(bucketLabel, kind){
       histStr=hist.map(function(h2){return h2.force;}).join('→')+'건';
     }
     var dlqAvgM=dlqMthN?Math.round(dlqMthSum/dlqMthN*10)/10:0, freeAvgM=freeMthN?Math.round(freeMthSum/freeMthN*10)/10:0;
+    // [v541] 퇴실 주체 3그룹 — 개런티즈 조치(강제퇴실 전체) / 불가항력(사망·임대인·하자·월세부담) / 자진(나머지: 중도퇴실·기타 사유)
+    var gzT=midForceAll, godT=midDeath+midOwner+midFlaw+midBurden, volT=Math.max(0, midA.length-gzT-godT);
+    var _bd=function(parts){ var a=[]; for(var bi=0;bi<parts.length;bi++){ if(parts[bi][1]>0) a.push(parts[bi][0]+' '+parts[bi][1]); } return a.length?('= '+a.join(' + ')):''; };
+    var gzBd=_bd([['공실',midForceVac],['연체',midForceDlq],['갱신불가',midForceRnw],['계약위반',midForceBrk]]);
+    var godBd=_bd([['사망',midDeath],['임대인',midOwner],['하자',midFlaw],['월세부담',midBurden]]);
     return '<div style="background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:9px;padding:10px 14px;margin:0 0 4px">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><b style="font-size:12.5px;color:#A32D2D">📊 중도퇴실 분석</b>'
       +'<span style="font-size:10.5px;color:#B91C1C">'+bucketLabel+' · 신규입주 '+neu+' · 만기 '+expA.length+' · 중도 '+midA.length+' → 순증 <b>'+(neu-expA.length-midA.length)+'명</b></span>'
@@ -19735,8 +19746,9 @@ function _vldAnalysis(bucketLabel, kind){
       +'</div></div>'
       +'<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:6px 9px 8px"><div style="font-size:9.5px;font-weight:800;color:#B91C1C;margin-bottom:5px">🚨 연체·강제퇴실</div><div style="display:flex;gap:7px;flex-wrap:wrap">'
       +  '<div style="background:#fff;border-radius:7px;padding:5px 10px;min-width:96px"><div style="font-size:9.5px;color:#B91C1C">연체 피해액</div><div style="font-size:15px;font-weight:800;color:#A32D2D">'+mil(midDlq)+'</div></div>'
-      +  '<div title="강제퇴실(공실): 강제퇴실 후 개런티즈에서 후임세입자 유입&#10;강제퇴실(연체): 연체로 인한 강제퇴실 계약자 후임세입자 유입" style="background:#fff;border-radius:7px;padding:5px 10px;min-width:165px;cursor:help"><div style="font-size:9.5px;color:#B91C1C">강제퇴실 토탈 <span style="color:#E08585">(공실상태 값 기준)</span></div><div style="font-size:15px;font-weight:800;color:#A32D2D">'+(midForceVac+midForceDlq)+'<span style="font-size:10px">건</span> <span style="font-size:11px;color:#DC2626">('+mpc(midForceVac+midForceDlq)+'%)</span> <span style="font-size:10.5px;font-weight:700;color:#94A3B8">= 공실 '+midForceVac+' + 연체 '+midForceDlq+'</span></div></div>'   /* [v530.1] 정의는 하단 각주로 이동 */
-      +  '<div style="background:#fff;border-radius:7px;padding:5px 10px;min-width:150px"><div style="font-size:9.5px;color:#B91C1C">사망 · 임대인사유퇴실</div><div style="font-size:15px;font-weight:800;color:#A32D2D">'+(midDeath+midOwner)+'<span style="font-size:10px">건</span> <span style="font-size:11px;color:#DC2626">('+mpc(midDeath+midOwner)+'%)</span> <span style="font-size:10.5px;font-weight:700;color:#94A3B8">= 사망 '+midDeath+' + 임대인 '+midOwner+'</span></div></div>'   /* [v538] */
+      +  '<div title="개런티즈가 조치한 강제퇴실 전체&#10;공실: 미거주·이탈 → 개문·신속 재임대&#10;연체: 연체 누적 (연락·소액납부 유지)&#10;갱신불가: 갱신심사 거절&#10;계약위반: 무단전대·용도위반 등" style="background:#fff;border-radius:7px;padding:5px 10px;min-width:165px;cursor:help"><div style="font-size:9.5px;color:#B91C1C">개런티즈 조치 토탈 <span style="color:#E08585">(강제퇴실 전체)</span></div><div style="font-size:15px;font-weight:800;color:#A32D2D">'+gzT+'<span style="font-size:10px">건</span> <span style="font-size:11px;color:#DC2626">('+mpc(gzT)+'%)</span> <span style="font-size:10.5px;font-weight:700;color:#94A3B8">'+gzBd+'</span></div></div>'   /* [v541] 공실+연체+갱신불가+계약위반 */
+      +  '<div title="누구 잘못도 아닌 퇴실 — 사망·임대인사유·물건하자·월세부담" style="background:#fff;border-radius:7px;padding:5px 10px;min-width:150px;cursor:help"><div style="font-size:9.5px;color:#B91C1C">불가항력</div><div style="font-size:15px;font-weight:800;color:#A32D2D">'+godT+'<span style="font-size:10px">건</span> <span style="font-size:11px;color:#DC2626">('+mpc(godT)+'%)</span> <span style="font-size:10.5px;font-weight:700;color:#94A3B8">'+godBd+'</span></div></div>'   /* [v541] 사망+임대인+하자+월세부담 */
+      +  '<div title="세입자 자발적 중도퇴실 — 상태값 중도퇴실(자진) 및 직장·개인사정 등 기타 사유, 상태 미기재 포함" style="background:#fff;border-radius:7px;padding:5px 10px;min-width:110px;cursor:help"><div style="font-size:9.5px;color:#B91C1C">자진 <span style="color:#E08585">(기타 포함)</span></div><div style="font-size:15px;font-weight:800;color:#A32D2D">'+volT+'<span style="font-size:10px">건</span> <span style="font-size:11px;color:#DC2626">('+mpc(volT)+'%)</span></div></div>'   /* [v541] 나머지 전부 */
       +'</div></div>'
       +'<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:6px 9px 8px"><div style="font-size:9.5px;font-weight:800;color:#1D4ED8;margin-bottom:5px">💰 손실 <span style="font-weight:400;color:#60A5FA">(미회수 연체금액 기준)</span></div><div style="display:flex;gap:7px;flex-wrap:wrap">'   /* [v530.1] LTV → 연체금액 기준 */
       +  '<div style="background:#fff;border-radius:7px;padding:5px 10px;min-width:100px"><div style="font-size:9.5px;color:#1E40AF">임대료 연체</div><div style="font-size:15px;font-weight:800;color:#1D4ED8">'+(lossOk?mil(lossRent):'—')+'</div></div>'
@@ -19754,7 +19766,7 @@ function _vldAnalysis(bucketLabel, kind){
       +(lossOk?(lossEtc>lossRent?'<b>퇴실 처리 비용이 임대료 손실을 초과</b>합니다 — 청소비·법비용·퇴실정산금의 청구·회수 절차 관리가 핵심입니다.':'<b>임대료 미납이 주 손실원</b>입니다 — 연체 조기 회수 개입이 핵심입니다.'):'수납 데이터 로딩 후 표시됩니다.')
       +' <span style="opacity:.75">(조기 이탈 기회손실 LTV '+mil(lossLtv)+' 별도)</span>'
       +'<br><b>④ 조치</b> — '+(midDlqCnt>0?('연체 보유 <b>'+midDlqCnt+'건</b>은 선조치(연락·분납 협의) 즉시 필요합니다. 이미 <b>'+fCur+'건</b>이 강제퇴실로 종결된 만큼, 남은 연체 건은 금액이 커지기 전에 개입해야 합니다.'):'현재 연체 보유 건이 없습니다 — 자발적 퇴실 사유(시설·가격·계약조건) 확인을 권장합니다.')
-      +'<div style="font-size:9.5px;color:#B91C1C;opacity:.72;margin-top:5px;padding-top:4px;border-top:1px dashed #FCA5A5;line-height:1.6">※ 강제퇴실(공실): 강제퇴실 후 개런티즈에서 후임세입자 유입 &nbsp;·&nbsp; 강제퇴실(연체): 연체로 인한 강제퇴실 계약자 후임세입자 유입</div>'   /* [v530.1] 각주 */
+      +'<div style="font-size:9.5px;color:#B91C1C;opacity:.72;margin-top:5px;padding-top:4px;border-top:1px dashed #FCA5A5;line-height:1.6">※ 퇴실 주체 3그룹 — <b>개런티즈 조치</b>: 강제퇴실(공실·미거주 이탈 / 연체 / 갱신불가 / 계약위반) &nbsp;·&nbsp; <b>불가항력</b>: 사망·임대인사유·물건하자·월세부담 &nbsp;·&nbsp; <b>자진</b>: 중도퇴실(자진)·기타 사유·상태 미기재</div>'   /* [v541] 각주 — 3그룹 정의 */
       +'</div></div>';
   }catch(e){ return ''; }
 }
