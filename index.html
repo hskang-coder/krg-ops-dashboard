@@ -23285,7 +23285,8 @@ function renderExitMgmtView(){
     V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c3=String(v.no||'').trim(); if(c3) aliveOf[c3]={ t:String(v.terminateDate||'').trim(), r:(drReal[c3]?drReal[c3].v:String(v.exitDate||'').trim()) }; } });
     var _wRow=function(c3,src){ var _v1=vMap[c3]||{}; return {cno:c3, src:src, nm:_v1.tenant1Name||_v1.tenantName||'-', addr:[_v1.propAddr,_v1.propBuilding,_v1.propRoom].filter(Boolean).join(' '), real:aliveOf[c3].r||'-', term:aliveOf[c3].t||'-'}; };
     var waitSet={};
-    Object.keys(aliveOf).forEach(function(c3){ if(aliveOf[c3].t&&exm_pd(aliveOf[c3].t)){ waitSet[c3]=1; waitTermCnt++; waitList.push(_wRow(c3,'퇴실일 확정')); } });
+    // [v547.1] 퇴실일이 선택월에 잡힌 건은 이미 '월 퇴실 상세'에 표시되므로 대기에서 제외 (그 외 월 확정 건만 대기)
+    Object.keys(aliveOf).forEach(function(c3){ var td=aliveOf[c3].t?exm_pd(aliveOf[c3].t):null; if(td&&(td.getFullYear()*100+(td.getMonth()+1))!==(Y*100+M)){ waitSet[c3]=1; waitTermCnt++; waitList.push(_wRow(c3,'퇴실일 확정')); } });
     Object.keys(funCnos).forEach(function(c3){ if(aliveOf[c3]!==undefined&&!waitSet[c3]&&aliveOf[c3].r&&exm_pd(aliveOf[c3].r)){ waitSet[c3]=1; waitDrCnt++; waitList.push(_wRow(c3,'실퇴실일 기재')); } });
     waitTot=Object.keys(waitSet).length;
   }catch(_we){}
@@ -23379,7 +23380,7 @@ function renderExitMgmtView(){
                +(ix2<2?'<span style="position:absolute;right:-7px;top:50%;transform:translateY(-50%);color:#C0CBDD;font-weight:800">›</span>':'')+'</div>';
            }).join('')   /* [v545] 3단계 (구 값 자동 매핑) · [v545.1] 클릭 → 명단 모달 */
     +    '</div>'
-    +    '<div onclick="exm_leadModal(\'wait\')" title="계약상태가 아직 계약중인데 ① 퇴실일(계약해지일)이 확정됐거나 ② 중도퇴실 진행 기록(최근 90일) + 실퇴실일(DR D열·BP열) 기재된 계약&#10;※ 실퇴실일 미기재 진행 건은 제외 · 클릭 시 명단" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:10px 12px;cursor:pointer">'   /* [v544.1/2] 퇴실대기 중 · [v545.1] 클릭 → 명단 모달 */
+    +    '<div onclick="exm_leadModal(\'wait\')" title="계약상태가 아직 계약중인데 ① 퇴실일(계약해지일)이 확정됐거나(당월 퇴실 상세 표시 건 제외) ② 중도퇴실 진행 기록(최근 90일) + 실퇴실일(DR D열·BP열) 기재된 계약&#10;※ 실퇴실일 미기재 진행 건은 제외 · 클릭 시 명단" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:10px 12px;cursor:pointer">'   /* [v544.1/2] 퇴실대기 중 · [v545.1] 클릭 → 명단 모달 · [v547.1] 당월 확정 제외 */
     +      '<div style="font-size:10.5px;color:#B45309;font-weight:700">퇴실대기 중</div>'
     +      '<div style="font-size:22px;font-weight:800;color:#D97706">'+waitTot+'건</div>'
     +      '<div style="font-size:10px;color:#5A6A8A;margin-top:3px">계약중 · 퇴실일 확정 '+waitTermCnt+' / 실퇴실일 기재 '+waitDrCnt+'</div>'
