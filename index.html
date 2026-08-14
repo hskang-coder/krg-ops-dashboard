@@ -23298,9 +23298,9 @@ function renderExitMgmtView(){
     if(String(v.status||'').indexOf('만기퇴실예정')>=0&&(_sk==='정상'||_sk==='계약중')){ expSched++; schedList.push({cno:String(v.no||'').trim(), nm:v.tenant1Name||v.tenantName||'-', addr:[v.propAddr,v.propBuilding,v.propRoom].filter(Boolean).join(' '), end:String(v.endDate||'').trim()||'-'}); }
     var _cnoX=String(v.no||'').trim();
     var _realX=(drReal[_cnoX]?drReal[_cnoX].v:String(v.exitDate||'').trim());
-    // [v549.5] 강제퇴실 + 계약중 + 계약해지일 미확정 → '강제퇴실 진행' 카드 소관 — 월 확정 상세·추이에서 제외
-    if(String(v.status||'').indexOf('강제퇴실')>=0&&(_sk==='정상'||_sk==='계약중')&&!exm_pd(v.terminateDate)) return;
-    var t=exm_pd(_realX)||exm_pd(v.terminateDate); if(!t) return;   /* [v549.3] 퇴실일 = 실퇴실일(DR D열·BP열) 우선, 없으면 계약해지일 — 실퇴실일만 확정된 건도 월 상세·추이에 포함 */
+    // [v549.6] 계약중 + 계약해지일 미확정 → 아직 확정 퇴실 아님 — 월 상세·추이 제외 (사유 불문, 강제퇴실 진행/퇴실대기 카드 소관)
+    if((_sk==='정상'||_sk==='계약중')&&!exm_pd(v.terminateDate)) return;
+    var t=exm_pd(v.terminateDate)||exm_pd(_realX); if(!t) return;   /* [v549.6] 퇴실일 = 계약해지일 우선(확정 월 기준), 종료 계약은 실퇴실일 폴백 */
     var key=t.getFullYear()*100+(t.getMonth()+1), g=exm_group(v);
     if(mIdx[key]!=null){ months[mIdx[key]][g]++; }
     if(key===prevKey){ prev[g]++; prev.tot++; }
@@ -23378,9 +23378,7 @@ function renderExitMgmtView(){
     Object.keys(aliveOf).forEach(function(c3){ if(!waitSet[c3]&&aliveOf[c3].r&&exm_pd(aliveOf[c3].r)){
       var _stW=String((vMap[c3]||{}).status||'').trim();
       if(_stW.indexOf('강제퇴실')>=0&&!aliveOf[c3].t) return;   /* [v549.2] 강제퇴실인데 계약해지일 미확정 → '강제퇴실 진행' 카드 소관 (상호 배타) */
-      var _rd3=exm_pd(aliveOf[c3].r);
-      if(_rd3&&(_rd3.getFullYear()*100+(_rd3.getMonth()+1))===(Y*100+M)) return;   /* [v549.3] 실퇴실일이 선택월 → 월 상세에 표시되므로 대기 제외 (v547.1 동일 원칙) */
-      waitSet[c3]=1; waitDrCnt++; waitList.push(_wRow(c3,'실퇴실일 기재')); } });   /* [v548.4] 실퇴실일 기재된 계약중 건 */
+      waitSet[c3]=1; waitDrCnt++; waitList.push(_wRow(c3,'실퇴실일 기재')); } });   /* [v548.4] 실퇴실일 기재된 계약중 건 · [v549.6] 해지일 미확정 건은 월 상세에서 빠지므로 당월 실퇴실도 대기에 포함 */
     waitTot=Object.keys(waitSet).length;
     waitList.forEach(function(w){ if(waitEx[w.exit]!==undefined) waitEx[w.exit]++; });   /* [v547.5] */
   }catch(_we){}
