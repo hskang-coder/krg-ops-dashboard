@@ -23122,15 +23122,30 @@ function exm_leadModal(kind, ix){
   try{
     var L=window._exmLead||{}, rows=[], title='', color='#4F46E5', cols=[];
     if(kind==='stage'){ var NM=['중도퇴실문의','계약해지확정','실제퇴실']; rows=(L.stages&&L.stages[ix])||[]; title=NM[ix]||'';
-      cols=[{h:'계약상태',f:function(r){ return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+(r.ck==='종료'?'background:#F1F5F9;color:#64748B':'background:#ECFDF5;color:#0B7A45')+'">'+r.ck+'</span>'; }},
-            {h:'최신 기록',f:function(r){ return r.f; }},{h:'기록일',f:function(r){ return exm_fmtD8(r.d); }},{h:'실퇴실일',f:function(r){ return r.real; }}]; }
+      cols=[{h:'계약상태',k:'ck',f:function(r){ return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+(r.ck==='종료'?'background:#F1F5F9;color:#64748B':'background:#ECFDF5;color:#0B7A45')+'">'+r.ck+'</span>'; }},
+            {h:'최신 기록',k:'f',f:function(r){ return r.f; }},{h:'기록일',k:'d',f:function(r){ return exm_fmtD8(r.d); }},{h:'실퇴실일',k:'real',f:function(r){ return r.real; }}]; }
     else if(kind==='wait'){ rows=L.wait||[]; title='퇴실대기 중'; color='#D97706';
-      cols=[{h:'퇴실구분',f:function(r){ var c4=r.exit==='강제퇴실'?'background:#FEF2F2;color:#B91C1C':(r.exit==='중도퇴실'?'background:#FFFBEB;color:#B45309':'background:#EFF6FF;color:#1D4ED8'); return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+c4+'">'+(r.exit||'-')+'</span>'; }},   /* [v547.2] */
-            {h:'구분',f:function(r){ return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+(r.src==='퇴실일 확정'?'background:#EFF6FF;color:#1D4ED8':'background:#FFFBEB;color:#B45309')+'">'+r.src+'</span>'; }},
-            {h:'공실상태(사유)',f:function(r){ return r.st==='-'?'<span style="color:#94A3B8">-</span>':r.st; }},   /* [v547.2] */
-            {h:'실퇴실일',f:function(r){ return r.real; }},{h:'계약해지일',f:function(r){ return r.term; }},{h:'만기일',f:function(r){ return r.end||'-'; }}]; }   /* [v547.3] 만기일 */
+      cols=[{h:'퇴실구분',k:'exit',f:function(r){ var c4=r.exit==='강제퇴실'?'background:#FEF2F2;color:#B91C1C':(r.exit==='중도퇴실'?'background:#FFFBEB;color:#B45309':'background:#EFF6FF;color:#1D4ED8'); return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+c4+'">'+(r.exit||'-')+'</span>'; }},   /* [v547.2] */
+            {h:'구분',k:'src',f:function(r){ return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+(r.src==='퇴실일 확정'?'background:#EFF6FF;color:#1D4ED8':'background:#FFFBEB;color:#B45309')+'">'+r.src+'</span>'; }},
+            {h:'공실상태(사유)',k:'st',f:function(r){ return r.st==='-'?'<span style="color:#94A3B8">-</span>':r.st; }},   /* [v547.2] */
+            {h:'실퇴실일',k:'real',f:function(r){ return r.real; }},{h:'계약해지일',k:'term',f:function(r){ return r.term; }},{h:'만기일',k:'end',f:function(r){ return r.end||'-'; }}]; }   /* [v547.3] 만기일 */
     else { rows=L.sched||[]; title='만기퇴실예정'; color='#1D4ED8';
-      cols=[{h:'만기일',f:function(r){ return r.end; }}]; }
+      cols=[{h:'만기일',k:'end',f:function(r){ return r.end; }}]; }
+    // [v547.4] 헤더 클릭 정렬
+    window._exmLeadCtx={kind:kind, ix:ix};
+    var S=window._exmLeadSort||null;
+    if(!(S&&S.kind===kind&&S.ix===ix&&S.key)) S=null;
+    if(S){
+      var _DK={real:1,term:1,end:1};
+      var dv=function(o,k5){ var v=o[k5]; if(k5==='d') return v||0; var s5=String(v==null?'':v);
+        if(_DK[k5]){ var m5=s5.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m5?(+m5[1])*10000+(+m5[2])*100+(+m5[3]):99999999; }
+        return s5; };
+      rows=rows.slice().sort(function(a,b){ var x=dv(a,S.key), y=dv(b,S.key), r5;
+        if(typeof x==='number'&&typeof y==='number') r5=x-y; else r5=String(x).localeCompare(String(y),'ko');
+        if(r5===0) r5=String(a.cno).localeCompare(String(b.cno)); return S.dir==='desc'?-r5:r5; });
+    }
+    var _ar=function(k5){ return (S&&S.key===k5)?(S.dir==='asc'?' ▲':' ▼'):' <span style="opacity:.3">⇅</span>'; };
+    var _sth=function(h5,k5){ return '<th onclick="exm_leadSortBy(\''+k5+'\')" style="padding:6px 9px;text-align:left;white-space:nowrap;cursor:pointer;user-select:none">'+h5+_ar(k5)+'</th>'; };
     window._exmLeadRows={title:title, rows:rows, cols:cols.map(function(c){return c.h;})};
     var prev=document.getElementById('exmLeadModal'); if(prev)prev.remove();
     var ov=document.createElement('div'); ov.id='exmLeadModal';
@@ -23140,10 +23155,10 @@ function exm_leadModal(kind, ix){
       return '<tr style="border-top:1px solid #F1F5F9"><td style="padding:6px 9px;color:#94A3B8;font-size:11px">'+(i+1)+'</td>'
         +'<td style="padding:6px 9px;white-space:nowrap"><b style="color:#4F46E5;cursor:pointer" onclick="document.getElementById(\'exmLeadModal\').remove();crNavFromView(\''+r.cno+'\',\'exitMgmt\')">'+r.cno+'</b></td>'
         +'<td style="padding:6px 9px;white-space:nowrap">'+r.nm+'</td>'
-        +'<td style="padding:6px 9px;font-size:11px;color:#6B7280;min-width:230px">'+r.addr+'</td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:#6B7280;min-width:230px;white-space:nowrap">'+r.addr+'</td>'   /* [v547.4] 1행 유지 */
         +cols.map(function(c){ return '<td style="padding:6px 9px;white-space:nowrap;font-size:11.5px">'+c.f(r)+'</td>'; }).join('')+'</tr>';
     }).join('')||'<tr><td colspan="'+(4+cols.length)+'" style="padding:18px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';
-    ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:1050px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
+    ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:1400px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
       +'<div style="display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid #EEF2F7">'
       +  '<span style="width:11px;height:11px;border-radius:3px;background:'+color+'"></span>'
       +  '<b style="font-size:14px;color:'+color+'">'+title+' · '+rows.length+'건</b>'
@@ -23152,8 +23167,9 @@ function exm_leadModal(kind, ix){
       +    '<button onclick="document.getElementById(\'exmLeadModal\').remove()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">닫기</button>'
       +  '</span></div>'
       +'<div style="overflow:auto;padding:0 6px 6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-      +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th><th style="padding:6px 9px;text-align:left">계약번호</th><th style="padding:6px 9px;text-align:left">계약자</th><th style="padding:6px 9px;text-align:left">물건지</th>'
-      +cols.map(function(c){ return '<th style="padding:6px 9px;text-align:left;white-space:nowrap">'+c.h+'</th>'; }).join('')+'</tr></thead>'
+      +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th>'
+      +_sth('계약번호','cno')+_sth('계약자','nm')+_sth('물건지','addr')
+      +cols.map(function(c){ return _sth(c.h,c.k); }).join('')+'</tr></thead>'   /* [v547.4] 클릭 정렬 */
       +'<tbody>'+body+'</tbody></table></div>'
       +'<div style="padding:7px 16px;border-top:1px solid #EEF2F7;font-size:10.5px;color:#94A3B8">계약번호 클릭 → 계약상세 이동</div></div>';
     document.body.appendChild(ov);
@@ -23176,6 +23192,15 @@ function exm_leadExcel(){
     XLSX.utils.book_append_sheet(wb, ws, R.title.slice(0,28));
     XLSX.writeFile(wb, '퇴실선행지표_'+R.title+'.xlsx');
   }catch(e){ console.warn('[exm] leadExcel:', e); }
+}
+function exm_leadSortBy(k){   // [v547.4] 명단 모달 헤더 클릭 정렬
+  try{
+    var ctx=window._exmLeadCtx||{}; var S=window._exmLeadSort;
+    if(S&&S.kind===ctx.kind&&S.ix===ctx.ix&&S.key===k) S.dir=(S.dir==='asc'?'desc':'asc');
+    else S={kind:ctx.kind, ix:ctx.ix, key:k, dir:'asc'};
+    window._exmLeadSort=S;
+    exm_leadModal(ctx.kind, ctx.ix);
+  }catch(e){ console.warn('[exm] leadSortBy:', e); }
 }
 function renderExitMgmtView(){
   var wrap=document.querySelector('#exitMgmtView .exm-inner');
