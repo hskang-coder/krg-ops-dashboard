@@ -23092,6 +23092,65 @@ function exm_excel(){
     XLSX.writeFile(wb, '퇴실관리_'+window._exm.y+'-'+('0'+window._exm.m).slice(-2)+'.xlsx');
   }catch(e){ console.warn('[exm] excel:', e); }
 }
+// [v545.1] 진행 현황 명단 모달 — 퍼널 단계 / 퇴실대기 / 만기퇴실예정 카드 클릭
+function exm_fmtD8(d){ return d? String(d).replace(/^(\d{4})(\d{2})(\d{2})$/,'$1.$2.$3') : '-'; }
+function exm_leadModal(kind, ix){
+  try{
+    var L=window._exmLead||{}, rows=[], title='', color='#4F46E5', cols=[];
+    if(kind==='stage'){ var NM=['중도퇴실문의','계약해지확정','실제퇴실']; rows=(L.stages&&L.stages[ix])||[]; title=NM[ix]||'';
+      cols=[{h:'계약상태',f:function(r){ return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+(r.ck==='종료'?'background:#F1F5F9;color:#64748B':'background:#ECFDF5;color:#0B7A45')+'">'+r.ck+'</span>'; }},
+            {h:'최신 기록',f:function(r){ return r.f; }},{h:'기록일',f:function(r){ return exm_fmtD8(r.d); }},{h:'실퇴실일',f:function(r){ return r.real; }}]; }
+    else if(kind==='wait'){ rows=L.wait||[]; title='퇴실대기 중'; color='#D97706';
+      cols=[{h:'구분',f:function(r){ return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+(r.src==='퇴실일 확정'?'background:#EFF6FF;color:#1D4ED8':'background:#FFFBEB;color:#B45309')+'">'+r.src+'</span>'; }},
+            {h:'실퇴실일',f:function(r){ return r.real; }},{h:'계약해지일',f:function(r){ return r.term; }}]; }
+    else { rows=L.sched||[]; title='만기퇴실예정'; color='#1D4ED8';
+      cols=[{h:'만기일',f:function(r){ return r.end; }}]; }
+    window._exmLeadRows={title:title, rows:rows, cols:cols.map(function(c){return c.h;})};
+    var prev=document.getElementById('exmLeadModal'); if(prev)prev.remove();
+    var ov=document.createElement('div'); ov.id='exmLeadModal';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    var body=rows.map(function(r,i){
+      return '<tr style="border-top:1px solid #F1F5F9"><td style="padding:6px 9px;color:#94A3B8;font-size:11px">'+(i+1)+'</td>'
+        +'<td style="padding:6px 9px;white-space:nowrap"><b style="color:#4F46E5;cursor:pointer" onclick="document.getElementById(\'exmLeadModal\').remove();crNavFromView(\''+r.cno+'\',\'exitMgmt\')">'+r.cno+'</b></td>'
+        +'<td style="padding:6px 9px;white-space:nowrap">'+r.nm+'</td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:#6B7280;min-width:230px">'+r.addr+'</td>'
+        +cols.map(function(c){ return '<td style="padding:6px 9px;white-space:nowrap;font-size:11.5px">'+c.f(r)+'</td>'; }).join('')+'</tr>';
+    }).join('')||'<tr><td colspan="'+(4+cols.length)+'" style="padding:18px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';
+    ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:1050px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
+      +'<div style="display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid #EEF2F7">'
+      +  '<span style="width:11px;height:11px;border-radius:3px;background:'+color+'"></span>'
+      +  '<b style="font-size:14px;color:'+color+'">'+title+' · '+rows.length+'건</b>'
+      +  '<span style="margin-left:auto;display:flex;gap:6px">'
+      +    '<button onclick="exm_leadExcel()" style="background:#1d4ed8;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">⬇ 엑셀</button>'
+      +    '<button onclick="document.getElementById(\'exmLeadModal\').remove()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">닫기</button>'
+      +  '</span></div>'
+      +'<div style="overflow:auto;padding:0 6px 6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+      +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th><th style="padding:6px 9px;text-align:left">계약번호</th><th style="padding:6px 9px;text-align:left">계약자</th><th style="padding:6px 9px;text-align:left">물건지</th>'
+      +cols.map(function(c){ return '<th style="padding:6px 9px;text-align:left;white-space:nowrap">'+c.h+'</th>'; }).join('')+'</tr></thead>'
+      +'<tbody>'+body+'</tbody></table></div>'
+      +'<div style="padding:7px 16px;border-top:1px solid #EEF2F7;font-size:10.5px;color:#94A3B8">계약번호 클릭 → 계약상세 이동</div></div>';
+    document.body.appendChild(ov);
+    // 엑셀용 평문 행 저장
+    window._exmLeadRows.flat=rows.map(function(r){
+      if(kind==='stage') return [r.cno,r.nm,r.addr,r.ck,r.f,exm_fmtD8(r.d),r.real];
+      if(kind==='wait') return [r.cno,r.nm,r.addr,r.src,r.real,r.term];
+      return [r.cno,r.nm,r.addr,r.end];
+    });
+    window._exmLeadRows.hdr=(kind==='stage')?['계약번호','계약자','물건지','계약상태','최신 기록','기록일','실퇴실일']
+      :(kind==='wait')?['계약번호','계약자','물건지','구분','실퇴실일','계약해지일']:['계약번호','계약자','물건지','만기일'];
+  }catch(e){ console.warn('[exm] leadModal:', e); }
+}
+function exm_leadExcel(){
+  try{
+    if(typeof XLSX==='undefined'){ alert('엑셀 모듈 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
+    var R=window._exmLeadRows; if(!R||!R.flat||!R.flat.length){ alert('출력할 데이터가 없습니다.'); return; }
+    var wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet([R.hdr].concat(R.flat));
+    ws['!cols']=R.hdr.map(function(h){ return {wch: h==='물건지'?45:14}; });
+    XLSX.utils.book_append_sheet(wb, ws, R.title.slice(0,28));
+    XLSX.writeFile(wb, '퇴실선행지표_'+R.title+'.xlsx');
+  }catch(e){ console.warn('[exm] leadExcel:', e); }
+}
 function renderExitMgmtView(){
   var wrap=document.querySelector('#exitMgmtView .exm-inner');
   if(!wrap) return;
@@ -23112,6 +23171,7 @@ function renderExitMgmtView(){
     fetchSheetByGid(DAILY_RPT_GID).then(function(r){ daeungRawData=_keepBig(daeungRawData, parseDailyReport(r)); if(document.querySelector('#exitMgmtView.active')) renderExitMgmtView(); }).catch(function(){});
   }
   var V=vacancyRawData, Y=window._exm.y, M=window._exm.m;
+  var vMap={}; V.forEach(function(v){ var c0=String(v.no||'').trim(); if(c0&&!vMap[c0]) vMap[c0]=v; });   // [v545.1] 모달 명단용
   var GRP_NM={exp:'만기',vol:'자진',god:'불가항력',gz:'개런티즈 조치'};
   var GRP_CL={exp:'#3B82F6',vol:'#D97706',god:'#8B5CF6',gz:'#DC2626'};
   // ── 최근 12개월 버킷 (선택월 포함) ──
@@ -23129,9 +23189,10 @@ function renderExitMgmtView(){
     });
   }catch(_re){}
   var curRows=[], prev={exp:0,vol:0,god:0,gz:0,tot:0}, cur={exp:0,vol:0,god:0,gz:0,tot:0}, curDlqCnt=0, curDlqSum=0, expSched=0;
+  var schedList=[];   // [v545.1] 만기퇴실예정 명단
   var prevKey=(function(){ var d=new Date(Y, M-2, 1); return d.getFullYear()*100+(d.getMonth()+1); })();
   V.forEach(function(v){
-    if(String(v.status||'').indexOf('만기퇴실예정')>=0) expSched++;
+    if(String(v.status||'').indexOf('만기퇴실예정')>=0){ expSched++; schedList.push({cno:String(v.no||'').trim(), nm:v.tenant1Name||v.tenantName||'-', addr:[v.propAddr,v.propBuilding,v.propRoom].filter(Boolean).join(' '), end:String(v.endDate||'').trim()||'-'}); }
     var t=exm_pd(v.terminateDate); if(!t) return;
     var key=t.getFullYear()*100+(t.getMonth()+1), g=exm_group(v);
     if(mIdx[key]!=null){ months[mIdx[key]][g]++; }
@@ -23164,7 +23225,7 @@ function renderExitMgmtView(){
   });
   var volEtcTip=Object.keys(volEtcMap).sort(function(a,b){return volEtcMap[b]-volEtcMap[a];}).map(function(k){return k+' '+volEtcMap[k];}).join(' · ')||'없음';
   // ── 진행 단계 선행지표 (DR 중도퇴실관리, 최근 90일, 상태확정 전) ──
-  var fun=[0,0,0], funCnos={};   // [v544.1] funCnos = 진행 단계에 있는 계약번호 (퇴실대기 카드용) · [v545] 3단계 개편
+  var fun=[0,0,0], funCnos={}, stageLists=[[],[],[]];   // [v544.1] funCnos = 진행 단계 계약번호 · [v545] 3단계 · [v545.1] stageLists = 모달 명단
   try{
     // [v545] 신규 3단계 + 구 값 매핑: 문의(신청 접수·정산 계열) → 계약해지확정(퇴실 확정) → 실제퇴실(보증금 반환)
     var STEP={'중도퇴실문의':0,'중도퇴실 신청 접수':0,'정산서 발행':0,'후임 세입자 모색':0,'정산 협의':0,'계약해지확정':1,'퇴실 확정':1,'실제퇴실':2,'보증금 반환':2};
@@ -23180,20 +23241,37 @@ function renderExitMgmtView(){
       var L=latest[cno];
       if(L.d<lim) return;
       if(window._VAC_STAT9&&window._VAC_STAT9.indexOf(L.f)>=0) return;   // 이미 상태확정 → 제외
-      if(STEP[L.f]!=null){ fun[STEP[L.f]]++; funCnos[cno]=1; }
+      if(STEP[L.f]!=null){
+        fun[STEP[L.f]]++; funCnos[cno]=1;
+        // [v545.1] 단계별 명단 수집 (모달용)
+        var _v0=vMap[cno], _k0=_v0?String(_v0.contractKind||'').trim():'';
+        stageLists[STEP[L.f]].push({cno:cno, f:L.f, d:L.d,
+          nm:_v0?(_v0.tenant1Name||_v0.tenantName||'-'):'-',
+          addr:_v0?[_v0.propAddr,_v0.propBuilding,_v0.propRoom].filter(Boolean).join(' '):'-',
+          ck:(_k0.indexOf('종료')>=0?'종료':(_k0==='정상'||_k0==='계약중'?'계약중':(_k0||'-'))),
+          real:(drReal[cno]?drReal[cno].v:(_v0?String(_v0.exitDate||'').trim():''))||'-'});
+      }
     });
   }catch(_fe){}
   // [v544.1] 퇴실대기 중 — 계약상태 '계약중/정상'인데 ① 퇴실일(계약해지일) 기재 또는 ② DR 진행 단계(최근 90일, 상태확정 전)
   // [v544.2] ②는 실퇴실일(DR D열 또는 BP열) 기재 건만 집계 — 실퇴실일 미기재 진행 건은 제외
-  var waitTot=0, waitTermCnt=0, waitDrCnt=0;
+  var waitTot=0, waitTermCnt=0, waitDrCnt=0, waitList=[];   // [v545.1] waitList = 모달 명단
   try{
     var aliveOf={};
     V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c3=String(v.no||'').trim(); if(c3) aliveOf[c3]={ t:String(v.terminateDate||'').trim(), r:(drReal[c3]?drReal[c3].v:String(v.exitDate||'').trim()) }; } });
+    var _wRow=function(c3,src){ var _v1=vMap[c3]||{}; return {cno:c3, src:src, nm:_v1.tenant1Name||_v1.tenantName||'-', addr:[_v1.propAddr,_v1.propBuilding,_v1.propRoom].filter(Boolean).join(' '), real:aliveOf[c3].r||'-', term:aliveOf[c3].t||'-'}; };
     var waitSet={};
-    Object.keys(aliveOf).forEach(function(c3){ if(aliveOf[c3].t&&exm_pd(aliveOf[c3].t)){ waitSet[c3]=1; waitTermCnt++; } });
-    Object.keys(funCnos).forEach(function(c3){ if(aliveOf[c3]!==undefined&&!waitSet[c3]&&aliveOf[c3].r&&exm_pd(aliveOf[c3].r)){ waitSet[c3]=1; waitDrCnt++; } });
+    Object.keys(aliveOf).forEach(function(c3){ if(aliveOf[c3].t&&exm_pd(aliveOf[c3].t)){ waitSet[c3]=1; waitTermCnt++; waitList.push(_wRow(c3,'퇴실일 확정')); } });
+    Object.keys(funCnos).forEach(function(c3){ if(aliveOf[c3]!==undefined&&!waitSet[c3]&&aliveOf[c3].r&&exm_pd(aliveOf[c3].r)){ waitSet[c3]=1; waitDrCnt++; waitList.push(_wRow(c3,'실퇴실일 기재')); } });
     waitTot=Object.keys(waitSet).length;
   }catch(_we){}
+  // [v545.1] 진행 현황 모달 데이터 저장
+  try{
+    stageLists.forEach(function(a){ a.sort(function(x,y){ return (y.d||0)-(x.d||0); }); });
+    waitList.sort(function(x,y){ var dx=exm_pd(x.src==='퇴실일 확정'?x.term:x.real), dy=exm_pd(y.src==='퇴실일 확정'?y.term:y.real); return (dx?+dx:9e15)-(dy?+dy:9e15); });
+    schedList.sort(function(x,y){ var dx=exm_pd(x.end), dy=exm_pd(y.end); return (dx?+dx:9e15)-(dy?+dy:9e15); });
+    window._exmLead={ stages:stageLists, wait:waitList, sched:schedList };
+  }catch(_le){}
   // ── KPI 카드 ──
   var lbl=Y+'년 '+M+'월';
   var badge=function(c2,p2){ var d=c2-p2; if(!p2&&!c2) return ''; if(d===0) return ' <span style="background:#F1F5F9;color:#64748B;border-radius:6px;padding:1.5px 6px;font-size:10px;font-weight:800;vertical-align:2px">—</span>';
@@ -23272,17 +23350,17 @@ function renderExitMgmtView(){
     +  '<div style="display:grid;grid-template-columns:1fr 200px 200px;gap:14px;align-items:stretch">'   /* [v544.1] 퇴실대기 카드 추가 */
     +    '<div style="display:flex;gap:6px;align-items:stretch">'
     +      ['중도퇴실문의','계약해지확정','실제퇴실'].map(function(nm2,ix2){
-             return '<div style="flex:1;background:#F8FAFF;border:1px solid #E2EAF5;border-radius:9px;padding:8px 10px;text-align:center;position:relative">'
+             return '<div onclick="exm_leadModal(\'stage\','+ix2+')" style="flex:1;background:#F8FAFF;border:1px solid #E2EAF5;border-radius:9px;padding:8px 10px;text-align:center;position:relative;cursor:pointer">'
                +'<b style="display:block;font-size:17px;color:#4F46E5">'+fun[ix2]+'</b><span style="font-size:10px;color:#5A6A8A">'+nm2+'</span>'
                +(ix2<2?'<span style="position:absolute;right:-7px;top:50%;transform:translateY(-50%);color:#C0CBDD;font-weight:800">›</span>':'')+'</div>';
-           }).join('')   /* [v545] 3단계 (구 값 자동 매핑) */
+           }).join('')   /* [v545] 3단계 (구 값 자동 매핑) · [v545.1] 클릭 → 명단 모달 */
     +    '</div>'
-    +    '<div title="계약상태가 아직 계약중인데 ① 퇴실일(계약해지일)이 확정됐거나 ② 중도퇴실 진행 기록(최근 90일) + 실퇴실일(DR D열·BP열) 기재된 계약&#10;※ 실퇴실일 미기재 진행 건은 제외" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:10px 12px;cursor:help">'   /* [v544.1/2] 퇴실대기 중 */
+    +    '<div onclick="exm_leadModal(\'wait\')" title="계약상태가 아직 계약중인데 ① 퇴실일(계약해지일)이 확정됐거나 ② 중도퇴실 진행 기록(최근 90일) + 실퇴실일(DR D열·BP열) 기재된 계약&#10;※ 실퇴실일 미기재 진행 건은 제외 · 클릭 시 명단" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:10px 12px;cursor:pointer">'   /* [v544.1/2] 퇴실대기 중 · [v545.1] 클릭 → 명단 모달 */
     +      '<div style="font-size:10.5px;color:#B45309;font-weight:700">퇴실대기 중</div>'
     +      '<div style="font-size:22px;font-weight:800;color:#D97706">'+waitTot+'건</div>'
     +      '<div style="font-size:10px;color:#5A6A8A;margin-top:3px">계약중 · 퇴실일 확정 '+waitTermCnt+' / 실퇴실일 기재 '+waitDrCnt+'</div>'
     +    '</div>'
-    +    '<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 12px">'
+    +    '<div onclick="exm_leadModal(\'sched\')" style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 12px;cursor:pointer">'   /* [v545.1] 클릭 → 명단 모달 */
     +      '<div style="font-size:10.5px;color:#1E40AF;font-weight:700">만기퇴실예정</div>'
     +      '<div style="font-size:22px;font-weight:800;color:#1D4ED8">'+expSched+'건</div>'
     +      '<div style="font-size:10px;color:#5A6A8A;margin-top:3px">공실상태 값 기준 (전체)</div>'
