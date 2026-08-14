@@ -23130,7 +23130,9 @@ function exm_leadModal(kind, ix){
             {h:'공실상태(사유)',k:'st',f:function(r){ return r.st==='-'?'<span style="color:#94A3B8">-</span>':r.st; }},   /* [v547.2] */
             {h:'실퇴실일',k:'real',f:function(r){ return r.real; }},{h:'계약해지일',k:'term',f:function(r){ return r.term; }},{h:'만기일',k:'end',f:function(r){ return r.end||'-'; }}]; }   /* [v547.3] 만기일 */
     else if(kind==='act'||kind==='forced'){ rows=(kind==='act'?L.act:L.forced)||[]; title=(kind==='act'?'활성 진행':'강제퇴실 진행'); color=(kind==='act'?'#4F46E5':'#9D174D');   /* [v548] */
-      cols=[{h:'최신 기록',k:'f',f:function(r){ return r.f; }},{h:'기록일',k:'d',f:function(r){ return exm_fmtD8(r.d); }},{h:'실퇴실일',k:'real',f:function(r){ return r.real; }}]; }
+      cols=[{h:'퇴실구분',k:'exit',f:function(r){ var c4=r.exit==='강제퇴실'?'background:#FEF2F2;color:#B91C1C':(r.exit==='중도퇴실'?'background:#FFFBEB;color:#B45309':'background:#EFF6FF;color:#1D4ED8'); return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+c4+'">'+(r.exit||'-')+'</span>'; }},   /* [v548.3] */
+            {h:'퇴실사유',k:'st',f:function(r){ return (!r.st||r.st==='-')?'<span style="color:#94A3B8">-</span>':r.st; }},   /* [v548.3] 공실상태 값 */
+            {h:'최신 기록',k:'f',f:function(r){ return r.f; }},{h:'기록일',k:'d',f:function(r){ return exm_fmtD8(r.d); }},{h:'실퇴실일',k:'real',f:function(r){ return r.real; }}]; }
     else if(kind==='stall'){ rows=L.stall||[]; title='장기 정체'; color='#B91C1C';   /* [v548] */
       cols=[{h:'최신 기록',k:'f',f:function(r){ return r.f; }},{h:'기록일',k:'d',f:function(r){ return exm_fmtD8(r.d); }},
             {h:'경과일',k:'age',f:function(r){ return '<b style="color:#B91C1C">'+r.age+'일</b>'; }},{h:'실퇴실일',k:'real',f:function(r){ return r.real; }}]; }
@@ -23193,7 +23195,7 @@ function exm_leadModal(kind, ix){
     window._exmLeadRows.flat=rows.map(function(r){
       if(kind==='stage') return [r.cno,r.nm,r.addr,r.ck,r.f,exm_fmtD8(r.d),r.real];
       if(kind==='wait') return [r.cno,r.nm,r.addr,r.exit||'-',r.src,r.st||'-',r.real,r.term,r.end||'-'];   /* [v547.2/3] */
-      if(kind==='act'||kind==='forced') return [r.cno,r.nm,r.addr,r.f,exm_fmtD8(r.d),r.real];   /* [v548] */
+      if(kind==='act'||kind==='forced') return [r.cno,r.nm,r.addr,r.exit||'-',r.st||'-',r.f,exm_fmtD8(r.d),r.real];   /* [v548/548.3] */
       if(kind==='stall') return [r.cno,r.nm,r.addr,r.f,exm_fmtD8(r.d),r.age+'일',r.real];   /* [v548] */
       if(kind==='fore') return [r.cno,r.nm,r.addr,r.exit||'-',r.st||'-',r.eff||'-',r.end||'-'];   /* [v548] */
       if(kind==='exp60') return [r.cno,r.nm,r.addr,r.end,'D-'+r.dday,({app:'승인',cond:'조건부승인',deny:'거절',none:'이력없음'}[r.judge]||'-'),(r.rnw?r.rnw+' ('+exm_fmtD8(r.rnwD)+')'+(r.rnwPg?' / '+r.rnwPg:''):'-'),(r.dlq||0)];   /* [v548/548.1/2] */
@@ -23201,7 +23203,7 @@ function exm_leadModal(kind, ix){
     });
     window._exmLeadRows.hdr=(kind==='stage')?['계약번호','계약자','물건지','계약상태','최신 기록','기록일','실퇴실일']
       :(kind==='wait')?['계약번호','계약자','물건지','퇴실구분','구분','공실상태(사유)','실퇴실일','계약해지일','만기일']
-      :(kind==='act'||kind==='forced')?['계약번호','계약자','물건지','최신 기록','기록일','실퇴실일']   /* [v548] */
+      :(kind==='act'||kind==='forced')?['계약번호','계약자','물건지','퇴실구분','퇴실사유','최신 기록','기록일','실퇴실일']   /* [v548/548.3] */
       :(kind==='stall')?['계약번호','계약자','물건지','최신 기록','기록일','경과일','실퇴실일']   /* [v548] */
       :(kind==='fore')?['계약번호','계약자','물건지','퇴실구분','공실상태(사유)','퇴실일','만기일']   /* [v548] */
       :(kind==='exp60')?['계약번호','계약자','물건지','만기일','D-DAY','갱신심사','갱신 최근 대응','연체금액']   /* [v548/548.1/2] */
@@ -23355,7 +23357,7 @@ function renderExitMgmtView(){
     var waitSet={};
     // [v547.1] 퇴실일이 선택월에 잡힌 건은 이미 '월 퇴실 상세'에 표시되므로 대기에서 제외 (그 외 월 확정 건만 대기)
     Object.keys(aliveOf).forEach(function(c3){ var td=aliveOf[c3].t?exm_pd(aliveOf[c3].t):null; if(td&&(td.getFullYear()*100+(td.getMonth()+1))!==(Y*100+M)){ waitSet[c3]=1; waitTermCnt++; waitList.push(_wRow(c3,'퇴실일 확정')); } });
-    Object.keys(funCnos).forEach(function(c3){ if(aliveOf[c3]!==undefined&&!waitSet[c3]&&aliveOf[c3].r&&exm_pd(aliveOf[c3].r)){ waitSet[c3]=1; waitDrCnt++; waitList.push(_wRow(c3,'실퇴실일 기재')); } });
+    Object.keys(aliveOf).forEach(function(c3){ if(!waitSet[c3]&&aliveOf[c3].r&&exm_pd(aliveOf[c3].r)){ waitSet[c3]=1; waitDrCnt++; waitList.push(_wRow(c3,'실퇴실일 기재')); } });   /* [v548.4] 90일 진행기록 조건 제거 — 실퇴실일 기재된 계약중 건 전부 (종료 처리 대기 포착) */
     waitTot=Object.keys(waitSet).length;
     waitList.forEach(function(w){ if(waitEx[w.exit]!==undefined) waitEx[w.exit]++; });   /* [v547.5] */
   }catch(_we){}
@@ -23406,8 +23408,10 @@ function renderExitMgmtView(){
       var rd=exm_pd(rdS);
       if(rd&&rd<=_ztd&&_zdays(_ztd,rd)<=90&&R.first){ var fd=_zd8(R.first); if(fd){ _zsum+=_zdays(rd,fd); zLeadN++; } }
       if(!_zalive[cno]) return;   // 이하 파이프라인은 계약중 건만
-      if(R.lv.indexOf('강제퇴실')>=0) zForced.push(_zrow(cno));   // 강제 계열(확정 포함)인데 아직 계약중
       if(conf||!R.mid) return;
+      // [v548.4] BO 공실상태가 확정값이거나 실퇴실일(DR D열·BP열) 기재 → 이미 퇴실 확정/완료 — 활성·정체에서 제외 (퇴실대기 카드 소관)
+      var _bo4=String(_v4.status||'').trim();
+      if((window._VAC_STAT9&&window._VAC_STAT9.indexOf(_bo4)>=0)||exm_pd(rdS)) return;
       var lastD=_zd8(R.last); if(!lastD) return;
       var age=_zdays(_ztd,lastD);
       if(age<=30) zAct.push(_zrow(cno));
@@ -23426,6 +23430,9 @@ function renderExitMgmtView(){
       var ed=exm_pd(_v5.endDate);
       if(ed&&ed>=_ztd&&_zdays(ed,_ztd)<=60) zExp60.push(_zrow(cno,{dday:_zdays(ed,_ztd), judge:_zj(cno), dlq:exm_num(_v5.dlqAmt)||0,
         rnw:(_zrnw[cno]?_zrnw[cno].f:''), rnwD:(_zrnw[cno]?_zrnw[cno].d:0), rnwPg:(_zrnw[cno]?_zrnw[cno].pg:'')}));   /* [v548.1/2] 갱신심사·갱신 최근 대응·연체금액 */
+      // [v548.5] 강제퇴실 진행: 강제 계열 상태(DR 최신 기록 or BO)인데 계약중 + 퇴실일(실퇴실일·계약해지일) 미정 — 날짜 확정 시 '퇴실대기 중'으로 이동 (상호 배타)
+      var _bo5=String(_v5.status||'').trim(), _R5=_zrec[cno];
+      if(((_R5&&String(_R5.lv||'').indexOf('강제퇴실')>=0)||_bo5.indexOf('강제퇴실')>=0)&&!eff) zForced.push(_zrow(cno));
     });
     zAct.sort(function(a,b){ return (b.d||0)-(a.d||0); });
     zStall.sort(function(a,b){ return (b.age||0)-(a.age||0); });
@@ -23526,8 +23533,8 @@ function renderExitMgmtView(){
     +  '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">'
     +    zc('exm_leadModal(\'act\')','#F8FAFF','#E2EAF5','#4F46E5','#4F46E5','활성 진행',zAct.length+'건','최근 30일 내 기록 있음 · 정상 진행 중','최신 기록이 30일 이내이고 상태 미확정인 중도퇴실 진행 건')
     +    zc('exm_leadModal(\'stall\')','#FEF2F2','#FECACA','#B91C1C','#B91C1C','⚠ 장기 정체',zStall.length+'건','마지막 기록 후 31일+ 무소식'+(zStall.length?' · 최장 '+zStall[0].age+'일':'')+' · <u>후속 기록 필요</u>','마지막 기록이 31~180일 전이고 상태 미확정 — 방치된 진행 건')
-    +    zc('exm_leadModal(\'wait\')','#FFFBEB','#FDE68A','#B45309','#D97706','퇴실대기 중',waitTot+'건','만기퇴실 '+waitEx['만기퇴실']+' · 중도퇴실 '+waitEx['중도퇴실']+' · 강제퇴실 '+waitEx['강제퇴실'],'계약중인데 ① 퇴실일 확정(당월 제외) 또는 ② 진행 기록+실퇴실일 기재')
-    +    zc('exm_leadModal(\'forced\')','#FDF2F8','#FBCFE8','#9D174D','#9D174D','강제퇴실 진행',zForced.length+'건','최신 기록이 강제퇴실 계열 · 아직 계약중','강제퇴실(공실·연체·갱신불가·계약위반) 기록 후 계약 종료 처리 전')
+    +    zc('exm_leadModal(\'wait\')','#FFFBEB','#FDE68A','#B45309','#D97706','퇴실대기 중',waitTot+'건','만기퇴실 '+waitEx['만기퇴실']+' · 중도퇴실 '+waitEx['중도퇴실']+' · 강제퇴실 '+waitEx['강제퇴실'],'계약중인데 ① 퇴실일 확정(당월 제외) 또는 ② 실퇴실일(DR D열·BP열) 기재')
+    +    zc('exm_leadModal(\'forced\')','#FDF2F8','#FBCFE8','#9D174D','#9D174D','강제퇴실 진행',zForced.length+'건','강제 상태 · 퇴실일 미정 (확정 시 대기로 이동)','강제퇴실(공실·연체·갱신불가·계약위반) 상태 + 계약중 + 실퇴실일·계약해지일 미기재 — 퇴실 날짜가 잡히면 퇴실대기 중 카드로 이동')
     +  '</div>'
     +  '<div style="font-size:10.5px;font-weight:800;color:#64748B;margin-bottom:6px">📅 퇴실 예보 <span style="font-weight:400;font-size:9.5px;color:#94A3B8">실퇴실일(DR D열·BP열) 우선, 없으면 계약해지일 · 계약중 건만</span></div>'
     +  '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">'
