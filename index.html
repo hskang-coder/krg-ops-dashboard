@@ -23622,6 +23622,31 @@ function renderExitMgmtView(){
     return { total: rooms.length, vacant: vacant, avgMonths: avgMonths, avgScore: avgScore, avgGrade: avgGrade, black: black, watch: watch };
   }
 
+  // [v543] 부동산 단위 요약 엑셀 출력 — 현재 화면 목록(미운영 필터·정렬 반영) 기준
+  window.prp_summaryExcel = function(){
+    try{
+      if (typeof XLSX === 'undefined'){ alert('엑셀 모듈 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
+      var list = window._prpSummaries || [];
+      if (!list.length){ alert('출력할 데이터가 없습니다.'); return; }
+      var aoa = [['임대인','연락처','주소','부동산명','임대인 성향','계약중 호실','총 호실','미계약','매력도 등급','매력도 평균','평균 거주(월)','중도퇴실율(%)','중도퇴실/종료','블랙 호실']];
+      list.forEach(function(s){
+        var traitTxt = (window._prpLandlordTraits && s.landlordName) ? (window._prpLandlordTraits[s.landlordName] || '') : '';
+        var tc = prp_classifyTrait(traitTxt);
+        aoa.push([s.landlordName||'-', s.landlordPhone||'', s.addr||'', s.name||'',
+          (tc ? (tc.grade+' '+tc.label) : ''),
+          s.activeRooms, s.total, s.vacantRooms, s.avgGrade, s.avgScore,
+          s.avgMonths>0 ? Math.round(s.avgMonths*10)/10 : '',
+          s.totalEnded>0 ? Math.round(s.midRate*100) : '',
+          s.totalMidExit+'/'+s.totalEnded, s.blackCnt]);
+      });
+      var wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols']=[{wch:14},{wch:14},{wch:36},{wch:20},{wch:14},{wch:10},{wch:8},{wch:8},{wch:10},{wch:10},{wch:11},{wch:12},{wch:11},{wch:9}];
+      XLSX.utils.book_append_sheet(wb, ws, '부동산요약');
+      var d=new Date();
+      XLSX.writeFile(wb, '부동산단위요약_'+d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)+'.xlsx');
+    }catch(e){ console.warn('[prp] excel:', e); }
+  };
+
   // 메인 렌더
   window.renderPropertyView = function(){
     prp_injectCss();
@@ -23864,6 +23889,7 @@ function renderExitMgmtView(){
         +   '<div class="prp-dash-card top"><div class="l">⭐ TOP 5 매력도 부동산</div><div class="v">'+(top5||'-')+'</div></div>'
         + '</div>';
 
+      window._prpSummaries = summaries;   // [v543] 엑셀 출력용 (필터·정렬 반영 후 목록)
       var rowsHtml = summaries.map(function(s){
         var hasBl = s.blackCnt > 0;
         var landlordPhoneFmt = s.landlordPhone ? fmtPhoneSafe(s.landlordPhone) : '';
@@ -23885,7 +23911,8 @@ function renderExitMgmtView(){
       var inactiveToggle = ''
         + '<button onclick="prp_toggleInactive()" style="padding:5px 10px;background:'+(flt.showInactive?'#4F46E5':'#fff')+';color:'+(flt.showInactive?'#fff':'#4F46E5')+';border:1px solid #4F46E5;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;margin-left:10px">'
         +   (flt.showInactive ? '✓ 미운영 포함 ('+totalBldg+'개)' : '미운영 보기'+(hiddenInactive>0?' ('+hiddenInactive+'개 숨김)':''))
-        + '</button>';
+        + '</button>'
+        + '<button onclick="prp_summaryExcel()" style="padding:5px 10px;background:#2563EB;color:#fff;border:1px solid #2563EB;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;margin-left:6px">⬇ 엑셀</button>';   /* [v543] 요약표 엑셀 출력 */
       return ''
         + dashHtml
         + '<div class="prp-overview">'
