@@ -2736,11 +2736,13 @@ function buildResponseTableHTML(responses) {
     return `<div style="text-align:center;color:#B0BDCE;padding:20px;font-size:13px">${jobFilter==='전체'?'대응 내역이 없습니다':jobFilter+' 대응 내역이 없습니다'}</div>`;
   // [v225] 컬럼 헤더 — jobFilter에 따라 입금예정일 / 재연락일정 동적 변경
   const dateColLabel = (jobFilter === '수납관리' || jobFilter === '연체관리' || jobFilter === '법무관리') ? '입금예정일'
-                     : (jobFilter === '갱신관리' || jobFilter === '중도퇴실관리' || jobFilter === '계약(입주)관리') ? '재연락일정'
+                     : (jobFilter === '중도퇴실관리' || jobFilter === '퇴실관리') ? '실퇴실일'   // [v547] D열 = 실퇴실일
+                     : (jobFilter === '갱신관리' || jobFilter === '계약(입주)관리') ? '재연락일정'
                      : '입금예정일/대응일';  // [v480] 라벨 변경
   // [v427 crx] 타임라인 렌더 — 필터·데이터 로직은 기존 그대로, 표시만 변경
   const payLabel = (jobFilter === '수납관리' || jobFilter === '연체관리' || jobFilter === '법무관리') ? '입금예정'
-                 : (jobFilter === '갱신관리' || jobFilter === '중도퇴실관리' || jobFilter === '계약(입주)관리') ? '재연락'
+                 : (jobFilter === '중도퇴실관리' || jobFilter === '퇴실관리') ? '실퇴실'   // [v547]
+                 : (jobFilter === '갱신관리' || jobFilter === '계약(입주)관리') ? '재연락'
                  : '예정일';
   // [v499] 목업 반영 — 최근 8건만 기본 표시, "전체 N건 보기 ↓ / 접기 ↑" 토글
   const SHOW_N = 8;
@@ -2750,8 +2752,8 @@ function buildResponseTableHTML(responses) {
   return `<div style="padding:2px 8px 6px">
     <div class="crx-rtl">${visible.map((r,i) => {
       const jt = String(r.jobType||'').trim();
-      const jtColor = jt==='연체관리' ? '#DC2626' : jt==='중도퇴실관리' ? '#4F46E5' : jt==='수납관리' ? '#0284C7' : jt==='갱신관리' ? '#0F766E' : jt==='계약(입주)관리' ? '#166534' : '#6B7280';
-      const jtBg    = jt==='연체관리' ? '#FEE2E2' : jt==='중도퇴실관리' ? '#EDE9FE' : jt==='수납관리' ? '#E0F2FE' : jt==='갱신관리' ? '#CCFBF1' : jt==='계약(입주)관리' ? '#DCFCE7' : '#F3F4F6';
+      const jtColor = jt==='연체관리' ? '#DC2626' : jt==='중도퇴실관리' ? '#4F46E5' : jt==='퇴실관리' ? '#0E7490' : jt==='수납관리' ? '#0284C7' : jt==='갱신관리' ? '#0F766E' : jt==='계약(입주)관리' ? '#166534' : '#6B7280';   /* [v547] 퇴실관리 */
+      const jtBg    = jt==='연체관리' ? '#FEE2E2' : jt==='중도퇴실관리' ? '#EDE9FE' : jt==='퇴실관리' ? '#CFFAFE' : jt==='수납관리' ? '#E0F2FE' : jt==='갱신관리' ? '#CCFBF1' : jt==='계약(입주)관리' ? '#DCFCE7' : '#F3F4F6';
       return `<div class="crx-rtl-item">
         <span class="crx-rtl-dot" style="background:${jtColor}"></span>
         <div class="crx-rtl-head">
@@ -2821,6 +2823,7 @@ function buildRespSummary(responses){
     // 우선순위 카테고리: 법무=연체 중 법적 하위구분, 연체=법무 제외
     var cats=[
       {k:'중도퇴실관리', f:function(r){return String(r.jobType||'').trim()==='중도퇴실관리';}, bg:'#EDE9FE', fg:'#4F46E5'},
+      {k:'퇴실관리',    f:function(r){return String(r.jobType||'').trim()==='퇴실관리';}, bg:'#CFFAFE', fg:'#0E7490'},   /* [v547] 만기퇴실 */
       {k:'법무관리',    f:function(r){return _respIsLegal(r);}, bg:'#FAEEDA', fg:'#854F0B'},
       {k:'연체관리',    f:function(r){return String(r.jobType||'').trim()==='연체관리' && !_respIsLegal(r);}, bg:'#FEE2E2', fg:'#DC2626'},
       {k:'수납관리',    f:function(r){return String(r.jobType||'').trim()==='수납관리';}, bg:'#E0F2FE', fg:'#0284C7'},
@@ -2854,6 +2857,7 @@ function buildRespSummary(responses){
       var s=hl(shorten(r.content, 110)); // [v463] 요약 길이 확대 46→110자
       var clause='';
       if(cat.k==='중도퇴실관리'){ clause='현재 '+name+' 진행 중'+(s&&s!=='—'?' — '+s:''); }
+      else if(cat.k==='퇴실관리'){ clause='현재 '+name+'(만기) 진행 중'+(s&&s!=='—'?' — '+s:''); }   /* [v547] */
       else if(cat.k==='법무관리'){ clause=name+eun+' '+(r.jobSub?String(r.jobSub).trim():'법적 조치')+' 진행 중'+(s&&s!=='—'?' ('+s+')':''); }
       else if(cat.k==='연체관리'){
         if(r.payDate){ clause=name+eun+' <b style="color:#B45309">'+r.payDate+'</b>까지 납부 약속'+(overdue?' — <b style="color:#B91C1C">기한 경과, 입금·연락 확인 필요</b>':''); if(s&&s!=='—') clause+=' ('+s+')'; }
@@ -2887,7 +2891,7 @@ function _respIsLegal(r){
 function buildJobFilterBar(responses) {
   const sel = window._respJobFilter || '전체';
   // [v66] 계약(입주)관리 추가
-  const counts = { '전체': responses.length, '연체관리': 0, '중도퇴실관리': 0, '수납관리': 0, '갱신관리': 0, '계약(입주)관리': 0, '법무관리': 0 };
+  const counts = { '전체': responses.length, '연체관리': 0, '중도퇴실관리': 0, '퇴실관리': 0, '수납관리': 0, '갱신관리': 0, '계약(입주)관리': 0, '법무관리': 0 };   /* [v547] */
   responses.forEach(r => { const jt = String(r.jobType||'').trim(); if (counts[jt] !== undefined) counts[jt]++; if (_respIsLegal(r)) counts['법무관리']++; });
   function pill(val) {
     const active = (val === sel);
@@ -2898,13 +2902,14 @@ function buildJobFilterBar(responses) {
     else if (val === '연체관리') { bg = active ? '#DC2626' : '#FEE2E2'; fg = active ? '#fff' : '#DC2626'; }
     else if (val === '갱신관리') { bg = active ? '#06B6D4' : '#CCFBF1'; fg = active ? '#fff' : '#0F766E'; }
     else if (val === '중도퇴실관리') { bg = active ? '#4F46E5' : '#EDE9FE'; fg = active ? '#fff' : '#4F46E5'; }
+    else if (val === '퇴실관리') { bg = active ? '#0E7490' : '#CFFAFE'; fg = active ? '#fff' : '#0E7490'; }  /* [v547] */
     else if (val === '계약(입주)관리') { bg = active ? '#16A34A' : '#DCFCE7'; fg = active ? '#fff' : '#166534'; }  /* [v66] */
     else if (val === '법무관리') { bg = active ? '#854F0B' : '#FAEEDA'; fg = active ? '#fff' : '#854F0B'; }  /* [v388] */
     else { bg = active ? '#4F46E5' : '#F3F4F6'; fg = active ? '#fff' : '#374151'; }
     return `<button onclick="setRespJobFilter('${val}')" style="background:${bg};color:${fg};border:none;padding:4px 12px;border-radius:14px;font-size:11.5px;font-weight:700;cursor:pointer;margin-right:6px">${val} <span style="opacity:.7;font-weight:600">(${counts[val]})</span></button>`;
   }
   // [v66/v70] 순서: 전체 → 수납관리 → 연체관리 → 갱신관리 → 중도퇴실관리 → 계약(입주)관리 (담당자 필터는 v69 별도 컬럼으로 대체)
-  return `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:0 4px 8px">${pill('전체')}${pill('수납관리')}${pill('연체관리')}${pill('갱신관리')}${pill('중도퇴실관리')}${pill('계약(입주)관리')}${pill('법무관리')}</div>`;
+  return `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:0 4px 8px">${pill('전체')}${pill('수납관리')}${pill('연체관리')}${pill('갱신관리')}${pill('중도퇴실관리')}${pill('퇴실관리')}${pill('계약(입주)관리')}${pill('법무관리')}</div>`;
 }
 
 // [v503] 갱신심사 카드 지연 재판정 — 입금데이터 로딩 완료 후 승인/조건부/거절 갱신
@@ -6041,7 +6046,7 @@ function renderContractRecord(c, payments, responses = []) {
       var _cn=String(c['계약번호']||'').trim(), best=null;
       (daeungRawData||[]).forEach(function(r){
         if(String(r.no||'').trim()!==_cn) return;
-        if(String(r.jobType||'').indexOf('중도퇴실관리')===-1) return;
+        if(String(r.jobType||'').indexOf('퇴실관리')===-1) return;   // [v547] '중도퇴실관리'+'퇴실관리(만기)' 모두 포함 (부분일치)
         var pd=String(r.payDate||'').trim(); if(!pd||!/\d{4}\D+\d{1,2}\D+\d{1,2}/.test(pd)) return;
         var d=cG_dateNum(r.date)||0, ix=r._idx||0;
         if(!best||d>best.d||(d===best.d&&ix>=best.i)) best={d:d,i:ix,v:pd};
@@ -21868,7 +21873,7 @@ function okpi_importantSection(){
   var anchor = (window._okpi && window._okpi.date) || new Date();
   var range = okpi_getRange(period, anchor);
   var filter = (window._okpi && window._okpi.importantFilter) || '전체';
-  var tabsDef = ['전체','입주(계약)관리','갱신관리','수납관리','연체관리','법무관리','중도퇴실관리'];
+  var tabsDef = ['전체','입주(계약)관리','갱신관리','수납관리','연체관리','법무관리','중도퇴실관리','퇴실관리'];   // [v547]
   var tabBtn = function(t){
     var on = (filter === t);
     return '<button onclick="okpi_setImpFilter(\'' + t.replace(/'/g,"\\'") + '\')" style="padding:5px 11px;border:1px solid ' + (on?'#4F46E5':'#E5E7EB') + ';background:' + (on?'#4F46E5':'#fff') + ';color:' + (on?'#fff':'#6B7280') + ';border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap">' + t + '</button>';
@@ -21882,9 +21887,9 @@ function okpi_importantSection(){
 function okpi_importantBox(range, filter){
   try {
     filter = filter || '전체';
-    var fmap = { '전체': null, '입주(계약)관리': '계약(입주)', '갱신관리': '갱신', '수납관리': '수납', '연체관리': '연체', '법무관리': '법무', '중도퇴실관리': '중도퇴실' };
+    var fmap = { '전체': null, '입주(계약)관리': '계약(입주)', '갱신관리': '갱신', '수납관리': '수납', '연체관리': '연체', '법무관리': '법무', '중도퇴실관리': '중도퇴실', '퇴실관리': '@퇴실관리' };   // [v547] @접두 = 정확 일치 ('중도퇴실관리' 오매칭 방지)
     var fkw = fmap[filter] || null;
-    var matchJob = function(jt){ return !fkw || String(jt||'').indexOf(fkw) >= 0; };
+    var matchJob = function(jt){ if(!fkw) return true; if(fkw.charAt(0)==='@') return String(jt||'').trim()===fkw.slice(1); return String(jt||'').indexOf(fkw) >= 0; };
     var daeRaw = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
     var payRaw = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData : [];
     var crRaw  = (typeof contractRawData !== 'undefined' && Array.isArray(contractRawData)) ? contractRawData : [];
@@ -21902,7 +21907,8 @@ function okpi_importantBox(range, filter){
     var sums = [];
     if (payTargets.length) sums.push('입금예정 <b>' + payTargets.length + '</b>' + (unpaidCnt?'<span style="color:#DC2626">(미납 ' + unpaidCnt + ')</span>':''));
     var _me=byJob('중도퇴실'), _lg=byJob('법무'), _dl=byJob('연체'), _rn=byJob('갱신'), _mi=byJob('계약(입주)');
-    if (_dl) sums.push('연체 <b>' + _dl + '</b>'); if (_me) sums.push('중도퇴실 <b>' + _me + '</b>');
+    var _ex=(function(){ var set={}; daeRaw.forEach(function(r){ if(okpi_inRange(r,range)&&String(r.jobType||'').trim()==='퇴실관리') set[_normCno(r.no)]=1; }); return Object.keys(set).filter(function(x){return x;}).length; })();   // [v547] 퇴실관리(만기) — 정확 일치
+    if (_dl) sums.push('연체 <b>' + _dl + '</b>'); if (_me) sums.push('중도퇴실 <b>' + _me + '</b>'); if (_ex) sums.push('만기퇴실 <b>' + _ex + '</b>');
     if (_lg) sums.push('법무 <b>' + _lg + '</b>'); if (_rn) sums.push('갱신 <b>' + _rn + '</b>'); if (_mi) sums.push('입주 <b>' + _mi + '</b>');
     // ── 약속/확인 텍스트 분석 ──
     var dlRe = /(오늘|금일|내일|익일|명일|모레|이번\s?주|다음\s?주|[월화수목금토일]\s?요일|\d{1,2}\s?월\s?\d{1,2}\s?일|\d{1,2}\/\d{1,2}|\d{1,2}\s?일까지|\d{1,2}\s?시(?:\s?\d{1,2}\s?분)?(?:\s?까지)?)/g;
@@ -21919,7 +21925,7 @@ function okpi_importantBox(range, filter){
     var arr = Object.keys(map).map(function(k){ return map[k]; }).sort(function(a,b){ return a.prio - b.prio; });
     var dlbl = okpi_ymd(range.start) + (okpi_ymd(range.start) !== okpi_ymd(range.end) ? ' ~ ' + okpi_ymd(range.end) : '');
     var numBadge = function(i, color){ return '<span style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:' + (color||'#4F46E5') + ';color:#fff;font-size:10px;font-weight:800;margin-top:1px">' + i + '</span>'; };
-    var catIcon = function(k){ k=String(k||''); return k.indexOf('연체')>=0?'🔴':(k.indexOf('수납')>=0?'💳':(k.indexOf('중도퇴실')>=0?'🚪':(k.indexOf('법무')>=0?'⚖️':(k.indexOf('갱신')>=0?'🔄':(k.indexOf('입주')>=0||k.indexOf('계약')>=0?'🏠':'📞'))))); };
+    var catIcon = function(k){ k=String(k||''); return k.indexOf('연체')>=0?'🔴':(k.indexOf('수납')>=0?'💳':(k.indexOf('퇴실')>=0?'🚪':(k.indexOf('법무')>=0?'⚖️':(k.indexOf('갱신')>=0?'🔄':(k.indexOf('입주')>=0||k.indexOf('계약')>=0?'🏠':'📞'))))); };   /* [v547] 퇴실관리 포함 */
     var renderItem = function(it, idx){
       var nm = nameOf(it.cno) || ('#' + it.cno);
       var jt = String(it.cat||it.tag||'');
@@ -21938,7 +21944,7 @@ function okpi_importantBox(range, filter){
       listHtml = '<div style="font-size:12px;color:#16A34A;margin-top:8px;font-weight:600">✅ 검색기간 내 확인/약속 항목 없음</div>';
     } else if (filter === '전체') {
       // 업무구분별 그룹 개요 — 카테고리별 상위 3건 (연체관리 탭과 중복 방지)
-      var catOrder = ['연체관리','수납관리','중도퇴실관리','법무관리','갱신관리','계약(입주)관리'];
+      var catOrder = ['연체관리','수납관리','중도퇴실관리','퇴실관리','법무관리','갱신관리','계약(입주)관리'];   // [v547] 중도퇴실관리 뒤 배치 (오매칭 방지)
       var keyOf = function(c){ c=String(c||''); for (var i=0;i<catOrder.length;i++){ var base=catOrder[i].replace('관리','').replace(/[()]/g,''); if (c.indexOf(catOrder[i])>=0 || (base && c.indexOf(base)>=0)) return catOrder[i]; } return c||'기타'; };
       var groups = {};
       arr.forEach(function(it){ var k=keyOf(it.cat||it.tag); (groups[k]=groups[k]||[]).push(it); });
@@ -22388,7 +22394,9 @@ window._okpiCat = {
     {v:'월세부담',          t:'월세부담 — 임대료 부담으로 인한 퇴실'},
     {h:'─ 상태확정 · 자진 ─'},
     {v:'중도퇴실',          t:'중도퇴실(자진) — 연체 없는 단순 퇴실'}
-  ]
+  ],
+  // [v547] 퇴실관리 (만기퇴실) — 임대인 정산·대응 중심. 중도퇴실관리(자진·강제)와 구분
+  '퇴실관리':['만기퇴실 안내','퇴실일정 협의','계약자대응','임대인대응','임대인 퇴실정산','원상복구·청소 확인','실제퇴실','기타']
 };
 
 function okpi_form_cat2Options(cat1){
@@ -22413,7 +22421,8 @@ window._okpiProgress = {
   '수납관리':       ['', '미수신', '분납', '완납', '강제퇴실확정'],
   '연체관리':       ['', '미수신', '분납', '완납', '강제퇴실확정'],
   '갱신관리':       ['', '갱신희망', '묵시적갱신', '만기퇴실예정', '갱신거절', '조건부승인'],
-  '중도퇴실관리':   ['', '대응중', '종료', '협의중']
+  '중도퇴실관리':   ['', '대응중', '종료', '협의중'],
+  '퇴실관리':       ['', '대응중', '종료', '협의중']   // [v547]
 };
 function okpi_form_progressOptions(cat1){
   var arr = window._okpiProgress[cat1] || [''];
@@ -22423,7 +22432,7 @@ function okpi_form_progressOptions(cat1){
 // D열 라벨 동적 변경
 function okpi_form_dueLabel(cat1){
   if (cat1 === '수납관리' || cat1 === '연체관리') return '입금예정일';
-  if (cat1 === '중도퇴실관리') return '실퇴실일';   // [v544] D열 = 실퇴실일 (퇴실관리탭 표시)
+  if (cat1 === '중도퇴실관리' || cat1 === '퇴실관리') return '실퇴실일';   // [v544] D열 = 실퇴실일 (퇴실관리탭 표시) · [v547] 퇴실관리(만기) 포함
   return '재연락일정';
 }
 
@@ -22434,6 +22443,7 @@ function okpi_form_memoPlaceholder(cat1){
   if (cat1 === '갱신관리')      return '예: 퇴실 / 갱신희망, 이슈사항';
   if (cat1 === '연체관리')      return '예: 분납 / 완납 / 미수신, 다음 액션 내용';
   if (cat1 === '중도퇴실관리')  return '예: 신고 / 진행중 / 청소중 / 완료, 다음 액션 사항';
+  if (cat1 === '퇴실관리')      return '예: 만기 안내 / 정산 협의 / 퇴실 완료, 다음 액션 사항';   // [v547]
   return '대응 상세내용';
 }
 
@@ -23195,7 +23205,7 @@ function renderExitMgmtView(){
   var drReal={};
   try{
     (Array.isArray(daeungRawData)?daeungRawData:[]).forEach(function(r){
-      if(String(r.jobType||'').indexOf('중도퇴실관리')===-1) return;
+      if(String(r.jobType||'').indexOf('퇴실관리')===-1) return;   // [v547] '중도퇴실관리'+'퇴실관리(만기)' 모두 포함 (부분일치)
       var pd2=String(r.payDate||'').trim(); if(!pd2) return;
       var cno2=String(r.no||'').trim(); if(!cno2) return;
       var d2=cG_dateNum(r.date)||0, ix2=r._idx||0, p3=drReal[cno2];
