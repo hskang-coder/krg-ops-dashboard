@@ -23163,7 +23163,7 @@ function renderExitMgmtView(){
   });
   var volEtcTip=Object.keys(volEtcMap).sort(function(a,b){return volEtcMap[b]-volEtcMap[a];}).map(function(k){return k+' '+volEtcMap[k];}).join(' · ')||'없음';
   // ── 진행 단계 선행지표 (DR 중도퇴실관리, 최근 90일, 상태확정 전) ──
-  var fun=[0,0,0,0];
+  var fun=[0,0,0,0], funCnos={};   // [v544.1] funCnos = 진행 단계에 있는 계약번호 (퇴실대기 카드용)
   try{
     var STEP={'중도퇴실 신청 접수':0,'정산서 발행':1,'후임 세입자 모색':1,'정산 협의':1,'퇴실 확정':2,'보증금 반환':3};
     var latest={};
@@ -23178,9 +23178,19 @@ function renderExitMgmtView(){
       var L=latest[cno];
       if(L.d<lim) return;
       if(window._VAC_STAT9&&window._VAC_STAT9.indexOf(L.f)>=0) return;   // 이미 상태확정 → 제외
-      if(STEP[L.f]!=null) fun[STEP[L.f]]++;
+      if(STEP[L.f]!=null){ fun[STEP[L.f]]++; funCnos[cno]=1; }
     });
   }catch(_fe){}
+  // [v544.1] 퇴실대기 중 — 계약상태 '계약중/정상'인데 ① 퇴실일(계약해지일) 기재 또는 ② DR 진행 단계(최근 90일, 상태확정 전)
+  var waitTot=0, waitTermCnt=0, waitDrCnt=0;
+  try{
+    var aliveOf={};
+    V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c3=String(v.no||'').trim(); if(c3) aliveOf[c3]=String(v.terminateDate||'').trim(); } });
+    var waitSet={};
+    Object.keys(aliveOf).forEach(function(c3){ if(aliveOf[c3]&&exm_pd(aliveOf[c3])){ waitSet[c3]=1; waitTermCnt++; } });
+    Object.keys(funCnos).forEach(function(c3){ if(aliveOf[c3]!==undefined&&!waitSet[c3]){ waitSet[c3]=1; waitDrCnt++; } });
+    waitTot=Object.keys(waitSet).length;
+  }catch(_we){}
   // ── KPI 카드 ──
   var lbl=Y+'년 '+M+'월';
   var badge=function(c2,p2){ var d=c2-p2; if(!p2&&!c2) return ''; if(d===0) return ' <span style="background:#F1F5F9;color:#64748B;border-radius:6px;padding:1.5px 6px;font-size:10px;font-weight:800;vertical-align:2px">—</span>';
@@ -23256,13 +23266,18 @@ function renderExitMgmtView(){
     +'</div>'
     +'<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:14px 16px;margin-bottom:14px">'
     +  '<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:10px">⏳ 진행 현황 — 퇴실 선행지표 <span style="font-size:10px;color:#8A9AB5;font-weight:400">Daily Report 중도퇴실관리 최근 90일 과정 기록 (상태확정 전) + 만기퇴실예정</span></div>'
-    +  '<div style="display:grid;grid-template-columns:1fr 220px;gap:14px;align-items:stretch">'
+    +  '<div style="display:grid;grid-template-columns:1fr 200px 200px;gap:14px;align-items:stretch">'   /* [v544.1] 퇴실대기 카드 추가 */
     +    '<div style="display:flex;gap:6px;align-items:stretch">'
     +      ['신청 접수','정산 협의','퇴실 확정','보증금 반환'].map(function(nm2,ix2){
              return '<div style="flex:1;background:#F8FAFF;border:1px solid #E2EAF5;border-radius:9px;padding:8px 10px;text-align:center;position:relative">'
                +'<b style="display:block;font-size:17px;color:#4F46E5">'+fun[ix2]+'</b><span style="font-size:10px;color:#5A6A8A">'+nm2+'</span>'
                +(ix2<3?'<span style="position:absolute;right:-7px;top:50%;transform:translateY(-50%);color:#C0CBDD;font-weight:800">›</span>':'')+'</div>';
            }).join('')
+    +    '</div>'
+    +    '<div title="계약상태가 아직 계약중인데 퇴실일이 확정됐거나 중도퇴실 진행 기록(최근 90일)이 있는 계약" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:10px 12px;cursor:help">'   /* [v544.1] 퇴실대기 중 */
+    +      '<div style="font-size:10.5px;color:#B45309;font-weight:700">퇴실대기 중</div>'
+    +      '<div style="font-size:22px;font-weight:800;color:#D97706">'+waitTot+'건</div>'
+    +      '<div style="font-size:10px;color:#5A6A8A;margin-top:3px">계약중 · 퇴실일 확정 '+waitTermCnt+' / 진행 기록 '+waitDrCnt+'</div>'
     +    '</div>'
     +    '<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:10px 12px">'
     +      '<div style="font-size:10.5px;color:#1E40AF;font-weight:700">만기퇴실예정</div>'
