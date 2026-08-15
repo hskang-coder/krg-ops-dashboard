@@ -23132,7 +23132,9 @@ function exm_leadModal(kind, ix){
     else if(kind==='act'||kind==='forced'){ rows=(kind==='act'?L.act:L.forced)||[]; title=(kind==='act'?'활성 진행':'강제퇴실 진행'); color=(kind==='act'?'#4F46E5':'#9D174D');   /* [v548] */
       cols=[{h:'퇴실구분',k:'exit',f:function(r){ var c4=r.exit==='강제퇴실'?'background:#FEF2F2;color:#B91C1C':(r.exit==='중도퇴실'?'background:#FFFBEB;color:#B45309':'background:#EFF6FF;color:#1D4ED8'); return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+c4+'">'+(r.exit||'-')+'</span>'; }},   /* [v548.3] */
             {h:'퇴실사유',k:'st',f:function(r){ return (!r.st||r.st==='-')?'<span style="color:#94A3B8">-</span>':r.st; }},   /* [v548.3] 공실상태 값 */
-            {h:(kind==='forced'?'최신 대응일':'최신 기록'),k:(kind==='forced'?'d':'f'),f:function(r){ return kind==='forced'?(r.d?exm_fmtD8(r.d):'<span style="color:#94A3B8">-</span>'):r.f; }},   /* [v550.3] forced는 최신 대응일 표시 */
+            {h:(kind==='forced'?'진척사항 (대응일)':'최신 기록'),k:(kind==='forced'?'lp':'f'),f:function(r){ if(kind!=='forced') return r.f;
+              var dt=r.d?' <span style="color:#94A3B8;font-size:10px">'+exm_fmtD8(r.d)+'</span>':'';
+              return r.lp?'<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:#EEF2FF;color:#4F46E5">'+r.lp+'</span>'+dt:(r.d?'<span style="color:#94A3B8">미입력</span>'+dt:'<span style="color:#94A3B8">-</span>'); }},   /* [v550.3/5] forced는 빠른메모 진척사항(I열) + 대응일 */
             {h:'대응내역',k:'lc',f:function(r){ if(!r.lc) return '<span style="color:#94A3B8">-</span>'; var t9=String(r.lc).replace(/"/g,'&quot;'); return '<span title="'+t9+'" style="display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">'+r.lc+'</span>'; }}]   /* [v549.9] 최신 대응내역 요약 · [v550.2] forced에도 표시 */
         .concat(kind==='act'?[{h:'기록일',k:'d',f:function(r){ return exm_fmtD8(r.d); }}]:[])   /* [v549.4] forced는 기록일 제외 */
         .concat(kind==='forced'?[{h:'실퇴실일',k:'real',f:function(r){ return r.real; }}]:[])   /* [v549.9] act는 실퇴실일 대신 만기일 */
@@ -23210,7 +23212,7 @@ function exm_leadModal(kind, ix){
       if(kind==='stage') return [r.cno,r.nm,r.addr,r.ck,r.f,exm_fmtD8(r.d),r.real];
       if(kind==='wait') return [r.cno,r.nm,r.addr,r.exit||'-',r.src,r.st||'-',r.real,r.term,r.end||'-'];   /* [v547.2/3] */
       if(kind==='act') return [r.cno,r.nm,r.addr,r.exit||'-',r.st||'-',r.f,(r.lc||'-'),exm_fmtD8(r.d),r.end||'-'];   /* [v548/549.9] 대응내역·만기일 */
-      if(kind==='forced') return [r.cno,r.nm,r.addr,r.exit||'-',r.st||'-',(r.d?exm_fmtD8(r.d):'-'),(r.lc||'-'),r.real,r.end||'-'];   /* [v549.4/550.2/3] 최신 대응일·대응내역 */
+      if(kind==='forced') return [r.cno,r.nm,r.addr,r.exit||'-',r.st||'-',(r.lp?r.lp+(r.d?' ('+exm_fmtD8(r.d)+')':''):(r.d?'미입력 ('+exm_fmtD8(r.d)+')':'-')),(r.lc||'-'),r.real,r.end||'-'];   /* [v549.4/550.2/3/5] 진척사항(대응일)·대응내역 */
       if(kind==='stall') return [r.cno,r.nm,r.addr,r.f,exm_fmtD8(r.d),r.age+'일',r.real,({app:'승인',cond:'조건부승인',deny:'거절',none:'이력없음'}[r.judge]||'-'),(r.lateT!=null?r.lateN+'/'+r.lateT+' ('+r.lateR+'%)':'-'),(r.lc?r.lc+' ('+exm_fmtD8(r.d)+')':'-')];   /* [v548/548.6] */
       if(kind==='fore') return [r.cno,r.nm,r.addr,r.exit||'-',r.st||'-',r.eff||'-',r.end||'-'];   /* [v548] */
       if(kind==='exp60') return [r.cno,r.nm,r.addr,r.end,'D-'+r.dday,({app:'승인',cond:'조건부승인',deny:'거절',none:'이력없음'}[r.judge]||'-'),(r.rnw?r.rnw+' ('+exm_fmtD8(r.rnwD)+')'+(r.rnwPg?' / '+r.rnwPg:''):'-'),(r.dlq||0)];   /* [v548/548.1/2] */
@@ -23220,7 +23222,7 @@ function exm_leadModal(kind, ix){
     window._exmLeadRows.hdr=(kind==='stage')?['계약번호','계약자','물건지','계약상태','최신 기록','기록일','실퇴실일']
       :(kind==='wait')?['계약번호','계약자','물건지','퇴실구분','구분','공실상태(사유)','실퇴실일','계약해지일','만기일']
       :(kind==='act')?['계약번호','계약자','물건지','퇴실구분','퇴실사유','최신 기록','대응내역','기록일','만기일']   /* [v548/549.9] */
-      :(kind==='forced')?['계약번호','계약자','물건지','퇴실구분','퇴실사유','최신 대응일','대응내역','실퇴실일','만기일']   /* [v549.4/550.2/3] */
+      :(kind==='forced')?['계약번호','계약자','물건지','퇴실구분','퇴실사유','진척사항 (대응일)','대응내역','실퇴실일','만기일']   /* [v549.4/550.2/3/5] */
       :(kind==='stall')?['계약번호','계약자','물건지','최신 기록','기록일','경과일','실퇴실일','갱신심사','연체율','최신 대응내용']   /* [v548/548.6] */
       :(kind==='fore')?['계약번호','계약자','물건지','퇴실구분','공실상태(사유)','퇴실 예정일','만기일']   /* [v548/549.7] */
       :(kind==='exp60')?['계약번호','계약자','물건지','만기일','D-DAY','갱신심사','갱신 최근 대응','연체금액']   /* [v548/548.1/2] */
@@ -23405,12 +23407,12 @@ function renderExitMgmtView(){
       var d=cG_dateNum(r.date)||0, ix=r._idx||0;
       var R=_zrec[cno]||(_zrec[cno]={first:0,last:0,li:0,lv:'',mid:false});
       if(!R.first||d<R.first) R.first=d;
-      if(d>R.last||(d===R.last&&ix>=R.li)){ R.last=d; R.li=ix; R.lv=String(r.jobSub||'').trim(); R.lc=String(r.content||'').trim(); }   /* [v548.6] 최신 대응내용 보존 */
+      if(d>R.last||(d===R.last&&ix>=R.li)){ R.last=d; R.li=ix; R.lv=String(r.jobSub||'').trim(); R.lc=String(r.content||'').trim(); R.lp=String(r.progress||'').trim(); }   /* [v548.6] 최신 대응내용 보존 · [v550.5] 진척사항(I열) 보존 */
       if(jt.indexOf('중도퇴실관리')>=0) R.mid=true;
     });
     var _zrow=function(cno,extra){ var _v2=vMap[cno]||{}; var R=_zrec[cno]; var _st2=String(_v2.status||'').trim();
       var o={cno:cno, nm:_v2.tenant1Name||_v2.tenantName||'-', addr:[_v2.propAddr,_v2.propBuilding,_v2.propRoom].filter(Boolean).join(' '),
-        f:R?R.lv:'-', d:R?R.last:0, lc:(R&&R.lc?R.lc:''), real:(drReal[cno]?drReal[cno].v:String(_v2.exitDate||'').trim())||'-',   /* [v549.9] lc 기본 포함 */
+        f:R?R.lv:'-', d:R?R.last:0, lc:(R&&R.lc?R.lc:''), lp:(R&&R.lp?R.lp:''), real:(drReal[cno]?drReal[cno].v:String(_v2.exitDate||'').trim())||'-',   /* [v549.9] lc 기본 포함 · [v550.5] 진척사항 */
         exit:(_st2.indexOf('강제퇴실')>=0?'강제퇴실':((/중도퇴실/.test(String(_v2.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|월세부담/.test(_st2))?'중도퇴실':'만기퇴실')),   /* [v549.10] 불가항력·중도 상태도 중도퇴실 */
         st:(_st2&&_st2!=='-'?_st2:'-'), end:(String(_v2.endDate||'').trim()||'-')};
       for(var k9 in (extra||{})) o[k9]=extra[k9]; return o; };
