@@ -23183,6 +23183,25 @@ function exm_leadModal(kind, ix){
     var _ar=function(k5){ return (S&&S.key===k5)?(S.dir==='asc'?' ▲':' ▼'):' <span style="opacity:.3">⇅</span>'; };
     var _sth=function(h5,k5){ return '<th onclick="exm_leadSortBy(\''+k5+'\')" style="padding:6px 9px;text-align:left;white-space:nowrap;cursor:pointer;user-select:none">'+h5+_ar(k5)+'</th>'; };
     window._exmLeadRows={title:title, rows:rows, cols:cols.map(function(c){return c.h;})};
+    // [v551.2] 강제퇴실 진행 — 진척표 (단계별 인원)
+    var stripHtml='';
+    if(kind==='forced'){
+      var _SP=['실제퇴실완료(개문포함)','임대인합의전(청소,보증금확인)','부동산컨설팅확정','부동산컨설팅제외(만기퇴실)'];
+      var _spC={}; _SP.forEach(function(s){_spC[s]=0;}); var _spNone=0;
+      rows.forEach(function(r){ if(_spC[r.lp]!=null) _spC[r.lp]++; else _spNone++; });
+      var _spBox=function(no9,nm9,n9,bg9,bd9,cl9){ return '<div style="flex:1;background:'+(n9?bg9:'#F8FAFC')+';border:1px solid '+(n9?bd9:'#E2EAF5')+';border-radius:8px;padding:6px 8px;text-align:center;min-width:0">'
+        +'<div style="font-size:9.5px;color:'+(n9?cl9:'#94A3B8')+';font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+no9+' '+nm9+'</div>'
+        +'<div style="font-size:15px;font-weight:800;color:'+(n9?cl9:'#CBD5E1')+'">'+n9+'명</div></div>'; };
+      var _spAr='<div style="color:#CBD5E1;font-weight:800;align-self:center;flex:none">→</div>';
+      stripHtml='<div style="display:flex;gap:7px;align-items:stretch;padding:10px 16px 0">'
+        +_spBox('①','실제퇴실완료(개문포함)',_spC[_SP[0]],'#EEF2FF','#C7D2FE','#4F46E5')+_spAr
+        +_spBox('②','임대인합의전(청소·보증금확인)',_spC[_SP[1]],'#EEF2FF','#C7D2FE','#4F46E5')+_spAr
+        +_spBox('③','부동산컨설팅확정',_spC[_SP[2]],'#EFF6FF','#BFDBFE','#1D4ED8')
+        +'<div style="width:1px;background:#E2EAF5;margin:2px 3px;flex:none"></div>'
+        +_spBox('④','부동산컨설팅제외(만기퇴실)',_spC[_SP[3]],'#F5F3FF','#DDD6FE','#6D28D9')
+        +_spBox('','미입력',_spNone,'#FFFBEB','#FDE68A','#B45309')
+        +'</div>';
+    }
     var prev=document.getElementById('exmLeadModal'); if(prev)prev.remove();
     var ov=document.createElement('div'); ov.id='exmLeadModal';
     ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px';
@@ -23202,6 +23221,7 @@ function exm_leadModal(kind, ix){
       +    '<button onclick="exm_leadExcel()" style="background:#1d4ed8;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">⬇ 엑셀</button>'
       +    '<button onclick="document.getElementById(\'exmLeadModal\').remove()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">닫기</button>'
       +  '</span></div>'
+      +stripHtml   /* [v551.2] 진척표 (forced 전용) */
       +'<div style="overflow:auto;padding:0 6px 6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
       +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th>'
       +_sth('계약번호','cno')+_sth('계약자','nm')+_sth('물건지','addr')
