@@ -23533,6 +23533,10 @@ function renderExitMgmtView(){
   var zfB=zForced.filter(function(x){return x.vacD!=null;});
   var zfMax=0; zfB.forEach(function(x){ if(x.vacD>zfMax) zfMax=x.vacD; });
   var zfC={pre:0,mid:0,exp:0}; zfB.forEach(function(x){ if(zfC[x.cls]!=null) zfC[x.cls]++; });
+  // [v551.3] 강제퇴실 진척사항 단계별 집계 (빠른 메모 I열 기준)
+  var _SPZ=['실제퇴실완료(개문포함)','임대인합의전(청소,보증금확인)','부동산컨설팅확정','부동산컨설팅제외(만기퇴실)'];
+  var zfS={}; _SPZ.forEach(function(s){zfS[s]=0;}); var zfSN=0;
+  zForced.forEach(function(x){ if(zfS[x.lp]!=null) zfS[x.lp]++; else zfSN++; });
   // [v550.1] 이번 달 조회 시 월말 추정 — 확정 + 만기예정 전환 예상 + 강제 진행 확정 예상 (총 퇴실 카드에 병기)
   var estHtml='';
   try{
@@ -23652,29 +23656,27 @@ function renderExitMgmtView(){
            '강제퇴실 상태 + 계약중 + 계약해지일 미확정. 공실 부담 = 실퇴실 완료(집 비움)인데 해지 미확정 — KRG가 월세 부담 중인 건. 경과 31일+ 주황 / 61일+ 빨강. 컨설팅 구분은 빠른 메모 진척사항(부동산컨설팅확정=컨설팅중 · 부동산컨설팅제외=만기확정 · 그 외=컨설팅전)으로 자동 분류. 해지일 확정 시 퇴실대기로 이동')   /* [v551] */
     +  '</div>'
     +  '<div style="font-size:10.5px;font-weight:800;color:#64748B;margin-bottom:6px">📅 퇴실 예보 <span style="font-weight:400;font-size:9.5px;color:#94A3B8">실퇴실일(DR D열·BP열) 우선, 없으면 계약해지일 · 계약중 건만</span></div>'
-    +  '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">'
+    +  '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">'   /* [v551.3] 4카드 — 만기퇴실예정 예보 존으로 이동 */
     +    zc('exm_leadModal(\'fore\',0)','#EFF6FF','#BFDBFE','#1E40AF','#1D4ED8','이번 달('+zNowM+') 잔여 퇴실',zFore[0].length+'건','오늘 이후 퇴실일 도래 · 원상복구/정산 준비','')
+    +    zc('exm_leadModal(\'sched\')','#FAFAFA','#E2EAF5','#475569','#1A3A5C','만기퇴실예정',zSchedM.length+'건','이번 달('+zNowM+') 만기 도래 · 계약중 — 갱신 미처리 시 퇴실','만기일이 이번 달인 계약중 건. 갱신 계약이 체결되면 만기일이 연장되어 자동으로 빠짐')   /* [v550] */
     +    zc('exm_leadModal(\'fore\',1)','#EFF6FF','#BFDBFE','#1E40AF','#1D4ED8','다음 달('+zNxtM+') 퇴실 예정',zFore[1].length+'건','워크로드 예보 · 공실 마케팅 선행 착수','')
     +    zc('exm_leadModal(\'exp60\')','#F0FDFA','#99F6E4','#0F766E','#0D9488','60일 내 만기 도래',zExp60.length+'건','갱신 협상 골든타임 · 미대응 시 만기퇴실 후보','계약중 건 중 만기일이 오늘~60일 이내')
     +  '</div>'
-    +  '<div style="font-size:10.5px;font-weight:800;color:#64748B;margin-bottom:6px">⚡ 처리 속도 · 참고 <span style="font-weight:400;font-size:9.5px;color:#94A3B8">최근 90일 실퇴실 완료 '+zLeadN+'건 기준</span></div>'
-    +  '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
-    +    '<div style="background:#FAFAFA;border:1px solid #E2EAF5;border-radius:9px;padding:10px 12px" title="최초 기록 → 실퇴실까지 평균 소요일">'
-    +      '<div style="font-size:10.5px;color:#475569;font-weight:700">평균 리드타임</div>'
-    +      '<div style="font-size:22px;font-weight:800;color:#1A3A5C">'+(zLeadAvg!=null?zLeadAvg+'일':'-')+'</div>'
-    +      '<div style="font-size:10px;color:#5A6A8A;margin-top:3px">최초 기록 → 실퇴실 평균 소요</div>'
-    +    '</div>'
-    +    '<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:10px 12px" title="최근 12개월 중도퇴실 문의 코호트. 모수 = 방어 성공 + 자진퇴실 (강제퇴실·불가항력 제외). 문의 후 60일 경과에도 계약 유지 시 방어 성공, 60일 미만은 판정 유보. 숫자 클릭 시 명단">'   /* [v549] 퇴실 방어율 (구 문의→확정→퇴실 퍼널 대체) */
-    +      '<div style="font-size:10.5px;color:#15803D;font-weight:700">퇴실 방어율 <span style="font-weight:400;font-size:9.5px;color:#94A3B8">12개월 문의 코호트</span></div>'
-    +      '<div style="font-size:22px;font-weight:800;color:#16A34A">'+(zDefPct!=null?zDefPct+'%':'-')+'</div>'
-    +      '<div style="font-size:10px;color:#5A6A8A;margin-top:3px">'
-    +        '방어 <span onclick="exm_leadModal(\'def\',0)" style="cursor:pointer;color:#16A34A;font-weight:800;text-decoration:underline">'+zDef[0].length+'</span>'
-    +        ' · 자진퇴실 <span onclick="exm_leadModal(\'def\',1)" style="cursor:pointer;color:#B91C1C;font-weight:800;text-decoration:underline">'+zDef[1].length+'</span>'
-    +        ' · 유보 <span onclick="exm_leadModal(\'def\',2)" style="cursor:pointer;color:#64748B;font-weight:800;text-decoration:underline">'+zDef[2].length+'</span>'
-    +        ' <span style="color:#94A3B8">(강제 '+zDefEx.gz+' · 불가항력 '+zDefEx.god+' 제외)</span></div>'
-    +    '</div>'
-    +    zc('exm_leadModal(\'sched\')','#FAFAFA','#E2EAF5','#475569','#1A3A5C','만기퇴실예정',zSchedM.length+'건','이번 달('+zNowM+') 만기 도래 · 계약중 — 갱신 미처리 시 퇴실','만기일이 이번 달인 계약중 건. 갱신 계약이 체결되면 만기일이 연장되어 자동으로 빠짐')   /* [v550] BO 잔존값 기준 → 이번 달 만기·계약중 기준 */
-    +  '</div>'
+    +  '<div style="font-size:10.5px;font-weight:800;color:#64748B;margin-bottom:6px">🚧 강제퇴실 진척사항 <span style="font-weight:400;font-size:9.5px;color:#94A3B8">강제퇴실 진행 '+zForced.length+'건 · 빠른 메모 진척사항(I열) 기준 · 클릭 시 명단</span></div>'   /* [v551.3] 처리 속도 존 → 강제퇴실 진척사항 */
+    +  (function(){
+         var b9=function(no9,nm9,n9,bg9,bd9,cl9){ return '<div onclick="exm_leadModal(\'forced\')" style="flex:1;min-width:0;cursor:pointer;background:'+(n9?bg9:'#F8FAFC')+';border:1px solid '+(n9?bd9:'#E2EAF5')+';border-radius:9px;padding:8px 10px;text-align:center">'
+           +'<div style="font-size:10px;color:'+(n9?cl9:'#94A3B8')+';font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+no9+' '+nm9+'</div>'
+           +'<div style="font-size:20px;font-weight:800;color:'+(n9?cl9:'#CBD5E1')+'">'+n9+'명</div></div>'; };
+         var ar9='<div style="color:#CBD5E1;font-weight:800;align-self:center;flex:none">→</div>';
+         return '<div style="display:flex;gap:8px;align-items:stretch">'
+           +b9('①','실제퇴실완료(개문포함)',zfS[_SPZ[0]],'#EEF2FF','#C7D2FE','#4F46E5')+ar9
+           +b9('②','임대인합의전(청소·보증금확인)',zfS[_SPZ[1]],'#EEF2FF','#C7D2FE','#4F46E5')+ar9
+           +b9('③','부동산컨설팅확정',zfS[_SPZ[2]],'#EFF6FF','#BFDBFE','#1D4ED8')
+           +'<div style="width:1px;background:#E2EAF5;margin:2px 3px;flex:none"></div>'
+           +b9('④','부동산컨설팅제외(만기퇴실)',zfS[_SPZ[3]],'#F5F3FF','#DDD6FE','#6D28D9')
+           +b9('','미입력',zfSN,'#FFFBEB','#FDE68A','#B45309')
+           +'</div>';
+       })()
     +'</div>'
     +'<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:14px 16px">'
     +  '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:13px;font-weight:800;color:#1A3A5C">📋 '+M+'월 퇴실 상세</span><span style="font-size:10px;color:#8A9AB5">계약번호 클릭 → 계약상세 이동 · 헤더 클릭 정렬</span>'
