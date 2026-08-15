@@ -23097,8 +23097,8 @@ function exm_isMid(v){ return /중도퇴실/.test(String(v.jValue||'')); }
 function exm_group(v){
   var s=String(v.status||'');
   if(s.indexOf('강제퇴실')>=0||s.indexOf('대위변제')>=0) return 'gz';   /* [v549.5] 강제 상태 최우선 — J열(중도퇴실 여부) 미기재여도 강제로 분류 */
+  if(s.indexOf('사망')>=0||s.indexOf('임대인사유')>=0||s.indexOf('물건하자')>=0||s.indexOf('월세부담')>=0) return 'god';   /* [v549.10] 불가항력도 J열 무관 — 중도 계열 */
   if(!exm_isMid(v)) return 'exp';
-  if(s.indexOf('사망')>=0||s.indexOf('임대인사유')>=0||s.indexOf('물건하자')>=0||s.indexOf('월세부담')>=0) return 'god';
   return 'vol';
 }
 function exm_shift(d){ var s=window._exm; var t=new Date(s.y, s.m-1+d, 1); s.y=t.getFullYear(); s.m=t.getMonth()+1; renderExitMgmtView(); }
@@ -23370,7 +23370,7 @@ function renderExitMgmtView(){
     V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c3=String(v.no||'').trim(); if(c3) aliveOf[c3]={ t:String(v.terminateDate||'').trim(), r:(drReal[c3]?drReal[c3].v:String(v.exitDate||'').trim()) }; } });
     var _wRow=function(c3,src){ var _v1=vMap[c3]||{}; var _st=String(_v1.status||'').trim();
       return {cno:c3, src:src, nm:_v1.tenant1Name||_v1.tenantName||'-', addr:[_v1.propAddr,_v1.propBuilding,_v1.propRoom].filter(Boolean).join(' '), real:aliveOf[c3].r||'-', term:aliveOf[c3].t||'-',
-        exit:(_st.indexOf('강제퇴실')>=0?'강제퇴실':(/중도퇴실/.test(String(_v1.jValue||''))?'중도퇴실':'만기퇴실')),   /* [v547.2] 퇴실구분 */
+        exit:(_st.indexOf('강제퇴실')>=0?'강제퇴실':((/중도퇴실/.test(String(_v1.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|월세부담/.test(_st))?'중도퇴실':'만기퇴실')),   /* [v547.2/549.10] 불가항력·중도 상태도 중도퇴실 */
         st:(_st&&_st!=='-'?_st:'-'),   /* [v547.2] 공실상태(사유) */
         end:(String(_v1.endDate||'').trim()||'-')}; };   /* [v547.3] 만기일 */
     var waitSet={};
@@ -23407,7 +23407,7 @@ function renderExitMgmtView(){
     var _zrow=function(cno,extra){ var _v2=vMap[cno]||{}; var R=_zrec[cno]; var _st2=String(_v2.status||'').trim();
       var o={cno:cno, nm:_v2.tenant1Name||_v2.tenantName||'-', addr:[_v2.propAddr,_v2.propBuilding,_v2.propRoom].filter(Boolean).join(' '),
         f:R?R.lv:'-', d:R?R.last:0, lc:(R&&R.lc?R.lc:''), real:(drReal[cno]?drReal[cno].v:String(_v2.exitDate||'').trim())||'-',   /* [v549.9] lc 기본 포함 */
-        exit:(_st2.indexOf('강제퇴실')>=0?'강제퇴실':(/중도퇴실/.test(String(_v2.jValue||''))?'중도퇴실':'만기퇴실')),
+        exit:(_st2.indexOf('강제퇴실')>=0?'강제퇴실':((/중도퇴실/.test(String(_v2.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|월세부담/.test(_st2))?'중도퇴실':'만기퇴실')),   /* [v549.10] 불가항력·중도 상태도 중도퇴실 */
         st:(_st2&&_st2!=='-'?_st2:'-'), end:(String(_v2.endDate||'').trim()||'-')};
       for(var k9 in (extra||{})) o[k9]=extra[k9]; return o; };
     var _zalive={}; V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c=String(v.no||'').trim(); if(c) _zalive[c]=1; } });
