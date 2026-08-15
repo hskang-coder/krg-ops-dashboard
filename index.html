@@ -23131,13 +23131,15 @@ function exm_leadModal(kind, ix){
             {h:'실퇴실일',k:'real',f:function(r){ return r.real; }},{h:'계약해지일',k:'term',f:function(r){ return r.term; }},{h:'만기일',k:'end',f:function(r){ return r.end||'-'; }}]; }   /* [v547.3] 만기일 */
     else if(kind==='act'||kind==='forced'){ rows=(kind==='act'?L.act:L.forced)||[]; title=(kind==='act'?'활성 진행':'강제퇴실 진행'); color=(kind==='act'?'#4F46E5':'#9D174D');   /* [v548] */
       cols=[{h:'퇴실구분',k:'exit',f:function(r){ var c4=r.exit==='강제퇴실'?'background:#FEF2F2;color:#B91C1C':(r.exit==='중도퇴실'?'background:#FFFBEB;color:#B45309':'background:#EFF6FF;color:#1D4ED8'); return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+c4+'">'+(r.exit||'-')+'</span>'; }},   /* [v548.3] */
-            {h:'퇴실사유',k:'st',f:function(r){ return (!r.st||r.st==='-')?'<span style="color:#94A3B8">-</span>':r.st; }},   /* [v548.3] 공실상태 값 */
-            {h:(kind==='forced'?'진척사항 (대응일)':'최신 기록'),k:(kind==='forced'?'lp':'f'),f:function(r){ if(kind!=='forced') return r.f;
+            {h:'퇴실사유',k:'st',f:function(r){ return (!r.st||r.st==='-')?'<span style="color:#94A3B8">-</span>':r.st; }}]   /* [v548.3] 공실상태 값 */
+        .concat(kind==='forced'?[{h:'컨설팅 구분',k:'cls',f:function(r){ var C={pre:['부동산컨설팅전','#FFFBEB','#B45309'],mid:['부동산컨설팅중','#EFF6FF','#1D4ED8'],exp:['만기퇴실로확정','#F5F3FF','#6D28D9']}[r.cls]||['-','#F1F5F9','#64748B']; return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:'+C[1]+';color:'+C[2]+'">'+C[0]+'</span>'; }}]:[])   /* [v551] 진척사항 기반 자동 분류 */
+        .concat([{h:(kind==='forced'?'진척사항 (대응일)':'최신 기록'),k:(kind==='forced'?'lp':'f'),f:function(r){ if(kind!=='forced') return r.f;
               var dt=r.d?' <span style="color:#94A3B8;font-size:10px">'+exm_fmtD8(r.d)+'</span>':'';
               return r.lp?'<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:#EEF2FF;color:#4F46E5">'+r.lp+'</span>'+dt:(r.d?'<span style="color:#94A3B8">미입력</span>'+dt:'<span style="color:#94A3B8">-</span>'); }},   /* [v550.3/5] forced는 빠른메모 진척사항(I열) + 대응일 */
-            {h:'대응내역',k:'lc',f:function(r){ if(!r.lc) return '<span style="color:#94A3B8">-</span>'; var t9=String(r.lc).replace(/"/g,'&quot;'); return '<span title="'+t9+'" style="display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">'+r.lc+'</span>'; }}]   /* [v549.9] 최신 대응내역 요약 · [v550.2] forced에도 표시 */
+            {h:'대응내역',k:'lc',f:function(r){ if(!r.lc) return '<span style="color:#94A3B8">-</span>'; var t9=String(r.lc).replace(/"/g,'&quot;'); return '<span title="'+t9+'" style="display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">'+r.lc+'</span>'; }}])   /* [v549.9] 최신 대응내역 요약 · [v550.2] forced에도 표시 */
         .concat(kind==='act'?[{h:'기록일',k:'d',f:function(r){ return exm_fmtD8(r.d); }}]:[])   /* [v549.4] forced는 기록일 제외 */
-        .concat(kind==='forced'?[{h:'실퇴실일',k:'real',f:function(r){ return r.real; }}]:[])   /* [v549.9] act는 실퇴실일 대신 만기일 */
+        .concat(kind==='forced'?[{h:'실퇴실일',k:'real',f:function(r){ return r.real; }},
+            {h:'공실 경과',k:'vacD',f:function(r){ if(r.vacD==null) return '<span style="color:#94A3B8">-</span>'; var c9=r.vacD>=61?'#B91C1C':(r.vacD>=31?'#D97706':'#64748B'); return '<b style="color:'+c9+'">'+(r.vacD>=61?'⚠ ':'')+r.vacD+'일</b>'; }}]:[])   /* [v549.9] act는 실퇴실일 대신 만기일 · [v551] 공실 경과 경고 */
         .concat([{h:'만기일',k:'end',f:function(r){ return r.end||'-'; }}]); }   /* [v549.4/9] 만기일 공통 */
     else if(kind==='stall'){ rows=L.stall||[]; title='장기 정체'; color='#B91C1C';   /* [v548] */
       cols=[{h:'최신 기록',k:'f',f:function(r){ return r.f; }},{h:'기록일',k:'d',f:function(r){ return exm_fmtD8(r.d); }},
@@ -23169,8 +23171,9 @@ function exm_leadModal(kind, ix){
     if(!(S&&S.kind===kind&&S.ix===ix&&S.key)) S=null;
     if(S){
       var _DK={real:1,term:1,end:1,eff:1};   /* [v548] eff 추가 */
-      var dv=function(o,k5){ var v=o[k5]; if(k5==='d'||k5==='age'||k5==='dday'||k5==='dlq'||k5==='rnwD'||k5==='lateR'||k5==='fd') return +v||0;   /* [v548.2/6, v549] 숫자키 */
+      var dv=function(o,k5){ var v=o[k5]; if(k5==='d'||k5==='age'||k5==='dday'||k5==='dlq'||k5==='rnwD'||k5==='lateR'||k5==='fd'||k5==='vacD') return +v||0;   /* [v548.2/6, v549, v551] 숫자키 */
         if(k5==='judge'){ var _jr={deny:0,cond:1,app:2,none:3}; return _jr[v]!=null?_jr[v]:9; }   /* [v548.1] 거절→조건부→승인 순 */
+        if(k5==='cls'){ var _cr={pre:0,mid:1,exp:2}; return _cr[v]!=null?_cr[v]:9; }   /* [v551] 컨설팅전→중→만기확정 순 */
         var s5=String(v==null?'':v);   /* [v548] 숫자키 확장 */
         if(_DK[k5]){ var m5=s5.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m5?(+m5[1])*10000+(+m5[2])*100+(+m5[3]):99999999; }
         return s5; };
@@ -23212,7 +23215,7 @@ function exm_leadModal(kind, ix){
       if(kind==='stage') return [r.cno,r.nm,r.addr,r.ck,r.f,exm_fmtD8(r.d),r.real];
       if(kind==='wait') return [r.cno,r.nm,r.addr,r.exit||'-',r.src,r.st||'-',r.real,r.term,r.end||'-'];   /* [v547.2/3] */
       if(kind==='act') return [r.cno,r.nm,r.addr,r.exit||'-',r.st||'-',r.f,(r.lc||'-'),exm_fmtD8(r.d),r.end||'-'];   /* [v548/549.9] 대응내역·만기일 */
-      if(kind==='forced') return [r.cno,r.nm,r.addr,r.exit||'-',r.st||'-',(r.lp?r.lp+(r.d?' ('+exm_fmtD8(r.d)+')':''):(r.d?'미입력 ('+exm_fmtD8(r.d)+')':'-')),(r.lc||'-'),r.real,r.end||'-'];   /* [v549.4/550.2/3/5] 진척사항(대응일)·대응내역 */
+      if(kind==='forced') return [r.cno,r.nm,r.addr,r.exit||'-',r.st||'-',({pre:'부동산컨설팅전',mid:'부동산컨설팅중',exp:'만기퇴실로확정'}[r.cls]||'-'),(r.lp?r.lp+(r.d?' ('+exm_fmtD8(r.d)+')':''):(r.d?'미입력 ('+exm_fmtD8(r.d)+')':'-')),(r.lc||'-'),r.real,(r.vacD!=null?r.vacD+'일':'-'),r.end||'-'];   /* [v549.4/550.2/3/5/551] 컨설팅 구분·공실 경과 */
       if(kind==='stall') return [r.cno,r.nm,r.addr,r.f,exm_fmtD8(r.d),r.age+'일',r.real,({app:'승인',cond:'조건부승인',deny:'거절',none:'이력없음'}[r.judge]||'-'),(r.lateT!=null?r.lateN+'/'+r.lateT+' ('+r.lateR+'%)':'-'),(r.lc?r.lc+' ('+exm_fmtD8(r.d)+')':'-')];   /* [v548/548.6] */
       if(kind==='fore') return [r.cno,r.nm,r.addr,r.exit||'-',r.st||'-',r.eff||'-',r.end||'-'];   /* [v548] */
       if(kind==='exp60') return [r.cno,r.nm,r.addr,r.end,'D-'+r.dday,({app:'승인',cond:'조건부승인',deny:'거절',none:'이력없음'}[r.judge]||'-'),(r.rnw?r.rnw+' ('+exm_fmtD8(r.rnwD)+')'+(r.rnwPg?' / '+r.rnwPg:''):'-'),(r.dlq||0)];   /* [v548/548.1/2] */
@@ -23222,7 +23225,7 @@ function exm_leadModal(kind, ix){
     window._exmLeadRows.hdr=(kind==='stage')?['계약번호','계약자','물건지','계약상태','최신 기록','기록일','실퇴실일']
       :(kind==='wait')?['계약번호','계약자','물건지','퇴실구분','구분','공실상태(사유)','실퇴실일','계약해지일','만기일']
       :(kind==='act')?['계약번호','계약자','물건지','퇴실구분','퇴실사유','최신 기록','대응내역','기록일','만기일']   /* [v548/549.9] */
-      :(kind==='forced')?['계약번호','계약자','물건지','퇴실구분','퇴실사유','진척사항 (대응일)','대응내역','실퇴실일','만기일']   /* [v549.4/550.2/3/5] */
+      :(kind==='forced')?['계약번호','계약자','물건지','퇴실구분','퇴실사유','컨설팅 구분','진척사항 (대응일)','대응내역','실퇴실일','공실 경과','만기일']   /* [v549.4/550.2/3/5/551] */
       :(kind==='stall')?['계약번호','계약자','물건지','최신 기록','기록일','경과일','실퇴실일','갱신심사','연체율','최신 대응내용']   /* [v548/548.6] */
       :(kind==='fore')?['계약번호','계약자','물건지','퇴실구분','공실상태(사유)','퇴실 예정일','만기일']   /* [v548/549.7] */
       :(kind==='exp60')?['계약번호','계약자','물건지','만기일','D-DAY','갱신심사','갱신 최근 대응','연체금액']   /* [v548/548.1/2] */
@@ -23466,7 +23469,12 @@ function renderExitMgmtView(){
       // [v548.5/549.2] 강제퇴실 진행: 강제 계열 상태(DR 최신 기록 or BO)인데 계약중 + 계약해지일 미확정 — 강제는 실퇴실 후 종료 처리하므로 해지일 확정 전까지 '진행', 확정 시 '퇴실대기 중'으로 이동 (상호 배타)
       var _bo5=String(_v5.status||'').trim(), _R5=_zrec[cno];
       var _tD5=exm_pd(String(_v5.terminateDate||'').trim());
-      if(((_R5&&String(_R5.lv||'').indexOf('강제퇴실')>=0)||_bo5.indexOf('강제퇴실')>=0)&&!_tD5) zForced.push(_zrow(cno));
+      if(((_R5&&String(_R5.lv||'').indexOf('강제퇴실')>=0)||_bo5.indexOf('강제퇴실')>=0)&&!_tD5){
+        var _rd5=exm_pd((drReal[cno]?drReal[cno].v:String(_v5.exitDate||'').trim()));   /* [v551] 공실 경과 = 오늘 - 실퇴실일 */
+        var _lp5=(_R5&&_R5.lp?_R5.lp:'');
+        zForced.push(_zrow(cno,{vacD:(_rd5&&_rd5<=_ztd?_zdays(_ztd,_rd5):null),
+          cls:(_lp5==='부동산컨설팅확정'?'mid':(_lp5==='부동산컨설팅제외(만기퇴실)'?'exp':'pre'))}));   /* [v551] 컨설팅 구분: 진척사항(I열) 기반 */
+      }
     });
     // [v549] 퇴실 방어율 — 최근 12개월 중도퇴실 문의 코호트 · 강제/불가항력 모수 제외 · 문의 후 60일 경과+계약 유지 = 방어 성공
     var _dLim=new Date(_ztd); _dLim.setMonth(_dLim.getMonth()-12);
@@ -23489,7 +23497,7 @@ function renderExitMgmtView(){
     zDef.forEach(function(a){ a.sort(function(x,y){ return (y.fd||0)-(x.fd||0); }); });
     zAct.sort(function(a,b){ return (b.d||0)-(a.d||0); });
     zStall.sort(function(a,b){ return (b.age||0)-(a.age||0); });
-    zForced.sort(function(a,b){ return (b.d||0)-(a.d||0); });
+    zForced.sort(function(a,b){ return (b.vacD==null?-1:b.vacD)-(a.vacD==null?-1:a.vacD); });   /* [v551] 공실 경과 내림차순 — 부담 큰 건 우선 */
     zFore.forEach(function(a){ a.sort(function(x,y){ var dx=exm_pd(x.eff), dy=exm_pd(y.eff); return (dx?+dx:9e15)-(dy?+dy:9e15); }); });
     zExp60.sort(function(a,b){ return (a.dday||0)-(b.dday||0); });
     zSchedM.sort(function(a,b){ var dx=exm_pd(a.end), dy=exm_pd(b.end); return (dx?+dx:9e15)-(dy?+dy:9e15); });   /* [v550] */
@@ -23502,6 +23510,10 @@ function renderExitMgmtView(){
     window._exmLead={ stages:stageLists, wait:waitList, sched:zSchedM,
       act:zAct, stall:zStall, forced:zForced, fore:zFore, exp60:zExp60, lead:{n:zLeadN, avg:zLeadAvg}, def:zDef };   /* [v548/549/550] sched = 이번 달 만기·계약중 */
   }catch(_le){}
+  // [v551] 강제퇴실 공실 부담 집계 — 실퇴실 완료(집 비움) + 해지일 미확정 = KRG 월세 부담 중
+  var zfB=zForced.filter(function(x){return x.vacD!=null;});
+  var zfMax=0; zfB.forEach(function(x){ if(x.vacD>zfMax) zfMax=x.vacD; });
+  var zfC={pre:0,mid:0,exp:0}; zfB.forEach(function(x){ if(zfC[x.cls]!=null) zfC[x.cls]++; });
   // [v550.1] 이번 달 조회 시 월말 추정 — 확정 + 만기예정 전환 예상 + 강제 진행 확정 예상 (총 퇴실 카드에 병기)
   var estHtml='';
   try{
@@ -23616,7 +23628,9 @@ function renderExitMgmtView(){
     +    zc('exm_leadModal(\'act\')','#F8FAFF','#E2EAF5','#4F46E5','#4F46E5','활성 진행',zAct.length+'건','최근 30일 내 기록 있음 · 정상 진행 중','최신 기록이 30일 이내이고 상태 미확정인 중도퇴실 진행 건')
     +    zc('exm_leadModal(\'stall\')','#FEF2F2','#FECACA','#B91C1C','#B91C1C','⚠ 장기 정체',zStall.length+'건','마지막 기록 후 31일+ 무소식'+(zStall.length?' · 최장 '+zStall[0].age+'일':'')+' · <u>후속 기록 필요</u>','마지막 기록이 31~180일 전이고 상태 미확정 — 방치된 진행 건')
     +    zc('exm_leadModal(\'wait\')','#FFFBEB','#FDE68A','#B45309','#D97706','퇴실대기 중',waitTot+'건','만기퇴실 '+waitEx['만기퇴실']+' · 중도퇴실 '+waitEx['중도퇴실']+' · 강제퇴실 '+waitEx['강제퇴실'],'계약중인데 ① 계약해지일 확정(당월 제외) 또는 ② 실퇴실일(DR D열·BP열) 기재')
-    +    zc('exm_leadModal(\'forced\')','#FDF2F8','#FBCFE8','#9D174D','#9D174D','강제퇴실 진행',zForced.length+'건','강제 상태 · 계약해지일 미확정 (확정 시 대기로 이동)','강제퇴실(공실·연체·갱신불가·계약위반) 상태 + 계약중 + 계약해지일 미확정 — 강제는 실퇴실 후 종료 처리하므로 해지일이 잡히면 퇴실대기 중 카드로 이동')
+    +    zc('exm_leadModal(\'forced\')','#FDF2F8','#FBCFE8','#9D174D','#9D174D','강제퇴실 진행',zForced.length+'건',
+           (zfB.length?'<span style="'+(zfMax>=61?'color:#B91C1C;font-weight:800':(zfMax>=31?'color:#D97706;font-weight:800':''))+'">'+(zfMax>=31?'⚠ ':'')+'공실 부담 '+zfB.length+'건 · 최장 '+zfMax+'일</span><br>컨설팅전 '+zfC.pre+' · 컨설팅중 '+zfC.mid+' · 만기확정 '+zfC.exp:'강제 상태 · 계약해지일 미확정 (확정 시 대기로 이동)'),
+           '강제퇴실 상태 + 계약중 + 계약해지일 미확정. 공실 부담 = 실퇴실 완료(집 비움)인데 해지 미확정 — KRG가 월세 부담 중인 건. 경과 31일+ 주황 / 61일+ 빨강. 컨설팅 구분은 빠른 메모 진척사항(부동산컨설팅확정=컨설팅중 · 부동산컨설팅제외=만기확정 · 그 외=컨설팅전)으로 자동 분류. 해지일 확정 시 퇴실대기로 이동')   /* [v551] */
     +  '</div>'
     +  '<div style="font-size:10.5px;font-weight:800;color:#64748B;margin-bottom:6px">📅 퇴실 예보 <span style="font-weight:400;font-size:9.5px;color:#94A3B8">실퇴실일(DR D열·BP열) 우선, 없으면 계약해지일 · 계약중 건만</span></div>'
     +  '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">'
