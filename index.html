@@ -6104,8 +6104,9 @@ function renderContractRecord(c, payments, responses = []) {
   <div class="cr-header-card">
     <div class="cr-header-top">
       <div>
-        <div style="font-size:11px;color:#94A3B8;font-weight:600;margin-bottom:4px">계약번호</div>
+        <div style="font-size:11px;color:#94A3B8;font-weight:600;margin-bottom:4px">계약자 · 계약번호</div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:20px;font-weight:800;color:#0F172A">${(function(){ const n=String(fmt(c['임차인명'])||'').trim(); if(n&&n!=='—'&&n!=='-') return n; try{ const v=(Array.isArray(vacancyRawData)?vacancyRawData:[]).find(x=>String(x.no||'').trim()===String(c['계약번호']||'').trim()); return (v&&(v.tenant1Name||v.tenantName))||'—'; }catch(e){ return '—'; } })()}</span>
           <span class="cr-contract-no">${c['계약번호']}</span>
           <span class="cr-grade ${gradeClass}">${grade}등급</span>
           ${_statusBadge(c['계약상태'])}
