@@ -6106,7 +6106,13 @@ function renderContractRecord(c, payments, responses = []) {
       <div>
         <div style="font-size:11px;color:#94A3B8;font-weight:600;margin-bottom:4px">계약자 · 계약번호</div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span style="font-size:20px;font-weight:800;color:#0F172A">${(function(){ const n=String(fmt(c['임차인명'])||'').trim(); if(n&&n!=='—'&&n!=='-') return n; try{ const v=(Array.isArray(vacancyRawData)?vacancyRawData:[]).find(x=>String(x.no||'').trim()===String(c['계약번호']||'').trim()); return (v&&(v.tenant1Name||v.tenantName))||'—'; }catch(e){ return '—'; } })()}</span>
+          <span style="font-size:20px;font-weight:800;color:#0F172A">${(function(){ /* [v551.6] 주계약자 + 부계약자(공동전차인/연대보증인) 표기 */
+            let v=null; try{ v=(Array.isArray(vacancyRawData)?vacancyRawData:[]).find(x=>String(x.no||'').trim()===String(c['계약번호']||'').trim())||null; }catch(e){}
+            let n=String(fmt(c['임차인명'])||'').trim(); if(!n||n==='—'||n==='-') n=(v&&(v.tenant1Name||v.tenantName))||'—';
+            const co=v?String(v.coName||'').trim():'';
+            if(co){ const lbl=/연대|보증/.test(String(v.contractInfo||''))?'연대보증인':'공동전차인';
+              return n+', '+co+' <span style="font-size:12px;font-weight:700;color:#64748B;vertical-align:2px">('+lbl+')</span>'; }
+            return n; })()}</span>
           <span class="cr-contract-no">${c['계약번호']}</span>
           <span class="cr-grade ${gradeClass}">${grade}등급</span>
           ${_statusBadge(c['계약상태'])}
