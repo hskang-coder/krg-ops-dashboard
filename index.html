@@ -12115,7 +12115,7 @@ function openMgmtContractModal(contractNo) {
     + styleBlock
     + '<div class="mctr-form">'
     // ① 임대인 정보 (계약자 "갑")
-    + section('① 임대인 정보 (계약자 "갑")',
+    + section('① 임대인 정보 (계약자 "갑") <button type="button" onclick="mgmtCtrAddLandlord()" style="margin-left:auto;border:1px solid #1B3976;background:#EEF2FF;color:#1B3976;border-radius:6px;font-size:11px;font-weight:800;padding:4px 10px;cursor:pointer">+ 임대인 추가</button>',   /* [v552.1] 공동 임대인 */
         row('c2',
           cell('임대인명 ' + H.req, inp('Name','예: 정진안')),
           cell('임대인 주민번호 ' + H.req, inp('Rrn','예: 961219-1037913'))
@@ -12126,6 +12126,7 @@ function openMgmtContractModal(contractNo) {
       + row('c1',
           cell('임대사업자 등록번호 ' + H.opt, inp('BizNo','예: 제 종로구-자기관리형 주택임대관리업자-1호'))
         )
+      + '<div class="mctr-coWrap"></div>'   /* [v552.1] 공동 임대인 블록 컨테이너 */
       )
     // ② 임대주택 표시
     + section('② 임대주택 표시',
@@ -12209,6 +12210,43 @@ function openMgmtContractModal(contractNo) {
   }, 100);
 }
 function closeMgmtContractModal(){ var m = document.getElementById('mgmtCtrModal'); if (m) m.remove(); }
+
+/* [v552.1] 공동 임대인(갑2, 갑3…) 블록 추가 — 활성 pane의 .mctr-coWrap에만 append */
+function mgmtCtrAddLandlord(){
+  var panes = document.querySelectorAll('#mctr_searchPane,#mctr_manualPane');
+  var wrap = null;
+  for (var i=0;i<panes.length;i++){
+    if (panes[i].style.display !== 'none') { wrap = panes[i].querySelector('.mctr-coWrap'); break; }
+  }
+  if (!wrap) return;
+  var blk = document.createElement('div');
+  blk.className = 'mctr-co-blk';
+  blk.style.cssText = 'border:1.5px dashed #93C5FD;background:#F8FAFF;border-radius:8px;padding:10px 12px;margin-top:10px';
+  blk.innerHTML = ''
+    + '<div style="display:flex;align-items:center;margin-bottom:8px">'
+    +   '<span class="mctr-co-ttl" style="font-size:11.5px;font-weight:800;color:#1B3976">공동 임대인</span>'
+    +   '<button type="button" onclick="var w=this.closest(\'.mctr-coWrap\');this.closest(\'.mctr-co-blk\').remove();mgmtCtrRenumberLandlords(w)" style="margin-left:auto;border:1px solid #FCA5A5;background:#FEF2F2;color:#B91C1C;border-radius:6px;font-size:10.5px;font-weight:700;padding:3px 8px;cursor:pointer">✕ 삭제</button>'
+    + '</div>'
+    + '<div class="mctr-row c2">'
+    +   '<div class="mctr-cell"><label class="mctr-lbl">공동 임대인명 <span class="mctr-hint req">필수</span></label><input type="text" class="mctr-fld mctr-co-name" placeholder="예: 홍길동"></div>'
+    +   '<div class="mctr-cell"><label class="mctr-lbl">주민번호 <span class="mctr-hint req">필수</span></label><input type="text" class="mctr-fld mctr-co-rrn" placeholder="예: 900101-1234567"></div>'
+    + '</div>'
+    + '<div class="mctr-row c1" style="margin-top:8px">'
+    +   '<div class="mctr-cell"><label class="mctr-lbl">주소 <span class="mctr-hint opt">미입력 시 갑1 주소 동일</span></label><input type="text" class="mctr-fld mctr-co-addr" placeholder="미입력 시 갑1(대표 임대인) 주소 적용"></div>'
+    + '</div>';
+  wrap.appendChild(blk);
+  mgmtCtrRenumberLandlords(wrap);
+  var nameFld = blk.querySelector('.mctr-co-name'); if (nameFld) nameFld.focus();
+}
+/* [v552.1] 갑2부터 순번 다시 매기기 */
+function mgmtCtrRenumberLandlords(wrap){
+  if (!wrap) return;
+  var blks = wrap.querySelectorAll('.mctr-co-blk');
+  for (var i=0;i<blks.length;i++){
+    var t = blks[i].querySelector('.mctr-co-ttl');
+    if (t) t.textContent = '공동 임대인 (갑' + (i+2) + ')';
+  }
+}
 
 // 모드 토글
 function mgmtCtrSwitchMode(mode, contractNo){
@@ -12515,6 +12553,26 @@ function generateMgmtContract(){
     signDate: getActive('SignDate'), startDate: getActive('StartDate'), endDate: getActive('EndDate'),
     rent: getActive('Rent'), payDay: getActive('PayDay')
   };
+  /* [v552.1] 공동 임대인 수집 — 활성 pane의 .mctr-co-blk만 */
+  d.coL = [];
+  var coErr = '';
+  (function(){
+    var panes = document.querySelectorAll('#mctr_searchPane,#mctr_manualPane');
+    for (var i=0;i<panes.length;i++){
+      if (panes[i].style.display === 'none') continue;
+      var blks = panes[i].querySelectorAll('.mctr-co-blk');
+      for (var j=0;j<blks.length;j++){
+        var nm = String((blks[j].querySelector('.mctr-co-name')||{}).value||'').trim();
+        var rr = String((blks[j].querySelector('.mctr-co-rrn')||{}).value||'').trim();
+        var ad = String((blks[j].querySelector('.mctr-co-addr')||{}).value||'').trim();
+        if (!nm && !rr && !ad) continue;               // 전부 빈 블록 → 무시
+        if (!nm || !rr) { coErr = '공동 임대인 (갑'+(j+2)+') 정보 누락: '+(!nm?'성명':'')+(!nm&&!rr?', ':'')+(!rr?'주민번호':''); return; }
+        d.coL.push({ name: nm, rrn: rr, addr: ad });
+      }
+      return;
+    }
+  })();
+  if (coErr) { alert(coErr); return; }
   var req = ['name','addr','rrn','propAddr','signDate','startDate','endDate','rent','payDay'];
   var missing = req.filter(function(k){ return !d[k]; });
   if (missing.length > 0) {
@@ -12543,6 +12601,17 @@ function buildMgmtContractHtml(d){
   var todayStr = (function(){var t=new Date(); return t.getFullYear()+'년 '+(t.getMonth()+1)+'월 '+t.getDate()+'일';})();
   // 직인
   var sealHtml = window.__krgSealDataUrl ? '<img src="'+window.__krgSealDataUrl+'" style="width:60px;height:60px;object-fit:contain">' : '';
+  /* [v552.1] 공동 임대인 */
+  var coL = (d.coL && d.coL.length) ? d.coL : [];
+  var hasCo = coL.length;
+  var coTables = coL.map(function(c, i){
+    return '<table class="tbl"><tr><th rowspan="3" style="text-align:center;background:#FEF3C7">갑'+(i+2)+' (공동임대인)</th><td><b>성명</b> &nbsp; '+c.name+'</td></tr>'
+      + '<tr><td><b>주소</b> &nbsp; '+(c.addr||d.addr)+'</td></tr>'
+      + '<tr><td><b>주민번호</b> &nbsp; '+c.rrn+'</td></tr></table>';
+  }).join('');
+  var coSignboxes = coL.map(function(c, i){
+    return '<div class="signbox"><b>갑'+(i+2)+' (공동임대인)</b>성명: '+c.name+'<br>주소: '+(c.addr||d.addr)+'<br>주민번호: '+c.rrn+'<br><span style="display:inline-block;margin-top:14px">(서명 또는 날인)</span><span class="stamp gapStamp" id="gapStamp'+(i+2)+'"></span></div>';
+  }).join('');
   var css = '*{box-sizing:border-box;margin:0;padding:0;font-family:"Noto Sans KR","Malgun Gothic",sans-serif}'
     + 'body{color:#1F2937;background:#F3F4F6;padding:20px;line-height:1.55;font-size:11.5px}'
     + '.page{max-width:780px;margin:0 auto 20px;background:#fff;padding:32px 40px;border:1px solid #D1D5DB;box-shadow:0 2px 6px rgba(0,0,0,.08);min-height:1050px;position:relative}'
@@ -12569,10 +12638,12 @@ function buildMgmtContractHtml(d){
     +   '<div class="title">표준 위·수탁 계약서 (자기관리형-임대인)</div>'
     +   '<div class="intro">임대인(이하 "갑"이라 한다)과 주택임대관리업자(이하 "을"이라 한다)는 아래 3. 임대주택의 표시란의 주택(이하 "임대주택")에 대하여 다음과 같이 주택임대관리(위탁관리)계약(이하 "본 계약")을 체결하고 이를 증명하기 위해 계약서 2통을 작성하여 "갑"과 "을"이 각각 기명날인한 후 각 1통씩 보관한다.</div>'
     +   '<div class="sec">1. 계약자</div>'
-    +   '<table class="tbl"><tr><th rowspan="4" style="text-align:center;background:#FEF3C7">갑 (임대인)</th><td><b>성명</b> &nbsp; '+d.name+'</td></tr>'
+    +   '<table class="tbl"><tr><th rowspan="4" style="text-align:center;background:#FEF3C7">'+(hasCo?'갑1 (임대인)':'갑 (임대인)')+'</th><td><b>성명</b> &nbsp; '+d.name+'</td></tr>'
     +     '<tr><td><b>주소</b> &nbsp; '+d.addr+'</td></tr>'
     +     '<tr><td><b>주민번호</b> &nbsp; '+d.rrn+'</td></tr>'
     +     '<tr><td><b>임대사업자 등록번호</b> &nbsp; '+(d.bizNo||'-')+'</td></tr></table>'
+    +   coTables   /* [v552.1] 공동 임대인 갑2~ 테이블 */
+    +   (hasCo ? '<div class="clause" style="margin-top:-4px;margin-bottom:12px;font-size:10px;color:#374151">※ 갑1 및 갑'+(hasCo>1?'2~갑'+(hasCo+1):'2')+'(이하 통칭하여 "갑")은 본 계약상 "갑"의 권리를 공동으로 보유하고 의무를 연대하여 부담한다.</div>' : '')
     +   '<table class="tbl"><tr><th rowspan="4" style="text-align:center;background:#DBEAFE">을 (주택임대관리업자)</th><td><b>성명</b> &nbsp; 케이알지그룹 주식회사</td></tr>'
     +     '<tr><td><b>주소</b> &nbsp; 충남 천안시 동남구 목천읍 천정1길 227-14</td></tr>'
     +     '<tr><td><b>법인등기번호</b> &nbsp; 110111-6847987</td></tr>'
@@ -12619,7 +12690,8 @@ function buildMgmtContractHtml(d){
     +   '<div class="clause">③ 본 계약은 "갑"과 "을"의 기명날인 또는 서명이 있는 서면 합의를 통해서만 수정 또는 변경될 수 있다.</div>'
     +   '<div class="clause"><b>제11조(특약)</b> "갑"과 "을"은 제1조부터 제10조까지에서 규정한 사항 외에 필요한 사항에 대해서는 따로 특약을 정할 수 있다.</div>'
     +   '<div class="signrow">'
-    +     '<div class="signbox"><b>갑 (임대인)</b>성명: '+d.name+'<br>주소: '+d.addr+'<br>주민번호: '+d.rrn+'<br><span style="display:inline-block;margin-top:14px">(서명 또는 날인)</span><span class="stamp" id="gapStamp"></span></div>'
+    +     '<div class="signbox"><b>'+(hasCo?'갑1 (임대인)':'갑 (임대인)')+'</b>성명: '+d.name+'<br>주소: '+d.addr+'<br>주민번호: '+d.rrn+'<br><span style="display:inline-block;margin-top:14px">(서명 또는 날인)</span><span class="stamp gapStamp" id="gapStamp"></span></div>'
+    +     coSignboxes   /* [v552.1] 공동 임대인 갑2~ 서명란 */
     +     '<div class="signbox"><b>을 (주택임대관리업자)</b>성명: 케이알지그룹 주식회사<br>주소: 충남 천안시 동남구 목천읍 천정1길 227-14<br>법인등기번호: 110111-6847987<span class="stamp">'+sealHtml+'</span></div>'
     +   '</div>'
     +   '<div style="text-align:center;margin-top:24px;font-size:13px;font-weight:700">'+fmtKr(d.signDate)+'</div>'
@@ -12628,10 +12700,10 @@ function buildMgmtContractHtml(d){
     + '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>위수탁계약서_'+(d.name||'')+'_'+(d.signDate||'')+'</title>'
     + '<style>'+css+'</style>'
     + '<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>'
-    + '<script>function attachGapStamp(){var i=document.createElement(\'input\');i.type=\'file\';i.accept=\'image/*\';i.onchange=function(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){var s=document.getElementById(\'gapStamp\');if(s)s.innerHTML=\'<img src="\'+ev.target.result+\'" alt="갑 도장" style="width:64px;height:64px;object-fit:contain;vertical-align:middle;margin-left:8px">\';};r.readAsDataURL(f);};i.click();}<\/script>'
+    + '<script>function attachGapStamp(){var slots=document.querySelectorAll(\'.gapStamp\');var s=null;for(var k=0;k<slots.length;k++){if(!slots[k].innerHTML){s=slots[k];break;}}if(!s){for(var k2=0;k2<slots.length;k2++){slots[k2].innerHTML=\'\';}s=slots[0];}if(!s)return;var i=document.createElement(\'input\');i.type=\'file\';i.accept=\'image/*\';i.onchange=function(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){s.innerHTML=\'<img src="\'+ev.target.result+\'" alt="갑 도장" style="width:64px;height:64px;object-fit:contain;vertical-align:middle;margin-left:8px">\';};r.readAsDataURL(f);};i.click();}<\/script>'
     + '</head><body>'
     + '<div class="print-actions">'
-    +   '<button class="print-btn" style="background:#B45309" onclick="attachGapStamp()">🖊️ 갑 도장 첨부</button>'
+    +   '<button class="print-btn" style="background:#B45309" onclick="attachGapStamp()">'+(hasCo?'🖊️ 갑 도장 첨부 (갑1→갑'+(hasCo+1)+' 순서)':'🖊️ 갑 도장 첨부')+'</button>'
     +   '<button class="print-btn" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>'
     +   '<button class="print-btn" style="background:#0EA5E9" onclick="(function(){var pages=document.querySelectorAll(\'.page\'); if(!pages.length) return; var acts=document.querySelector(\'.print-actions\'); if(acts) acts.style.display=\'none\'; var promises=[]; pages.forEach(function(p,i){promises.push(html2canvas(p,{scale:2,backgroundColor:\'#fff\'}).then(function(c){var a=document.createElement(\'a\');a.href=c.toDataURL(\'image/jpeg\',0.95);a.download=\'위수탁계약서_'+(d.name||'')+'_p\'+(i+1)+\'.jpg\';document.body.appendChild(a);a.click();document.body.removeChild(a);}));}); Promise.all(promises).then(function(){if(acts) acts.style.display=\'\';}).catch(function(e){if(acts) acts.style.display=\'\'; alert(\'JPG 생성 실패\');});})()">🖼️ JPG 저장 (페이지별)</button>'
     +   '<button class="print-btn" style="background:#6B7280" onclick="window.close()">닫기</button>'
