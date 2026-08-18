@@ -12604,10 +12604,8 @@ function buildMgmtContractHtml(d){
   /* [v552.1] 공동 임대인 */
   var coL = (d.coL && d.coL.length) ? d.coL : [];
   var hasCo = coL.length;
-  var coTables = coL.map(function(c, i){
-    return '<table class="tbl"><tr><th rowspan="3" style="text-align:center;background:#FEF3C7">갑'+(i+2)+' (공동임대인)</th><td><b>성명</b> &nbsp; '+c.name+'</td></tr>'
-      + '<tr><td><b>주소</b> &nbsp; '+(c.addr||d.addr)+'</td></tr>'
-      + '<tr><td><b>주민번호</b> &nbsp; '+c.rrn+'</td></tr></table>';
+  var coTables = coL.map(function(c, i){   /* [v552.2] 1행 압축형 — 페이지 넘침 방지 */
+    return '<table class="tbl"><tr><th style="text-align:center;background:#FEF3C7">갑'+(i+2)+' (공동임대인)</th><td><b>성명</b> '+c.name+' &nbsp;·&nbsp; <b>주민번호</b> '+c.rrn+'<br><b>주소</b> '+(c.addr||d.addr)+'</td></tr></table>';
   }).join('');
   var coSignboxes = coL.map(function(c, i){
     return '<div class="signbox"><b>갑'+(i+2)+' (공동임대인)</b>성명: '+c.name+'<br>주소: '+(c.addr||d.addr)+'<br>주민번호: '+c.rrn+'<br><span style="display:inline-block;margin-top:14px">(서명 또는 날인)</span><span class="stamp gapStamp" id="gapStamp'+(i+2)+'"></span></div>';
@@ -12631,6 +12629,17 @@ function buildMgmtContractHtml(d){
     + '.signbox .stamp{position:absolute;right:14px;bottom:10px;opacity:0.9}'
     + '.print-actions{text-align:center;padding:16px;background:#F1F5F9;border-radius:8px;margin-bottom:14px;max-width:780px;margin:0 auto 20px}'
     + '.print-btn{padding:10px 20px;background:#0F766E;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;margin:0 6px;font-size:13px}'
+    /* [v552.2] 공동 임대인 있을 때 페이지 넘침 방지 — 행간·여백 압축 + 서명란 재배치 */
+    + 'body.co1 .clause,body.co2 .clause{line-height:1.55;margin-bottom:6px}'
+    + 'body.co1 table.tbl,body.co2 table.tbl{margin-bottom:8px}'
+    + 'body.co1 table.tbl th,body.co1 table.tbl td,body.co2 table.tbl th,body.co2 table.tbl td{padding:5px 8px}'
+    + 'body.co1 .sec,body.co2 .sec{margin:10px 0 6px}'
+    + 'body.co1 .intro,body.co2 .intro{line-height:1.55;margin-bottom:10px}'
+    + 'body.co1 .signrow,body.co2 .signrow{margin-top:14px}'
+    + 'body.co1 .signbox,body.co2 .signbox{min-height:104px;padding:10px 12px}'
+    + 'body.co1 .signrow{grid-template-columns:1fr 1fr 1fr;gap:12px}'   /* 갑1·갑2·을 한 줄 */
+    + 'body.co2 .clause{line-height:1.45;margin-bottom:4px;font-size:10px}'
+    + 'body.co2 table.tbl{font-size:10.5px}'
     + '@page{size:A4 portrait;margin:10mm 14mm}'
     + '@media print{body{background:#fff;padding:0}.page{border:none;box-shadow:none;page-break-after:always;padding:0 6mm;min-height:auto}.print-actions{display:none}}';
   var p1 = ''
@@ -12701,7 +12710,7 @@ function buildMgmtContractHtml(d){
     + '<style>'+css+'</style>'
     + '<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>'
     + '<script>function attachGapStamp(){var slots=document.querySelectorAll(\'.gapStamp\');var s=null;for(var k=0;k<slots.length;k++){if(!slots[k].innerHTML){s=slots[k];break;}}if(!s){for(var k2=0;k2<slots.length;k2++){slots[k2].innerHTML=\'\';}s=slots[0];}if(!s)return;var i=document.createElement(\'input\');i.type=\'file\';i.accept=\'image/*\';i.onchange=function(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){s.innerHTML=\'<img src="\'+ev.target.result+\'" alt="갑 도장" style="width:64px;height:64px;object-fit:contain;vertical-align:middle;margin-left:8px">\';};r.readAsDataURL(f);};i.click();}<\/script>'
-    + '</head><body>'
+    + '</head><body'+(hasCo?' class="co'+(hasCo>=2?'2':'1')+'"':'')+'>'   /* [v552.2] */
     + '<div class="print-actions">'
     +   '<button class="print-btn" style="background:#B45309" onclick="attachGapStamp()">'+(hasCo?'🖊️ 갑 도장 첨부 (갑1→갑'+(hasCo+1)+' 순서)':'🖊️ 갑 도장 첨부')+'</button>'
     +   '<button class="print-btn" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>'
