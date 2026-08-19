@@ -22510,7 +22510,7 @@ window._okpiProgress = {
   '수납관리':       ['', '미수신', '분납', '완납', '강제퇴실확정'],
   '연체관리':       ['', '미수신', '분납', '완납', '강제퇴실확정'],
   '갱신관리':       ['', '갱신희망', '묵시적갱신', '만기퇴실예정', '갱신거절', '조건부승인'],
-  '중도퇴실관리':   ['', '실제퇴실완료(개문포함)', '임대인합의전(청소,보증금확인)', '부동산컨설팅확정', '부동산컨설팅제외(만기퇴실)'],   /* [v550.4] */
+  '중도퇴실관리':   ['', '실제퇴실완료(개문포함)', '임대인합의전(청소,보증금확인)', '임대인합의완료(계약해지)', '부동산컨설팅확정', '부동산컨설팅제외(만기퇴실)'],   /* [v550.4] · [v553.1] 합의완료 추가 */
   '퇴실관리':       ['', '대응중', '종료', '협의중']   // [v547]
 };
 function okpi_form_progressOptions(cat1){
@@ -23220,10 +23220,14 @@ function exm_leadModal(kind, ix){
             {h:'공실상태(사유)',k:'st',f:function(r){ return r.st==='-'?'<span style="color:#94A3B8">-</span>':r.st; }},   /* [v547.2] */
             {h:'실퇴실일',k:'real',f:function(r){ return r.real; }},{h:'계약해지일',k:'term',f:function(r){ return r.term; }},{h:'만기일',k:'end',f:function(r){ return r.end||'-'; }}]; }   /* [v547.3] 만기일 */
     else if(kind==='act'||kind==='forced'){ rows=(kind==='act'?L.act:L.forced)||[]; title=(kind==='act'?'활성 진행':'강제퇴실 진행'); color=(kind==='act'?'#4F46E5':'#9D174D');   /* [v548] */
-      // [v551.4] 진척 단계 필터 — ix: 0~3 = 표준 단계, 4 = 미입력
+      // [v551.4] 진척 단계 필터 — ix: 0~3 = 표준 단계, 4 = 미입력 · [v553.1] 임대인합의완료(계약해지)는 ④컨설팅제외 그룹 소속
       if(kind==='forced'&&typeof ix==='number'){ var _SPF=['실제퇴실완료(개문포함)','임대인합의전(청소,보증금확인)','부동산컨설팅확정','부동산컨설팅제외(만기퇴실)'];
-        rows=rows.filter(function(r){ return ix===4?_SPF.indexOf(r.lp||'')===-1:(r.lp===_SPF[ix]); });
-        title='강제퇴실 진행 — '+(ix===4?'미입력':_SPF[ix]); }
+        var _SPX=['부동산컨설팅제외(만기퇴실)','임대인합의완료(계약해지)'];
+        rows=rows.filter(function(r){ var lp9=r.lp||'';
+          if(ix===4) return _SPF.indexOf(lp9)===-1&&_SPX.indexOf(lp9)===-1;
+          if(ix===3) return _SPX.indexOf(lp9)>=0;
+          return lp9===_SPF[ix]; });
+        title='강제퇴실 진행 — '+(ix===4?'미입력':(ix===3?'부동산컨설팅제외(임대인합의·만기퇴실)':_SPF[ix])); }
       cols=[{h:'퇴실구분',k:'exit',f:function(r){ var c4=r.exit==='강제퇴실'?'background:#FEF2F2;color:#B91C1C':(r.exit==='중도퇴실'?'background:#FFFBEB;color:#B45309':'background:#EFF6FF;color:#1D4ED8'); return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;'+c4+'">'+(r.exit||'-')+'</span>'; }},   /* [v548.3] */
             {h:'퇴실사유',k:'st',f:function(r){ return (!r.st||r.st==='-')?'<span style="color:#94A3B8">-</span>':r.st; }}]   /* [v548.3] 공실상태 값 */
         .concat(kind==='forced'?[{h:'컨설팅 구분',k:'cls',f:function(r){ var C={pre:['부동산컨설팅전','#FFFBEB','#B45309'],mid:['부동산컨설팅중','#EFF6FF','#1D4ED8'],exp:['만기퇴실로확정','#F5F3FF','#6D28D9']}[r.cls]||['-','#F1F5F9','#64748B']; return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:'+C[1]+';color:'+C[2]+'">'+C[0]+'</span>'; }}]:[])   /* [v551] 진척사항 기반 자동 분류 */
@@ -23289,10 +23293,11 @@ function exm_leadModal(kind, ix){
     // [v551.2] 강제퇴실 진행 — 진척표 (단계별 인원) · [v551.4] 클릭 시 해당 단계만 필터 (재클릭 = 전체)
     var stripHtml='';
     if(kind==='forced'){
-      var _SP=['실제퇴실완료(개문포함)','임대인합의전(청소,보증금확인)','부동산컨설팅확정','부동산컨설팅제외(만기퇴실)'];
+      var _SP=['실제퇴실완료(개문포함)','임대인합의전(청소,보증금확인)','임대인합의완료(계약해지)','부동산컨설팅확정','부동산컨설팅제외(만기퇴실)'];   /* [v553.1] 집계용 — 합의완료는 ④그룹 소속 */
       var _all9=(L.forced||[]);
       var _spC={}; _SP.forEach(function(s){_spC[s]=0;}); var _spNone=0;
       _all9.forEach(function(r){ if(_spC[r.lp]!=null) _spC[r.lp]++; else _spNone++; });
+      var _agr9=_spC['임대인합의완료(계약해지)'], _exc9=_spC['부동산컨설팅제외(만기퇴실)'];
       var _sel9=(typeof ix==='number'?ix:null);
       /* [v552.3] 컴팩트 스텝퍼 — 원형 번호 배지 + 단계명 + 인원 한 줄, 선택 단계만 필 강조 */
       var _spBox=function(i9,nm9,n9,bg9,cl9){ var on9=(_sel9===i9);
@@ -23304,9 +23309,9 @@ function exm_leadModal(kind, ix){
       stripHtml='<div style="display:flex;gap:2px;align-items:center;padding:14px 16px 10px">'   /* [v552.4] 상하 여백 확대 — 선택 필 테두리 잘림 방지 */
         +_spBox(0,'실제퇴실완료(개문포함)',_spC[_SP[0]],'#EEF2FF','#4F46E5')+_spLn
         +_spBox(1,'임대인합의전(청소·보증금확인)',_spC[_SP[1]],'#EEF2FF','#4F46E5')+_spLn
-        +_spBox(2,'부동산컨설팅확정',_spC[_SP[2]],'#EFF6FF','#1D4ED8')
+        +_spBox(2,'부동산컨설팅확정',_spC[_SP[3]],'#EFF6FF','#1D4ED8')
         +'<div style="width:1px;height:18px;background:#E2EAF5;margin:0 8px;flex:none"></div>'
-        +_spBox(3,'부동산컨설팅제외(만기퇴실)',_spC[_SP[3]],'#F5F3FF','#6D28D9')
+        +_spBox(3,'부동산컨설팅제외(임대인합의 '+_agr9+' · 만기퇴실 '+_exc9+')',_agr9+_exc9,'#F5F3FF','#6D28D9')   /* [v553.1] 합의완료 소속 병기 */
         +'<div style="width:6px;flex:none"></div>'
         +_spBox(4,'미입력',_spNone,'#FFFBEB','#B45309')
         +'</div>';
@@ -23658,7 +23663,7 @@ function renderExitMgmtView(){
   var zfMax=0; zfB.forEach(function(x){ if(x.vacD>zfMax) zfMax=x.vacD; });
   var zfC={pre:0,mid:0,exp:0}; zfB.forEach(function(x){ if(zfC[x.cls]!=null) zfC[x.cls]++; });
   // [v551.3] 강제퇴실 진척사항 단계별 집계 (빠른 메모 I열 기준)
-  var _SPZ=['실제퇴실완료(개문포함)','임대인합의전(청소,보증금확인)','부동산컨설팅확정','부동산컨설팅제외(만기퇴실)'];
+  var _SPZ=['실제퇴실완료(개문포함)','임대인합의전(청소,보증금확인)','임대인합의완료(계약해지)','부동산컨설팅확정','부동산컨설팅제외(만기퇴실)'];   /* [v553.1] */
   var zfS={}; _SPZ.forEach(function(s){zfS[s]=0;}); var zfSN=0;
   zForced.forEach(function(x){ if(zfS[x.lp]!=null) zfS[x.lp]++; else zfSN++; });
   // [v552] 강제퇴실 전체 이력 — 진행(해지 미확정)/대기(계약중·해지 확정)/완료(종료) 전 기간
@@ -23816,9 +23821,9 @@ function renderExitMgmtView(){
          return '<div style="display:flex;gap:8px;align-items:stretch">'
            +b9(0,'①','실제퇴실완료(개문포함)',zfS[_SPZ[0]],'#EEF2FF','#C7D2FE','#4F46E5')+ar9
            +b9(1,'②','임대인합의전(청소·보증금확인)',zfS[_SPZ[1]],'#EEF2FF','#C7D2FE','#4F46E5')+ar9
-           +b9(2,'③','부동산컨설팅확정',zfS[_SPZ[2]],'#EFF6FF','#BFDBFE','#1D4ED8')
+           +b9(2,'③','부동산컨설팅확정',zfS[_SPZ[3]],'#EFF6FF','#BFDBFE','#1D4ED8')
            +'<div style="width:1px;background:#E2EAF5;margin:2px 3px;flex:none"></div>'
-           +b9(3,'④','부동산컨설팅제외(만기퇴실)',zfS[_SPZ[3]],'#F5F3FF','#DDD6FE','#6D28D9')
+           +b9(3,'④','부동산컨설팅제외(임대인합의 '+zfS[_SPZ[2]]+' · 만기퇴실 '+zfS[_SPZ[4]]+')',zfS[_SPZ[2]]+zfS[_SPZ[4]],'#F5F3FF','#DDD6FE','#6D28D9')   /* [v553.1] 합의완료 소속 병기 */
            +b9(4,'','미입력',zfSN,'#FFFBEB','#FDE68A','#B45309')
            +'</div>';
        })()
