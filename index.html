@@ -25206,12 +25206,15 @@ function renderExitMgmtView(){
     for(var _i=0;_i<all.length;_i++){var _r=all[_i]; if(_r.due==null)continue; if(_ddL[_r.cno]==null||_r.due>_ddL[_r.cno]){_ddL[_r.cno]=_r.due; dueDayMap[_r.cno]=_r.due%100;}}
     function projectedBilled(y,mo){ var ld=lastDay(y,mo),bd=[]; for(var d=1;d<=31;d++)bd.push(0); for(var cno in dueDayMap){ var day=Math.min(dueDayMap[cno],ld); if(day<1)continue; if(activeAt(cno,y*10000+mo*100+day)) bd[day-1]++; } return bd; }
     var today=new Date(),TY=today.getFullYear(),TM=today.getMonth()+1,TD=today.getDate();
-    function monthDaily(y,mo){ var ld=lastDay(y,mo),isCur=(y===TY&&mo===TM),cap=isCur?TD:ld,b=billed(y,mo)||1,cnt=[],rate=[];
-      for(var d=1;d<=31;d++){ if(d>ld||d>cap){cnt.push(null);rate.push(null);} else {var c=delqAsOf(y*10000+mo*100+d);cnt.push(c);rate.push(+(c/b*100).toFixed(2));} }
+    // [v379] 당월분/이월분 분리 — 이월분: 그 달 이전 납기 미납이 하나라도 있는 사람(소화 실패), 당월분: 전부 그 달 납기(신규 유입). 합계 = delqAsOf와 동일
+    function delqSplitAsOf(a,mS){ var s={}; for(var i=0;i<R.length;i++){var r=R[i]; if(r.due==null||r.due>a)continue; if(r.pay!=null&&!(r.pay>a))continue; if(!activeAt(r.cno,a))continue; if(r.due<mS) s[r.cno]=1; else if(s[r.cno]!==1) s[r.cno]=2; } var cy=0,nw=0; for(var k in s){ if(s[k]===1)cy++; else nw++; } return {cy:cy,nw:nw}; }
+    function monthDaily(y,mo){ var ld=lastDay(y,mo),isCur=(y===TY&&mo===TM),cap=isCur?TD:ld,b=billed(y,mo)||1,cnt=[],rate=[],cN=[],cC=[];
+      var mS=y*10000+mo*100+1;
+      for(var d=1;d<=31;d++){ if(d>ld||d>cap){cnt.push(null);rate.push(null);cN.push(null);cC.push(null);} else {var sp=delqSplitAsOf(y*10000+mo*100+d,mS);var c=sp.nw+sp.cy;cnt.push(c);rate.push(+(c/b*100).toFixed(2));cN.push(sp.nw);cC.push(sp.cy);} }
       var sd={'정상납부':[],'연체납부':[],'연체중':[],'분납중':[],'납부예정':[]}; for(var d=1;d<=31;d++){for(var k in sd)sd[k].push(0);}
       var bd=[]; for(var d=1;d<=31;d++) bd.push(0);
       for(var i=0;i<all.length;i++){var r=all[i];if(r.due==null)continue;var yy=Math.floor(r.due/10000),mm=Math.floor(r.due/100)%100,dd=r.due%100;if(yy===y&&mm===mo&&dd>=1&&dd<=31&&activeAt(r.cno,r.due)){ if(sd[r.st])sd[r.st][dd-1]++; bd[dd-1]++; }}
-      return {cnt:cnt,rate:rate,status:sd,billedDaily:bd,projectedDaily:projectedBilled(y,mo),label:mlabel(y,mo),billed:b,y:y,mo:mo}; }  /* [v469] y/mo 노출 — 명단 모달 클릭 키 계산용 */
+      return {cnt:cnt,rate:rate,cntNew:cN,cntCarry:cC,status:sd,billedDaily:bd,projectedDaily:projectedBilled(y,mo),label:mlabel(y,mo),billed:b,y:y,mo:mo}; }  /* [v469] y/mo 노출 — 명단 모달 클릭 키 계산용 · [v379] cntNew/cntCarry */
     function monthAgg(y,mo){ var ld=lastDay(y,mo),day=Math.min(TD,ld),asof=y*10000+mo*100+day,b=billed(y,mo)||1,c=delqAsOf(asof);
       var sc={'정상납부':0,'연체납부':0,'연체중':0,'분납중':0,'납부예정':0}; for(var i=0;i<all.length;i++){var r=all[i];if(r.due==null)continue;var yy=Math.floor(r.due/10000),mm=Math.floor(r.due/100)%100;if(yy===y&&mm===mo&&sc[r.st]!=null&&activeAt(r.cno,r.due))sc[r.st]++;}
       var _pj=projectedBilled(y,mo),_pjT=0; for(var _q=0;_q<_pj.length;_q++)_pjT+=_pj[_q];
@@ -25247,7 +25250,7 @@ function renderExitMgmtView(){
       '<div id="rnwMetrics" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px;"></div>'+
       '<div id="rnwLegend" style="display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:#6b7280;margin-bottom:4px;"></div>'+
       '<div style="position:relative;width:100%;height:200px;"><canvas id="rnwCanvas"></canvas></div>'+
-      '<div style="margin-top:8px;font-size:11px;color:#9aa0a6;">계약중(마스터 정상)·납기 경과·연체중+분납중 · 퇴실일(Z열) 기준 당시 계약중 · 계약번호 중복제거 · 종료 계약 제외 · <b style="color:#185FA5">build v378</b></div>';
+      '<div style="margin-top:8px;font-size:11px;color:#9aa0a6;">계약중(마스터 정상)·납기 경과·연체중+분납중 · 퇴실일(Z열) 기준 당시 계약중 · 계약번호 중복제거 · 종료 계약 제외 · 당월 막대 = 이월분(하단)+당월분(상단) · <b style="color:#185FA5">build v379</b></div>';
     anchorCard.parentNode.insertBefore(card, anchorCard);
     var sw=function(c,t){ return '<span><i style="display:inline-block;vertical-align:middle;margin-right:5px;width:11px;height:11px;border-radius:2px;background:'+c+'"></i>'+t+'</span>'; };
     var ml=function(c,k,v){ return '<div style="border-radius:8px;padding:7px 12px;min-width:108px;background:#f4f6fa;"><div style="font-size:11px;color:#6b7280;">'+k+'</div><div style="font-size:19px;font-weight:600;line-height:1.15;color:'+c+'">'+v+'</div></div>'; };
@@ -25416,13 +25419,27 @@ function renderExitMgmtView(){
           return;
         }
         var key = mode==='count'?'cnt':'rate';
-        lg.innerHTML = md.map(function(x,i){ return sw(cols[i], names[i]); }).join('');
+        // [v379] count 모드 — 당월 막대만 이월분(하단)+당월분(상단) 스택 분해, 전월·전전월은 단색 유지
+        var C_CY='#1B3976', C_NW='#7FA8DC';
+        var canSplit=(mode==='count'&&recent&&recent.cntNew&&recent.cntCarry);
+        if(canSplit){ lg.innerHTML = md.slice(0,-1).map(function(x,i){ return sw(cols[i], names[i]); }).join('') + sw(C_CY,'당월 이월분(전월 이전 납기 미납·소화 실패)') + sw(C_NW,'당월분(이번 달 납기·신규 유입)'); }
+        else { lg.innerHTML = md.map(function(x,i){ return sw(cols[i], names[i]); }).join(''); }
         var curToday=lastVal(recent[key]);
         if(mode==='count'){ var pToday=prev?(prev.cnt[S.today.day-1]!=null?prev.cnt[S.today.day-1]:lastVal(prev.cnt)):0, p2Today=prev2?(prev2.cnt[S.today.day-1]!=null?prev2.cnt[S.today.day-1]:lastVal(prev2.cnt)):0;
-          mt.innerHTML=(prev?ml('#A32D2D','전월 동일 대비',pc(curToday,pToday)):'')+(prev2?ml('#A32D2D','전전월 동일 대비',pc(curToday,p2Today)):'')+ml('#185FA5','당월 연체(오늘)',curToday+'명'); }
+          var _nwT=canSplit?lastVal(recent.cntNew):null, _cyT=canSplit?lastVal(recent.cntCarry):null;
+          mt.innerHTML=(prev?ml('#A32D2D','전월 동일 대비',pc(curToday,pToday)):'')+(prev2?ml('#A32D2D','전전월 동일 대비',pc(curToday,p2Today)):'')+ml('#185FA5','당월 연체(오늘)',curToday+'명')+(canSplit?ml(C_NW,'당월분(신규)',_nwT+'명')+ml(C_CY,'이월분(소화 실패)',_cyT+'명'):''); }
         else { mt.innerHTML=ml('#185FA5','당월 연체율',curToday+'%')+(prev?ml('#e8852b','전월',lastVal(prev.rate)+'%'):'')+(prev2?ml('#6b7280','전전월',lastVal(prev2.rate)+'%'):''); }
-        var ds=md.map(function(x,i){ var c=cols[i]; if(mode==='count'){ return {label:names[i],data:x.cnt,backgroundColor:c,barPercentage:0.95,categoryPercentage:0.72}; } else { return {label:names[i],data:x.rate,borderColor:c,backgroundColor:'transparent',tension:0.3,borderWidth:(i===md.length-1?2.5:2),pointRadius:0,spanGaps:true,borderDash:(i<md.length-1&&md.length>2&&i===0?[5,3]:[])}; } });
-        chart=new Chart(ctx,{type:mode==='count'?'bar':'line',data:{labels:days,datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},scales:{ y: mode==='count'?{beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'명';}},grid:{color:'rgba(120,120,120,0.1)'}}:rateLog((function(){var rv=[];md.forEach(function(x){for(var i=0;i<x.rate.length;i++)rv.push(x.rate[i]);});return rv;})()), x:dayX },plugins:{legend:{display:false}}}});
+        var ds=[];
+        md.forEach(function(x,i){ var c=cols[i];
+          if(mode==='count'){
+            if(canSplit&&i===md.length-1){
+              ds.push({label:'이월분',data:x.cntCarry,backgroundColor:C_CY,stack:'m'+i,barPercentage:0.95,categoryPercentage:0.72});
+              ds.push({label:'당월분(신규)',data:x.cntNew,backgroundColor:C_NW,stack:'m'+i,barPercentage:0.95,categoryPercentage:0.72});
+            } else ds.push({label:names[i],data:x.cnt,backgroundColor:c,stack:'m'+i,barPercentage:0.95,categoryPercentage:0.72});
+          } else ds.push({label:names[i],data:x.rate,borderColor:c,backgroundColor:'transparent',tension:0.3,borderWidth:(i===md.length-1?2.5:2),pointRadius:0,spanGaps:true,borderDash:(i<md.length-1&&md.length>2&&i===0?[5,3]:[])});
+        });
+        var cntTip={callbacks:{footer:function(items){ if(!canSplit||!items.length)return ''; var idx=items[0].dataIndex; var t=(recent.cnt[idx]!=null)?recent.cnt[idx]:null; return t!=null?('당월 합계: '+t+'명'):''; }}};
+        chart=new Chart(ctx,{type:mode==='count'?'bar':'line',data:{labels:days,datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},scales:{ y: mode==='count'?{stacked:true,beginAtZero:true,ticks:{font:{size:10},callback:function(v){return v+'명';}},grid:{color:'rgba(120,120,120,0.1)'}}:rateLog((function(){var rv=[];md.forEach(function(x){for(var i=0;i<x.rate.length;i++)rv.push(x.rate[i]);});return rv;})()), x:(mode==='count'?Object.assign({stacked:true},dayX):dayX) },plugins:{legend:{display:false},tooltip:(mode==='count'?cntTip:{})}}});
       } else {
         var ma = months.map(function(m){ return S.monthAgg(m.y,m.m); });
         var labels = ma.map(function(x){ return x.label; });
