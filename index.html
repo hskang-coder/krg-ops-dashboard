@@ -23858,7 +23858,9 @@ function renderExitMgmtView(){
             onClick:function(_e9,_els){ try{ if(!_els||!_els.length) return; var _el9=_els[0]; var _b9=months[_el9.index]; if(!_b9) return;
               window._exm={y:_b9.y,m:_b9.m}; window._exmKindF=['만기','중도','중도','강제'][_el9.datasetIndex]||'all'; renderExitMgmtView(); }catch(_ce){} },   /* [v552] 스택 클릭 → 해당 월+퇴실구분 필터로 이동 */
             plugins:{ legend:{position:'bottom',labels:{boxWidth:10,boxHeight:10,font:{size:10.5},color:'#475569'}},
-              tooltip:{mode:'index',callbacks:{footer:function(it){ return '총 '+it.reduce(function(s3,x){return s3+x.parsed.y;},0)+'명'; }}} },
+              tooltip:{mode:'index',callbacks:{
+                label:function(x3){ var t3=0; x3.chart.data.datasets.forEach(function(d3){ var v3=d3.data[x3.dataIndex]; if(v3!=null)t3+=v3; }); var v9=x3.parsed.y||0; var p9=t3>0?Math.round(v9/t3*100):0; return ' '+x3.dataset.label+': '+v9+'명 ('+p9+'%)'; },   /* [v552.5] 툴팁 % 병기 */
+                footer:function(it){ return '총 '+it.reduce(function(s3,x){return s3+x.parsed.y;},0)+'명'; }}} },
             scales:{ x:{stacked:true,grid:{display:false},ticks:{font:{size:10},color:'#8A9AB5'}},
               y:{stacked:true,grid:{color:'#F1F5F9'},ticks:{font:{size:10},color:'#8A9AB5',precision:0},border:{display:false}} } },
           plugins:[{ id:'exmTotal', afterDatasetsDraw:function(c2){
