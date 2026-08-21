@@ -23240,7 +23240,7 @@ function exm_leadModal(kind, ix){
             {h:'퇴실사유',k:'st',f:function(r){ return (!r.st||r.st==='-')?'<span style="color:#94A3B8">-</span>':r.st; }}]   /* [v548.3] 공실상태 값 */
         .concat(kind==='forced'?[{h:'컨설팅 구분',k:'cls',f:function(r){ var C={pre:['부동산컨설팅전','#FFFBEB','#B45309'],mid:['부동산컨설팅중','#EFF6FF','#1D4ED8'],exp:['만기퇴실로확정','#F5F3FF','#6D28D9'],agr:['임대인합의확정','#ECFDF5','#047857']}[r.cls]||['-','#F1F5F9','#64748B']; return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:'+C[1]+';color:'+C[2]+'">'+C[0]+'</span>'; }}]:[])   /* [v551] 진척사항 기반 자동 분류 */
         .concat([{h:(kind==='forced'?'진척사항':'최신 기록'),k:(kind==='forced'?'lp':'f'),f:function(r){ if(kind!=='forced') return r.f;
-              return r.lp?'<span title="대응일 '+exm_fmtD8(r.d)+'" style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:#EEF2FF;color:#4F46E5">'+r.lp+'</span>':(r.d?'<span title="대응일 '+exm_fmtD8(r.d)+'" style="color:#94A3B8">미입력</span>':'<span style="color:#94A3B8">-</span>'); }},   /* [v550.3/5] forced는 빠른메모 진척사항(I열) · [v551.1] 대응일은 툴팁으로 */
+              return r.lp?'<span title="진척 기재일 '+exm_fmtD8(r.lpd||r.d)+(r.lpd&&r.d&&r.lpd!==r.d?' · 최신 대응일 '+exm_fmtD8(r.d):'')+'" style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:#EEF2FF;color:#4F46E5">'+r.lp+'</span>':(r.d?'<span title="대응일 '+exm_fmtD8(r.d)+'" style="color:#94A3B8">미입력</span>':'<span style="color:#94A3B8">-</span>'); }},   /* [v553.4] 진척 기재일 툴팁 */   /* [v550.3/5] forced는 빠른메모 진척사항(I열) · [v551.1] 대응일은 툴팁으로 */
             {h:'대응내역',k:'lc',f:function(r){ if(!r.lc) return '<span style="color:#94A3B8">-</span>'; var t9=String(r.lc).replace(/"/g,'&quot;'); return '<span title="'+t9+'" style="display:inline-block;max-width:'+(kind==='forced'?170:240)+'px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">'+r.lc+'</span>'; }}])   /* [v549.9] 최신 대응내역 요약 · [v550.2] forced에도 표시 · [v551.1] forced 폭 압축 */
         .concat(kind==='act'?[{h:'기록일',k:'d',f:function(r){ return exm_fmtD8(r.d); }}]:[])   /* [v549.4] forced는 기록일 제외 */
         .concat(kind==='forced'?[{h:'실퇴실일',k:'real',f:function(r){ return r.real; }},
@@ -23564,14 +23564,17 @@ function renderExitMgmtView(){
       var jt=String(r.jobType||''); if(jt.indexOf('퇴실관리')===-1) return;
       var cno=String(r.no||'').trim(); if(!cno) return;
       var d=cG_dateNum(r.date)||0, ix=r._idx||0;
-      var R=_zrec[cno]||(_zrec[cno]={first:0,last:0,li:0,lv:'',mid:false});
+      var R=_zrec[cno]||(_zrec[cno]={first:0,last:0,li:0,lv:'',mid:false,lp:'',lpD:0,lpI:0});
       if(!R.first||d<R.first) R.first=d;
-      if(d>R.last||(d===R.last&&ix>=R.li)){ R.last=d; R.li=ix; R.lv=String(r.jobSub||'').trim(); R.lc=String(r.content||'').trim(); R.lp=String(r.progress||'').trim(); }   /* [v548.6] 최신 대응내용 보존 · [v550.5] 진척사항(I열) 보존 */
+      if(d>R.last||(d===R.last&&ix>=R.li)){ R.last=d; R.li=ix; R.lv=String(r.jobSub||'').trim(); R.lc=String(r.content||'').trim(); }   /* [v548.6] 최신 대응내용 보존 */
+      /* [v553.4] 진척사항(I열)은 '최근 기재된' 값 유지 — 이후 기록에 진척사항이 비어 있어도 확정된 단계가 미입력으로 되돌아가지 않도록 */
+      var _p9=String(r.progress||'').trim();
+      if(_p9&&(d>R.lpD||(d===R.lpD&&ix>=R.lpI))){ R.lpD=d; R.lpI=ix; R.lp=_p9; }
       if(jt.indexOf('중도퇴실관리')>=0) R.mid=true;
     });
     var _zrow=function(cno,extra){ var _v2=vMap[cno]||{}; var R=_zrec[cno]; var _st2=String(_v2.status||'').trim();
       var o={cno:cno, nm:_v2.tenant1Name||_v2.tenantName||'-', addr:[_v2.propAddr,_v2.propBuilding,_v2.propRoom].filter(Boolean).join(' '),
-        f:R?R.lv:'-', d:R?R.last:0, lc:(R&&R.lc?R.lc:''), lp:(R&&R.lp?R.lp:''), real:exm_fmtDt(drReal[cno]?drReal[cno].v:_v2.exitDate),   /* [v549.9] lc 기본 포함 · [v550.5] 진척사항 · [v553.3] 날짜 표기 통일 */
+        f:R?R.lv:'-', d:R?R.last:0, lc:(R&&R.lc?R.lc:''), lp:(R&&R.lp?R.lp:''), lpd:(R&&R.lpD?R.lpD:0), real:exm_fmtDt(drReal[cno]?drReal[cno].v:_v2.exitDate),   /* [v553.4] lpd = 진척사항 기재일 */   /* [v549.9] lc 기본 포함 · [v550.5] 진척사항 · [v553.3] 날짜 표기 통일 */
         exit:(_st2.indexOf('강제퇴실')>=0?'강제퇴실':((/중도퇴실/.test(String(_v2.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|월세부담/.test(_st2))?'중도퇴실':(exm_early(_v2,(drReal[cno]?drReal[cno].v:''))?'중도퇴실':'만기퇴실'))),   /* [v549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 */
         st:(_st2&&_st2!=='-'?_st2:'-'), end:exm_fmtDt(_v2.endDate)};
       for(var k9 in (extra||{})) o[k9]=extra[k9]; return o; };
