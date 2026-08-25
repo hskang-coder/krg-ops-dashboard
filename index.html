@@ -391,8 +391,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .crx-memo-dock { position:fixed; left:0; right:0; bottom:0; z-index:900; background:#F9F7FE; border-top:2px solid #C4B5FD; box-shadow:0 -4px 16px rgba(91,33,182,.10); padding:6px 16px 8px; }
 .crx-memo-dock .cr-qf-card { max-width:1400px; margin:0 auto; background:transparent; border:none; box-shadow:none; padding:0; }
 .crx-memo-dock.collapsed .cr-qf-card > *:not(.cr-qf-hd) { display:none; }
-/* [v559] 빠른 메모 상단 인라인 — 검색창 바로 아래, 계약자 카드 위 */
-.crx-memo-inline { margin:10px auto 12px; max-width:1400px; background:#F9F7FE; border:1.5px solid #C4B5FD; border-radius:12px; box-shadow:0 2px 10px rgba(91,33,182,.08); padding:8px 16px 10px; }
+/* [v559] 빠른 메모 상단 인라인 — 검색창 바로 아래, 계약자 카드 위 · [v560] 스크롤 시 상단 고정(sticky) */
+.crx-memo-inline { position:sticky; top:calc(var(--crx-hdr-h, 135px) + 6px); z-index:250; margin:10px auto 12px; max-width:1400px; background:#F9F7FE; border:1.5px solid #C4B5FD; border-radius:12px; box-shadow:0 3px 14px rgba(91,33,182,.14); padding:8px 16px 10px; }
 .crx-memo-inline .cr-qf-card { background:transparent; border:none; box-shadow:none; padding:0; }
 .crx-memo-inline.collapsed .cr-qf-card > *:not(.cr-qf-hd) { display:none; }
 .crx-memo-toggle { font-size:11px; font-weight:700; color:#4338CA; background:#EDE9FE; border:1px solid #DDD6FE; border-radius:6px; padding:3px 10px; cursor:pointer; float:right; }
@@ -23233,6 +23233,19 @@ function crQF_render(no, tenantName){
     host.id = 'crQuickFormHost';
     host.className = 'crx-memo-inline'; // [v559] 상단 인라인 — 검색창(.cr-search-panel) 바로 아래, 계약자 카드(crResult) 위
     crResult.parentNode.insertBefore(host, crResult);
+
+    // [v560] sticky 오프셋 = 상단 고정 헤더 높이 실측 (창 크기 변경 시 재계산)
+    try {
+      var _hd = document.querySelector('.header');
+      if (_hd) document.documentElement.style.setProperty('--crx-hdr-h', _hd.offsetHeight + 'px');
+      if (!window._crxHdrRsz) {
+        window._crxHdrRsz = 1;
+        window.addEventListener('resize', function(){
+          var h2 = document.querySelector('.header');
+          if (h2) document.documentElement.style.setProperty('--crx-hdr-h', h2.offsetHeight + 'px');
+        });
+      }
+    } catch(e){}
 
     okpi_injectCss(); // okpi CSS 재사용 (.cG-fld 등)
     var todayStr = okpi_ymd(new Date());
