@@ -23375,31 +23375,47 @@ function okpi_respSection(all, range, period){
     var pc=Math.round((c-p)/p*100);
     return ' <span style="font-size:10.5px;font-weight:800;color:'+(pc>0?'#15803D':pc<0?'#DC2626':'#94A3B8')+'">'+(pc>0?'▲':pc<0?'▼':'—')+Math.abs(pc)+'%</span>';
   };
+  /* [v557.1] 역할별 맞춤 지표 — 업무 내용이 달라 개별 최적화 (업무하위·진척사항 기반) */
+  var ROLE={'김영철':'전화·방문 회수 집중','오진선':'법적 진행 (KCB·내용증명·지급명령)','이지희':'운영 — 거주·퇴거 정산 대응','고송미':'운영 — 초동 대응·계약 진행'};
   var cards=PEOPLE.map(function(p){
-    var s=stat(W(p)), sp=stat(WP(p));
+    var arr=W(p);
+    var s=stat(arr), sp=stat(WP(p));
     var mixKeys=Object.keys(s.mix).sort(function(a,b){return s.mix[b]-s.mix[a];});
-    var topT=mixKeys[0]||'—';
     var mixBar=s.n? '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:#F6F7F9;margin-top:7px">'
       + mixKeys.map(function(t){ return '<div title="'+t+' '+s.mix[t]+'건" style="width:'+(s.mix[t]/s.n*100).toFixed(1)+'%;background:'+(TASKC[t]||'#94A3B8')+'"></div>'; }).join('')+'</div>' : '';
-    var doneR=s.fill? Math.round(s.done/s.fill*100) : null;
-    var missR=s.n? Math.round(s.miss/s.n*100) : 0;
     var fillR=s.n? Math.round(s.fill/s.n*100) : 0;
     var share=T.n? Math.round(s.n/T.n*100) : 0;
-    var m9=function(lb,v,c9){ return '<div style="flex:1;min-width:0"><div style="font-size:9.5px;color:#8A97A8;font-weight:700;white-space:nowrap">'+lb+'</div><div style="font-size:12.5px;font-weight:800;color:'+(c9||'#1E293B')+';white-space:nowrap">'+v+'</div></div>'; };
+    var sub9=function(pats){ var n=0; arr.forEach(function(r){ var t9=(r.sub||'').trim(); for(var i9=0;i9<pats.length;i9++){ if(t9&&t9.indexOf(pats[i9])>=0){ n++; return; } } }); return n; };
+    var pg9=function(keys){ var n=0; arr.forEach(function(r){ if(keys.indexOf((r.prog||'').trim())>=0) n++; }); return n; };
+    var avg9=s.nd? (Math.round(s.n/s.nd*10)/10)+'건' : '—';
+    var cells, extra='';
+    if(p==='김영철'){ var ctc=s.n? Math.round((s.n-s.miss)/s.n*100):0;
+      cells=[['일평균',avg9,0],['접촉률', s.n?ctc+'%':'—', ctc>=80?'#15803D':ctc>=60?'#B45309':'#DC2626'],['현장방문', sub9(['현장방문'])+'건','#7C3AED'],
+             ['완납', pg9(['완납'])+'건','#15803D'],['분납·약속', pg9(['분납','납부약속'])+'건','#4F46E5'],['미수신', s.miss+'건'+(s.n?' ('+Math.round(s.miss/s.n*100)+'%)':''), (s.n&&s.miss/s.n>=0.25)?'#DC2626':'#475569']];
+    } else if(p==='오진선'){ var l1=sub9(['법적 조치 검토']), l2=sub9(['내용증명']), l3=sub9(['지급명령']), l4=sub9(['보정명령']), l5=sub9(['기타집행']);
+      cells=[['법적 검토', l1+'건','#7C3AED'],['내용증명', l2+'건','#B45309'],['명령·집행', (l3+l4+l5)+'건','#DC2626'],
+             ['납부 전환', pg9(['완납','분납','납부약속'])+'건','#15803D'],['수납 처리', sub9(['임대료 수납 처리'])+'건',0],['계약 커버', s.nc+'건',0]];
+      if(s.n) extra='<div style="font-size:9.5px;color:#64748B;margin-top:6px;font-weight:700">⚖️ 검토 '+l1+' → 내용증명 '+l2+' → 지급명령 '+l3+' → 보정 '+l4+' → 집행 '+l5+'</div>';
+    } else if(p==='이지희'){
+      cells=[['임차·임대인 응대', sub9(['전화응대'])+'건','#4F46E5'],['갱신 확인', sub9(['갱신'])+'건','#0E7490'],['퇴실 접수·문의', sub9(['중도퇴실','만기퇴실'])+'건','#7C3AED'],
+             ['정산·수납', sub9(['정산','임대료 수납 처리'])+'건','#B45309'],['계약 커버', s.nc+'건',0],['일평균',avg9,0]];
+    } else if(p==='고송미'){
+      cells=[['초동 응대', sub9(['전화응대'])+'건','#4F46E5'],['계약 진행', (s.mix['계약(입주)관리']||0)+'건','#15803D'],['퇴실 접수·문의', sub9(['중도퇴실','만기퇴실'])+'건','#7C3AED'],
+             ['갱신 확인', sub9(['갱신'])+'건','#0E7490'],['계약 커버', s.nc+'건',0],['일평균',avg9,0]];
+    } else {
+      var doneR=s.fill? Math.round(s.done/s.fill*100) : null;
+      cells=[['일평균',avg9,0],['계약 커버',s.nc+'건',0],['성과율',doneR==null?'—':doneR+'%',0],
+             ['미수신',(s.n?Math.round(s.miss/s.n*100):0)+'%',0],['기재율',fillR+'%',0],['활동일',s.nd+'일',0]];
+    }
+    var m9=function(c){ return '<div style="flex:1;min-width:0"><div style="font-size:9.5px;color:#8A97A8;font-weight:700;white-space:nowrap">'+c[0]+'</div><div style="font-size:12.5px;font-weight:800;color:'+(c[2]||'#1E293B')+';white-space:nowrap">'+c[1]+'</div></div>'; };
     return '<div style="background:#fff;border:1px solid #E2E8F0;border-top:3px solid '+(PC[p]||'#64748B')+';border-radius:10px;padding:12px 14px'+(s.n?'':';opacity:.55')+'">'
-      +'<div style="display:flex;align-items:baseline;gap:7px;margin-bottom:2px"><span style="font-size:14px;font-weight:800;color:#1E293B">'+p+'</span><span style="font-size:10px;color:'+(PC[p]||'#64748B')+';font-weight:700">'+topT+'</span><span style="margin-left:auto;font-size:10px;color:#8A97A8">비중 '+share+'%</span></div>'
+      +'<div style="display:flex;align-items:baseline;gap:7px;margin-bottom:2px"><span style="font-size:14px;font-weight:800;color:#1E293B">'+p+'</span><span style="font-size:9.5px;color:'+(PC[p]||'#64748B')+';font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(ROLE[p]||'')+'</span><span style="margin-left:auto;font-size:10px;color:#8A97A8;flex:none">비중 '+share+'%</span></div>'
       +'<div style="font-size:22px;font-weight:900;color:'+(PC[p]||'#1E293B')+';line-height:1.2">'+s.n+'<span style="font-size:11px;color:#8A97A8;font-weight:600">건</span>'+arrow(s.n,sp.n)+'</div>'
-      +'<div style="display:flex;gap:8px;margin-top:7px">'
-      +  m9('일평균', s.nd? (Math.round(s.n/s.nd*10)/10)+'건' : '—')
-      +  m9('계약 커버', s.nc+'건')
-      +  m9('성과율', doneR==null?'—':doneR+'%', doneR==null?'#94A3B8':(doneR>=50?'#15803D':doneR>=25?'#B45309':'#DC2626'))
-      +'</div>'
-      +'<div style="display:flex;gap:8px;margin-top:5px">'
-      +  m9('미수신', missR+'%', missR>=20?'#DC2626':'#475569')
-      +  m9('진척 기재율', fillR+'%', fillR>=50?'#15803D':fillR>=25?'#B45309':'#DC2626')
-      +  m9('활동일', s.nd+'일')
-      +'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:7px">'+m9(cells[0])+m9(cells[1])+m9(cells[2])+'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:5px">'+m9(cells[3])+m9(cells[4])+m9(cells[5])+'</div>'
+      + extra
       + mixBar
+      +'<div style="font-size:9px;color:#B0BDCE;margin-top:5px">활동 '+s.nd+'일 · 진척 기재 '+fillR+'%</div>'
       +'</div>';
   }).join('');
   /* 업무구분 범례 + 기타 담당자 */
