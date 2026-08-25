@@ -20311,18 +20311,35 @@ function _tentPartnerExcel(){
   var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'부동산별');
   XLSX.writeFile(wb,'부동산별_계약현황_'+Date.now()+'.xlsx');
 }
-function _tentOpenDetail(partner){
+/* [v556.2] 계약 명단 모달 헤더 정렬 — 같은 컬럼 재클릭 시 오름/내림 전환 */
+function _tpdSortBy(key){ var s=window.__tpdSort||{};
+  window.__tpdSort=(s.key===key)?{key:key,dir:(s.dir==='asc'?'desc':'asc')}:{key:key,dir:'asc'};
+  _tentOpenDetail(window.__tpdName, true); }
+function _tentOpenDetail(partner, keepSort){
   try{
     var c=window.__tpCtx; if(!c) return;
     var rows=(window.__tpRows||[]).filter(function(r){return r.name===partner;})[0];
     if(!rows) return;
+    if(!keepSort) window.__tpdSort=null;   /* [v556.2] 새로 열면 정렬 초기화 */
+    window.__tpdName=partner;
+    var s2=window.__tpdSort;
+    var items=rows.items.slice();
+    if(s2){ var gv=function(v){ var k=s2.key;
+        if(k==='tentativeDate'||k==='startDate'){ var d=_bfPd(v[k]); return d?d.getTime():0; }
+        if(k==='rent'||k==='fee') return _bfNum(v[k]);
+        if(k==='addr') return String((v.propAddr||'')+' '+(v.propRoom||''));
+        return String(v[k]==null?'':v[k]); };
+      items.sort(function(a,b){ var x=gv(a),y=gv(b),r0;
+        if(typeof x==='number'&&typeof y==='number') r0=x-y; else r0=String(x).localeCompare(String(y),'ko');
+        if(r0===0) r0=String(a.no).localeCompare(String(b.no));
+        return s2.dir==='desc'?-r0:r0; }); }
     var prev=document.getElementById('tpDetailModal'); if(prev)prev.remove();
     var ov=document.createElement('div'); ov.id='tpDetailModal';
     ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:100002;display:flex;align-items:center;justify-content:center;padding:24px';
     ov.onclick=function(){ ov.remove(); };
     /* [v556] 가계약일·시작일 표기 */
     var _fd=function(s){ var d=_bfPd(s); return d?(d.getFullYear()+'.'+('0'+(d.getMonth()+1)).slice(-2)+'.'+('0'+d.getDate()).slice(-2)):'—'; };
-    var body=rows.items.map(function(v,i){
+    var body=items.map(function(v,i){
       return '<tr style="border-top:1px solid #F1F5F9">'
         +'<td style="padding:6px 9px;color:#94A3B8;font-size:11px">'+(i+1)+'</td>'
         +'<td style="padding:6px 9px;white-space:nowrap"><b style="color:#0E7490;cursor:pointer" onclick="document.getElementById(\'tpDetailModal\').remove();document.getElementById(\'tpModal\')&&document.getElementById(\'tpModal\').remove();crNavFromView(\''+v.no+'\',\'summary\')">'+v.no+'</b></td>'
@@ -20339,9 +20356,12 @@ function _tentOpenDetail(partner){
       +'<b style="font-size:14px;color:#1B62D6">'+partner+' · '+rows.cur+'건</b><span style="font-size:11.5px;color:#8A97A8">'+c.label+' 계약 명단</span>'
       +'<span style="margin-left:auto"><button onclick="document.getElementById(\'tpDetailModal\').remove()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">닫기</button></span></div>'
       +'<div style="overflow:auto;padding:0 6px 6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-      +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th><th style="padding:6px 9px;text-align:left">계약번호</th><th style="padding:6px 9px;text-align:left">임(전)차인</th><th style="padding:6px 9px;text-align:left">물건지</th><th style="padding:6px 9px;text-align:left">가계약일</th><th style="padding:6px 9px;text-align:left">시작일</th><th style="padding:6px 9px;text-align:right">임대료</th><th style="padding:6px 9px;text-align:right">수수료</th><th style="padding:6px 9px;text-align:left">담당자</th></tr></thead>'
+      +(function(){ var th2=function(lb,k,al){ var on=s2&&s2.key===k;
+          return '<th onclick="_tpdSortBy(\''+k+'\')" title="클릭하여 정렬" style="padding:6px 9px;text-align:'+(al||'left')+';cursor:pointer;user-select:none;white-space:nowrap;color:'+(on?'#1B62D6':'#64748B')+'">'+lb+(on?(s2.dir==='asc'?' ▲':' ▼'):' <span style="opacity:.3">⇅</span>')+'</th>'; };
+        return '<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th>'
+          +th2('계약번호','no')+th2('임(전)차인','tenantName')+th2('물건지','addr')+th2('가계약일','tentativeDate')+th2('시작일','startDate')+th2('임대료','rent','right')+th2('수수료','fee','right')+th2('담당자','partnerPerson')+'</tr></thead>'; })()   /* [v556.2] 헤더 정렬 */
       +'<tbody>'+body+'</tbody></table></div>'
-      +'<div style="padding:7px 16px;border-top:1px solid #EEF2F7;font-size:10.5px;color:#94A3B8">계약번호 클릭 → 계약상세 이동</div></div>';
+      +'<div style="padding:7px 16px;border-top:1px solid #EEF2F7;font-size:10.5px;color:#94A3B8">계약번호 클릭 → 계약상세 이동 · 헤더 클릭 → 정렬</div></div>';
     document.body.appendChild(ov);
   }catch(e){ console.warn('[tpDetail]',e); }
 }
