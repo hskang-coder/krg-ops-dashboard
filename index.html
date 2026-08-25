@@ -23394,17 +23394,17 @@ function okpi_respSection(all, range, period){
              ['완납', pg9(['완납'])+'건','#15803D'],['분납·약속', pg9(['분납','납부약속'])+'건','#4F46E5'],['미수신', s.miss+'건'+(s.n?' ('+Math.round(s.miss/s.n*100)+'%)':''), (s.n&&s.miss/s.n>=0.25)?'#DC2626':'#475569']];
     } else if(p==='오진선'){ var l1=sub9(['법적 조치 검토']), l2=sub9(['내용증명']), l3=sub9(['지급명령']), l4=sub9(['보정명령']), l5=sub9(['기타집행']);
       cells=[['법적 검토', l1+'건','#7C3AED'],['내용증명', l2+'건','#B45309'],['명령·집행', (l3+l4+l5)+'건','#DC2626'],
-             ['납부 전환', pg9(['완납','분납','납부약속'])+'건','#15803D'],['수납 처리', sub9(['임대료 수납 처리'])+'건',0],['계약 커버', s.nc+'건',0]];
+             ['납부 전환', pg9(['완납','분납','납부약속'])+'건','#15803D'],['수납 처리', sub9(['임대료 수납 처리'])+'건',0],['대응 계약수', s.nc+'건',0]];
       if(s.n) extra='<div style="font-size:9.5px;color:#64748B;margin-top:6px;font-weight:700">⚖️ 검토 '+l1+' → 내용증명 '+l2+' → 지급명령 '+l3+' → 보정 '+l4+' → 집행 '+l5+'</div>';
     } else if(p==='이지희'){
       cells=[['임차·임대인 응대', sub9(['전화응대'])+'건','#4F46E5'],['갱신 확인', sub9(['갱신'])+'건','#0E7490'],['퇴실 접수·문의', sub9(['중도퇴실','만기퇴실'])+'건','#7C3AED'],
-             ['정산·수납', sub9(['정산','임대료 수납 처리'])+'건','#B45309'],['계약 커버', s.nc+'건',0],['일평균',avg9,0]];
+             ['정산·수납', sub9(['정산','임대료 수납 처리'])+'건','#B45309'],['대응 계약수', s.nc+'건',0],['일평균',avg9,0]];
     } else if(p==='고송미'){
       cells=[['초동 응대', sub9(['전화응대'])+'건','#4F46E5'],['계약 진행', (s.mix['계약(입주)관리']||0)+'건','#15803D'],['퇴실 접수·문의', sub9(['중도퇴실','만기퇴실'])+'건','#7C3AED'],
-             ['갱신 확인', sub9(['갱신'])+'건','#0E7490'],['계약 커버', s.nc+'건',0],['일평균',avg9,0]];
+             ['갱신 확인', sub9(['갱신'])+'건','#0E7490'],['대응 계약수', s.nc+'건',0],['일평균',avg9,0]];
     } else {
       var doneR=s.fill? Math.round(s.done/s.fill*100) : null;
-      cells=[['일평균',avg9,0],['계약 커버',s.nc+'건',0],['성과율',doneR==null?'—':doneR+'%',0],
+      cells=[['일평균',avg9,0],['대응 계약수',s.nc+'건',0],['성과율',doneR==null?'—':doneR+'%',0],
              ['미수신',(s.n?Math.round(s.miss/s.n*100):0)+'%',0],['기재율',fillR+'%',0],['활동일',s.nd+'일',0]];
     }
     var m9=function(c){ return '<div style="flex:1;min-width:0"><div style="font-size:9.5px;color:#8A97A8;font-weight:700;white-space:nowrap">'+c[0]+'</div><div style="font-size:12.5px;font-weight:800;color:'+(c[2]||'#1E293B')+';white-space:nowrap">'+c[1]+'</div></div>'; };
@@ -23447,7 +23447,7 @@ function okpi_respSection(all, range, period){
     +'<div style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:#78350F;line-height:1.55">'+tips.slice(0,6).map(function(t){return '<div>'+t+'</div>';}).join('')+'</div></div>';
   var head='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:11px;color:#475569">'
     +'<span><b style="color:#4F46E5;font-size:13px">'+T.n+'건</b> 총 대응'+arrow(T.n, prevRows.length)+'</span>'
-    +'<span>계약 커버 <b>'+T.nc+'건</b></span>'
+    +'<span>대응 계약수 <b>'+T.nc+'건</b></span>'
     +'<span>진척 기재 <b>'+(T.n?Math.round(T.fill/T.n*100):0)+'%</b></span>'
     +'<span>성과(기재 중) <b style="color:#15803D">'+(T.fill?Math.round(T.done/T.fill*100):0)+'%</b></span>'
     +'<span>미수신 <b style="color:#DC2626">'+(T.n?Math.round(T.miss/T.n*100):0)+'%</b></span>'
