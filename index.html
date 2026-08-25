@@ -23381,8 +23381,8 @@ function okpi_respSection(all, range, period){
     var arr=W(p);
     var s=stat(arr), sp=stat(WP(p));
     var mixKeys=Object.keys(s.mix).sort(function(a,b){return s.mix[b]-s.mix[a];});
-    var mixBar=s.n? '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:#F6F7F9;margin-top:7px">'
-      + mixKeys.map(function(t){ return '<div title="'+t+' '+s.mix[t]+'건" style="width:'+(s.mix[t]/s.n*100).toFixed(1)+'%;background:'+(TASKC[t]||'#94A3B8')+'"></div>'; }).join('')+'</div>' : '';
+    var mixBar=s.n? '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:#F6F7F9">'
+      + mixKeys.map(function(t){ return '<div title="'+t+' '+s.mix[t]+'건" style="width:'+(s.mix[t]/s.n*100).toFixed(1)+'%;background:'+(TASKC[t]||'#94A3B8')+'"></div>'; }).join('')+'</div>' : '<div style="height:8px;border-radius:4px;background:#F6F7F9"></div>';
     var fillR=s.n? Math.round(s.fill/s.n*100) : 0;
     var share=T.n? Math.round(s.n/T.n*100) : 0;
     var sub9=function(pats){ var n=0; arr.forEach(function(r){ var t9=(r.sub||'').trim(); for(var i9=0;i9<pats.length;i9++){ if(t9&&t9.indexOf(pats[i9])>=0){ n++; return; } } }); return n; };
@@ -23408,14 +23408,15 @@ function okpi_respSection(all, range, period){
              ['미수신',(s.n?Math.round(s.miss/s.n*100):0)+'%',0],['기재율',fillR+'%',0],['활동일',s.nd+'일',0]];
     }
     var m9=function(c){ return '<div style="flex:1;min-width:0"><div style="font-size:9.5px;color:#8A97A8;font-weight:700;white-space:nowrap">'+c[0]+'</div><div style="font-size:12.5px;font-weight:800;color:'+(c[2]||'#1E293B')+';white-space:nowrap">'+c[1]+'</div></div>'; };
-    return '<div style="background:#fff;border:1px solid #E2E8F0;border-top:3px solid '+(PC[p]||'#64748B')+';border-radius:10px;padding:12px 14px'+(s.n?'':';opacity:.55')+'">'
+    /* [v557.2] 진행 bar·하단 정보를 카드 맨 아래로 고정 — 4카드 수평 정렬 */
+    return '<div style="display:flex;flex-direction:column;background:#fff;border:1px solid #E2E8F0;border-top:3px solid '+(PC[p]||'#64748B')+';border-radius:10px;padding:12px 14px'+(s.n?'':';opacity:.55')+'">'
       +'<div style="display:flex;align-items:baseline;gap:7px;margin-bottom:2px"><span style="font-size:14px;font-weight:800;color:#1E293B">'+p+'</span><span style="font-size:9.5px;color:'+(PC[p]||'#64748B')+';font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(ROLE[p]||'')+'</span><span style="margin-left:auto;font-size:10px;color:#8A97A8;flex:none">비중 '+share+'%</span></div>'
       +'<div style="font-size:22px;font-weight:900;color:'+(PC[p]||'#1E293B')+';line-height:1.2">'+s.n+'<span style="font-size:11px;color:#8A97A8;font-weight:600">건</span>'+arrow(s.n,sp.n)+'</div>'
       +'<div style="display:flex;gap:8px;margin-top:7px">'+m9(cells[0])+m9(cells[1])+m9(cells[2])+'</div>'
       +'<div style="display:flex;gap:8px;margin-top:5px">'+m9(cells[3])+m9(cells[4])+m9(cells[5])+'</div>'
       + extra
-      + mixBar
-      +'<div style="font-size:9px;color:#B0BDCE;margin-top:5px">활동 '+s.nd+'일 · 진척 기재 '+fillR+'%</div>'
+      +'<div style="margin-top:auto;padding-top:7px">'+mixBar
+      +'<div style="font-size:9px;color:#B0BDCE;margin-top:5px">활동 '+s.nd+'일 · 진척 기재 '+fillR+'%</div></div>'
       +'</div>';
   }).join('');
   /* 업무구분 범례 + 기타 담당자 */
