@@ -5462,6 +5462,9 @@ async function renderSettlementView(){
     // [v522] cs = 계약번호 집합(사람 수), k = 청구 종류별 라인 수 — '건'이 청구 라인 수임을 명확히 하기 위해 함께 집계
     var _z=function(){ return {gen:0,rec:0,out:0,n:0,cs:{},k:{}}; };
     var coh={}, prevG={A:_z(), E:_z()};
+    /* [v554] 발생월 클릭 → 상세 리스트 — 코호트 집계와 동일 조건으로 행 단위 보존 */
+    var _cohRows={};   // { '2025-10'|'prev' : { A:[], E:[] } }
+    var _nmMap={}; V.forEach(function(v){ var c=String(v.no||'').trim(); if(c) _nmMap[c]={nm:(v.tenant1Name||v.tenantName||'-'), tel:(v.tenantPhone||'-')}; });
     var winLen=Math.max(4,_mKeys.length);   // [v515] 기간이 4개월 초과 시 전체 표시, 이하면 최근 4개월
     var win=[]; for(var k=winLen-1;k>=0;k--){ var d=new Date(+cmKey.slice(0,4), +cmKey.slice(5,7)-1-k, 1); win.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
     P.forEach(function(p){
@@ -5480,10 +5483,17 @@ async function renderSettlementView(){
       var paid=Math.max(0, gen-out);
       var ended = String(p['계약상태']||'').trim()==='종료';   // [v507] 계약중/퇴실채권 구분
       var gk = ended ? 'E' : 'A';                              // [v521]
-      var tgt;
-      if(win.indexOf(bm)>=0){ if(!coh[bm]) coh[bm]={A:_z(), E:_z()}; tgt=coh[bm][gk]; }
-      else { tgt=prevG[gk]; }
+      var tgt, _rk;
+      if(win.indexOf(bm)>=0){ if(!coh[bm]) coh[bm]={A:_z(), E:_z()}; tgt=coh[bm][gk]; _rk=bm; }
+      else { tgt=prevG[gk]; _rk='prev'; }
       tgt.gen+=gen; tgt.rec+=paid; tgt.out+=out; tgt.n++;
+      /* [v554] 상세 행 보존 */
+      (function(){ var _c9=String(p['계약번호']||'').trim(); var _i9=_nmMap[_c9]||{};
+        if(!_cohRows[_rk]) _cohRows[_rk]={A:[],E:[]};
+        _cohRows[_rk][gk].push({ cno:_c9, nm:_i9.nm||'-', tel:_i9.tel||'-', bm:bm,
+          ty:(isRent(p)?'임대료':(isFee(p)?'수수료':'변동관리비')), bill:String(p['청구서명']||'').trim(),
+          due:String(p['납기일']||'').trim(), pay:String(p['납부일']||'').trim(), st:String(p['납부상태']||'').trim(),
+          days:days, gen:gen, rec:paid, out:out, ck:(ended?'종료':'계약중') }); })();
       // [v522] 사람 수(계약번호 distinct) + 청구 종류별 라인 수
       tgt.cs[String(p['계약번호']||'').trim()]=1;
       var _lb = isRent(p) ? '임대료' : (isFee(p) ? '수수료' : '변동관리비');
@@ -5756,9 +5766,11 @@ async function renderSettlementView(){
     var _ktip=function(c){ var a=[]; for(var i in (c.k||{})) a.push(i+' '+c.k[i]+'건'); return a.length? '청구 종류별 — '+a.join(' · ') : ''; };
     var nlbl=function(c){ return '<span title="'+_ktip(c)+'" style="font-size:9px;color:#94A3B8;font-weight:500;cursor:help">'+_cn(c)+'명 · '+c.n+'건</span>'; };
     var pv=gpick(prevG);
+    window.__stlCohRows=_cohRows;   /* [v554] 발생월 상세 모달용 */
+    window.__stlCohMeta={win:win.slice(), prevLbl:win[0].replace('-','.')+' 이전 전체', today:_ymd(today)};
     var rf='', run=pv.out;
-    rf+='<tr style="border-top:1px solid #F1F5F9;color:#94A3B8">'
-      +'<td style="padding:6px 8px">'+win[0].replace('-','.')+' 이전 전체</td>'
+    rf+='<tr onclick="stl_cohModal(\'prev\')" title="클릭 시 상세 내역 보기" style="border-top:1px solid #F1F5F9;color:#94A3B8;cursor:pointer" onmouseover="this.style.background=\'#F8FAFC\'" onmouseout="this.style.background=\'\'">'
+      +'<td style="padding:6px 8px">'+win[0].replace('-','.')+' 이전 전체 <span style="font-size:9px;color:#CBD5E1">▸</span></td>'
       +'<td style="padding:6px 8px;text-align:right">'+mil(pv.gen)+' '+nlbl(pv)+'</td>'
       +'<td style="padding:6px 8px;text-align:right">'+mil(pv.rec)+'</td>'
       +'<td style="padding:6px 8px;text-align:right">'+(pv.gen?Math.round(pv.rec/pv.gen*100):0)+'%</td>'
@@ -5770,8 +5782,8 @@ async function renderSettlementView(){
       var rr=c2.gen? Math.round(c2.rec/c2.gen*100) : 0;
       var col=rr>=70?'#15803D':(rr>=40?'#B45309':'#DC2626');
       var ing=(m===curRealM);
-      rf+='<tr style="border-top:1px solid #F1F5F9'+(ing?';background:#EFF6FF':'')+'">'
-        +'<td style="padding:6px 8px;font-weight:700;white-space:nowrap">'+m.replace('-','.')+(ing?' <span style="font-size:9px;font-weight:600;color:#2563EB;background:#DBEAFE;border-radius:4px;padding:1px 5px">진행 중</span>':'')+'</td>'
+      rf+='<tr onclick="stl_cohModal(\''+m+'\')" title="클릭 시 이 달 상세 내역 보기" onmouseover="this.style.background=\''+(ing?'#DBEAFE':'#F8FAFC')+'\'" onmouseout="this.style.background=\''+(ing?'#EFF6FF':'')+'\'" style="border-top:1px solid #F1F5F9;cursor:pointer'+(ing?';background:#EFF6FF':'')+'">'   /* [v554] 행 클릭 → 상세 */
+        +'<td style="padding:6px 8px;font-weight:700;white-space:nowrap">'+m.replace('-','.')+(ing?' <span style="font-size:9px;font-weight:600;color:#2563EB;background:#DBEAFE;border-radius:4px;padding:1px 5px">진행 중</span>':'')+' <span style="font-size:9px;color:#CBD5E1">▸</span></td>'
         +'<td style="padding:6px 8px;text-align:right;color:#DC2626;font-weight:700;white-space:nowrap">'+mil(c2.gen)+' '+nlbl(c2)+'</td>'
         +'<td style="padding:6px 8px;text-align:right;color:#15803D;font-weight:700">'+mil(c2.rec)+'</td>'
         +'<td style="padding:6px 8px;text-align:right;white-space:nowrap">'+rbar(rr,col)+'<span style="font-weight:700;color:'+col+'">'+rr+'%</span></td>'
@@ -5812,6 +5824,7 @@ async function renderSettlementView(){
       +'<div style="background:#F8FAFC;border-left:3px solid #94A3B8;border-radius:0 6px 6px 0;padding:7px 10px;margin-bottom:9px;font-size:11px;color:#475569;line-height:1.6">'
       +'📖 <b>읽는 법</b> — '+exM.replace('-','.')+' 줄은 “그 달에 <b>'+_cn(exC)+'명</b>이 <b style="color:#DC2626">'+mil(exC.gen)+'</b>('+exC.n+'건)을 새로 밀렸는데, 그중 <b style="color:#15803D">'+exR+'%('+mil(exC.rec)+')</b>를 지금까지 회수했고 <b>'+mil(exC.out)+'</b>은 아직 못 받았다”는 뜻입니다. 맨 오른쪽은 그때까지 쌓인 <b>회사 전체 미회수 총액</b>입니다.'
       +'<br><span style="font-size:10.5px;color:#64748B"><b>명</b> = 계약 수 · <b>건</b> = 청구서 줄 수. 한 사람이 같은 달에 임대료·수수료·변동관리비로 나뉘어 청구되면 <b>2~3건</b>이 됩니다 (숫자에 마우스를 올리면 종류별 내역이 보입니다).</span>'
+      +'<br><span style="font-size:10.5px;color:#2563EB;font-weight:700">👉 발생월 행을 클릭하면 그 달의 연체 명단 · 회수 내역이 상세로 열립니다.</span>'   /* [v554] */
       +'</div>'
       +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px;min-width:640px">'
       +'<tr style="background:#F8FAFC;color:#475569;font-size:11px">'
@@ -5839,6 +5852,111 @@ async function renderSettlementView(){
     console.error('[settlement]', e);
     el.innerHTML = '<div class="cr-empty">⚠ 정산 데이터 로딩 실패: '+e.message+'</div>';
   }
+}
+// ═══ [v554] 월별 연체 발생·회수 — 발생월 행 클릭 시 상세 명단 모달 ═══
+function stl_cohSort(k){ var S=window.__stlCohSort||{}; window.__stlCohSort=(S.key===k)?{key:k,dir:(S.dir==='asc'?'desc':'asc')}:{key:k,dir:(k==='cno'||k==='nm'||k==='ty'?'asc':'desc')}; stl_cohModal(window.__stlCohKey, true); }
+function stl_cohExcel(){
+  try{
+    var rows=window.__stlCohFlat||[];
+    if(!rows.length||typeof XLSX==='undefined'){ alert('다운로드할 데이터가 없습니다.'); return; }
+    var ws=XLSX.utils.json_to_sheet(rows.map(function(r,i){ return {'No':i+1,'계약번호':r.cno,'임(전)차인':r.nm,'연락처':r.tel,'계약상태':r.ck,'발생월':r.bm,
+      '납부종류':r.ty,'청구서명':r.bill||'','납기일':r.due,'납부일':r.pay||'','납부상태':r.st,'연체일수':r.days,
+      '① 발생액':r.gen,'② 회수액':r.rec,'③ 미회수':r.out,'회수율(%)':(r.gen?Math.round(r.rec/r.gen*100):0)}; }));
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'연체상세');
+    XLSX.writeFile(wb,'연체발생회수_'+(window.__stlCohKey||'')+'_'+Date.now()+'.xlsx');
+  }catch(e){ alert('엑셀 생성 실패'); }
+}
+function stl_cohDay(d){ window.__stlCohDay=(d==null||window.__stlCohDay===d)?null:d; stl_cohModal(window.__stlCohKey, true, true); }
+function stl_cohModal(key, keepSort, keepDay){
+  try{
+    if(!keepSort) window.__stlCohSort=null;
+    if(!keepDay) window.__stlCohDay=null;
+    window.__stlCohKey=key;
+    var all=window.__stlCohRows||{}, meta=window.__stlCohMeta||{win:[],today:''};
+    var g=all[key]||{A:[],E:[]};
+    var dk=window._stlDlqK||'T';   // T=전체 · A=계약중 · E=계약종료 (표의 현재 필터와 동일)
+    var rowsAll=(dk==='A')?g.A.slice():(dk==='E')?g.E.slice():g.A.concat(g.E);
+    /* [v554] 납기일(1~31)별 집계 — 당월 발생 연체를 청구서 납기일 단위로 분해 */
+    var _dayN=function(s){ var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?+m[3]:0; };
+    var dayAgg={}; rowsAll.forEach(function(r){ var d9=_dayN(r.due); if(!d9) return;
+      var a=dayAgg[d9]||(dayAgg[d9]={gen:0,out:0,rec:0,n:0}); a.gen+=r.gen; a.out+=r.out; a.rec+=r.rec; a.n++; });
+    var dayKeys=Object.keys(dayAgg).map(Number).sort(function(a,b){return a-b;});
+    var dSel=window.__stlCohDay||null;
+    var rows=dSel? rowsAll.filter(function(r){ return _dayN(r.due)===dSel; }) : rowsAll.slice();
+    var S=window.__stlCohSort||{key:'out',dir:'desc'};
+    var dv=function(o){ var v=o[S.key];
+      if(S.key==='due'||S.key==='pay'){ var m=String(v||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(+m[1])*10000+(+m[2])*100+(+m[3]):0; }
+      return (typeof v==='number')?v:String(v==null?'':v); };
+    rows.sort(function(a,b){ var x=dv(a),y=dv(b),r;
+      if(typeof x==='number'&&typeof y==='number') r=x-y; else r=String(x).localeCompare(String(y),'ko');
+      if(r===0) r=String(a.cno).localeCompare(String(b.cno)); return S.dir==='desc'?-r:r; });
+    window.__stlCohFlat=rows;
+    var W=function(n){ return '₩'+Math.round(n||0).toLocaleString(); };
+    var T={gen:0,rec:0,out:0}, cs={};
+    rows.forEach(function(r){ T.gen+=r.gen; T.rec+=r.rec; T.out+=r.out; cs[r.cno]=1; });
+    var RR=T.gen?Math.round(T.rec/T.gen*1000)/10:0;
+    var lbl=(key==='prev')?(meta.prevLbl||'이전 전체'):String(key).replace('-','.');
+    var dLbl={T:'전체',A:'계약중(거주 중)',E:'계약종료(퇴실)'}[dk];
+    var prev=document.getElementById('stlCohModal'); if(prev) prev.remove();
+    var ov=document.createElement('div'); ov.id='stlCohModal';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    var _sth=function(h,k,al){ var on=(S.key===k); return '<th onclick="stl_cohSort(\''+k+'\')" style="padding:6px 9px;text-align:'+(al||'left')+';white-space:nowrap;cursor:pointer;user-select:none">'+h+(on?(S.dir==='asc'?' ▲':' ▼'):' <span style="opacity:.3">⇅</span>')+'</th>'; };
+    var body=rows.map(function(r,i){
+      var rr=r.gen?Math.round(r.rec/r.gen*100):0;
+      var rc=rr>=100?'#15803D':(rr>=50?'#B45309':'#DC2626');
+      var sc={'정상납부':'#16A34A','연체납부':'#F59E0B','연체중':'#DC2626','분납중':'#4F46E5','납부예정':'#94A3B8'}[r.st]||'#64748B';
+      return '<tr style="border-top:1px solid #F1F5F9'+(r.out>0?';background:#FFFBFB':'')+'">'
+        +'<td style="padding:6px 9px;color:#94A3B8;font-size:11px">'+(i+1)+'</td>'
+        +'<td style="padding:6px 9px"><b style="color:#0E7490;cursor:pointer" onclick="document.getElementById(\'stlCohModal\').remove();crNavFromView(\''+r.cno+'\',\'delinquency\')">'+r.cno+'</b></td>'
+        +'<td style="padding:6px 9px;white-space:nowrap">'+r.nm+'</td>'
+        +'<td style="padding:6px 9px"><span style="display:inline-block;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;'+(r.ck==='종료'?'background:#FEF3C7;color:#B45309':'background:#EFF6FF;color:#1D4ED8')+'">'+r.ck+'</span></td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:#475569;white-space:nowrap">'+r.ty+'</td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:#64748B;white-space:nowrap">'+(r.due||'-')+'</td>'
+        +'<td style="padding:6px 9px;text-align:right;font-weight:700;color:#DC2626;white-space:nowrap">'+W(r.gen)+'</td>'
+        +'<td style="padding:6px 9px;text-align:right;font-weight:700;color:#15803D;white-space:nowrap">'+W(r.rec)+'</td>'
+        +'<td style="padding:6px 9px;text-align:right;font-weight:800;white-space:nowrap;color:'+(r.out>0?'#B91C1C':'#94A3B8')+'">'+(r.out>0?W(r.out):'—')+'</td>'
+        +'<td style="padding:6px 9px;text-align:right;font-weight:700;color:'+rc+'">'+rr+'%</td>'
+        +'<td style="padding:6px 9px;white-space:nowrap"><span style="display:inline-block;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;background:'+sc+'1a;color:'+sc+'">'+(r.st||'-')+'</span></td>'
+        +'<td style="padding:6px 9px;text-align:center;font-weight:700;color:'+(r.days>0?'#DC2626':'#94A3B8')+'">'+(r.days||0)+'</td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:#64748B;white-space:nowrap">'+(r.pay||'—')+'</td></tr>';
+    }).join('')||'<tr><td colspan="13" style="padding:22px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';
+    ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:1180px;width:100%;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
+      +'<div style="display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid #EEF2F7">'
+      +  '<span style="width:11px;height:11px;border-radius:3px;background:#DC2626"></span>'
+      +  '<b style="font-size:14px;color:#1A3A5C">'+lbl+' 연체 발생 · 회수 상세</b>'
+      +  '<span style="font-size:11.5px;color:#8A97A8">'+dLbl+' · '+Object.keys(cs).length+'명 · '+rows.length+'건</span>'
+      +  '<span style="margin-left:auto;display:flex;gap:6px">'
+      +    '<button onclick="stl_cohExcel()" style="background:#1d4ed8;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">⬇️ 엑셀</button>'
+      +    '<button onclick="document.getElementById(\'stlCohModal\').remove()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">닫기</button>'
+      +  '</span></div>'
+      +'<div style="display:flex;gap:14px;flex-wrap:wrap;padding:9px 16px;border-bottom:1px solid #F1F5F9;background:#FCFDFF;font-size:12px;color:#475569;font-weight:700">'
+      +  '<span>① 새로 밀린 금액 <b style="color:#DC2626">'+W(T.gen)+'</b></span>'
+      +  '<span>② 지금까지 회수 <b style="color:#15803D">'+W(T.rec)+'</b></span>'
+      +  '<span>회수율 <b style="color:'+(RR>=70?'#15803D':(RR>=40?'#B45309':'#DC2626'))+'">'+RR+'%</b></span>'
+      +  '<span>③ 아직 못 받음 <b style="color:#B91C1C">'+W(T.out)+'</b></span>'
+      +  '<span style="color:#94A3B8;font-weight:500">① 발생액은 <b>이 달에 새로 밀린 금액</b>(누적 아님) · ② · ③은 오늘('+(meta.today||'')+') 기준</span>'
+      +'</div>'
+      /* [v554] 납기일별 분해 — 당월 발생 연체를 청구서 납기일(1~31)로 나눠 표시 + 클릭 필터 */
+      +(dayKeys.length? '<div style="padding:8px 16px;border-bottom:1px solid #F1F5F9;background:#fff">'
+        +'<div style="font-size:10.5px;color:#64748B;font-weight:700;margin-bottom:6px">📅 납기일별 발생 · 미회수 <span style="font-weight:500;color:#94A3B8">— 클릭하면 그 납기일 건만 표시 (재클릭 = 전체)</span></div>'
+        +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+        +'<span onclick="stl_cohDay(null)" style="cursor:pointer;border-radius:8px;padding:4px 10px;font-size:10.5px;font-weight:800;border:1.5px solid '+(dSel?'#E2E8F0':'#334155')+';background:'+(dSel?'#fff':'#334155')+';color:'+(dSel?'#475569':'#fff')+'">전체 '+rowsAll.length+'건</span>'
+        +dayKeys.map(function(d9){ var a=dayAgg[d9]; var on=(dSel===d9);
+            return '<span onclick="stl_cohDay('+d9+')" title="발생 '+W(a.gen)+' · 회수 '+W(a.rec)+' · 미회수 '+W(a.out)+' ('+a.n+'건)" style="cursor:pointer;border-radius:8px;padding:4px 10px;font-size:10.5px;line-height:1.45;border:1.5px solid '+(on?'#DC2626':'#E2E8F0')+';background:'+(on?'#FEF2F2':'#fff')+'">'
+              +'<b style="color:#1A3A5C">'+d9+'일</b> <span style="color:#94A3B8">'+a.n+'건</span>'
+              +'<br><span style="color:#DC2626;font-weight:700">'+W(a.gen)+'</span>'
+              +' <span style="color:'+(a.out>0?'#B91C1C':'#94A3B8')+';font-weight:700">'+(a.out>0?'미회수 '+W(a.out):'전액 회수')+'</span></span>'; }).join('')
+        +'</div></div>' : '')
+      +'<div style="overflow:auto;padding:0 6px 6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+      +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px;position:sticky;top:0"><th style="padding:6px 9px;text-align:left">No</th>'
+      + _sth('계약번호','cno') + _sth('임(전)차인','nm') + _sth('계약상태','ck') + _sth('납부종류','ty') + _sth('납기일','due')
+      + _sth('① 발생액','gen','right') + _sth('② 회수액','rec','right') + _sth('③ 미회수','out','right') + _sth('회수율','gen','right')
+      + _sth('납부상태','st') + _sth('연체일','days','center') + _sth('납부일','pay')
+      +'</tr></thead><tbody>'+body+'</tbody></table></div>'
+      +'<div style="padding:7px 16px;border-top:1px solid #EEF2F7;font-size:10.5px;color:#94A3B8">계약번호 클릭 → 연체관리 상세 이동 · 헤더 클릭 정렬 · 회수액 = 발생액 − 미납액 · 미회수 있는 행은 연한 붉은 배경</div></div>';
+    document.body.appendChild(ov);
+  }catch(e){ console.warn('[stlCoh]', e); }
 }
 // [v513] 정산관리 기간 선택 핸들러 (운영관리 okpi_setPeriod/okpi_setDate와 동일 패턴)
 function stl_setPeriod(p){ window._stlP = window._stlP || {period:'day'}; window._stlP.period = p; renderSettlementView(); }
