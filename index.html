@@ -23538,6 +23538,7 @@ function exm_early(v, realOv){
 }
 /* [v553.3] 날짜 표기 통일 — 시트 원본이 '2026-08-22' 형식이어도 '2026. 8. 22'로 출력 */
 function exm_fmtDt(s){ var d=exm_pd(s); return d?(d.getFullYear()+'. '+(d.getMonth()+1)+'. '+d.getDate()):((String(s||'').trim())||'-'); }
+function exm_stDisp(s){ s=String(s||'').trim(); var m=s.match(/^중도퇴실\s*\(\s*자진\s*\)\s*[-–—:·]*\s*(.+)$/); return m?m[1].trim():s; }   /* [v558.3] 표시용 — '중도퇴실(자진)' 접두어 제거, 뒷부분 사유만 출력 */
 function exm_group(v){
   var s=String(v.status||'');
   if(s.indexOf('강제퇴실')>=0||s.indexOf('대위변제')>=0) return 'gz';   /* [v549.5] 강제 상태 최우선 — J열(중도퇴실 여부) 미기재여도 강제로 분류 */
@@ -23825,7 +23826,7 @@ function renderExitMgmtView(){
         addr:[v.propAddr,v.propBuilding,v.propRoom].filter(Boolean).join(' '),
         kind:(g==='gz'?'강제':(g==='exp'?'만기':'중도')), grp:g, grpNm:GRP_NM[g],   /* [v549.1] 퇴실구분 3종 — 개런티즈 조치 = 강제 */
         ck:(function(){ var k=String(v.contractKind||'').trim(); if(k.indexOf('종료')>=0) return '종료'; if(k==='정상'||k==='계약중') return '계약중'; return k||'-'; })(),   /* [v542.5] 계약 종료 여부 (계약상태) */
-        st:(g==='exp'?(String(v.status||'').trim()||'계약만기'):(String(v.status||'').trim()||'미기재')),
+        st:(g==='exp'?(String(v.status||'').trim()||'계약만기'):(exm_stDisp(v.status)||'미기재')),   /* [v558.3] 자진 접두어 제거 표시 */
         realTerm:exm_fmtDt(drReal[cno]?drReal[cno].v:v.exitDate),   /* [v544] 실퇴실일: DR D열 우선 + BP열 폴백 · [v553.3] 날짜 표기 통일 */
         realSrc:(drReal[cno]?'DR':(String(v.exitDate||'').trim()?'BP':'')),
         start:exm_fmtDt(v.startDate), term:exm_fmtDt(v.terminateDate), termD:+t,   /* [v553.3] */
@@ -23882,7 +23883,7 @@ function renderExitMgmtView(){
     var _wRow=function(c3,src){ var _v1=vMap[c3]||{}; var _st=String(_v1.status||'').trim();
       return {cno:c3, src:src, nm:_v1.tenant1Name||_v1.tenantName||'-', addr:[_v1.propAddr,_v1.propBuilding,_v1.propRoom].filter(Boolean).join(' '), real:exm_fmtDt(aliveOf[c3].r), term:exm_fmtDt(aliveOf[c3].t),   /* [v553.3] 날짜 표기 통일 */
         exit:(_st.indexOf('강제퇴실')>=0?'강제퇴실':((/중도퇴실/.test(String(_v1.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|월세부담/.test(_st))?'중도퇴실':(exm_early(_v1,aliveOf[c3].r)?'중도퇴실':'만기퇴실'))),   /* [v547.2/549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 */
-        st:(_st&&_st!=='-'?_st:'-'),   /* [v547.2] 공실상태(사유) */
+        st:(_st&&_st!=='-'?exm_stDisp(_st):'-'),   /* [v547.2] 공실상태(사유) · [v558.3] 자진 접두어 제거 */
         end:exm_fmtDt(_v1.endDate)}; };   /* [v547.3] 만기일 */
     var waitSet={};
     // [v547.1] 퇴실일이 선택월에 잡힌 건은 이미 '월 퇴실 상세'에 표시되므로 대기에서 제외 (그 외 월 확정 건만 대기)
@@ -23923,7 +23924,7 @@ function renderExitMgmtView(){
       var o={cno:cno, nm:_v2.tenant1Name||_v2.tenantName||'-', addr:[_v2.propAddr,_v2.propBuilding,_v2.propRoom].filter(Boolean).join(' '),
         f:R?R.lv:'-', d:R?R.last:0, lc:(R&&R.lc?R.lc:''), lp:(R&&R.lp?R.lp:''), lpd:(R&&R.lpD?R.lpD:0), real:exm_fmtDt(drReal[cno]?drReal[cno].v:_v2.exitDate),   /* [v553.4] lpd = 진척사항 기재일 */   /* [v549.9] lc 기본 포함 · [v550.5] 진척사항 · [v553.3] 날짜 표기 통일 */
         exit:(_st2.indexOf('강제퇴실')>=0?'강제퇴실':((/중도퇴실/.test(String(_v2.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|월세부담/.test(_st2))?'중도퇴실':(exm_early(_v2,(drReal[cno]?drReal[cno].v:''))?'중도퇴실':'만기퇴실'))),   /* [v549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 */
-        st:(_st2&&_st2!=='-'?_st2:'-'), end:exm_fmtDt(_v2.endDate)};
+        st:(_st2&&_st2!=='-'?exm_stDisp(_st2):'-'), end:exm_fmtDt(_v2.endDate)};   /* [v558.3] 자진 접두어 제거 */
       for(var k9 in (extra||{})) o[k9]=extra[k9]; return o; };
     var _zalive={}; V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c=String(v.no||'').trim(); if(c) _zalive[c]=1; } });
     // [v548.2] 갱신관리(DR E열) 최신 대응 맵 — 계약별 최신 기록 (업무하위 + 진척사항)
