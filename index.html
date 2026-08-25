@@ -19698,7 +19698,7 @@ function _tentBriefCore(cur, fld, verb){
     }catch(_e){}
     // [v488] 한 줄로 압축 — 계약·평균임대료·수수료·중개보수·정산예정·순수익
     var line2 = '<b>계약 '+a.cnt+' '+_bfArrow(a.cnt,b.cnt)+'</b>'
-      + (_isCur? ' <span style="color:#64748B">(전월 1~'+_D+'일 '+b.cnt+'건 대비)</span>':'')   /* [v556.3] */
+      + (_isCur? ' <span style="color:#64748B">(전월 동기 '+b.cnt+'건)</span>':'')   /* [v556.3/556.4] */
       + (avg3? ' <span style="color:#64748B">(3개월평균'+(_isCur?'·1~'+_D+'일':'')+' '+avg3+'건 대비 '+_bfArrow(a.cnt,avg3)+')</span>' : '') + ' · '
       + '평균임대료 '+Math.round(a.avgRent/1000)+'천 '+_bfArrow(a.avgRent,b.avgRent)+' · '
       + '수수료 '+_bfMil(a.fee)+' '+_bfArrow(a.fee,b.fee)+' · '
@@ -19707,10 +19707,11 @@ function _tentBriefCore(cur, fld, verb){
       + (a.dlq>0 ? ' · 연체 '+_bfMil(a.dlq) : '')
       + ' → <b>순수익 '+_bfMil(net)+' '+_bfArrow(net,netP)+'</b>'
       + (net<0 ? ' <span style="color:#B45309">⚠ 획득비 초과</span>' : '');
-    var _tdNote=_isCur? ' <span style="color:#64748B;font-weight:600">— 동일기간(전월 1~'+_D+'일) 비교</span>':'';   /* [v556.3] */
+    /* [v556.4] 동일기간 배지 — 문장 뒤가 아니라 맨 앞에 가시성 있게 표시 */
+    var _tdBadge=_isCur? '<span style="display:inline-block;background:#1B3976;color:#fff;font-size:9.5px;font-weight:800;padding:1px 8px;border-radius:9px;margin-right:6px;vertical-align:1px">📅 전월 1~'+_D+'일 동일기간 비교</span>':'';
     return '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:9px">'
-      + _bfBox('영업','#2E9E6B','#F0FDF4','#14532D', _bfSalesLine(A,B,verb,cur,'partner')+_tdNote)   // [v489] 가계약 페이지 = 파트너·지역만
-      + _bfBox('경영','#1B62D6','#EFF6FF','#1E3A8A', line2)
+      + _bfBox('영업','#2E9E6B','#F0FDF4','#14532D', _tdBadge+_bfSalesLine(A,B,verb,cur,'partner'))   // [v489] 가계약 페이지 = 파트너·지역만
+      + _bfBox('경영','#1B62D6','#EFF6FF','#1E3A8A', _tdBadge+line2)
       + '</div>';
   }catch(e){ return ''; }
 }
