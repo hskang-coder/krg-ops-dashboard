@@ -19671,7 +19671,9 @@ function _tentBriefCore(cur, fld, verb){
     if(!V.length||!cur) return '';
     fld = fld || 'tentativeDate'; verb = verb || '가계약';
     var pm=new Date(cur.y, cur.m-2, 1), prv={y:pm.getFullYear(), m:pm.getMonth()+1};
-    var pick=function(o){ return V.filter(function(v){ return _bfInM(_bfPd(v[fld]),o); }); };
+    /* [v556.3] 진행 중인 달은 같은 기간(1~오늘 일자)으로 잘라 비교 — 완료된 전월 전체와의 착시 방지 */
+    var _now=new Date(), _isCur=(cur.y===_now.getFullYear()&&cur.m===_now.getMonth()+1), _D=_now.getDate();
+    var pick=function(o){ return V.filter(function(v){ var d=_bfPd(v[fld]); return _bfInM(d,o)&&(!_isCur||d.getDate()<=_D); }); };
     var A=pick(cur), B=pick(prv);
     if(!A.length && !B.length) return '';
     var agg=function(arr){
@@ -19696,7 +19698,8 @@ function _tentBriefCore(cur, fld, verb){
     }catch(_e){}
     // [v488] 한 줄로 압축 — 계약·평균임대료·수수료·중개보수·정산예정·순수익
     var line2 = '<b>계약 '+a.cnt+' '+_bfArrow(a.cnt,b.cnt)+'</b>'
-      + (avg3? ' <span style="color:#64748B">(3개월평균 '+avg3+'건 대비 '+_bfArrow(a.cnt,avg3)+')</span>' : '') + ' · '
+      + (_isCur? ' <span style="color:#64748B">(전월 1~'+_D+'일 '+b.cnt+'건 대비)</span>':'')   /* [v556.3] */
+      + (avg3? ' <span style="color:#64748B">(3개월평균'+(_isCur?'·1~'+_D+'일':'')+' '+avg3+'건 대비 '+_bfArrow(a.cnt,avg3)+')</span>' : '') + ' · '
       + '평균임대료 '+Math.round(a.avgRent/1000)+'천 '+_bfArrow(a.avgRent,b.avgRent)+' · '
       + '수수료 '+_bfMil(a.fee)+' '+_bfArrow(a.fee,b.fee)+' · '
       + '중개보수 <b>'+_bfMil(a.brk)+'</b> '+_bfArrow(a.brk,b.brk,true)+' · '
@@ -19704,8 +19707,9 @@ function _tentBriefCore(cur, fld, verb){
       + (a.dlq>0 ? ' · 연체 '+_bfMil(a.dlq) : '')
       + ' → <b>순수익 '+_bfMil(net)+' '+_bfArrow(net,netP)+'</b>'
       + (net<0 ? ' <span style="color:#B45309">⚠ 획득비 초과</span>' : '');
+    var _tdNote=_isCur? ' <span style="color:#64748B;font-weight:600">— 동일기간(전월 1~'+_D+'일) 비교</span>':'';   /* [v556.3] */
     return '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:9px">'
-      + _bfBox('영업','#2E9E6B','#F0FDF4','#14532D', _bfSalesLine(A,B,verb,cur,'partner'))   // [v489] 가계약 페이지 = 파트너·지역만
+      + _bfBox('영업','#2E9E6B','#F0FDF4','#14532D', _bfSalesLine(A,B,verb,cur,'partner')+_tdNote)   // [v489] 가계약 페이지 = 파트너·지역만
       + _bfBox('경영','#1B62D6','#EFF6FF','#1E3A8A', line2)
       + '</div>';
   }catch(e){ return ''; }
@@ -23314,86 +23318,128 @@ function crQF_render(no, tenantName){
 })();
 
 // 메인 렌더
-// ── [v433] 수신 전화 업무 구분 · AI 자동화 분석 (gid=1658264212) ──
-function okpi_parseCalls(resp){
+// ── [v557] 담당자별 대응 KPI (gid=554798125 대응내역) — 수신전화 분석(v433) 대체 ──
+function okpi_parseResp(resp){
   if(!resp||!resp.table) return [];
   return (resp.table.rows||[]).map(function(r){
     var c=r.c||[];
     var g=function(i){return c[i]?String(c[i].f!=null?c[i].f:(c[i].v!=null?c[i].v:'')).trim():'';};
-    return { date:g(1), who:g(2), target:g(3), seg:g(4), task:g(5), note:g(6) };
-  }).filter(function(r){ return r.who; });
+    return { date:g(0), cno:g(1), nm:g(2), task:g(4), sub:g(5), who:g(6), note:g(7), prog:g(8) };
+  }).filter(function(r){ return r.date; });
 }
-function okpi_callSection(rows, range, period){
-  if(range){ rows = (rows||[]).filter(function(r){ return okpi_inRange(r, range); }); }
-  // [v436] 선택 기간(일/주/월 · 기준일)을 헤더에 표시 — 위 KPI 카드의 '기간'과 동일하게 연동
+function okpi_respSection(all, range, period){
   var _f=function(d){ return (d instanceof Date && !isNaN(d)) ? (d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')) : ''; };
   var selDr = range ? (function(){ var s=_f(range.start), e=_f(range.end); return s? ((s===e)? s : (s+' ~ '+e)) : '-'; })() : '-';
   var plabel = ({day:'일',week:'주',month:'월'}[period]||'');
   var pTag = (plabel? plabel+' · ':'') + selDr;
-  if(!rows||!rows.length){
-    return '<div class="okpi-section-title">📞 수신 전화 업무 구분 · AI 자동화 우선순위 <span class="pill">'+pTag+' · 0콜</span></div>'
-      +'<div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:16px;color:#8A97A8;font-size:12px;margin-bottom:14px">선택 기간(<b>'+pTag+'</b>)에 수신 전화 기록이 없습니다. (gid=1658264212)</div>';
+  all = all||[];
+  var rows = range? all.filter(function(r){ return okpi_inRange(r, range); }) : all.slice();
+  /* 비교 기간 — 월: 전월 동일기간(1~같은 일자) · 일/주: 직전 동일 길이 구간 */
+  var prevRange=(function(){ if(!range) return null;
+    var s=new Date(range.start), e=new Date(range.end);
+    if(period==='month'){ var today=new Date(); today.setHours(0,0,0,0);
+      var cut=(range.start.getFullYear()===today.getFullYear()&&range.start.getMonth()===today.getMonth())? today.getDate() : range.end.getDate();
+      var ps=new Date(s.getFullYear(), s.getMonth()-1, 1), pe=new Date(s.getFullYear(), s.getMonth(), 0);
+      if(cut<pe.getDate()) pe=new Date(ps.getFullYear(), ps.getMonth(), cut);
+      return {start:ps, end:pe};
+    }
+    var span=(e-s)/864e5+1;
+    var pe2=new Date(s); pe2.setDate(s.getDate()-1);
+    var ps2=new Date(pe2); ps2.setDate(pe2.getDate()-span+1);
+    return {start:ps2, end:pe2};
+  })();
+  var prevRows = prevRange? all.filter(function(r){ return okpi_inRange(r, prevRange); }) : [];
+  if(!rows.length){
+    return '<div class="okpi-section-title">👥 담당자별 대응 KPI <span class="pill">'+pTag+' · 0건</span></div>'
+      +'<div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:16px;color:#8A97A8;font-size:12px;margin-bottom:14px">선택 기간(<b>'+pTag+'</b>)에 대응 기록이 없습니다. (gid=554798125)</div>';
   }
-  var PER=2.5, total=rows.length;
-  var fm=function(n){ return Math.round(n*10)/10; };
-  var whoMap={}; rows.forEach(function(r){var k=r.who||'미상';whoMap[k]=(whoMap[k]||0)+1;});
-  var whoArr=Object.keys(whoMap).map(function(k){return [k,whoMap[k]];}).sort(function(a,b){return b[1]-a[1];});
-  var segNorm=function(s){ if(/신규/.test(s))return 'new'; if(/기존/.test(s))return 'old'; return 'unk'; };
-  var tOrder=['임차인','임대인','부동산','기타'];
-  var tMap={}; rows.forEach(function(r){var k=r.target||'기타'; if(!tMap[k])tMap[k]={n:0,old:0,'new':0,unk:0}; tMap[k].n++; tMap[k][segNorm(r.seg)]++;});
-  var tKeys=tOrder.filter(function(k){return tMap[k];}).concat(Object.keys(tMap).filter(function(k){return tOrder.indexOf(k)<0;}));
-  var taskMap={}; rows.forEach(function(r){var k=(r.task&&r.task.trim())?r.task.trim():'미분류'; taskMap[k]=(taskMap[k]||0)+1;});
-  var taskArr=Object.keys(taskMap).map(function(k){return [k,taskMap[k]];}).sort(function(a,b){return b[1]-a[1];});
-  var urg=function(t){ if(/수납|정산|연체/.test(t))return 'h'; if(/정보변경|기타|미분류/.test(t))return 'l'; return 'm'; };
-  var uinfo={h:['🔴','높음'],m:['🟡','중간'],l:['🟢','낮음']};
-  var top=taskArr[0]||['-',0];
-  var w0=whoArr[0]||['-',0], w1=whoArr[1]||['',0];
-  var kpi='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">'
-    +'<div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#6B7280;font-weight:700">총 수신콜</div><div style="font-size:24px;font-weight:800;color:#4F46E5">'+total+'<span style="font-size:12px;color:#8A97A8">건</span></div><div style="font-size:10.5px;color:#8A97A8">'+selDr+'</div></div>'
-    +'<div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#6B7280;font-weight:700">총 응대시간</div><div style="font-size:24px;font-weight:800;color:#0E7490">'+fm(total*PER)+'<span style="font-size:12px;color:#8A97A8">분</span></div><div style="font-size:10.5px;color:#8A97A8">건당 2.5분 환산</div></div>'
-    +'<div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#6B7280;font-weight:700">담당자 부하</div><div style="font-size:14px;font-weight:800;color:#B45309">'+w0[0]+' '+fm(w0[1]*PER)+'분 <span style="font-size:11px;color:#DC2626">'+Math.round(w0[1]/total*100)+'%</span></div>'+(w1[0]?'<div style="font-size:11px;font-weight:700;color:#475569">'+w1[0]+' '+fm(w1[1]*PER)+'분 <span style="color:#8A97A8">'+Math.round(w1[1]/total*100)+'%</span></div>':'')+'</div>'
-    +'<div style="background:#EEF3FB;border:1px solid #C3D4EE;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#4F46E5;font-weight:700">최우선 자동화 대상</div><div style="font-size:16px;font-weight:800;color:#4F46E5;line-height:1.25;margin-top:2px">'+top[0]+'</div><div style="font-size:11px;color:#2E5AAC;font-weight:700">'+top[1]+'건 · '+Math.round(top[1]/total*100)+'% · '+fm(top[1]*PER)+'분</div></div>'
+  var PEOPLE=['김영철','오진선','이지희','고송미'];
+  var PC={'김영철':'#4F46E5','오진선':'#0E7490','이지희':'#B45309','고송미':'#7C3AED'};
+  var TASKC={'연체관리':'#DC2626','수납관리':'#F59E0B','계약(입주)관리':'#4F46E5','갱신관리':'#0E7490','중도퇴실관리':'#7C3AED','퇴실관리':'#64748B'};
+  var DONE={'완납':1,'분납':1,'납부약속':1,'갱신희망':1,'묵시적갱신':1,'종료':1,'실제퇴실완료(개문포함)':1,'만기퇴실예정':1,'임대인합의확정':1,'갱신확정':1};
+  var stat=function(arr){
+    var s={n:arr.length, days:{}, cno:{}, fill:0, done:0, miss:0, mix:{}};
+    arr.forEach(function(r){ s.days[r.date]=1; if(r.cno) s.cno[r.cno]=1;
+      var p=(r.prog||'').trim(); if(p){ s.fill++; if(DONE[p]) s.done++; if(p==='미수신') s.miss++; }
+      var t=(r.task||'기타').trim()||'기타'; s.mix[t]=(s.mix[t]||0)+1; });
+    s.nd=Object.keys(s.days).length; s.nc=Object.keys(s.cno).length;
+    return s;
+  };
+  var W=function(k){ return rows.filter(function(r){ return (r.who||'').trim()===k; }); };
+  var WP=function(k){ return prevRows.filter(function(r){ return (r.who||'').trim()===k; }); };
+  var others=rows.filter(function(r){ return PEOPLE.indexOf((r.who||'').trim())<0; });
+  var T=stat(rows);
+  var arrow=function(c,p){ if(!prevRange) return '';
+    if(!p) return c? ' <span style="font-size:10px;color:#94A3B8">(전기 0)</span>':'';
+    var pc=Math.round((c-p)/p*100);
+    return ' <span style="font-size:10.5px;font-weight:800;color:'+(pc>0?'#15803D':pc<0?'#DC2626':'#94A3B8')+'">'+(pc>0?'▲':pc<0?'▼':'—')+Math.abs(pc)+'%</span>';
+  };
+  var cards=PEOPLE.map(function(p){
+    var s=stat(W(p)), sp=stat(WP(p));
+    var mixKeys=Object.keys(s.mix).sort(function(a,b){return s.mix[b]-s.mix[a];});
+    var topT=mixKeys[0]||'—';
+    var mixBar=s.n? '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:#F6F7F9;margin-top:7px">'
+      + mixKeys.map(function(t){ return '<div title="'+t+' '+s.mix[t]+'건" style="width:'+(s.mix[t]/s.n*100).toFixed(1)+'%;background:'+(TASKC[t]||'#94A3B8')+'"></div>'; }).join('')+'</div>' : '';
+    var doneR=s.fill? Math.round(s.done/s.fill*100) : null;
+    var missR=s.n? Math.round(s.miss/s.n*100) : 0;
+    var fillR=s.n? Math.round(s.fill/s.n*100) : 0;
+    var share=T.n? Math.round(s.n/T.n*100) : 0;
+    var m9=function(lb,v,c9){ return '<div style="flex:1;min-width:0"><div style="font-size:9.5px;color:#8A97A8;font-weight:700;white-space:nowrap">'+lb+'</div><div style="font-size:12.5px;font-weight:800;color:'+(c9||'#1E293B')+';white-space:nowrap">'+v+'</div></div>'; };
+    return '<div style="background:#fff;border:1px solid #E2E8F0;border-top:3px solid '+(PC[p]||'#64748B')+';border-radius:10px;padding:12px 14px'+(s.n?'':';opacity:.55')+'">'
+      +'<div style="display:flex;align-items:baseline;gap:7px;margin-bottom:2px"><span style="font-size:14px;font-weight:800;color:#1E293B">'+p+'</span><span style="font-size:10px;color:'+(PC[p]||'#64748B')+';font-weight:700">'+topT+'</span><span style="margin-left:auto;font-size:10px;color:#8A97A8">비중 '+share+'%</span></div>'
+      +'<div style="font-size:22px;font-weight:900;color:'+(PC[p]||'#1E293B')+';line-height:1.2">'+s.n+'<span style="font-size:11px;color:#8A97A8;font-weight:600">건</span>'+arrow(s.n,sp.n)+'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:7px">'
+      +  m9('일평균', s.nd? (Math.round(s.n/s.nd*10)/10)+'건' : '—')
+      +  m9('계약 커버', s.nc+'건')
+      +  m9('성과율', doneR==null?'—':doneR+'%', doneR==null?'#94A3B8':(doneR>=50?'#15803D':doneR>=25?'#B45309':'#DC2626'))
+      +'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:5px">'
+      +  m9('미수신', missR+'%', missR>=20?'#DC2626':'#475569')
+      +  m9('진척 기재율', fillR+'%', fillR>=50?'#15803D':fillR>=25?'#B45309':'#DC2626')
+      +  m9('활동일', s.nd+'일')
+      +'</div>'
+      + mixBar
+      +'</div>';
+  }).join('');
+  /* 업무구분 범례 + 기타 담당자 */
+  var legend=Object.keys(TASKC).map(function(t){ return '<span style="white-space:nowrap"><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+TASKC[t]+';margin-right:3px;vertical-align:-1px"></i>'+t+'</span>'; }).join(' ');
+  var othersNote='';
+  if(others.length){ var om={}; others.forEach(function(r){ var k=(r.who||'(공란)').trim()||'(공란)'; om[k]=(om[k]||0)+1; });
+    othersNote='<div style="font-size:10px;color:#8A97A8;margin-top:6px">그 외: '+Object.keys(om).sort(function(a,b){return om[b]-om[a];}).map(function(k){return k+' '+om[k]+'건';}).join(' · ')+'</div>'; }
+  /* 룰 기반 개선 제안 */
+  var tips=[];
+  try{
+    PEOPLE.forEach(function(p){ var s=stat(W(p)); if(!s.n){ tips.push('⚠️ <b>'+p+'</b> — 선택 기간 대응 기록 0건. 담당 공백 또는 기록 누락 확인 필요.'); return; }
+      var fillR=Math.round(s.fill/s.n*100);
+      if(fillR<40) tips.push('📝 <b>'+p+'</b> 진척사항 기재율 <b>'+fillR+'%</b> — 결과(완납/약속/미수신 등) 기록을 정착시키면 성과 측정과 후속 대응 자동화가 가능해집니다.');
+      var missR=Math.round(s.miss/s.n*100);
+      if(missR>=25) tips.push('📵 <b>'+p+'</b> 미수신율 <b>'+missR+'%</b> — 전화 외 알림톡·문자 병행 및 수신 잘 되는 시간대(오전/저녁) 재시도 규칙 권장.');
+    });
+    var mixT={}; rows.forEach(function(r){ var t=(r.task||'기타').trim()||'기타'; if(!mixT[t]) mixT[t]={}; var w=(r.who||'').trim()||'(공란)'; mixT[t][w]=(mixT[t][w]||0)+1; });
+    Object.keys(mixT).forEach(function(t){ var m=mixT[t]; var tot=0,mx=0,mp=''; Object.keys(m).forEach(function(w){ tot+=m[w]; if(m[w]>mx){mx=m[w];mp=w;} });
+      if(tot>=30&&mx/tot>=0.8) tips.push('🧑‍🤝‍🧑 <b>'+t+'</b>의 '+Math.round(mx/tot*100)+'%('+mx+'건)를 <b>'+mp+'</b> 1인이 처리 — 부재 시 공백 위험. 백업 담당 지정 권장.'); });
+    var mxP=0,mpP=''; PEOPLE.forEach(function(p){ var n=W(p).length; if(n>mxP){mxP=n;mpP=p;} });
+    if(T.n>=40&&mxP/T.n>=0.5) tips.push('⚖️ 전체 대응의 '+Math.round(mxP/T.n*100)+'%가 <b>'+mpP+'</b>에게 집중 — 업무 재배분 또는 반복 안내성 콜의 자동화(알림톡 템플릿) 검토.');
+    var doneAll=T.fill? Math.round(T.done/T.fill*100):0;
+    if(T.fill&&doneAll<40) tips.push('🎯 기재된 결과 중 성과(완납·분납·약속·확정) 비율 '+doneAll+'% — 미수신·무응답 건의 후속 규칙(N일 내 재시도 → 문자 전환)을 정하면 회수 전환율을 높일 수 있습니다.');
+  }catch(_e){}
+  if(!tips.length) tips.push('✅ 특이 사항 없음 — 기재율·부하·미수신 모두 양호합니다.');
+  var tipBox='<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px 14px;margin-bottom:14px">'
+    +'<div style="font-size:12px;font-weight:800;color:#92400E;margin-bottom:6px">💡 개선 제안 <span style="font-size:10px;font-weight:600;color:#B45309">(대응내역 자동 분석 — 기간 '+pTag+')</span></div>'
+    +'<div style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:#78350F;line-height:1.55">'+tips.slice(0,6).map(function(t){return '<div>'+t+'</div>';}).join('')+'</div></div>';
+  var head='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:11px;color:#475569">'
+    +'<span><b style="color:#4F46E5;font-size:13px">'+T.n+'건</b> 총 대응'+arrow(T.n, prevRows.length)+'</span>'
+    +'<span>계약 커버 <b>'+T.nc+'건</b></span>'
+    +'<span>진척 기재 <b>'+(T.n?Math.round(T.fill/T.n*100):0)+'%</b></span>'
+    +'<span>성과(기재 중) <b style="color:#15803D">'+(T.fill?Math.round(T.done/T.fill*100):0)+'%</b></span>'
+    +'<span>미수신 <b style="color:#DC2626">'+(T.n?Math.round(T.miss/T.n*100):0)+'%</b></span>'
+    +'<span style="margin-left:auto;display:flex;gap:7px;font-size:9.5px;color:#8A97A8;flex-wrap:wrap">'+legend+'</span>'
     +'</div>';
-  var tmax=taskArr[0]?taskArr[0][1]:1;
-  var tbars=taskArr.map(function(x){
-    var w=(x[1]/tmax*100).toFixed(1);
-    var col=x[1]>=tmax*0.6?'#4F46E5':x[1]>=tmax*0.18?'#2E5AAC':'#7BA4E3';
-    return '<div style="display:flex;align-items:center;gap:8px"><div style="width:92px;text-align:right;color:#475569;font-weight:600">'+x[0]+'</div><div style="flex:1;background:#F6F7F9;border-radius:4px;height:16px;overflow:hidden"><div style="width:'+w+'%;background:'+col+';height:100%;border-radius:4px"></div></div><div style="width:84px;color:#4F46E5;font-weight:700">'+x[1]+'건 · '+fm(x[1]*PER)+'분</div></div>';
-  }).join('');
-  var gmax=1; tKeys.forEach(function(k){ if(tMap[k].n>gmax)gmax=tMap[k].n; });
-  var cc={old:'#4F46E5','new':'#7BA4E3',unk:'#D8E0EC'};
-  var gbars=tKeys.map(function(k){
-    var m=tMap[k];
-    var seg=['old','new','unk'].map(function(s){ return m[s]>0?'<div style="width:'+(m[s]/gmax*100).toFixed(1)+'%;background:'+cc[s]+';height:100%"></div>':''; }).join('');
-    return '<div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-weight:700;color:#374151">'+k+'</span><span style="color:#4F46E5;font-weight:700">'+m.n+'건 · '+Math.round(m.n/total*100)+'%</span></div><div style="display:flex;background:#F6F7F9;border-radius:4px;height:15px;overflow:hidden">'+seg+'</div></div>';
-  }).join('');
-  var panels='<div style="display:grid;grid-template-columns:1.25fr 1fr;gap:10px;margin-bottom:12px">'
-    +'<div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px"><div style="font-size:12px;font-weight:800;color:#4F46E5;margin-bottom:10px">🧩 업무구분별 볼륨 · 시간 <span style="font-size:10.5px;font-weight:600;color:#8A97A8">(무엇을 — 병목)</span></div><div style="display:flex;flex-direction:column;gap:6px;font-size:11px">'+tbars+'</div></div>'
-    +'<div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px"><div style="font-size:12px;font-weight:800;color:#4F46E5;margin-bottom:10px">👥 대상별 <span style="font-size:10.5px;font-weight:600;color:#8A97A8">(누구를 — 기존/신규)</span></div><div style="display:flex;flex-direction:column;gap:9px;font-size:11px">'+gbars+'</div><div style="margin-top:9px;font-size:10px;color:#8A97A8"><span style="display:inline-block;width:9px;height:9px;background:#4F46E5;border-radius:2px;vertical-align:middle"></span> 기존 <span style="display:inline-block;width:9px;height:9px;background:#7BA4E3;border-radius:2px;vertical-align:middle;margin-left:6px"></span> 신규 <span style="display:inline-block;width:9px;height:9px;background:#D8E0EC;border-radius:2px;vertical-align:middle;margin-left:6px"></span> 미상</div></div>'
-    +'</div>';
-  var cum=0;
-  var rankRows=taskArr.map(function(x,i){
-    cum+=x[1];
-    var u=uinfo[urg(x[0])];
-    var pct=Math.round(x[1]/total*100), cpct=Math.round(cum/total*100);
-    var rankBg=i===0?'#4F46E5':i<3?'#2E5AAC':'#94A3B8';
-    return '<tr style="border-bottom:1px solid #F1F5F9">'
-      +'<td style="padding:5px 8px;text-align:center"><span style="display:inline-block;min-width:18px;background:'+rankBg+';color:#fff;border-radius:10px;font-size:10.5px;font-weight:800;padding:1px 6px">'+(i+1)+'</span></td>'
-      +'<td style="padding:5px 8px;font-weight:700;color:#1E293B">'+x[0]+'</td>'
-      +'<td style="padding:5px 8px;text-align:right;color:#4F46E5;font-weight:700">'+x[1]+'건</td>'
-      +'<td style="padding:5px 8px;text-align:right;color:#475569">'+pct+'%</td>'
-      +'<td style="padding:5px 8px;text-align:right;color:#8A97A8">'+cpct+'%</td>'
-      +'<td style="padding:5px 8px;text-align:right;color:#0E7490">'+fm(x[1]*PER)+'분</td>'
-      +'<td style="padding:5px 8px;text-align:center">'+u[0]+' <span style="font-size:10px;color:#6B7280">'+u[1]+'</span></td>'
-      +'</tr>';
-  }).join('');
-  var c2=0,cover=0; for(var ci=0;ci<taskArr.length;ci++){c2+=taskArr[ci][1];cover=ci+1;if(c2/total>=0.7)break;}
-  var priority='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px;margin-bottom:14px">'
-    +'<div style="font-size:12px;font-weight:800;color:#4F46E5;margin-bottom:4px">🎯 AI 자동화 우선순위 <span style="font-size:10.5px;font-weight:600;color:#8A97A8">(콜 볼륨 기준 — 무엇을 먼저)</span></div>'
-    +'<div style="font-size:10.5px;color:#15803D;margin-bottom:9px">💡 상위 '+cover+'개 업무구분이 전체 콜의 '+Math.round(c2/total*100)+'% → 우선 자동화 시 최대 효과</div>'
-    +'<table style="width:100%;border-collapse:collapse;font-size:11.5px"><thead><tr style="background:#F8FAFC;color:#64748B;font-size:10.5px"><th style="padding:5px 8px">순위</th><th style="padding:5px 8px;text-align:left">업무구분</th><th style="padding:5px 8px;text-align:right">콜수</th><th style="padding:5px 8px;text-align:right">비중</th><th style="padding:5px 8px;text-align:right">누적</th><th style="padding:5px 8px;text-align:right">시간</th><th style="padding:5px 8px">긴급도</th></tr></thead><tbody>'+rankRows+'</tbody></table>'
-    +'<div style="margin-top:8px;font-size:10px;color:#8A97A8">긴급도: 🔴 높음(수납·정산 등 시간민감) · 🟡 중간(계약·퇴실·심사) · 🟢 낮음(정보변경·기타) — 각 건은 자동화 검토용 로우데이터</div></div>';
-  return '<div class="okpi-section-title">📞 수신 전화 업무 구분 · AI 자동화 우선순위 <span class="pill">'+pTag+' · '+total+'콜 · 건당 2.5분</span></div>'+kpi+panels+priority;
+  return '<div class="okpi-section-title">👥 담당자별 대응 KPI <span class="pill">'+pTag+' · '+T.n+'건</span></div>'
+    + head
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">'+cards+'</div>'
+    + othersNote
+    + tipBox;
 }
 
 async function okpi_render(){
@@ -23406,12 +23452,12 @@ async function okpi_render(){
     await okpi_ensureData();
     var k = okpi_calcAll();
     var _callRows=[];
-    try{ var _cr=await okpi_fetchRaw('1658264212'); _callRows=okpi_parseCalls(_cr); }catch(_e){ console.warn('[okpi] 수신전화 fetch 실패:', _e); }
+    try{ var _cr=await okpi_fetchRaw('554798125'); _callRows=okpi_parseResp(_cr); }catch(_e){ console.warn('[okpi] 대응내역 fetch 실패:', _e); }   /* [v557] */
     var _callPeriod = (window._okpi&&window._okpi.period)||'day';
     var _callRange = okpi_getRange(_callPeriod, (window._okpi&&window._okpi.date)||new Date());
     host.innerHTML = '<div class="okpi-wrap">'
       + okpi_renderTopBar(k)
-      + okpi_callSection(_callRows, _callRange, _callPeriod)
+      + okpi_respSection(_callRows, _callRange, _callPeriod)   /* [v557] 담당자별 대응 KPI */
       + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
       + okpi_renderChart(k)
       + okpi_renderPersonCards(k)
