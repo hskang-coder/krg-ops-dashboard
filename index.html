@@ -5876,14 +5876,18 @@ function stl_cohDay(d){ if(d==null) stl_cohRange(null,null); else stl_cohRange(d
 /* [v555.1] 납부종류·청구그룹 필터 (재클릭 = 해제) */
 function stl_cohTy(t){ window.__stlCohTy=(t==='all'||window.__stlCohTy===t)?'all':t; stl_cohModal(window.__stlCohKey, true, true); }
 function stl_cohGrp(g2){ window.__stlCohGrp=(g2==='all'||window.__stlCohGrp===g2)?'all':g2; stl_cohModal(window.__stlCohKey, true, true); }
+/* [v555.2] 히어로 카드 클릭 필터 — gen=전체(해제) · rec=회수 있는 건 · out=미회수 잔존 건 (재클릭 = 해제) */
+function stl_cohHero(h){ window.__stlCohHero=(h==='gen'||window.__stlCohHero===h)?null:h; stl_cohModal(window.__stlCohKey, true, true); }
+/* [v555.2] 모달 내 계약 상태 전환 — T=전체 · A=계약중 · E=계약종료 (표의 필터와 독립) */
+function stl_cohDk(k){ window.__stlCohDk=k; stl_cohModal(window.__stlCohKey, true, true); }
 function stl_cohModal(key, keepSort, keepDay){
   try{
     if(!keepSort) window.__stlCohSort=null;
-    if(!keepDay){ window.__stlCohRange=null; window.__stlCohTy='all'; window.__stlCohGrp='all'; }   /* [v555/555.1] */
+    if(!keepDay){ window.__stlCohRange=null; window.__stlCohTy='all'; window.__stlCohGrp='all'; window.__stlCohHero=null; window.__stlCohDk=null; }   /* [v555/555.1/555.2] */
     window.__stlCohKey=key;
     var all=window.__stlCohRows||{}, meta=window.__stlCohMeta||{win:[],today:''};
     var g=all[key]||{A:[],E:[]};
-    var dk=window._stlDlqK||'T';   // T=전체 · A=계약중 · E=계약종료 (표의 현재 필터와 동일)
+    var dk=window.__stlCohDk||window._stlDlqK||'T';   // T=전체 · A=계약중 · E=계약종료 ([v555.2] 모달 내 전환 우선, 없으면 표의 현재 필터)
     var rowsAll=(dk==='A')?g.A.slice():(dk==='E')?g.E.slice():g.A.concat(g.E);
     /* [v555.1] 납부종류 필터 (전체/임대료/변동관리비/기타계약금) + 청구서명 그룹 필터 */
     var _grpOf=function(b){ b=String(b||'');
@@ -5903,6 +5907,7 @@ function stl_cohModal(key, keepSort, keepDay){
     var grpAgg={};
     rowsAll.forEach(function(r){ var g9=_grpOf(r.bill); var a9=grpAgg[g9]||(grpAgg[g9]={gen:0,out:0,rec:0,n:0}); a9.gen+=r.gen; a9.out+=r.out; a9.rec+=r.rec; a9.n++; });
     var grpKeys=Object.keys(grpAgg).sort(function(a,b){ return grpAgg[b].gen-grpAgg[a].gen; });
+    var _nAllG=rowsAll.length;   /* [v555.2] 그룹 필터 전 건수 — '전체' 칩용 */
     if(grpF!=='all') rowsAll=rowsAll.filter(function(r){ return _grpOf(r.bill)===grpF; });
     /* [v554] 납기일(1~31)별 집계 — 당월 발생 연체를 청구서 납기일 단위로 분해 */
     var _dayN=function(s){ var m=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?+m[3]:0; };
@@ -5912,6 +5917,10 @@ function stl_cohModal(key, keepSort, keepDay){
     /* [v555] 구간 필터 — [from,to] (단일일 클릭 = [d,d]) */
     var RG=window.__stlCohRange||null;
     var rows=RG? rowsAll.filter(function(r){ var d9=_dayN(r.due); return d9>=RG[0]&&d9<=RG[1]; }) : rowsAll.slice();
+    /* [v555.2] 히어로 카드 클릭 필터 — rec: 회수 있는 건 · out: 미회수 잔존 건 */
+    var HF=window.__stlCohHero||null;
+    if(HF==='rec') rows=rows.filter(function(r){ return r.rec>0; });
+    else if(HF==='out') rows=rows.filter(function(r){ return r.out>0; });
     /* 전체(구간 무관) 합계 — 히어로 요약은 항상 그 달 전체 기준 */
     var TA={gen:0,rec:0,out:0,n:0,cs:{},onN:0,onCs:{}};
     rowsAll.forEach(function(r){ TA.gen+=r.gen; TA.rec+=r.rec; TA.out+=r.out; TA.n++; TA.cs[r.cno]=1;
@@ -5965,8 +5974,14 @@ function stl_cohModal(key, keepSort, keepDay){
       +    '<button onclick="stl_cohExcel()" style="background:#1d4ed8;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">⬇️ 엑셀</button>'
       +    '<button onclick="document.getElementById(\'stlCohModal\').remove()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">닫기</button>'
       +  '</span></div>'
-      /* [v555.1] 납부종류 필터 + 청구서명 그룹별 금액 */
+      /* [v555.1] 납부종류 필터 + 청구서명 그룹별 금액 · [v555.2] 계약 상태 필터 */
       +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #F1F5F9;background:#fff">'
+      +  '<span style="font-size:10.5px;color:#64748B;font-weight:800;margin-right:2px">계약 상태</span>'
+      +  (function(){ var nA8=g.A.length, nE8=g.E.length;
+           var c8=function(k8,lb8,n8,ac8){ var on=(dk===k8);
+             return '<span onclick="stl_cohDk(\''+k8+'\')" style="cursor:pointer;border-radius:7px;padding:3px 10px;font-size:10.5px;font-weight:800;border:1.5px solid '+(on?ac8:'#E2E8F0')+';background:'+(on?ac8:'#fff')+';color:'+(on?'#fff':'#475569')+'">'+lb8+' '+n8+'</span>'; };
+           return c8('T','전체',nA8+nE8,'#1B3976')+c8('A','계약중',nA8,'#15803D')+c8('E','계약종료',nE8,'#64748B'); })()
+      +  '<span style="width:1px;height:15px;background:#E2E8F0;margin:0 5px"></span>'
       +  '<span style="font-size:10.5px;color:#64748B;font-weight:800;margin-right:2px">납부종류</span>'
       +  (function(){ var c9=function(k9,lb9,n9){ var on=(tyF===k9);
            return '<span onclick="stl_cohTy(\''+k9+'\')" style="cursor:pointer;border-radius:7px;padding:3px 10px;font-size:10.5px;font-weight:800;border:1.5px solid '+(on?'#1B3976':'#E2E8F0')+';background:'+(on?'#1B3976':'#fff')+';color:'+(on?'#fff':'#475569')+'">'+lb9+' '+n9+'</span>'; };
@@ -5974,27 +5989,28 @@ function stl_cohModal(key, keepSort, keepDay){
       +'</div>'
       +(grpKeys.length? '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #F1F5F9;background:#FCFDFF">'
         +'<span style="font-size:10.5px;color:#64748B;font-weight:800;margin-right:2px">청구 그룹</span>'
+        +'<span onclick="stl_cohGrp(\'all\')" style="cursor:pointer;border-radius:8px;padding:4px 11px;font-size:10.5px;font-weight:800;border:1.5px solid '+(grpF==='all'?'#1B3976':'#E2E8F0')+';background:'+(grpF==='all'?'#1B3976':'#fff')+';color:'+(grpF==='all'?'#fff':'#475569')+'">전체 '+_nAllG+'건</span>'   /* [v555.2] 전체 버튼 맨 앞 */
         +grpKeys.map(function(g9){ var a9=grpAgg[g9]; var on=(grpF===g9);
             return '<span onclick="stl_cohGrp(\''+g9+'\')" title="발생 '+W(a9.gen)+' · 회수 '+W(a9.rec)+' · 미회수 '+W(a9.out)+' ('+a9.n+'건)" style="cursor:pointer;border-radius:8px;padding:4px 10px;font-size:10.5px;line-height:1.5;border:1.5px solid '+(on?'#DC2626':'#E2E8F0')+';background:'+(on?'#FEF2F2':'#fff')+'">'
               +'<b style="color:#1A3A5C">'+g9+'</b> <span style="color:#94A3B8">'+a9.n+'건</span>'
               +' <span style="color:#DC2626;font-weight:800">'+W(a9.gen)+'</span>'
               +' <span style="color:'+(a9.out>0?'#B91C1C':'#94A3B8')+';font-weight:800">'+(a9.out>0?'미회수 '+W(a9.out):'전액 회수')+'</span></span>'; }).join('')
-        +(grpF!=='all'?'<span onclick="stl_cohGrp(\''+grpF+'\')" style="cursor:pointer;font-size:10px;color:#2563EB;font-weight:700;text-decoration:underline">필터 해제</span>':'')
         +'</div>' : '')
       /* [v555] 히어로 요약 — "이 달 얼마 밀렸고, 지금까지 얼마 회수됐나"를 한 번에 (항상 그 달 전체 기준) */
       +'<div style="padding:12px 16px 11px;border-bottom:1px solid #F1F5F9;background:linear-gradient(180deg,#FCFDFF,#F8FAFC)">'
       +  '<div style="display:flex;gap:0;align-items:stretch;flex-wrap:wrap">'
-      +    '<div style="flex:1;min-width:180px"><div style="font-size:10.5px;color:#64748B;font-weight:700;margin-bottom:3px">① 이 달 새로 밀린 금액'+((tyF!=='all'||grpF!=='all')?' <span style="color:#2563EB">— '+(tyF!=='all'?tyF:'')+(grpF!=='all'?((tyF!=='all'?' · ':'')+grpF):'')+'</span>':'')+'</div>'
+      /* [v555.2] 카드 클릭 → 아래 명단 필터 (①=전체 · ②=회수 있는 건 · ③=미회수 잔존 건) */
+      +    '<div onclick="stl_cohHero(\'gen\')" title="클릭 시 전체 명단 표시" style="flex:1;min-width:180px;cursor:pointer;border-radius:9px;padding:6px 10px'+(!HF?';background:#fff;box-shadow:0 0 0 1.5px #CBD5E1':'')+'"><div style="font-size:10.5px;color:#64748B;font-weight:700;margin-bottom:3px">① 이 달 새로 밀린 금액'+((tyF!=='all'||grpF!=='all')?' <span style="color:#2563EB">— '+(tyF!=='all'?tyF:'')+(grpF!=='all'?((tyF!=='all'?' · ':'')+grpF):'')+'</span>':'')+'</div>'
       +      '<div style="font-size:21px;font-weight:900;color:#DC2626;line-height:1.15">'+W(TA.gen)+'</div>'
-      +      '<div style="font-size:10px;color:#94A3B8;margin-top:2px">'+Object.keys(TA.cs).length+'명 · '+TA.n+'건</div></div>'
-      +    '<div style="width:1px;background:#E8EDF5;margin:0 16px"></div>'
-      +    '<div style="flex:1;min-width:180px"><div style="font-size:10.5px;color:#64748B;font-weight:700;margin-bottom:3px">② 지금까지 회수 <span style="font-weight:500;color:#94A3B8">('+(meta.today||'')+' 기준)</span></div>'
+      +      '<div style="font-size:10px;color:#94A3B8;margin-top:2px">'+Object.keys(TA.cs).length+'명 · '+TA.n+'건 · <span style="color:#2563EB;font-weight:700">클릭 = 전체 명단</span></div></div>'
+      +    '<div style="width:1px;background:#E8EDF5;margin:0 12px"></div>'
+      +    '<div onclick="stl_cohHero(\'rec\')" title="클릭 시 회수(입금) 있는 건만 표시" style="flex:1;min-width:180px;cursor:pointer;border-radius:9px;padding:6px 10px'+(HF==='rec'?';background:#ECFDF5;box-shadow:0 0 0 1.5px #15803D':'')+'"><div style="font-size:10.5px;color:#64748B;font-weight:700;margin-bottom:3px">② 지금까지 회수 <span style="font-weight:500;color:#94A3B8">('+(meta.today||'')+' 기준)</span></div>'
       +      '<div style="font-size:21px;font-weight:900;color:#15803D;line-height:1.15">'+W(TA.rec)+'</div>'
-      +      '<div style="font-size:10px;color:#94A3B8;margin-top:2px">회수율 <b style="color:'+(RRA>=70?'#15803D':(RRA>=40?'#B45309':'#DC2626'))+'">'+RRA+'%</b></div></div>'
-      +    '<div style="width:1px;background:#E8EDF5;margin:0 16px"></div>'
-      +    '<div style="flex:1;min-width:180px"><div style="font-size:10.5px;color:#64748B;font-weight:700;margin-bottom:3px">③ 아직 못 받음 <span style="font-weight:500;color:#94A3B8">(현시점)</span></div>'
+      +      '<div style="font-size:10px;color:#94A3B8;margin-top:2px">회수율 <b style="color:'+(RRA>=70?'#15803D':(RRA>=40?'#B45309':'#DC2626'))+'">'+RRA+'%</b> · <span style="color:#15803D;font-weight:700">클릭 = 회수 내역</span></div></div>'
+      +    '<div style="width:1px;background:#E8EDF5;margin:0 12px"></div>'
+      +    '<div onclick="stl_cohHero(\'out\')" title="클릭 시 미회수 잔존 건만 표시" style="flex:1;min-width:180px;cursor:pointer;border-radius:9px;padding:6px 10px'+(HF==='out'?';background:#FEF2F2;box-shadow:0 0 0 1.5px #DC2626':'')+'"><div style="font-size:10.5px;color:#64748B;font-weight:700;margin-bottom:3px">③ 아직 못 받음 <span style="font-weight:500;color:#94A3B8">(현시점)</span></div>'
       +      '<div style="font-size:21px;font-weight:900;color:#B91C1C;line-height:1.15">'+W(TA.out)+'</div>'
-      +      '<div style="font-size:10px;color:#94A3B8;margin-top:2px">'+Object.keys(TA.onCs).length+'명 · '+TA.onN+'건 미납 잔존</div></div>'
+      +      '<div style="font-size:10px;color:#94A3B8;margin-top:2px">'+Object.keys(TA.onCs).length+'명 · '+TA.onN+'건 미납 잔존 · <span style="color:#B91C1C;font-weight:700">클릭 = 미회수 명단</span></div></div>'
       +  '</div>'
       +  '<div style="display:flex;height:9px;border-radius:5px;overflow:hidden;background:#EEF2F7;margin-top:10px">'
       +    '<div style="width:'+RRA+'%;background:#15803D;opacity:.72"></div>'
