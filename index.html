@@ -2062,6 +2062,20 @@ function parseDailyReport(resp) {
 //   과거 기록 호환용(퇴실완료·만기퇴실예정·대위변제퇴실)을 더한 12종. 입력 드롭다운은 _okpiCat 참조.
 window._VAC_STAT9 = ['퇴실완료','중도퇴실','강제퇴실(공실)','강제퇴실(연체)','만기퇴실예정','강제퇴실(갱신불가)','강제퇴실(계약위반)','임대인사유퇴실','대위변제퇴실','사망','물건하자','월세부담',
   '중도퇴실(자진)-룸상태불만·건물환경','중도퇴실(자진)-직장이동','중도퇴실(자진)-동거인불화','중도퇴실(자진)-갱신후해지','중도퇴실(자진)-개인사정'];   /* [v558.1] 자진 사유 세분 */
+/* [v558.2] 상태확정 인식 — 시트 직접 입력 표기 변형 허용:
+   ① 공백 차이 무시('중도퇴실(자진) - 직장이동') ② 표준값 + 구분자(-·(—) 뒤 설명이 붙은 변형('물건하자-계약 물건 하자로 인한 퇴실') 인정.
+   '중도퇴실문의'·'중도퇴실 신청 접수' 같은 과정 기록은 구분자 규칙에 걸리지 않아 그대로 제외됨 */
+window._vacStatOk = function(f){
+  f = String(f||'').trim(); if (!f) return false;
+  if (window._VAC_STAT9.indexOf(f) >= 0) return true;
+  var z = f.replace(/\s+/g,'');
+  for (var i = 0; i < window._VAC_STAT9.length; i++) {
+    var e = window._VAC_STAT9[i].replace(/\s+/g,'');
+    if (z === e) return true;
+    if (z.indexOf(e) === 0) { var c = z.charAt(e.length); if (c==='-'||c==='('||c==='·'||c==='—'||c==='–') return true; }
+  }
+  return false;
+};
 function _vacDrOverride(vacArr, daeArr){
   try {
     if (!Array.isArray(vacArr) || !vacArr.length) return;
@@ -2071,7 +2085,7 @@ function _vacDrOverride(vacArr, daeArr){
       var r = daeArr[i];
       if (String(r.jobType||'').indexOf('중도퇴실관리') === -1) continue;
       var f = String(r.jobSub||'').trim();
-      if (window._VAC_STAT9.indexOf(f) === -1) continue;
+      if (!window._vacStatOk(f)) continue;   /* [v558.2] 표기 변형 허용 */
       var cno = String(r.no||'').trim();
       if (!cno) continue;
       var d = cG_dateNum(r.date) || 0, ix = r._idx || 0;
@@ -23845,7 +23859,7 @@ function renderExitMgmtView(){
     Object.keys(latest).forEach(function(cno){
       var L=latest[cno];
       if(L.d<lim) return;
-      if(window._VAC_STAT9&&window._VAC_STAT9.indexOf(L.f)>=0) return;   // 이미 상태확정 → 제외
+      if(window._vacStatOk&&window._vacStatOk(L.f)) return;   // 이미 상태확정 → 제외 [v558.2] 표기 변형 허용
       if(STEP[L.f]!=null){
         fun[STEP[L.f]]++; funCnos[cno]=1;
         // [v545.1] 단계별 명단 수집 (모달용)
@@ -23927,7 +23941,7 @@ function renderExitMgmtView(){
     var _zsum=0;
     Object.keys(_zrec).forEach(function(cno){
       var R=_zrec[cno];
-      var conf=!!(window._VAC_STAT9&&window._VAC_STAT9.indexOf(R.lv)>=0);
+      var conf=!!(window._vacStatOk&&window._vacStatOk(R.lv));   /* [v558.2] */
       // 리드타임: 실퇴실일(DR D열·BP열)이 최근 90일 내 과거 → 최초 기록부터 소요일
       var _v4=vMap[cno]||{}; var rdS=(drReal[cno]?drReal[cno].v:String(_v4.exitDate||'').trim());
       var rd=exm_pd(rdS);
@@ -23936,7 +23950,7 @@ function renderExitMgmtView(){
       if(conf||!R.mid) return;
       // [v548.4] BO 공실상태가 확정값이거나 실퇴실일(DR D열·BP열) 기재 → 이미 퇴실 확정/완료 — 활성·정체에서 제외 (퇴실대기 카드 소관)
       var _bo4=String(_v4.status||'').trim();
-      if((window._VAC_STAT9&&window._VAC_STAT9.indexOf(_bo4)>=0)||exm_pd(rdS)) return;
+      if((window._vacStatOk&&window._vacStatOk(_bo4))||exm_pd(rdS)) return;   /* [v558.2] */
       var lastD=_zd8(R.last); if(!lastD) return;
       var age=_zdays(_ztd,lastD);
       if(age<=30) zAct.push(_zrow(cno));
