@@ -2060,8 +2060,8 @@ function parseDailyReport(resp) {
 // ═══════════════════════════════════════════
 // [v540.1] 인식 목록 — 신규 입력 체계(강제퇴실 4종 + 불가항력 4종 + 자진 1종)에
 //   과거 기록 호환용(퇴실완료·만기퇴실예정·대위변제퇴실)을 더한 12종. 입력 드롭다운은 _okpiCat 참조.
-window._VAC_STAT9 = ['퇴실완료','중도퇴실','강제퇴실(공실)','강제퇴실(연체)','만기퇴실예정','강제퇴실(갱신불가)','강제퇴실(계약위반)','임대인사유퇴실','대위변제퇴실','사망','물건하자','월세부담',
-  '중도퇴실(자진)-룸상태불만·건물환경','중도퇴실(자진)-직장이동','중도퇴실(자진)-동거인불화','중도퇴실(자진)-갱신후해지','중도퇴실(자진)-개인사정'];   /* [v558.1] 자진 사유 세분 */
+window._VAC_STAT9 = ['퇴실완료','중도퇴실','강제퇴실(공실)','강제퇴실(연체)','만기퇴실예정','강제퇴실(갱신불가)','강제퇴실(계약위반)','임대인사유퇴실','대위변제퇴실','사망','물건하자','월세부담','주위환경',
+  '중도퇴실(자진)-룸상태불만·건물환경','중도퇴실(자진)-직장이동','중도퇴실(자진)-동거인불화','중도퇴실(자진)-갱신후해지','중도퇴실(자진)-개인사정'];   /* [v558.1] 자진 사유 세분 · [v562] 주위환경(불가항력) 추가 — 룸상태불만은 입력 옵션에서 제외됐지만 기존 기록 인식 위해 유지 */
 /* [v558.2] 상태확정 인식 — 시트 직접 입력 표기 변형 허용:
    ① 공백 차이 무시('중도퇴실(자진) - 직장이동') ② 표준값 + 구분자(-·(—) 뒤 설명이 붙은 변형('물건하자-계약 물건 하자로 인한 퇴실') 인정.
    '중도퇴실문의'·'중도퇴실 신청 접수' 같은 과정 기록은 구분자 규칙에 걸리지 않아 그대로 제외됨 */
@@ -20118,7 +20118,7 @@ function _vldAnalysis(bucketLabel, kind){
       +(lossOk?(lossEtc>lossRent?'<b>퇴실 처리 비용이 임대료 손실을 초과</b>합니다 — 청소비·법비용·퇴실정산금의 청구·회수 절차 관리가 핵심입니다.':'<b>임대료 미납이 주 손실원</b>입니다 — 연체 조기 회수 개입이 핵심입니다.'):'수납 데이터 로딩 후 표시됩니다.')
       +' <span style="opacity:.75">(조기 이탈 기회손실 LTV '+mil(lossLtv)+' 별도)</span>'
       +'<br><b>④ 조치</b> — '+(midDlqCnt>0?('연체 보유 <b>'+midDlqCnt+'건</b>은 선조치(연락·분납 협의) 즉시 필요합니다. 이미 <b>'+fCur+'건</b>이 강제퇴실로 종결된 만큼, 남은 연체 건은 금액이 커지기 전에 개입해야 합니다.'):'현재 연체 보유 건이 없습니다 — 자발적 퇴실 사유(시설·가격·계약조건) 확인을 권장합니다.')
-      +'<div style="font-size:9.5px;color:#B91C1C;opacity:.72;margin-top:5px;padding-top:4px;border-top:1px dashed #FCA5A5;line-height:1.6">※ 퇴실 주체 3그룹 — <b>개런티즈 조치</b>: 강제퇴실(공실·미거주 이탈 / 연체 / 갱신불가 / 계약위반) &nbsp;·&nbsp; <b>불가항력</b>: 사망·임대인사유·물건하자·월세부담 &nbsp;·&nbsp; <b>자진</b>: 중도퇴실(자진)·기타 사유·상태 미기재</div>'   /* [v541] 각주 — 3그룹 정의 */
+      +'<div style="font-size:9.5px;color:#B91C1C;opacity:.72;margin-top:5px;padding-top:4px;border-top:1px dashed #FCA5A5;line-height:1.6">※ 퇴실 주체 3그룹 — <b>개런티즈 조치</b>: 강제퇴실(공실·미거주 이탈 / 연체 / 갱신불가 / 계약위반) &nbsp;·&nbsp; <b>불가항력</b>: 사망·임대인사유·물건하자·주위환경·월세부담 &nbsp;·&nbsp; <b>자진</b>: 중도퇴실(자진)·기타 사유·상태 미기재</div>'   /* [v541] 각주 — 3그룹 정의 */
       +'</div></div>';
   }catch(e){ return ''; }
 }
@@ -22745,12 +22745,12 @@ window._okpiCat = {
     {h:'─ 상태확정 · 불가항력 ─'},
     {v:'임대인사유퇴실',    t:'임대인사유퇴실 — 임대인 사정(매각·직접거주 등)'},
     {v:'사망',             t:'사망 — 계약자 사망'},
-    {v:'물건하자',          t:'물건하자 — 계약 물건 하자로 인한 퇴실'},
+    {v:'물건하자',          t:'물건하자 — 곰팡이, 누수'},   /* [v562] 설명 수정 */
+    {v:'주위환경',          t:'주위환경 — 소음, 치안 등'},   /* [v562] 불가항력 신규 */
     {v:'월세부담',          t:'월세부담 — 임대료 부담으로 인한 퇴실'},
     {h:'─ 상태확정 · 자진 ─'},
     {v:'중도퇴실',          t:'중도퇴실(자진) — 연체 없는 단순 퇴실'},
-    /* [v558.1] 자진 퇴실 사유 세분 — F열에 사유 포함 저장, 공실상태로도 그대로 반영 */
-    {v:'중도퇴실(자진)-룸상태불만·건물환경', t:'중도퇴실(자진) — 룸상태불만(곰팡이,누수,소음)·건물환경(소음,치안)'},
+    /* [v558.1] 자진 퇴실 사유 세분 — F열에 사유 포함 저장, 공실상태로도 그대로 반영 · [v562] 룸상태불만·건물환경 옵션 삭제(→ 불가항력 물건하자·주위환경으로 이관, 기존 기록은 계속 인식) */
     {v:'중도퇴실(자진)-직장이동',           t:'중도퇴실(자진) — 직장이동'},
     {v:'중도퇴실(자진)-동거인불화',          t:'중도퇴실(자진) — 동거인불화'},
     {v:'중도퇴실(자진)-갱신후해지',          t:'중도퇴실(자진) — 갱신후해지'},
@@ -23536,7 +23536,7 @@ async function okpi_render(){
 // ════════════════════════════════════════════════
 // ▶ [v542] 퇴실관리 — 월 단위 만기/중도/강제퇴실 파악
 //   · 구분: 만기/중도 = J열(중도퇴실 여부) · 주체 3그룹 = 공실상태 값 자동 분류
-//     개런티즈 조치(강제퇴실*) / 불가항력(사망·임대인사유·물건하자·월세부담) / 자진(나머지)
+//     개런티즈 조치(강제퇴실*) / 불가항력(사망·임대인사유·물건하자·주위환경·월세부담) / 자진(나머지)
 //   · 데이터: vacancyRawData(하이브리드 공실상태) + daeungRawData(진행 단계 선행지표)
 // ════════════════════════════════════════════════
 window._exm = window._exm || (function(){ var d=new Date(); return { y:d.getFullYear(), m:d.getMonth()+1 }; })();
@@ -23562,7 +23562,7 @@ function exm_shortExp(v){
 function exm_group(v){
   var s=String(v.status||'');
   if(s.indexOf('강제퇴실')>=0||s.indexOf('대위변제')>=0) return 'gz';   /* [v549.5] 강제 상태 최우선 — J열(중도퇴실 여부) 미기재여도 강제로 분류 */
-  if(s.indexOf('사망')>=0||s.indexOf('임대인사유')>=0||s.indexOf('물건하자')>=0||s.indexOf('월세부담')>=0) return 'god';   /* [v549.10] 불가항력도 J열 무관 — 중도 계열 */
+  if(s.indexOf('사망')>=0||s.indexOf('임대인사유')>=0||s.indexOf('물건하자')>=0||s.indexOf('월세부담')>=0||s.indexOf('주위환경')>=0) return 'god';   /* [v549.10] 불가항력도 J열 무관 — 중도 계열 · [v562] 주위환경 */
   if(exm_shortExp(v)) return 'exp';   /* [v561] 단기계약 만기 보정 — J열 중도 기재보다 우선 */
   if(!exm_isMid(v)) return exm_early(v)?'vol':'exp';   /* [v553.3] 만기 前 조기 퇴실 → 중도 */
   return 'vol';
@@ -23856,12 +23856,12 @@ function renderExitMgmtView(){
     }
   });
   // ── 사유 구성 (선택월) ──
-  var rs={vac:0,dlq:0,rnw:0,brk:0,death:0,owner:0,flaw:0,burden:0,volPlain:0,volEtc:0};
+  var rs={vac:0,dlq:0,rnw:0,brk:0,death:0,owner:0,flaw:0,env:0,burden:0,volPlain:0,volEtc:0};   /* [v562] env=주위환경 */
   var volEtcMap={};
   curRows.forEach(function(r){
     var s=r.st;
     if(r.grp==='gz'){ if(s.indexOf('공실')>=0)rs.vac++; else if(s.indexOf('연체')>=0)rs.dlq++; else if(s.indexOf('갱신불가')>=0)rs.rnw++; else if(s.indexOf('계약위반')>=0)rs.brk++; else rs.vac++; }
-    else if(r.grp==='god'){ if(s.indexOf('사망')>=0)rs.death++; else if(s.indexOf('임대인사유')>=0)rs.owner++; else if(s.indexOf('물건하자')>=0)rs.flaw++; else rs.burden++; }
+    else if(r.grp==='god'){ if(s.indexOf('사망')>=0)rs.death++; else if(s.indexOf('임대인사유')>=0)rs.owner++; else if(s.indexOf('물건하자')>=0)rs.flaw++; else if(s.indexOf('주위환경')>=0)rs.env++; else rs.burden++; }   /* [v562] 주위환경 */
     else if(r.grp==='vol'){ if(s==='미기재'||s==='-'||s.indexOf('중도퇴실')>=0)rs.volPlain++; else { rs.volEtc++; volEtcMap[s]=(volEtcMap[s]||0)+1; } }
   });
   var volEtcTip=Object.keys(volEtcMap).sort(function(a,b){return volEtcMap[b]-volEtcMap[a];}).map(function(k){return k+' '+volEtcMap[k];}).join(' · ')||'없음';
@@ -23903,7 +23903,7 @@ function renderExitMgmtView(){
     V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c3=String(v.no||'').trim(); if(c3) aliveOf[c3]={ t:String(v.terminateDate||'').trim(), r:(drReal[c3]?drReal[c3].v:String(v.exitDate||'').trim()) }; } });
     var _wRow=function(c3,src){ var _v1=vMap[c3]||{}; var _st=String(_v1.status||'').trim();
       return {cno:c3, src:src, nm:_v1.tenant1Name||_v1.tenantName||'-', addr:[_v1.propAddr,_v1.propBuilding,_v1.propRoom].filter(Boolean).join(' '), real:exm_fmtDt(aliveOf[c3].r), term:exm_fmtDt(aliveOf[c3].t),   /* [v553.3] 날짜 표기 통일 */
-        exit:(_st.indexOf('강제퇴실')>=0?'강제퇴실':(exm_shortExp(_v1)?'만기퇴실':((/중도퇴실/.test(String(_v1.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|월세부담/.test(_st))?'중도퇴실':(exm_early(_v1,aliveOf[c3].r)?'중도퇴실':'만기퇴실')))),   /* [v547.2/549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 · [v561] 단기 만기 보정 */
+        exit:(_st.indexOf('강제퇴실')>=0?'강제퇴실':(exm_shortExp(_v1)?'만기퇴실':((/중도퇴실/.test(String(_v1.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|주위환경|월세부담/.test(_st))?'중도퇴실':(exm_early(_v1,aliveOf[c3].r)?'중도퇴실':'만기퇴실')))),   /* [v547.2/549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 · [v561] 단기 만기 보정 */
         st:(_st&&_st!=='-'?exm_stDisp(_st):'-'),   /* [v547.2] 공실상태(사유) · [v558.3] 자진 접두어 제거 */
         end:exm_fmtDt(_v1.endDate)}; };   /* [v547.3] 만기일 */
     var waitSet={};
@@ -23944,7 +23944,7 @@ function renderExitMgmtView(){
     var _zrow=function(cno,extra){ var _v2=vMap[cno]||{}; var R=_zrec[cno]; var _st2=String(_v2.status||'').trim();
       var o={cno:cno, nm:_v2.tenant1Name||_v2.tenantName||'-', addr:[_v2.propAddr,_v2.propBuilding,_v2.propRoom].filter(Boolean).join(' '),
         f:R?R.lv:'-', d:R?R.last:0, lc:(R&&R.lc?R.lc:''), lp:(R&&R.lp?R.lp:''), lpd:(R&&R.lpD?R.lpD:0), real:exm_fmtDt(drReal[cno]?drReal[cno].v:_v2.exitDate),   /* [v553.4] lpd = 진척사항 기재일 */   /* [v549.9] lc 기본 포함 · [v550.5] 진척사항 · [v553.3] 날짜 표기 통일 */
-        exit:(_st2.indexOf('강제퇴실')>=0?'강제퇴실':(exm_shortExp(_v2)?'만기퇴실':((/중도퇴실/.test(String(_v2.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|월세부담/.test(_st2))?'중도퇴실':(exm_early(_v2,(drReal[cno]?drReal[cno].v:''))?'중도퇴실':'만기퇴실')))),   /* [v549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 · [v561] 단기 만기 보정 */
+        exit:(_st2.indexOf('강제퇴실')>=0?'강제퇴실':(exm_shortExp(_v2)?'만기퇴실':((/중도퇴실/.test(String(_v2.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|주위환경|월세부담/.test(_st2))?'중도퇴실':(exm_early(_v2,(drReal[cno]?drReal[cno].v:''))?'중도퇴실':'만기퇴실')))),   /* [v549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 · [v561] 단기 만기 보정 */
         st:(_st2&&_st2!=='-'?exm_stDisp(_st2):'-'), end:exm_fmtDt(_v2.endDate)};   /* [v558.3] 자진 접두어 제거 */
       for(var k9 in (extra||{})) o[k9]=extra[k9]; return o; };
     var _zalive={}; V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c=String(v.no||'').trim(); if(c) _zalive[c]=1; } });
@@ -24007,7 +24007,7 @@ function renderExitMgmtView(){
     // [v549] 퇴실 방어율 — 최근 12개월 중도퇴실 문의 코호트 · 강제/불가항력 모수 제외 · 문의 후 60일 경과+계약 유지 = 방어 성공
     var _dLim=new Date(_ztd); _dLim.setMonth(_dLim.getMonth()-12);
     var _dGZ=function(s){ return s.indexOf('강제퇴실')>=0||s.indexOf('대위변제')>=0; };
-    var _dGOD=function(s){ return s.indexOf('사망')>=0||s.indexOf('임대인사유')>=0||s.indexOf('물건하자')>=0||s.indexOf('월세부담')>=0; };
+    var _dGOD=function(s){ return s.indexOf('사망')>=0||s.indexOf('임대인사유')>=0||s.indexOf('물건하자')>=0||s.indexOf('월세부담')>=0||s.indexOf('주위환경')>=0; };   /* [v562] */
     Object.keys(_zrec).forEach(function(cno){
       var R=_zrec[cno]; if(!R.mid||!R.first) return;
       var fD=_zd8(R.first); if(!fD||fD<_dLim) return;
@@ -24110,12 +24110,12 @@ function renderExitMgmtView(){
     +kpi('총 퇴실', cur.tot+'명', badge(cur.tot,prev.tot), '전월 '+prev.tot+'명 · 만기 '+cur.exp+' / 중도 '+(cur.tot-cur.exp)+estHtml)   /* [v550.1] 월말 추정 병기 */
     +kpi('만기퇴실', cur.exp+'명'+pctb(cur.exp,'#1D4ED8'), badge(cur.exp,prev.exp), '만기퇴실예정(이번 달 만기·계약중) '+zSchedM.length+'건')   /* [v550] */
     +kpi('자진 중도퇴실', cur.vol+'명'+pctb(cur.vol,'#B45309'), badge(cur.vol,prev.vol), '단순 자진 '+rs.volPlain+' · 기타 사유 '+rs.volEtc)
-    +kpi('불가항력', cur.god+'명'+pctb(cur.god,'#6D28D9'), badge(cur.god,prev.god), '사망 '+rs.death+' · 임대인 '+rs.owner+' · 하자 '+rs.flaw+' · 월세부담 '+rs.burden)
+    +kpi('불가항력', cur.god+'명'+pctb(cur.god,'#6D28D9'), badge(cur.god,prev.god), '사망 '+rs.death+' · 임대인 '+rs.owner+' · 하자 '+rs.flaw+' · 주위환경 '+rs.env+' · 월세부담 '+rs.burden)   /* [v562] */
     +kpi('개런티즈 조치 (강제)', cur.gz+'명'+pctb(cur.gz,'#B91C1C'), badge(cur.gz,prev.gz), '공실 '+rs.vac+' · 연체 '+rs.dlq+' · 갱신불가 '+rs.rnw+' · 계약위반 '+rs.brk, '#B91C1C')
     +kpi('선조치 대상 (연체 보유)', curDlqCnt+'건', '', '중도퇴실자 연체 합계 '+mil2(curDlqSum), '#B45309')
     +'</div>';
   // ── 사유 구성 박스 ──
-  var maxN=Math.max(1,cur.exp,rs.volPlain,rs.volEtc,rs.owner,rs.death,rs.flaw,rs.burden,rs.vac,rs.dlq,rs.rnw,rs.brk);
+  var maxN=Math.max(1,cur.exp,rs.volPlain,rs.volEtc,rs.owner,rs.death,rs.flaw,rs.env,rs.burden,rs.vac,rs.dlq,rs.rnw,rs.brk);   /* [v562] */
   var rrow=function(nm,n,cl,op,tip){ var w=Math.round(n/maxN*100);   /* [v542.3] 행 간격·바 높이 압축 */
     return '<div'+(tip?' title="'+tip+'"':'')+' style="display:flex;align-items:center;gap:8px;font-size:11px;padding:1px 0'+(tip?';cursor:help':'')+'"><span style="width:114px;color:#475569;font-weight:600">'+nm+'</span>'
     +'<div style="flex:1;height:7px;background:#F1F5F9;border-radius:4px;overflow:hidden"><i style="display:block;height:100%;border-radius:4px;width:'+w+'%;background:'+cl+';opacity:'+(op||1)+'"></i></div>'
@@ -24124,7 +24124,7 @@ function renderExitMgmtView(){
   var grpBox=function(bg,bd,cl,ttl,inner){ return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:9px;padding:5px 11px 6px;margin-bottom:5px"><div style="font-size:10.5px;font-weight:800;color:'+cl+';margin-bottom:2px">'+ttl+'</div>'+inner+'</div>'; };   /* [v542.3/4] 그룹 박스 여백 압축 */
   var compHtml=grpBox('#EFF6FF','#BFDBFE','#1D4ED8','📅 만기퇴실 — '+cur.exp+'명 ('+pct2(cur.exp)+'%)', rrow('계약만기 종료',cur.exp,GRP_CL.exp))
     +grpBox('#FFFBEB','#FDE68A','#B45309','🚶 자진 — '+cur.vol+'명 ('+pct2(cur.vol)+'%)', rrow('중도퇴실(자진)',rs.volPlain,GRP_CL.vol)+rrow('기타(직장·개인 등)',rs.volEtc,GRP_CL.vol,.55,volEtcTip))
-    +grpBox('#F5F3FF','#DDD6FE','#6D28D9','⚖️ 불가항력 — '+cur.god+'명 ('+pct2(cur.god)+'%)', rrow('임대인사유퇴실',rs.owner,GRP_CL.god)+rrow('사망',rs.death,GRP_CL.god,.7)+rrow('물건하자',rs.flaw,GRP_CL.god,.55)+rrow('월세부담',rs.burden,GRP_CL.god,.4))
+    +grpBox('#F5F3FF','#DDD6FE','#6D28D9','⚖️ 불가항력 — '+cur.god+'명 ('+pct2(cur.god)+'%)', rrow('임대인사유퇴실',rs.owner,GRP_CL.god)+rrow('사망',rs.death,GRP_CL.god,.7)+rrow('물건하자',rs.flaw,GRP_CL.god,.55,'곰팡이, 누수')+rrow('주위환경',rs.env,GRP_CL.god,.48,'소음, 치안 등')+rrow('월세부담',rs.burden,GRP_CL.god,.4))   /* [v562] 주위환경 행 추가 */
     +grpBox('#FEF2F2','#FECACA','#B91C1C','🚨 개런티즈 조치 — '+cur.gz+'명 ('+pct2(cur.gz)+'%)', rrow('강제퇴실(공실)',rs.vac,GRP_CL.gz)+rrow('강제퇴실(연체)',rs.dlq,GRP_CL.gz,.7)+rrow('갱신불가',rs.rnw,GRP_CL.gz,.55)+rrow('계약위반',rs.brk,GRP_CL.gz,.4));
   // ── 상세 테이블 (정렬) ──
   var s2=window._exmSort||{key:'term',dir:'asc'};
@@ -24221,7 +24221,7 @@ function renderExitMgmtView(){
     +  th2('계약번호','cno')+th2('임(전)차인','nm')+th2('물건지','addr')+th2('계약종료','ck')+th2('퇴실구분','kind')+th2('주체','grpNm')+th2('공실상태(사유)','st')+th2('실퇴실일','realTerm')+th2('계약해지일','term')+th2('거주(M)','living')+th2('연체금액','dlq')   /* [v549.1/7] 퇴실일→계약해지일 */
     +  '</tr></thead><tbody>'+tbody+'</tbody></table></div>'
     +  '<div style="font-size:10px;color:#8A9AB5;line-height:1.7;border-top:1px dashed #D7DFEC;padding-top:8px;margin-top:10px">'
-    +  '· <b>퇴실구분</b>: 만기/중도 = 계약관리 시트 중도퇴실 여부(J열) 기준, 강제 = 주체가 개런티즈 조치인 건 &nbsp;· <b>주체</b>: 공실상태 값 3그룹 자동 분류 — 개런티즈 조치(강제퇴실 4종) / 불가항력(사망·임대인사유·물건하자·월세부담) / 자진(중도퇴실·기타)<br>'
+    +  '· <b>퇴실구분</b>: 만기/중도 = 계약관리 시트 중도퇴실 여부(J열) 기준, 강제 = 주체가 개런티즈 조치인 건 &nbsp;· <b>주체</b>: 공실상태 값 3그룹 자동 분류 — 개런티즈 조치(강제퇴실 4종) / 불가항력(사망·임대인사유·물건하자·주위환경·월세부담) / 자진(중도퇴실·기타)<br>'
     +  '· 상태 미기재 건은 자진(기타)로 집계되며, 입주관리 빠른 메모(중도퇴실관리 → 상태확정)로 즉시 보정할 수 있습니다. &nbsp;· <b>실퇴실일</b>: Daily Report 중도퇴실관리 실퇴실일(D열) 기록 우선, 없으면 계약관리 실제퇴실일(BP열) — 빠른 메모의 실퇴실일 입력란으로 등록 가능'
     +  '</div>'
     +'</div>';
