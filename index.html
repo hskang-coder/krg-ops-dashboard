@@ -22769,9 +22769,28 @@ window._okpiProgress = {
   '중도퇴실관리':   ['', '실제퇴실완료(개문포함)', '임대인합의전(청소,보증금확인)', '임대인합의완료(계약해지)', '부동산컨설팅확정', '부동산컨설팅제외(만기퇴실)'],   /* [v550.4] · [v553.1] 합의완료 추가 */
   '퇴실관리':       ['', '대응중', '종료', '협의중']   // [v547]
 };
-function okpi_form_progressOptions(cat1){
-  var arr = window._okpiProgress[cat1] || [''];
-  return arr.map(function(o){ return '<option value="' + o + '">' + (o || '— 선택 —') + '</option>'; }).join('');
+/* [v558] 2차 선택값별 추가 진척 카테고리 — '중도퇴실(자진) — 연체 없는 단순 퇴실' 선택 시 퇴실 사유 표기 */
+window._okpiProgressBy2 = {
+  '중도퇴실': ['─ 자진 퇴실 사유 ─','룸상태불만(곰팡이,누수,방음,청결)','건물환경(소음,치안)','직장이동','동거인불화','갱신후해지','가정사정','군입대','기타사유']
+};
+function okpi_form_progressOptions(cat1, cat2){
+  var arr = (window._okpiProgress[cat1] || ['']).slice();
+  var ext = window._okpiProgressBy2 && window._okpiProgressBy2[cat2];   /* [v558] */
+  if (ext) arr = arr.concat(ext);
+  return arr.map(function(o){
+    if (/^─/.test(o)) return '<option disabled style="color:#94A3B8;font-weight:700">' + o + '</option>';
+    return '<option value="' + o + '">' + (o || '— 선택 —') + '</option>';
+  }).join('');
+}
+/* [v558] 2차 변경 시 진척사항 옵션 갱신 (기존 선택값은 가능하면 유지) */
+function okpi_form_onCat2Change(){
+  try {
+    var c1 = (document.getElementById('okpiF_cat1')||{}).value || '';
+    var c2 = (document.getElementById('okpiF_cat2')||{}).value || '';
+    var selP = document.getElementById('okpiF_progress');
+    if (selP) { var cur = selP.value; selP.innerHTML = okpi_form_progressOptions(c1, c2);
+      if (cur && Array.prototype.some.call(selP.options, function(op){ return op.value === cur; })) selP.value = cur; }
+  } catch(e){ console.warn('[okpi] cat2 change:', e); }
 }
 
 // D열 라벨 동적 변경
@@ -22801,9 +22820,9 @@ function okpi_form_onCat1Change(){
     if (lblD) lblD.textContent = okpi_form_dueLabel(c1);
     var memoEl = document.getElementById('okpiF_memo');
     if (memoEl) memoEl.placeholder = okpi_form_memoPlaceholder(c1);
-    // [v221] 진척사항 옵션 동적 갱신
+    // [v221] 진척사항 옵션 동적 갱신 · [v558] 2차 값 반영
     var selP = document.getElementById('okpiF_progress');
-    if (selP) selP.innerHTML = okpi_form_progressOptions(c1);
+    if (selP) selP.innerHTML = okpi_form_progressOptions(c1, (sel2 && sel2.value) || '');
   } catch(e){ console.warn('[okpi] cat1 change:', e); }
 }
 
@@ -23158,7 +23177,7 @@ function okpi_renderForm(){
     +         Object.keys(window._okpiCat).map(function(k){ return '<option' + (k===c1Default?' selected':'') + '>' + k + '</option>'; }).join('')
     +       '</select></div>'
     +     '<div class="okpi-fld"><label>2차<span class="okpi-tag-new">F</span></label>'
-    +       '<select id="okpiF_cat2" class="okpi-fld-input">' + c2Opts + '</select></div>'
+    +       '<select id="okpiF_cat2" class="okpi-fld-input" onchange="okpi_form_onCat2Change()">' + c2Opts + '</select></div>'
     +     '<div class="okpi-fld okpi-fld-search"><label>검색</label>'
     +       '<input type="text" id="okpiF_search" class="okpi-fld-input okpi-fld-search-input" placeholder="이름2자/계약번호4자리" oninput="okpi_form_onSearchInput()" autocomplete="off">'
     +       '<div id="okpiF_acBox" class="okpi-ac-box" style="display:none"></div>'
@@ -23225,7 +23244,7 @@ function crQF_render(no, tenantName){
       +           Object.keys(window._okpiCat).map(function(k){ return '<option' + (k===c1Default?' selected':'') + '>' + k + '</option>'; }).join('')
       +         '</select></div>'
       +       '<div class="okpi-fld"><label>2차<span class="okpi-tag-new">F</span></label>'
-      +         '<select id="okpiF_cat2" class="okpi-fld-input">' + c2Opts + '</select></div>'
+      +         '<select id="okpiF_cat2" class="okpi-fld-input" onchange="okpi_form_onCat2Change()">' + c2Opts + '</select></div>'
       +       '<div class="okpi-fld"><label id="okpiF_dueLabel">' + okpi_form_dueLabel(c1Default) + '</label>'
       +         '<input type="date" id="okpiF_dueDate" class="okpi-fld-input"></div>'
       +       '<div class="okpi-fld"><label>진척사항<span class="okpi-tag-new">I</span></label>'
