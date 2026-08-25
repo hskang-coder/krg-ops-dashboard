@@ -87,6 +87,26 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .period-tab.active { color: #FFF; border-bottom-color: #818CF8; }
 .period-tab:hover:not(.active) { color: rgba(255,255,255,0.8); }
 
+/* ─── [v559.1] NAV ROW — 기간·날짜 블록을 뷰 탭과 같은 줄 좌측에 카드형으로 배치 ─── */
+.nav-row { display: flex; align-items: center; gap: 14px; padding: 0 18px; }
+.nav-row .view-tabs { margin: 10px auto 14px; }
+.nav-spacer { width: 300px; flex: none; }
+.nav-left {
+  flex: none; min-width: 310px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px; padding: 4px 14px 9px;
+}
+.nav-left .period-tabs { padding: 0; }
+.nav-left .period-tab { padding: 8px 20px; font-size: 13px; }
+.nav-left .date-nav-row { background: transparent; border-top: none; padding: 6px 0 0; }
+.nav-left .date-nav-label { min-width: 150px; }
+@media (max-width: 1520px) {
+  .nav-row { flex-wrap: wrap; justify-content: center; }
+  .nav-spacer { display: none; }
+  .nav-row .view-tabs { order: 1; margin: 10px auto 6px; }
+  .nav-left { order: 2; margin: 0 auto 12px; min-width: 0; }
+}
+
 /* ─── PIE + ANALYSIS SPLIT ─────────────────────────────── */
 .pie-analysis-split { display: flex; align-items: stretch; }
 .pie-split-left { flex: 1; min-width: 0; border-right: 1.5px solid var(--border); }
@@ -387,8 +407,12 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .crx-memo-dock { position:fixed; left:0; right:0; bottom:0; z-index:900; background:#F9F7FE; border-top:2px solid #C4B5FD; box-shadow:0 -4px 16px rgba(91,33,182,.10); padding:6px 16px 8px; }
 .crx-memo-dock .cr-qf-card { max-width:1400px; margin:0 auto; background:transparent; border:none; box-shadow:none; padding:0; }
 .crx-memo-dock.collapsed .cr-qf-card > *:not(.cr-qf-hd) { display:none; }
+/* [v559] 빠른 메모 상단 인라인 — 검색창 바로 아래, 계약자 카드 위 */
+.crx-memo-inline { margin:10px auto 12px; max-width:1400px; background:#F9F7FE; border:1.5px solid #C4B5FD; border-radius:12px; box-shadow:0 2px 10px rgba(91,33,182,.08); padding:8px 16px 10px; }
+.crx-memo-inline .cr-qf-card { background:transparent; border:none; box-shadow:none; padding:0; }
+.crx-memo-inline.collapsed .cr-qf-card > *:not(.cr-qf-hd) { display:none; }
 .crx-memo-toggle { font-size:11px; font-weight:700; color:#4338CA; background:#EDE9FE; border:1px solid #DDD6FE; border-radius:6px; padding:3px 10px; cursor:pointer; float:right; }
-#contractView { padding-bottom:150px; }
+#contractView { padding-bottom:24px; }   /* [v559] 하단 독 제거로 여백 축소 */
 .crx-rtl { border-left:2px solid #E2E8F0; margin:6px 0 6px 10px; padding-left:18px; display:flex; flex-direction:column; gap:13px; }
 .crx-rtl-item { position:relative; }
 .crx-rtl-dot { position:absolute; left:-23px; top:4px; width:9px; height:9px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px #E2E8F0; }
@@ -1091,19 +1115,37 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     </div>
   </div>
 
-  <!-- View toggle -->
-  <div class="view-tabs">
-    <button class="view-tab active" onclick="switchView('summary')">📈 DashBoard</button>
-    <button class="view-tab"        onclick="switchView('settlement')">💵 정산관리</button>
-    <button class="view-tab"        onclick="switchView('opskpi')">📊 운영관리</button>
-    <button class="view-tab"        onclick="switchView('contractMgmt')">📑 계약관리</button>
-    <button class="view-tab"        onclick="switchView('partnerMgmt')">🏢 파트너관리</button>
-    <button class="view-tab"        onclick="switchView('contract')">📋 입주관리</button>
-    <button class="view-tab"        onclick="switchView('renewal')">🔄 갱신관리</button>
-    <button class="view-tab"        onclick="switchView('payment')">💰 수납관리</button>
-    <button class="view-tab"        onclick="switchView('delinquency')">🚨 연체관리</button>
-    <button class="view-tab"        onclick="switchView('exitMgmt')">🚪 퇴실관리</button>
-    <button class="view-tab"        onclick="switchView('property')">🏢 물건관리</button>
+  <!-- [v559.1] View toggle + 기간·날짜 내비 한 줄 배치 — 기간 블록을 뷰 탭 좌측으로 이동·확대 -->
+  <div class="nav-row">
+    <div class="nav-left">
+      <!-- Period tabs -->
+      <div class="period-tabs">
+        <button class="period-tab active" onclick="switchPeriod('daily')">Daily</button>
+        <button class="period-tab"        onclick="switchPeriod('weekly')">Weekly</button>
+        <button class="period-tab"        onclick="switchPeriod('monthly')">Monthly</button>
+      </div>
+      <!-- Date navigation -->
+      <div class="date-nav-row">
+        <button class="date-nav-btn" onclick="shiftPeriod(-1)">◀</button>
+        <span id="dateNavLabel" class="date-nav-label">—</span>
+        <button class="date-nav-btn" id="dateNavFwd" onclick="shiftPeriod(1)">▶</button>
+        <button class="date-nav-today" onclick="shiftPeriod(0)">오늘</button>
+      </div>
+    </div>
+    <div class="view-tabs">
+      <button class="view-tab active" onclick="switchView('summary')">📈 DashBoard</button>
+      <button class="view-tab"        onclick="switchView('settlement')">💵 정산관리</button>
+      <button class="view-tab"        onclick="switchView('opskpi')">📊 운영관리</button>
+      <button class="view-tab"        onclick="switchView('contractMgmt')">📑 계약관리</button>
+      <button class="view-tab"        onclick="switchView('partnerMgmt')">🏢 파트너관리</button>
+      <button class="view-tab"        onclick="switchView('contract')">📋 입주관리</button>
+      <button class="view-tab"        onclick="switchView('renewal')">🔄 갱신관리</button>
+      <button class="view-tab"        onclick="switchView('payment')">💰 수납관리</button>
+      <button class="view-tab"        onclick="switchView('delinquency')">🚨 연체관리</button>
+      <button class="view-tab"        onclick="switchView('exitMgmt')">🚪 퇴실관리</button>
+      <button class="view-tab"        onclick="switchView('property')">🏢 물건관리</button>
+    </div>
+    <div class="nav-spacer"></div>
   </div>
 
   <!-- Person tabs (checklist only) -->
@@ -1112,21 +1154,6 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
     <button class="person-tab"        onclick="selectPerson('이지희')">이지희</button>
     <button class="person-tab"        onclick="selectPerson('강휘수')">강휘수</button>
     <button class="person-tab"        onclick="selectPerson('전체')" style="margin-left:8px;border-left:1px solid rgba(255,255,255,0.3);padding-left:12px">전체 보기</button>
-  </div>
-
-  <!-- Period tabs -->
-  <div class="period-tabs">
-    <button class="period-tab active" onclick="switchPeriod('daily')">Daily</button>
-    <button class="period-tab"        onclick="switchPeriod('weekly')">Weekly</button>
-    <button class="period-tab"        onclick="switchPeriod('monthly')">Monthly</button>
-  </div>
-
-  <!-- Date navigation -->
-  <div class="date-nav-row">
-    <button class="date-nav-btn" onclick="shiftPeriod(-1)">◀</button>
-    <span id="dateNavLabel" class="date-nav-label">—</span>
-    <button class="date-nav-btn" id="dateNavFwd" onclick="shiftPeriod(1)">▶</button>
-    <button class="date-nav-today" onclick="shiftPeriod(0)">오늘</button>
   </div>
 </div>
 
@@ -23222,9 +23249,8 @@ function crQF_render(no, tenantName){
     // 2. 새 host div 생성 후 crResult 직전(= 검색창 바로 아래)에 삽입
     var host = document.createElement('div');
     host.id = 'crQuickFormHost';
-    host.className = 'crx-memo-dock'; // [v494 crx] 하단 고정 독 — contractView 내부라 다른 뷰에서는 자동 숨김
-    var __cv = document.getElementById('contractView') || crResult.parentNode;
-    __cv.appendChild(host);
+    host.className = 'crx-memo-inline'; // [v559] 상단 인라인 — 검색창(.cr-search-panel) 바로 아래, 계약자 카드(crResult) 위
+    crResult.parentNode.insertBefore(host, crResult);
 
     okpi_injectCss(); // okpi CSS 재사용 (.cG-fld 등)
     var todayStr = okpi_ymd(new Date());
