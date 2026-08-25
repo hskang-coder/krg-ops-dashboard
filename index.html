@@ -20266,14 +20266,16 @@ function _vldPickKind(bucketLabel, items, ev){
 // [v487] 월별 가계약 막대 클릭 → 부동산별 계약 현황 모달 (전월 대비 증감)
 function _tentPartnerRows(o, prv, fld){
   var V=Array.isArray(vacancyRawData)?vacancyRawData:[];
+  var D=(new Date()).getDate(); window.__tpD=D;   /* [v556.1] 오늘 일자 기준 컷 (1~D일 페이스 비교) */
   var pick=function(t){ return V.filter(function(v){ return _bfInM(_bfPd(v[fld]), t); }); };
   var agg=function(arr){
     var m={};
     arr.forEach(function(v){
       var k=(String(v.partnerName||'').trim())||'미지정';
-      if(!m[k]) m[k]={c:0,rent:0,rentN:0,fee:0,brk:0,gu:{},items:[]};
+      if(!m[k]) m[k]={c:0,td:0,rent:0,rentN:0,fee:0,brk:0,gu:{},items:[]};
       var rt=_bfNum(v.rent);
       m[k].c++; m[k].rent+=rt; if(rt>0)m[k].rentN++;
+      var dd0=_bfPd(v[fld]); if(dd0&&dd0.getDate()<=D) m[k].td++;   /* [v556.1] 1~D일 건수 */
       m[k].fee+=_bfNum(v.fee);
       var tm=_vldMonths(v.startDate,v.endDate);
       if(!(tm!=null&&tm<12) && typeof calcBrokerage==='function') m[k].brk+=_bfNum(calcBrokerage(_bfNum(v.deposit),rt,v.housingType));
@@ -20285,9 +20287,10 @@ function _tentPartnerRows(o, prv, fld){
   var A=agg(pick(o)), B=agg(pick(prv));
   var keys={}; Object.keys(A).forEach(function(k){keys[k]=1;}); Object.keys(B).forEach(function(k){keys[k]=1;});
   return Object.keys(keys).map(function(k){
-    var a=A[k]||{c:0,rent:0,rentN:0,fee:0,brk:0,gu:{},items:[]}, b=B[k]||{c:0};
+    var a=A[k]||{c:0,td:0,rent:0,rentN:0,fee:0,brk:0,gu:{},items:[]}, b=B[k]||{c:0,td:0};
     var tops=Object.keys(a.gu).map(function(g){return {g:g,n:a.gu[g]};}).sort(function(x,y){return y.n-x.n;}).slice(0,2);  // [v487] 상위 2개 지역
     return { name:k, prv:b.c, cur:a.c, diff:a.c-b.c, pct:b.c?Math.round((a.c-b.c)/b.c*100):null,
+      prvTd:(b.td||0), curTd:(a.td||0), tdDiff:(a.td||0)-(b.td||0), tdPct:(b.td?Math.round(((a.td||0)-b.td)/b.td*100):null),   /* [v556.1] 1~D일 페이스 */
       avgRent:a.rentN?Math.round(a.rent/a.rentN):0, fee:Math.round(a.fee), brk:Math.round(a.brk),
       net:Math.round(a.fee-a.brk),
       gu: tops.length? tops.map(function(t){return t.g+' '+t.n;}).join(' · ') : '—', items:a.items };
@@ -20301,8 +20304,10 @@ function _tentSortBy(key){
 function _tentPartnerExcel(){
   var rows=window.__tpRows||[];
   if(!rows.length||typeof XLSX==='undefined'){ alert('다운로드할 데이터가 없습니다.'); return; }
-  var ws=XLSX.utils.json_to_sheet(rows.map(function(r,i){ return {'No':i+1,'부동산':r.name,'전월':r.prv,'당월':r.cur,'증감':r.diff,
-    '증감률':(r.pct===null?'신규':r.pct+'%'),'평균임대료':r.avgRent,'서비스수수료':r.fee,'중개보수':r.brk,'순수익':r.net,'주력지역':r.gu}; }));
+  var D9=window.__tpD||(new Date()).getDate();   /* [v556.1] */
+  var ws=XLSX.utils.json_to_sheet(rows.map(function(r,i){ var o9={'No':i+1,'부동산':r.name,'전월':r.prv,'당월':r.cur};
+    o9['전월 1~'+D9+'일']=r.prvTd; o9['당월 1~'+D9+'일']=r.curTd; o9['증감('+D9+'일 기준)']=r.tdDiff; o9['증감(월)']=r.diff;
+    o9['증감률']=(r.pct===null?'신규':r.pct+'%'); o9['평균임대료']=r.avgRent; o9['서비스수수료']=r.fee; o9['중개보수']=r.brk; o9['순수익']=r.net; o9['주력지역']=r.gu; return o9; }));
   var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'부동산별');
   XLSX.writeFile(wb,'부동산별_계약현황_'+Date.now()+'.xlsx');
 }
@@ -20315,22 +20320,26 @@ function _tentOpenDetail(partner){
     var ov=document.createElement('div'); ov.id='tpDetailModal';
     ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:100002;display:flex;align-items:center;justify-content:center;padding:24px';
     ov.onclick=function(){ ov.remove(); };
+    /* [v556] 가계약일·시작일 표기 */
+    var _fd=function(s){ var d=_bfPd(s); return d?(d.getFullYear()+'.'+('0'+(d.getMonth()+1)).slice(-2)+'.'+('0'+d.getDate()).slice(-2)):'—'; };
     var body=rows.items.map(function(v,i){
       return '<tr style="border-top:1px solid #F1F5F9">'
         +'<td style="padding:6px 9px;color:#94A3B8;font-size:11px">'+(i+1)+'</td>'
         +'<td style="padding:6px 9px;white-space:nowrap"><b style="color:#0E7490;cursor:pointer" onclick="document.getElementById(\'tpDetailModal\').remove();document.getElementById(\'tpModal\')&&document.getElementById(\'tpModal\').remove();crNavFromView(\''+v.no+'\',\'summary\')">'+v.no+'</b></td>'
         +'<td style="padding:6px 9px;white-space:nowrap">'+(v.tenantName||'—')+'</td>'
         +'<td style="padding:6px 9px;font-size:11px;color:#6B7280">'+((v.propAddr||'')+' '+(v.propRoom||''))+'</td>'
+        +'<td style="padding:6px 9px;white-space:nowrap;color:#7C3AED;font-weight:700">'+_fd(v.tentativeDate)+'</td>'
+        +'<td style="padding:6px 9px;white-space:nowrap;color:#334155">'+_fd(v.startDate)+'</td>'
         +'<td style="padding:6px 9px;text-align:right;white-space:nowrap">'+(v.rent||'—')+'</td>'
         +'<td style="padding:6px 9px;text-align:right;white-space:nowrap">'+(v.fee||'—')+'</td>'
         +'<td style="padding:6px 9px;white-space:nowrap;color:#64748B">'+(v.partnerPerson||'—')+'</td></tr>';
-    }).join('')||'<tr><td colspan="7" style="padding:18px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';
-    ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:1000px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
+    }).join('')||'<tr><td colspan="9" style="padding:18px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';
+    ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:1140px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
       +'<div style="display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid #EEF2F7">'
       +'<b style="font-size:14px;color:#1B62D6">'+partner+' · '+rows.cur+'건</b><span style="font-size:11.5px;color:#8A97A8">'+c.label+' 계약 명단</span>'
       +'<span style="margin-left:auto"><button onclick="document.getElementById(\'tpDetailModal\').remove()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">닫기</button></span></div>'
       +'<div style="overflow:auto;padding:0 6px 6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-      +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th><th style="padding:6px 9px;text-align:left">계약번호</th><th style="padding:6px 9px;text-align:left">임(전)차인</th><th style="padding:6px 9px;text-align:left">물건지</th><th style="padding:6px 9px;text-align:right">임대료</th><th style="padding:6px 9px;text-align:right">수수료</th><th style="padding:6px 9px;text-align:left">담당자</th></tr></thead>'
+      +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px"><th style="padding:6px 9px;text-align:left">No</th><th style="padding:6px 9px;text-align:left">계약번호</th><th style="padding:6px 9px;text-align:left">임(전)차인</th><th style="padding:6px 9px;text-align:left">물건지</th><th style="padding:6px 9px;text-align:left">가계약일</th><th style="padding:6px 9px;text-align:left">시작일</th><th style="padding:6px 9px;text-align:right">임대료</th><th style="padding:6px 9px;text-align:right">수수료</th><th style="padding:6px 9px;text-align:left">담당자</th></tr></thead>'
       +'<tbody>'+body+'</tbody></table></div>'
       +'<div style="padding:7px 16px;border-top:1px solid #EEF2F7;font-size:10.5px;color:#94A3B8">계약번호 클릭 → 계약상세 이동</div></div>';
     document.body.appendChild(ov);
@@ -20363,19 +20372,21 @@ function _tentOpenPartners(bucketLabel){
     var body=rows.map(function(r,i){
       var hot=(r.pct!==null&&r.pct>=50&&r.diff>=3);
       var dc=r.diff>0?'#15803D':r.diff<0?'#DC2626':'#94A3B8';
+      var td=r.tdDiff||0, tc=td>0?'#15803D':td<0?'#DC2626':'#94A3B8';   /* [v556.1] */
       return '<tr style="border-top:1px solid #F1F5F9'+(hot?';background:#F0FDF4':'')+'">'
         +'<td style="padding:6px 8px;color:#94A3B8;font-size:11px">'+(i+1)+'</td>'
         +'<td style="padding:6px 8px;white-space:nowrap"><b style="color:#0E7490;cursor:pointer" onclick="_tentOpenDetail(\''+String(r.name).replace(/'/g,"\\'")+'\')">'+r.name+'</b></td>'
         +'<td style="padding:6px 8px;text-align:right;color:#94A3B8">'+r.prv+'</td>'
         +'<td style="padding:6px 8px;text-align:right;font-weight:800;color:#1E293B">'+r.cur+'</td>'
+        +'<td title="전월 1~'+(window.__tpD||'')+'일 '+r.prvTd+'건 → 당월 1~'+(window.__tpD||'')+'일 '+r.curTd+'건" style="padding:6px 8px;text-align:right;font-weight:700;color:'+tc+';white-space:nowrap">'+(td>0?'+':'')+td+' ('+(r.tdPct==null?'신규':(r.tdPct>0?'+':'')+r.tdPct+'%')+')</td>'   /* [v556.1] 오늘(D일) 기준 증감 */
         +'<td style="padding:6px 8px;text-align:right;font-weight:700;color:'+dc+';white-space:nowrap">'+(r.diff>0?'+':'')+r.diff+' ('+(r.pct===null?'신규':(r.pct>0?'+':'')+r.pct+'%')+')</td>'
         +'<td style="padding:6px 8px;text-align:right;white-space:nowrap">₩'+r.avgRent.toLocaleString()+'</td>'
         +'<td style="padding:6px 8px;text-align:right;white-space:nowrap;font-weight:700;color:#1B62D6">'+_bfMil(r.fee)+'</td>'
         +'<td style="padding:6px 8px;text-align:right;white-space:nowrap;color:#B5730F">'+_bfMil(r.brk)+'</td>'
         +'<td style="padding:6px 8px;text-align:right;white-space:nowrap;font-weight:800;color:'+(r.net>=0?'#15803D':'#DC2626')+'">'+_bfMil(r.net)+'</td>'
         +'<td style="padding:6px 8px;white-space:nowrap;color:#64748B;font-size:11px">'+r.gu+'</td></tr>';
-    }).join('')||'<tr><td colspan="10" style="padding:18px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';
-    ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:1240px;width:100%;max-height:84vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
+    }).join('')||'<tr><td colspan="11" style="padding:18px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';
+    ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:1300px;width:100%;max-height:84vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
       +'<div style="display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid #EEF2F7">'
       +  '<b style="font-size:14px;color:#1B62D6">'+bucketLabel+' 부동산별 '+verb+' 현황</b>'
       +  '<span style="background:#EFF6FF;color:#1B62D6;font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:9px">전월 대비</span>'
@@ -20394,7 +20405,7 @@ function _tentOpenPartners(bucketLabel){
       +'</div>'
       +'<div style="overflow:auto;padding:0 6px 6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
       +'<thead><tr style="background:#F8FAFC;font-size:11px"><th style="padding:6px 8px;text-align:left;color:#64748B">No</th>'
-      + th('부동산','name','left') + th('전월','prv') + th('당월','cur') + th('증감','diff') + th('평균임대료','avgRent') + th('수수료','fee') + th('중개보수','brk') + th('순수익','net') + th('주력지역(상위2)','gu','left')
+      + th('부동산','name','left') + th('전월','prv') + th('당월','cur') + th('증감('+(window.__tpD||(new Date()).getDate())+'일 기준)','tdDiff') + th('증감(월)','diff') + th('평균임대료','avgRent') + th('수수료','fee') + th('중개보수','brk') + th('순수익','net') + th('주력지역(상위2)','gu','left')
       +'</tr></thead><tbody>'+body+'</tbody></table></div>'
       +'<div style="padding:7px 16px;border-top:1px solid #EEF2F7;font-size:10.5px;color:#94A3B8">부동산명 클릭 → 계약 명단 · 헤더 클릭 → 정렬</div></div>';
     document.body.appendChild(ov);
