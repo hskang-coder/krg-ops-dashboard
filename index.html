@@ -23552,10 +23552,18 @@ function exm_early(v, realOv){
 /* [v553.3] 날짜 표기 통일 — 시트 원본이 '2026-08-22' 형식이어도 '2026. 8. 22'로 출력 */
 function exm_fmtDt(s){ var d=exm_pd(s); return d?(d.getFullYear()+'. '+(d.getMonth()+1)+'. '+d.getDate()):((String(s||'').trim())||'-'); }
 function exm_stDisp(s){ s=String(s||'').trim(); var m=s.match(/^중도퇴실\s*\(\s*자진\s*\)\s*[-–—:·]*\s*(.+)$/); return m?m[1].trim():s; }   /* [v558.3] 표시용 — '중도퇴실(자진)' 접두어 제거, 뒷부분 사유만 출력 */
+/* [v561] 단기계약(3개월 이하) 만기 보정 — 퇴실일이 만기일 ±31일 이내면 중도가 아닌 만기로 분류 (예: 60926 김혁종, 3개월 계약 만기 3일 전 퇴실) */
+function exm_shortExp(v){
+  var sd=exm_pd(v&&v.startDate), ed=exm_pd(v&&v.endDate); if(!sd||!ed) return false;
+  if(Math.round((ed-sd)/864e5)>100) return false;   /* 계약기간 3개월(~92일) 초과 → 해당 없음 */
+  var xd=exm_pd(v&&v.terminateDate)||exm_pd(v&&v.exitDate); if(!xd) return false;
+  return Math.abs(Math.round((ed-xd)/864e5))<=31;   /* 만기 1개월 전후 */
+}
 function exm_group(v){
   var s=String(v.status||'');
   if(s.indexOf('강제퇴실')>=0||s.indexOf('대위변제')>=0) return 'gz';   /* [v549.5] 강제 상태 최우선 — J열(중도퇴실 여부) 미기재여도 강제로 분류 */
   if(s.indexOf('사망')>=0||s.indexOf('임대인사유')>=0||s.indexOf('물건하자')>=0||s.indexOf('월세부담')>=0) return 'god';   /* [v549.10] 불가항력도 J열 무관 — 중도 계열 */
+  if(exm_shortExp(v)) return 'exp';   /* [v561] 단기계약 만기 보정 — J열 중도 기재보다 우선 */
   if(!exm_isMid(v)) return exm_early(v)?'vol':'exp';   /* [v553.3] 만기 前 조기 퇴실 → 중도 */
   return 'vol';
 }
@@ -23895,7 +23903,7 @@ function renderExitMgmtView(){
     V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c3=String(v.no||'').trim(); if(c3) aliveOf[c3]={ t:String(v.terminateDate||'').trim(), r:(drReal[c3]?drReal[c3].v:String(v.exitDate||'').trim()) }; } });
     var _wRow=function(c3,src){ var _v1=vMap[c3]||{}; var _st=String(_v1.status||'').trim();
       return {cno:c3, src:src, nm:_v1.tenant1Name||_v1.tenantName||'-', addr:[_v1.propAddr,_v1.propBuilding,_v1.propRoom].filter(Boolean).join(' '), real:exm_fmtDt(aliveOf[c3].r), term:exm_fmtDt(aliveOf[c3].t),   /* [v553.3] 날짜 표기 통일 */
-        exit:(_st.indexOf('강제퇴실')>=0?'강제퇴실':((/중도퇴실/.test(String(_v1.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|월세부담/.test(_st))?'중도퇴실':(exm_early(_v1,aliveOf[c3].r)?'중도퇴실':'만기퇴실'))),   /* [v547.2/549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 */
+        exit:(_st.indexOf('강제퇴실')>=0?'강제퇴실':(exm_shortExp(_v1)?'만기퇴실':((/중도퇴실/.test(String(_v1.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|월세부담/.test(_st))?'중도퇴실':(exm_early(_v1,aliveOf[c3].r)?'중도퇴실':'만기퇴실')))),   /* [v547.2/549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 · [v561] 단기 만기 보정 */
         st:(_st&&_st!=='-'?exm_stDisp(_st):'-'),   /* [v547.2] 공실상태(사유) · [v558.3] 자진 접두어 제거 */
         end:exm_fmtDt(_v1.endDate)}; };   /* [v547.3] 만기일 */
     var waitSet={};
@@ -23936,7 +23944,7 @@ function renderExitMgmtView(){
     var _zrow=function(cno,extra){ var _v2=vMap[cno]||{}; var R=_zrec[cno]; var _st2=String(_v2.status||'').trim();
       var o={cno:cno, nm:_v2.tenant1Name||_v2.tenantName||'-', addr:[_v2.propAddr,_v2.propBuilding,_v2.propRoom].filter(Boolean).join(' '),
         f:R?R.lv:'-', d:R?R.last:0, lc:(R&&R.lc?R.lc:''), lp:(R&&R.lp?R.lp:''), lpd:(R&&R.lpD?R.lpD:0), real:exm_fmtDt(drReal[cno]?drReal[cno].v:_v2.exitDate),   /* [v553.4] lpd = 진척사항 기재일 */   /* [v549.9] lc 기본 포함 · [v550.5] 진척사항 · [v553.3] 날짜 표기 통일 */
-        exit:(_st2.indexOf('강제퇴실')>=0?'강제퇴실':((/중도퇴실/.test(String(_v2.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|월세부담/.test(_st2))?'중도퇴실':(exm_early(_v2,(drReal[cno]?drReal[cno].v:''))?'중도퇴실':'만기퇴실'))),   /* [v549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 */
+        exit:(_st2.indexOf('강제퇴실')>=0?'강제퇴실':(exm_shortExp(_v2)?'만기퇴실':((/중도퇴실/.test(String(_v2.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|월세부담/.test(_st2))?'중도퇴실':(exm_early(_v2,(drReal[cno]?drReal[cno].v:''))?'중도퇴실':'만기퇴실')))),   /* [v549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 · [v561] 단기 만기 보정 */
         st:(_st2&&_st2!=='-'?exm_stDisp(_st2):'-'), end:exm_fmtDt(_v2.endDate)};   /* [v558.3] 자진 접두어 제거 */
       for(var k9 in (extra||{})) o[k9]=extra[k9]; return o; };
     var _zalive={}; V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c=String(v.no||'').trim(); if(c) _zalive[c]=1; } });
