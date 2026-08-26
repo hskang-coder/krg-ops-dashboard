@@ -5480,6 +5480,11 @@ async function renderSettlementView(){
     /* [v571] 연체채권 집계기 — R=검색기간 발생분, A=전체 누적 */
     var _dZ=function(){ return {active:0,ended:0,rent:0,exit:0,cs:{}}; };
     var _dR=_dZ(), _dA=_dZ();
+    /* [v572] 계약 시작일 기준 코호트 — 검색기간 내 시작한 계약만 별도 집계 */
+    var cohS={}, prevGS={A:_z(), E:_z()}, _cohRowsS={};
+    var _sdMap={}; V.forEach(function(v){ var c=String(v.no||'').trim(); if(c) _sdMap[c]=_bfPd(v.startDate); });
+    var _sdStr=function(cno){ var d=_sdMap[String(cno||'').trim()]; return d?_ymd(d):''; };
+    var _sdIn =function(cno){ var d=_sdMap[String(cno||'').trim()]; return !!(d && d>=rs && d<=re2); };
     var winLen=Math.max(4,_mKeys.length);   // [v515] 기간이 4개월 초과 시 전체 표시, 이하면 최근 4개월
     var win=[]; for(var k=winLen-1;k>=0;k--){ var d=new Date(+cmKey.slice(0,4), +cmKey.slice(5,7)-1-k, 1); win.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
     P.forEach(function(p){
@@ -5502,17 +5507,26 @@ async function renderSettlementView(){
       if(win.indexOf(bm)>=0){ if(!coh[bm]) coh[bm]={A:_z(), E:_z()}; tgt=coh[bm][gk]; _rk=bm; }
       else { tgt=prevG[gk]; _rk='prev'; }
       tgt.gen+=gen; tgt.rec+=paid; tgt.out+=out; tgt.n++;
-      /* [v554] 상세 행 보존 */
-      (function(){ var _c9=String(p['계약번호']||'').trim(); var _i9=_nmMap[_c9]||{};
-        if(!_cohRows[_rk]) _cohRows[_rk]={A:[],E:[]};
-        _cohRows[_rk][gk].push({ cno:_c9, nm:_i9.nm||'-', tel:_i9.tel||'-', bm:bm,
+      var _c9=String(p['계약번호']||'').trim();
+      var _lb = isRent(p) ? '임대료' : (isFee(p) ? '수수료' : (isExitStl(p) ? '퇴실정산' : '변동관리비'));   /* [v570] */
+      /* [v554] 상세 행 보존 · [v572] 계약시작일(sd) 동봉 */
+      var _rowO=(function(){ var _i9=_nmMap[_c9]||{};
+        return { cno:_c9, nm:_i9.nm||'-', tel:_i9.tel||'-', bm:bm, sd:_sdStr(_c9),
           ty:(isRent(p)?'임대료':(isFee(p)?'수수료':(isExitStl(p)?'퇴실정산':'변동관리비'))), rty:String(p['납부종류']||'').trim(), bill:String(p['청구서명']||'').trim(),   /* [v555.1] rty=원본 납부종류 · [v570] 퇴실정산 구분 */
           due:String(p['납기일']||'').trim(), pay:String(p['납부일']||'').trim(), st:String(p['납부상태']||'').trim(),
-          days:days, gen:gen, rec:paid, out:out, ck:(ended?'종료':'계약중') }); })();
+          days:days, gen:gen, rec:paid, out:out, ck:(ended?'종료':'계약중') }; })();
+      if(!_cohRows[_rk]) _cohRows[_rk]={A:[],E:[]};
+      _cohRows[_rk][gk].push(_rowO);
       // [v522] 사람 수(계약번호 distinct) + 청구 종류별 라인 수
-      tgt.cs[String(p['계약번호']||'').trim()]=1;
-      var _lb = isRent(p) ? '임대료' : (isFee(p) ? '수수료' : (isExitStl(p) ? '퇴실정산' : '변동관리비'));   /* [v570] */
+      tgt.cs[_c9]=1;
       tgt.k[_lb]=(tgt.k[_lb]||0)+1;
+      /* [v572] 계약 시작일이 검색기간 내인 계약만 — '계약 시작일 기준' 코호트 */
+      if(_sdIn(_c9)){
+        var tgtS = (win.indexOf(bm)>=0) ? ((cohS[bm]=cohS[bm]||{A:_z(),E:_z()})[gk]) : prevGS[gk];
+        tgtS.gen+=gen; tgtS.rec+=paid; tgtS.out+=out; tgtS.n++; tgtS.cs[_c9]=1; tgtS.k[_lb]=(tgtS.k[_lb]||0)+1;
+        if(!_cohRowsS[_rk]) _cohRowsS[_rk]={A:[],E:[]};
+        _cohRowsS[_rk][gk].push(_rowO);
+      }
       /* [v570] 연체채권 총액 = 임대료 + 퇴실정산만 (수수료·순수 변동관리비 제외)
          [v571] 기간검색 연동 — _dR=검색기간 발생분 / _dA=전체 누적 (토글로 선택) */
       if(out>0 && isDebtItem(p)){
@@ -5524,11 +5538,14 @@ async function renderSettlementView(){
         });
       }
     });
+    /* [v572] 코호트 기준 — bill(청구 발행월, 기본) / start(계약 시작일이 검색기간 내) */
+    var _cohBase=(window._stlCohBase==='start')?'start':'bill';
+    var COH=(_cohBase==='start')?cohS:coh, PREVG=(_cohBase==='start')?prevGS:prevG;
     // [v521] 그룹별 누적 미회수 (버튼 라벨·표에 사용)
-    var _co=function(m,k){ return ((coh[m]||{})[k]||_z()).out; };
-    var totA = prevG.A.out + win.reduce(function(s,m){ return s+_co(m,'A'); },0);
-    var totE = prevG.E.out + win.reduce(function(s,m){ return s+_co(m,'E'); },0);
-    var prevGen = prevG.A.gen + prevG.E.gen, prevOut = prevG.A.out + prevG.E.out;
+    var _co=function(m,k){ return ((COH[m]||{})[k]||_z()).out; };
+    var totA = PREVG.A.out + win.reduce(function(s,m){ return s+_co(m,'A'); },0);
+    var totE = PREVG.E.out + win.reduce(function(s,m){ return s+_co(m,'E'); },0);
+    var prevGen = PREVG.A.gen + PREVG.E.gen, prevOut = PREVG.A.out + PREVG.E.out;
     var totalOut = totA + totE;
     /* [v570/571] 연체채권 — 기간검색 발생분(range) / 전체 누적(all) 토글 */
     var _dScope=(window._stlDebtScope==='all')?'all':'range';
@@ -5803,8 +5820,8 @@ async function renderSettlementView(){
     var _cn=function(c){ return Object.keys(c.cs||{}).length; };
     var _ktip=function(c){ var a=[]; for(var i in (c.k||{})) a.push(i+' '+c.k[i]+'건'); return a.length? '청구 종류별 — '+a.join(' · ') : ''; };
     var nlbl=function(c){ return '<span title="'+_ktip(c)+'" style="font-size:9px;color:#94A3B8;font-weight:500;cursor:help">'+_cn(c)+'명 · '+c.n+'건</span>'; };
-    var pv=gpick(prevG);
-    window.__stlCohRows=_cohRows;   /* [v554] 발생월 상세 모달용 */
+    var pv=gpick(PREVG);   /* [v572] */
+    window.__stlCohRows=(_cohBase==='start')?_cohRowsS:_cohRows;   /* [v554] 발생월 상세 모달용 · [v572] 기준 연동 */
     window.__stlCohMeta={win:win.slice(), prevLbl:win[0].replace('-','.')+' 이전 전체', today:_ymd(today)};
     var rf='', run=pv.out;
     rf+='<tr onclick="stl_cohModal(\'prev\')" title="클릭 시 상세 내역 보기" style="border-top:1px solid #F1F5F9;color:#94A3B8;cursor:pointer" onmouseover="this.style.background=\'#F8FAFC\'" onmouseout="this.style.background=\'\'">'
@@ -5815,7 +5832,7 @@ async function renderSettlementView(){
       +'<td style="padding:6px 8px;text-align:right">'+mil(pv.out)+'</td>'
       +'<td style="padding:6px 8px;text-align:right;font-weight:700">'+mil(pv.out)+'</td></tr>';
     win.forEach(function(m){
-      var c2=gpick(coh[m]||{A:_z(),E:_z()});
+      var c2=gpick(COH[m]||{A:_z(),E:_z()});   /* [v572] */
       run+=c2.out;
       var rr=c2.gen? Math.round(c2.rec/c2.gen*100) : 0;
       var col=rr>=70?'#15803D':(rr>=40?'#B45309':'#DC2626');
@@ -5855,9 +5872,17 @@ async function renderSettlementView(){
       +'<div style="font-size:11px;color:#5A6A8A;margin-bottom:8px;line-height:1.6">'
       +'<b>매달 임대료가 얼마나 밀렸고, 그중 지금까지 얼마를 돌려받았는지</b> 보여주는 표입니다. 한 번 밀린 금액은 그 달에 고정되고, 회수액만 시간이 지나며 쌓입니다.'
       +'</div>'
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px">'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px;align-items:center">'
       + dbtn('T','전체', totA+totE) + dbtn('A','🔵 계약중', totA) + dbtn('E','🟠 계약종료(퇴실)', totE)
+      /* [v572] 집계 기준 — 청구 발행월 / 계약 시작일 */
+      + (function(){ var cb=function(k,lb,tip){ var on=(_cohBase===k);
+          return '<span title="'+tip+'" onclick="stl_setCohBase(\''+k+'\')" style="cursor:pointer;font-size:10px;font-weight:800;border-radius:12px;padding:4px 11px;border:1px solid '+(on?'#1A3A5C':'#D7DFEC')+';background:'+(on?'#1A3A5C':'#fff')+';color:'+(on?'#fff':'#5A6A8A')+'">'+lb+'</span>'; };
+          return '<span style="margin-left:auto;display:inline-flex;gap:5px;align-items:center">'
+            +'<span style="font-size:10px;color:#8A97A8;font-weight:700">집계 기준</span>'
+            +cb('bill','📄 청구 발행월','연체가 발생한 청구서의 발행월로 집계 (기본)')
+            +cb('start','🗓 계약 시작일','계약 시작일이 검색기간 안인 계약만 집계 — 신규 코호트 성과 보기')+'</span>'; })()
       +'</div>'
+      + (_cohBase==='start' ? '<div style="background:#EEF2FF;border-left:3px solid #4F46E5;border-radius:0 6px 6px 0;padding:7px 10px;margin-bottom:9px;font-size:11px;color:#3730A3;line-height:1.6"><b>🗓 계약 시작일 기준</b> — 계약 시작일이 <b>'+rlbl+'</b> 안인 계약만 집계합니다. 그 계약들이 이후 어느 달에 얼마나 밀렸는지(행=연체 발생월) 보여주므로, <b>신규 계약 코호트의 연체·회수 성과</b> 확인에 씁니다.</div>' : '')   /* [v572] */
       + asOfWarn
       +'<div style="background:#F8FAFC;border-left:3px solid #94A3B8;border-radius:0 6px 6px 0;padding:7px 10px;margin-bottom:9px;font-size:11px;color:#475569;line-height:1.6">'
       +'📖 <b>읽는 법</b> — '+exM.replace('-','.')+' 줄은 “그 달에 <b>'+_cn(exC)+'명</b>이 <b style="color:#DC2626">'+mil(exC.gen)+'</b>('+exC.n+'건)을 새로 밀렸는데, 그중 <b style="color:#15803D">'+exR+'%('+mil(exC.rec)+')</b>를 지금까지 회수했고 <b>'+mil(exC.out)+'</b>은 아직 못 받았다”는 뜻입니다. 맨 오른쪽은 그때까지 쌓인 <b>회사 전체 미회수 총액</b>입니다.'
@@ -5897,7 +5922,7 @@ function stl_cohExcel(){
   try{
     var rows=window.__stlCohFlat||[];
     if(!rows.length||typeof XLSX==='undefined'){ alert('다운로드할 데이터가 없습니다.'); return; }
-    var ws=XLSX.utils.json_to_sheet(rows.map(function(r,i){ return {'No':i+1,'계약번호':r.cno,'임(전)차인':r.nm,'연락처':r.tel,'계약상태':r.ck,'발생월':r.bm,
+    var ws=XLSX.utils.json_to_sheet(rows.map(function(r,i){ return {'No':i+1,'계약번호':r.cno,'임(전)차인':r.nm,'연락처':r.tel,'계약상태':r.ck,'계약시작일':r.sd||'','발생월':r.bm,   /* [v572] 계약시작일 */
       '납부종류':r.rty||r.ty,'청구서명':r.bill||'','납기일':r.due,'납부일':r.pay||'','납부상태':r.st,'연체일수':r.days,
       '① 발생액':r.gen,'② 회수액':r.rec,'③ 미회수':r.out,'회수율(%)':(r.gen?Math.round(r.rec/r.gen*100):0)}; }));
     var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'연체상세');
@@ -5966,7 +5991,7 @@ function stl_cohModal(key, keepSort, keepDay){
     var RRA=TA.gen?Math.round(TA.rec/TA.gen*1000)/10:0;
     var S=window.__stlCohSort||{key:'out',dir:'desc'};
     var dv=function(o){ var v=o[S.key];
-      if(S.key==='due'||S.key==='pay'){ var m=String(v||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(+m[1])*10000+(+m[2])*100+(+m[3]):0; }
+      if(S.key==='due'||S.key==='pay'||S.key==='sd'){ var m=String(v||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(+m[1])*10000+(+m[2])*100+(+m[3]):0; }   /* [v572] sd 날짜 정렬 */
       return (typeof v==='number')?v:String(v==null?'':v); };
     rows.sort(function(a,b){ var x=dv(a),y=dv(b),r;
       if(typeof x==='number'&&typeof y==='number') r=x-y; else r=String(x).localeCompare(String(y),'ko');
@@ -5992,6 +6017,7 @@ function stl_cohModal(key, keepSort, keepDay){
         +'<td style="padding:6px 9px"><b style="color:#0E7490;cursor:pointer" onclick="document.getElementById(\'stlCohModal\').remove();crNavFromView(\''+r.cno+'\',\'delinquency\')">'+r.cno+'</b></td>'
         +'<td style="padding:6px 9px;white-space:nowrap">'+r.nm+'</td>'
         +'<td style="padding:6px 9px"><span style="display:inline-block;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;'+(r.ck==='종료'?'background:#FEF3C7;color:#B45309':'background:#EFF6FF;color:#1D4ED8')+'">'+r.ck+'</span></td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:'+(r.sd?'#0E7490':'#CBD5E1')+';white-space:nowrap;font-weight:'+(r.sd?'700':'400')+'">'+(r.sd||'-')+'</td>'   /* [v572] 계약시작일 */
         +'<td style="padding:6px 9px;font-size:11px;color:#475569;white-space:nowrap">'+(r.rty||r.ty)+'</td>'
         +'<td style="padding:6px 9px;font-size:11px;color:#475569"><span title="'+String(r.bill||'').replace(/"/g,'&quot;')+'" style="display:inline-block;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">'+(r.bill||'-')+'</span></td>'   /* [v555.1] 청구서명 */
         +'<td style="padding:6px 9px;font-size:11px;color:#64748B;white-space:nowrap">'+(r.due||'-')+'</td>'
@@ -6002,7 +6028,7 @@ function stl_cohModal(key, keepSort, keepDay){
         +'<td style="padding:6px 9px;white-space:nowrap"><span style="display:inline-block;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;background:'+sc+'1a;color:'+sc+'">'+(r.st||'-')+'</span></td>'
         +'<td style="padding:6px 9px;text-align:center;font-weight:700;color:'+(r.days>0?'#DC2626':'#94A3B8')+'">'+(r.days||0)+'</td>'
         +'<td style="padding:6px 9px;font-size:11px;color:#64748B;white-space:nowrap">'+(r.pay||'—')+'</td></tr>';
-    }).join('')||'<tr><td colspan="14" style="padding:22px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';
+    }).join('')||'<tr><td colspan="15" style="padding:22px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';   /* [v572] 컬럼 +1 */
     ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:1180px;width:100%;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
       +'<div style="display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid #EEF2F7">'
       +  '<span style="width:11px;height:11px;border-radius:3px;background:#DC2626"></span>'
@@ -6090,7 +6116,7 @@ function stl_cohModal(key, keepSort, keepDay){
         })() : '')
       +'<div style="overflow:auto;padding:0 6px 6px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
       +'<thead><tr style="background:#F8FAFC;color:#64748B;font-size:11px;position:sticky;top:0"><th style="padding:6px 9px;text-align:left">No</th>'
-      + _sth('계약번호','cno') + _sth('임(전)차인','nm') + _sth('계약상태','ck') + _sth('납부종류','rty') + _sth('청구서명','bill') + _sth('납기일','due')
+      + _sth('계약번호','cno') + _sth('임(전)차인','nm') + _sth('계약상태','ck') + _sth('계약시작일','sd') + _sth('납부종류','rty') + _sth('청구서명','bill') + _sth('납기일','due')   /* [v572] 계약시작일 */
       + _sth('① 발생액','gen','right') + _sth('② 회수액','rec','right') + _sth('③ 미회수','out','right') + _sth('회수율','gen','right')
       + _sth('납부상태','st') + _sth('연체일','days','center') + _sth('납부일','pay')
       +'</tr></thead><tbody>'+body+'</tbody></table></div>'
@@ -6111,6 +6137,8 @@ function stl_setRange(){
 }
 /* [v571] 연체채권 총액 집계 범위 — range(검색기간 발생분) / all(전체 누적) */
 function stl_setDebtScope(k){ window._stlDebtScope=(k==='all'?'all':'range'); renderSettlementView(); }
+/* [v572] ③ 월별 연체 코호트 집계 기준 — bill(청구 발행월) / start(계약 시작일이 검색기간 내) */
+function stl_setCohBase(k){ window._stlCohBase=(k==='start'?'start':'bill'); renderSettlementView(); }
 function stl_clearRange(){ window._stlP = window._stlP || {period:'day'}; window._stlP.r1=null; window._stlP.r2=null; window._stlP.period='day'; renderSettlementView(); }
 // [v532.1] 월 단위 이동 — delta:-1 전월 / +1 다음달 / 0 이번달. 기간검색을 해당 월 1일~말일로 설정
 function stl_shiftMonth(delta){
