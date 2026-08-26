@@ -17197,6 +17197,35 @@ function rnwRenderCohortChart(cohorts){
 .cmg-region-cell { background:#F9FAFB; border:1px solid #E5E7EB; border-radius:8px; padding:10px 12px; }
 .cmg-region-cell .name { font-size:13px; font-weight:800; color:#1F2937; }
 .cmg-region-cell .cnt  { font-size:11px; color:#6B7280; margin-top:2px; }
+/* [v573] 해당 기간 계약 지역분포 — 타일맵 + 랭킹 */
+.crg-wrap { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:14px; margin-top:10px; }
+@media (max-width:1180px){ .crg-wrap { grid-template-columns:1fr; } }
+.crg-map { position:relative; width:100%; height:340px; background:#F8FAFC; border:1px solid #E5E7EB; border-radius:10px; overflow:hidden; }
+.crg-tile { position:absolute; box-sizing:border-box; border:2px solid #fff; border-radius:6px; overflow:hidden; cursor:pointer; transition:filter .12s; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:2px; line-height:1.15; }
+.crg-tile:hover { filter:brightness(1.12); }
+.crg-tile.on { outline:3px solid #111827; outline-offset:-3px; }
+.crg-tile .tn { font-size:12.5px; font-weight:800; }
+.crg-tile .tc { font-size:11px; font-weight:700; opacity:.94; margin-top:1px; }
+.crg-tile .tp { font-size:10px; opacity:.8; }
+.crg-rankbox { border:1px solid #E5E7EB; border-radius:10px; overflow:auto; max-height:340px; background:#fff; }
+.crg-rank-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.crg-rank-tbl th { position:sticky; top:0; background:#F8FAFC; z-index:2; padding:7px 8px; font-size:10.5px; color:#475569; font-weight:800; border-bottom:1px solid #E5E7EB; text-align:left; white-space:nowrap; }
+.crg-rank-tbl td { padding:6px 8px; border-bottom:1px solid #F1F5F9; vertical-align:middle; }
+.crg-rank-tbl tbody tr { cursor:pointer; }
+.crg-rank-tbl tbody tr:hover td { background:#F8FAFC; }
+.crg-rank-tbl tbody tr.on td { background:#EEF2FF; }
+.crg-bar { height:8px; border-radius:4px; background:#EEF2F7; overflow:hidden; min-width:36px; }
+.crg-bar > i { display:block; height:100%; border-radius:4px; }
+.crg-chip { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:800; border:1px solid #E5E7EB; background:#F8FAFC; color:#334155; margin-right:6px; }
+.crg-chip i { width:9px; height:9px; border-radius:3px; display:inline-block; }
+.crg-warn { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:8px; font-size:11.5px; font-weight:800; background:#FFFBEB; border:1px solid #FDE68A; color:#B45309; }
+.crg-det { margin-top:12px; border:1px solid #E5E7EB; border-radius:10px; overflow:hidden; }
+.crg-det-h { padding:8px 12px; background:#F8FAFC; font-size:12.5px; font-weight:800; color:#1F2937; border-bottom:1px solid #E5E7EB; display:flex; justify-content:space-between; align-items:center; }
+.crg-det table { width:100%; border-collapse:collapse; font-size:11.5px; }
+.crg-det th { padding:6px 8px; background:#fff; color:#64748B; font-weight:800; font-size:10.5px; border-bottom:1px solid #E5E7EB; text-align:left; white-space:nowrap; }
+.crg-det td { padding:6px 8px; border-bottom:1px solid #F1F5F9; }
+.crg-num2 { text-align:right; font-variant-numeric:tabular-nums; }
+.crg-rank-tbl th.crg-num2, .crg-det th.crg-num2 { text-align:right; }
 .cmg-onboard-tbl { width:100%; border-collapse:collapse; font-size:11.5px; margin-top:6px; }
 .cmg-onboard-tbl th { padding:6px 8px; background:#F1F5F9; color:#475569; font-weight:700; text-align:left; }
 .cmg-onboard-tbl td { padding:6px 8px; border-bottom:1px solid #E5E7EB; }
@@ -18185,6 +18214,232 @@ function cmgRenderPartnerStats(){
     + '</div>';
 }
 
+// ==================================================================
+// [v573] 해당 기간 계약 지역분포 — 타일맵(면적=건수) + 시군구 랭킹
+//   기간은 '부동산(파트너)별 계약 통계'와 동일(window._cmgStatsRange)
+// ==================================================================
+var CRG_RAMP = {
+  '서울': ['#312E81','#3730A3','#4338CA','#4F46E5','#6366F1','#818CF8','#A5B4FC'],
+  '경기': ['#78350F','#92400E','#B45309','#D97706','#F59E0B','#FBBF24','#FCD34D'],
+  '인천': ['#134E4A','#115E59','#0F766E','#0D9488','#14B8A6','#2DD4BF','#5EEAD4'],
+  '_':    ['#334155','#475569','#64748B','#94A3B8','#CBD5E1','#DDE3EA','#E9EEF3']
+};
+function crg_esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function crg_color(sido, t){
+  var r = CRG_RAMP[sido] || CRG_RAMP['_'];
+  var i = Math.round((1 - Math.max(0, Math.min(1, t||0))) * (r.length - 2));
+  return r[Math.max(0, Math.min(r.length - 1, i))];
+}
+function crg_ink(hex){
+  try{
+    var h = String(hex).replace('#','');
+    var R = parseInt(h.slice(0,2),16), G = parseInt(h.slice(2,4),16), B = parseInt(h.slice(4,6),16);
+    return ((0.2126*R + 0.7152*G + 0.0722*B) / 255) > 0.62 ? '#1F2937' : '#FFFFFF';
+  }catch(_){ return '#1F2937'; }
+}
+/* 주소 → {sido, gu, key} — 광역시는 '시/도 + 구', 도는 '시 + 구/읍/면' */
+function crg_region(addr){
+  var s = String(addr||'').replace(/\s+/g,' ').trim();
+  if (!s) return null;
+  var SIDO = {'서울':'서울','서울시':'서울','서울특별시':'서울','부산':'부산','부산시':'부산','부산광역시':'부산',
+    '대구':'대구','대구광역시':'대구','인천':'인천','인천시':'인천','인천광역시':'인천','광주':'광주','광주광역시':'광주',
+    '대전':'대전','대전광역시':'대전','울산':'울산','울산광역시':'울산','세종':'세종','세종시':'세종','세종특별자치시':'세종',
+    '경기':'경기','경기도':'경기','강원':'강원','강원도':'강원','강원특별자치도':'강원',
+    '충북':'충북','충청북도':'충북','충남':'충남','충청남도':'충남',
+    '전북':'전북','전라북도':'전북','전북특별자치도':'전북','전남':'전남','전라남도':'전남',
+    '경북':'경북','경상북도':'경북','경남':'경남','경상남도':'경남','제주':'제주','제주도':'제주','제주특별자치도':'제주'};
+  var METRO = {'서울':1,'부산':1,'대구':1,'인천':1,'광주':1,'대전':1,'울산':1,'세종':1};
+  var t = s.split(' ');
+  var sido = SIDO[t[0]] || '';
+  var rest = sido ? t.slice(1) : t;
+  if (!sido) sido = '기타';
+  var gu = '';
+  if (METRO[sido]) {
+    if (sido === '세종') gu = '세종';
+    else { for (var i=0;i<rest.length;i++){ if (/(구|군)$/.test(rest[i])) { gu = rest[i]; break; } } }
+  } else {
+    var si = '';
+    for (var j=0;j<rest.length;j++){ if (/시$/.test(rest[j])) { si = rest[j]; break; } }
+    var sub = '';
+    for (var k=0;k<rest.length;k++){ if (rest[k] !== si && /(구|군|읍|면)$/.test(rest[k])) { sub = rest[k]; break; } }
+    if (si && sub) gu = si.replace(/시$/,'') + ' ' + sub;
+    else gu = si || sub || '';
+  }
+  if (!gu) return null;
+  return { sido: sido, gu: gu, key: sido + ' ' + gu };
+}
+/* squarified treemap — values[] → [{idx,x,y,w,h}] (0~100 좌표계) */
+function crg_squarify(values, x, y, w, h){
+  var out = [];
+  var total = values.reduce(function(s,v){ return s + (v>0?v:0); }, 0);
+  if (!(total > 0) || !(w > 0) || !(h > 0)) return out;
+  var scale = (w * h) / total;
+  var vals = values.map(function(v){ return (v>0?v:0) * scale; });
+  function worst(row, len){
+    var s = row.reduce(function(a,b){ return a+b; }, 0);
+    if (!(s > 0) || !(len > 0)) return Infinity;
+    var mx = Math.max.apply(null, row), mn = Math.min.apply(null, row);
+    if (!(mn > 0)) return Infinity;
+    return Math.max((len*len*mx)/(s*s), (s*s)/(len*len*mn));
+  }
+  var i = 0, rx = x, ry = y, rw = w, rh = h, guard = 0;
+  while (i < vals.length && rw > 0.0001 && rh > 0.0001 && guard++ < 500) {
+    var row = [], rowIdx = [], len = Math.min(rw, rh);
+    while (i < vals.length) {
+      if (row.length === 0 || worst(row.concat([vals[i]]), len) <= worst(row, len)) { row.push(vals[i]); rowIdx.push(i); i++; }
+      else break;
+    }
+    if (!row.length) { row.push(vals[i]); rowIdx.push(i); i++; }
+    var sum = row.reduce(function(a,b){ return a+b; }, 0);
+    if (rw >= rh) {
+      var rowW = sum / rh, oy = ry;
+      for (var a=0;a<row.length;a++){ var hh = row[a] / (rowW || 1); out.push({ idx: rowIdx[a], x: rx, y: oy, w: rowW, h: hh }); oy += hh; }
+      rx += rowW; rw -= rowW;
+    } else {
+      var rowH = sum / rw, ox = rx;
+      for (var b=0;b<row.length;b++){ var ww = row[b] / (rowH || 1); out.push({ idx: rowIdx[b], x: ox, y: ry, w: ww, h: rowH }); ox += ww; }
+      ry += rowH; rh -= rowH;
+    }
+  }
+  return out;
+}
+function crg_build(){
+  var range = window._cmgStatsRange || cmgRangeFromOffset(1);
+  var V = Array.isArray(vacancyRawData) ? vacancyRawData : [];
+  var cmap = {};
+  if (Array.isArray(contractRawData)) contractRawData.forEach(function(c){ cmap[String(c['계약번호']||'').trim()] = c; });
+  var by = {}, total = 0, noAddr = 0;
+  V.forEach(function(v){
+    var sd = cmgParseStartDate(v.startDate); if (!sd) return;
+    var ym = sd.getFullYear() + '-' + String(sd.getMonth()+1).padStart(2,'0');
+    if (!cmgYmInRange(ym, range)) return;
+    total++;
+    var cno = String(v.no||'').trim();
+    var c = cmap[cno];
+    var addr = String(v.propAddr || (c ? (c['계약지주소']||'') : '') || '').trim();
+    var rg = crg_region(addr);
+    if (!rg) { noAddr++; return; }
+    var dep = cmgParseAmount(v.deposit);
+    var rent = cmgParseAmount(v.monthRent || v.rent);
+    var ed = cmgParseStartDate(v.endDate);
+    var mo = cmgMonthsBetween(sd, ed);
+    var brk = (mo > 0 && mo < 12) ? 0 : calcBrokerage(dep, rent, v.housingType);
+    if (!by[rg.key]) by[rg.key] = { key: rg.key, sido: rg.sido, gu: rg.gu, cnt: 0, trade: 0, brk: 0, bill: 0, late: 0, rows: [] };
+    var B = by[rg.key];
+    B.cnt++; B.trade += dep + rent * 100; B.brk += brk;
+    var dr = null;
+    try { if (typeof _dlqRateOf === 'function') dr = _dlqRateOf(cno); } catch(_){}
+    if (dr) { B.bill += dr.bill; B.late += dr.late; }
+    B.rows.push({ cno: cno, tenant: String(v.tenant1Name||'').trim(), partner: String(v.partnerName||'').trim(),
+      addr: addr, sd: sd, dep: dep, rent: rent, brk: brk, dlq: dr ? dr.rate : null });
+  });
+  var arr = Object.keys(by).map(function(k){ return by[k]; });
+  arr.sort(function(a,b){ return b.cnt - a.cnt || b.trade - a.trade; });
+  return { list: arr, total: total, noAddr: noAddr, range: range };
+}
+function crg_toggle(key){
+  window._crgOpen = (window._crgOpen === key) ? '' : key;
+  renderContractMgmtView();
+}
+function cmgRenderRegionDistCard(){
+  var D = crg_build(), list = D.list, range = D.range;
+  var head = '<div class="cmg-card-title"><span class="dot" style="background:#8B5CF6"></span>🗺️ 해당 기간 계약 지역분포 (타일맵 + 시군구 랭킹)</div>';
+  var parsed = list.reduce(function(s,r){ return s + r.cnt; }, 0);
+  var periodMeta = '<div class="cmg-section-meta">기간 <b>' + range.start + ' ~ ' + range.end + '</b>'
+    + ' <span style="color:#9CA3AF">(부동산별 계약 통계와 동일 기간 — 위 기간 선택기로 변경)</span></div>';
+  if (!parsed) {
+    return '<div class="cmg-card">' + head + periodMeta
+      + '<div class="cmg-empty">선택 기간에 주소를 확인할 수 있는 계약이 없습니다.</div></div>';
+  }
+  var maxCnt = list[0].cnt;
+  var bySido = {};
+  list.forEach(function(r){ bySido[r.sido] = (bySido[r.sido]||0) + r.cnt; });
+  var chips = Object.keys(bySido).map(function(k){ return { k:k, v:bySido[k] }; })
+    .sort(function(a,b){ return b.v - a.v; })
+    .map(function(s){
+      return '<span class="crg-chip"><i style="background:' + crg_color(s.k, 1) + '"></i>' + crg_esc(s.k)
+        + ' <b>' + s.v + '</b>건 <span style="color:#64748B;font-weight:700">(' + Math.round(s.v/parsed*100) + '%)</span></span>';
+    }).join('');
+  var topShare = Math.round(list[0].cnt / parsed * 100);
+  var warn = topShare >= 30
+    ? '<span class="crg-warn">⚠ 집중도 — <b>' + crg_esc(list[0].gu) + '</b> ' + list[0].cnt + '건 = 전체의 <b>' + topShare + '%</b></span>'
+    : '';
+  var meta = '<div class="cmg-section-meta"><b>' + parsed + '건</b> · <b>' + list.length + '개 시군구</b>'
+    + (D.noAddr ? ' · <span style="color:#B45309">주소 미확인 ' + D.noAddr + '건 제외</span>' : '')
+    + '</div>'
+    + '<div style="margin:8px 0 4px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">' + chips + warn + '</div>';
+
+  /* 타일맵 — 상위 16개 + 나머지는 '기타' 1타일 */
+  var tiles = list.slice(0, 16), tail = list.slice(16);
+  if (tail.length) tiles = tiles.concat([{ key:'__etc', sido:'기타', gu:'기타 ' + tail.length + '개 지역',
+    cnt: tail.reduce(function(s,r){ return s + r.cnt; }, 0), _etc: true }]);
+  var rects = crg_squarify(tiles.map(function(t){ return t.cnt; }), 0, 0, 100, 100);
+  var mapHtml = '<div class="crg-map">' + rects.map(function(R){
+      var t = tiles[R.idx]; if (!t) return '';
+      var bg = t._etc ? '#CBD5E1' : crg_color(t.sido, t.cnt / maxCnt);
+      var fg = crg_ink(bg);
+      var pct = Math.round(t.cnt / parsed * 100);
+      var big = (R.w >= 13 && R.h >= 12), mid = (R.w >= 8 && R.h >= 7);
+      var lbl = big
+        ? '<div class="tn">' + crg_esc(t.gu) + '</div><div class="tc">' + t.cnt + '건</div><div class="tp">' + pct + '%</div>'
+        : (mid ? '<div class="tn" style="font-size:11px">' + crg_esc(t.gu) + '</div><div class="tc" style="font-size:10px">' + t.cnt + '</div>' : '');
+      return '<div class="crg-tile' + (window._crgOpen === t.key ? ' on' : '') + '"'
+        + ' style="left:' + R.x.toFixed(3) + '%;top:' + R.y.toFixed(3) + '%;width:' + R.w.toFixed(3) + '%;height:' + R.h.toFixed(3) + '%;background:' + bg + ';color:' + fg + '"'
+        + ' title="' + crg_esc((t._etc ? '' : t.sido + ' ') + t.gu) + ' · ' + t.cnt + '건 (' + pct + '%)"'
+        + (t._etc ? '' : ' onclick="crg_toggle(\'' + crg_esc(t.key).replace(/'/g,'\\&#39;') + '\')"')
+        + '>' + lbl + '</div>';
+    }).join('') + '</div>';
+
+  /* 랭킹 */
+  var rankHtml = '<div class="crg-rankbox"><table class="crg-rank-tbl">'
+    + '<thead><tr><th>#</th><th>시군구</th><th>분포</th><th class="crg-num2">건수</th>'
+    + '<th class="crg-num2">거래액</th><th class="crg-num2">중개보수<span style="font-size:9px;color:#059669"> (VAT)</span></th>'
+    + '<th class="crg-num2">연체율</th></tr></thead><tbody>'
+    + list.map(function(r, i){
+        var pct = r.cnt / parsed * 100;
+        var col = crg_color(r.sido, r.cnt / maxCnt);
+        var hasD = r.bill > 0, dv = hasD ? (r.late / r.bill) : 0;
+        var dCol = !hasD ? '#9CA3AF' : (dv <= 0.05 ? '#059669' : (dv <= 0.15 ? '#B45309' : '#DC2626'));
+        return '<tr class="' + (window._crgOpen === r.key ? 'on' : '') + '" onclick="crg_toggle(\'' + crg_esc(r.key).replace(/'/g,'\\&#39;') + '\')">'
+          + '<td style="color:#94A3B8;font-size:11px">' + (i+1) + '</td>'
+          + '<td style="white-space:nowrap"><b>' + crg_esc(r.gu) + '</b> <span style="font-size:10px;color:#94A3B8">' + crg_esc(r.sido) + '</span></td>'
+          + '<td style="width:26%"><div class="crg-bar"><i style="width:' + Math.max(4, pct).toFixed(1) + '%;background:' + col + '"></i></div></td>'
+          + '<td class="crg-num2" style="white-space:nowrap"><b>' + r.cnt + '</b>건 <span style="color:#94A3B8;font-size:10.5px">' + Math.round(pct) + '%</span></td>'
+          + '<td class="crg-num2" style="white-space:nowrap">' + cmgFmtMoneyKor(r.trade) + '</td>'
+          + '<td class="crg-num2" style="white-space:nowrap;color:#047857;font-weight:700">' + cmgFmtMoney(Math.round(r.brk * 1.1)) + '</td>'
+          + '<td class="crg-num2" style="color:' + dCol + ';font-weight:800">' + (hasD ? Math.round(dv*100) + '%' : '—') + '</td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+
+  /* 선택 지역 상세 */
+  var det = '', sel = null;
+  for (var s2=0;s2<list.length;s2++){ if (list[s2].key === window._crgOpen) { sel = list[s2]; break; } }
+  if (sel) {
+    var rows = sel.rows.slice().sort(function(a,b){ return b.sd - a.sd; });
+    det = '<div class="crg-det"><div class="crg-det-h"><span>📍 ' + crg_esc(sel.sido + ' ' + sel.gu) + ' — 계약 ' + sel.cnt + '건</span>'
+      + '<button onclick="crg_toggle(\'' + crg_esc(sel.key).replace(/'/g,'\\&#39;') + '\')" style="padding:2px 10px;font-size:11px;border:1px solid #CBD5E1;background:#fff;border-radius:6px;cursor:pointer;font-weight:700">닫기</button></div>'
+      + '<div style="max-height:280px;overflow:auto"><table>'
+      + '<thead><tr><th>계약번호</th><th>계약자</th><th>파트너</th><th>시작일</th>'
+      + '<th class="crg-num2">보증금</th><th class="crg-num2">월세</th><th class="crg-num2">중개보수(VAT)</th><th class="crg-num2">연체율</th><th>주소</th></tr></thead><tbody>'
+      + rows.map(function(x){
+          return '<tr><td><b>' + crg_esc(x.cno) + '</b></td><td>' + crg_esc(x.tenant||'—') + '</td><td>' + crg_esc(x.partner||'—') + '</td>'
+            + '<td style="white-space:nowrap">' + cmgDateInputFmt(x.sd) + '</td>'
+            + '<td class="crg-num2">' + cmgFmtMoneyKor(x.dep) + '</td>'
+            + '<td class="crg-num2">' + cmgFmtMoneyKor(x.rent) + '</td>'
+            + '<td class="crg-num2">' + cmgFmtMoney(Math.round(x.brk * 1.1)) + '</td>'
+            + '<td class="crg-num2">' + (x.dlq === null ? '—' : x.dlq + '%') + '</td>'
+            + '<td style="color:#64748B">' + crg_esc(x.addr||'—') + '</td></tr>';
+        }).join('')
+      + '</tbody></table></div></div>';
+  }
+  return '<div class="cmg-card">' + head + periodMeta + meta
+    + '<div class="crg-wrap">' + mapHtml + rankHtml + '</div>'
+    + '<div style="margin-top:6px;font-size:11px;color:#9CA3AF">타일 면적 = 계약 건수 · 색상 = 시/도 · 타일이나 표를 클릭하면 해당 지역 계약 목록이 열립니다.</div>'
+    + det
+    + '</div>';
+}
+
 // [v78] 파트너 등급 자동 산정 (누적계약 + 최근활동)
 //   A: 누적 ≥30건 + 최근6개월 활동
 //   B: 10~29건 또는 최근활동 있음
@@ -19145,6 +19400,7 @@ function renderPartnerMgmtView(){
     }).catch(function(e){ window._cmgIncomeFetching = false; console.warn('[ptn] 입금 백그라운드 로드 실패', e); });
   }
   wrap.innerHTML = cmgRenderPartnerStats()   // [v77] 섹션 B — 부동산(파트너)별 계약 통계 + 중개보수료
+    + cmgRenderRegionDistCard()              // [v573] 해당 기간 계약 지역분포 (타일맵 + 랭킹)
     + cmgRenderPersonStats()                 // [v78] 섹션 C — 계약담당자별 통계
     + cmgRenderSettlementCard()              // [v79] 6-2 정산
     + cmgRenderRegionCard();                 // [v79] 6-5 지역
