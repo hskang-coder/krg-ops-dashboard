@@ -7836,6 +7836,14 @@ async function renderDelinquency() {
       }
     }
     _dlqIncomeData   = parseIncomeForDlqV2(r2, dlqV3Data.dlqCnoSet);
+    /* [v564.1] 연체율 컬럼 복구 — 연체관리 뷰가 직접 받은 입금내역(r2)을 paymentRawData에도 반영.
+       기존엔 입주관리 등 다른 탭을 먼저 열어야만 paymentRawData가 채워져 _dlqRateOf가 전부 '-'로 나왔음 */
+    try {
+      if (typeof gvizToObjects === 'function') {
+        paymentRawData = _keepBig(paymentRawData, gvizToObjects(r2).filter(function(x){ return _krNo(x); }));
+        window.__dlqRateMap = null;   // 연체율 캐시 재계산
+      }
+    } catch(_pE){ console.warn('[v564.1] paymentRawData sync:', _pE); }
     window._delinqDaysMap = _dlqIncomeData.delinqDaysMap || {};
     // [v495] 입금내역 시트 상태 자동 점검 (통화서식/헤더 이탈/납기일 공란) — 이상 시 상단 배너
     _sheetHealth(r2, '입금내역', { cnoIdx:4, billIdx:18, dueIdx:28,
