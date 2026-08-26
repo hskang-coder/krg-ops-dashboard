@@ -385,7 +385,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .crx-cond-cell.warn .l { color:#B45309; } .crx-cond-cell.warn .v { color:#92400E; }
 .crx-drop { position:relative; display:inline-block; }
 #contractView .cr-search-panel { overflow:visible; } /* [v427 crx] 문서발행 드롭다운 잘림 방지 (입주관리 전용) */
-.crx-drop-menu { display:none; position:absolute; top:calc(100% + 4px); left:0; background:#fff; border:1px solid #D6E0EF; border-radius:8px; min-width:160px; z-index:100; box-shadow:0 4px 14px rgba(26,58,92,.12); padding:4px; }
+.crx-drop-menu { display:none; position:absolute; top:calc(100% + 4px); left:0; background:#fff; border:1px solid #D6E0EF; border-radius:8px; min-width:160px; z-index:320; box-shadow:0 4px 14px rgba(26,58,92,.12); padding:4px; }   /* [v564.2] 빠른 메모 sticky(250)보다 위 — 문서 발행 메뉴 가림 해소 */
 .crx-drop.open .crx-drop-menu { display:block; }
 .crx-drop-menu .cr-contract-pdf-btn { display:block; width:100%; text-align:left; margin:2px 0; }
 .crx-memo-dock { position:fixed; left:0; right:0; bottom:0; z-index:900; background:#F9F7FE; border-top:2px solid #C4B5FD; box-shadow:0 -4px 16px rgba(91,33,182,.10); padding:6px 16px 8px; }
@@ -1279,15 +1279,11 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
       <div id="crSearchBox" class="cr-search-bar">
         <input id="crInput" type="text" placeholder="계약번호 / 임(전)차인명 입력" inputmode="text" enterkeyhint="search" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter'&&!event.isComposing)searchContract()"><!-- [v316] IME 호환 + 모바일 친화 속성 (천지인/한글 합성 안전) -->
         <button class="cr-search-btn" onclick="searchContract()">🔍 검색</button>
-        <div class="crx-drop" id="crxDocDrop">
-          <button type="button" class="cr-contract-pdf-btn" onclick="document.getElementById('crxDocDrop').classList.toggle('open')">📄 문서 발행 ▾</button>
-          <div class="crx-drop-menu">
-            <button class="cr-contract-pdf-btn" id="crContractPdfBtn" onclick="openContractPdfModal(window._crCurrentNo)" title="계약서 발행">📄 계약서</button>
-            <button class="cr-contract-pdf-btn" id="crMgmtCtrBtn" onclick="openMgmtContractModal(window._crCurrentNo)" title="표준 위수탁 계약서(자기관리형-임대인) 발행">🏢 위수탁</button>
-            <button class="cr-contract-pdf-btn" id="crSubAgreementBtn" onclick="generateSubAgreement(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (부속합의)">📋 부속합의</button>
-            <button class="cr-contract-pdf-btn" id="crIncomeReceiptBtn" onclick="openIncomeReceiptModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (납부증빙)" style="background:#059669;color:#fff;border-color:#059669">💰 납부증빙</button>
-          </div>
-        </div>
+        <!-- [v565] 문서 발행 드롭다운 → 인라인 버튼으로 풀기 (폭 1500px 확장으로 공간 확보 · 메뉴 가림 문제 원천 해소) -->
+        <button class="cr-contract-pdf-btn" id="crContractPdfBtn" onclick="openContractPdfModal(window._crCurrentNo)" title="계약서 발행" style="white-space:nowrap">📄 계약서</button>
+        <button class="cr-contract-pdf-btn" id="crMgmtCtrBtn" onclick="openMgmtContractModal(window._crCurrentNo)" title="표준 위수탁 계약서(자기관리형-임대인) 발행" style="white-space:nowrap">🏢 위수탁</button>
+        <button class="cr-contract-pdf-btn" id="crSubAgreementBtn" onclick="generateSubAgreement(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (부속합의)" style="white-space:nowrap">📋 부속합의</button>
+        <button class="cr-contract-pdf-btn" id="crIncomeReceiptBtn" onclick="openIncomeReceiptModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (납부증빙)" style="background:#059669;color:#fff;border-color:#059669;white-space:nowrap">💰 납부증빙</button>
         <button class="cr-contract-pdf-btn" id="crFeeCalcBtn" onclick="openFeeCalcModal(window._crCurrentNo)" title="수수료 / 일할 계산기" style="background:#4F46E5;color:#fff;border-color:#4F46E5">🧮 수수료</button>
         <button class="cr-contract-pdf-btn" id="crDelqReportBtn" onclick="openReportChooser(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (연체 대응 REPORT)" style="background:#DC2626;color:#fff;border-color:#DC2626">📊 리포트</button>
       </div>
