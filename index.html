@@ -6403,7 +6403,22 @@ function renderContractRecord(c, payments, responses = []) {
   <div class="cr-card" style="margin-bottom:10px" id="crxSecInfo">
     <div class="cr-card-title">📋 계약 조건 정보</div>
     <div class="crx-cond-grid">
-      <div class="crx-cond-cell"><div class="l">계약정보</div><div class="v">${fmt(c['계약정보'])}${(__vacRow.reviewResult && String(__vacRow.reviewResult).trim() && String(__vacRow.reviewResult).trim() !== '-') ? ' <span style="font-size:11px;color:#6B7280;font-weight:500">('+String(__vacRow.reviewResult).trim()+')</span>' : ''}</div></div>
+      <div class="crx-cond-cell"><div class="l">계약정보</div><div class="v">${fmt(c['계약정보'])}</div>${(function(){
+        /* [v568] 계약심사 결과 — 회색 소괄호 텍스트 → 판정별 색상 배지 (가시성 개선) */
+        var rv = String(__vacRow.reviewResult == null ? '' : __vacRow.reviewResult).trim();
+        if (!rv || rv === '-' || rv === '—') return '';
+        var head = rv.replace(/\s*\(.*$/, '').trim();          // '거절(일시납+분할)' → '거절'
+        var detail = (rv.slice(head.length).replace(/^[\s(]+|[)\s]+$/g, '')).trim();   // → '일시납+분할'
+        var C = /거절|불가|반려|부결/.test(head) ? ['#FEF2F2','#FECACA','#B91C1C','⛔']
+              : /조건부|보류|재심사/.test(head)   ? ['#FFFBEB','#FDE68A','#B45309','⚠️']
+              : /승인|가능|통과|적합/.test(head)  ? ['#ECFDF5','#A7F3D0','#047857','✅']
+              :                                    ['#F1F5F9','#E2E8F0','#475569','📋'];
+        return '<div style="margin-top:5px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">'
+          + '<span style="font-size:9.5px;color:#94A3B8;font-weight:700">심사</span>'
+          + '<span style="display:inline-flex;align-items:center;gap:4px;background:' + C[0] + ';border:1px solid ' + C[1] + ';color:' + C[2] + ';font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;line-height:1.5">' + C[3] + ' ' + head + '</span>'
+          + (detail ? '<span style="font-size:10.5px;color:#64748B;font-weight:600">' + detail + '</span>' : '')
+          + '</div>';
+      })()}</div>
       <div class="crx-cond-cell"><div class="l">계약조건</div><div class="v">${fmt(c['계약조건'])}</div></div>
       <div class="crx-cond-cell"><div class="l">전대계약확인</div><div class="v">${fmt(c['전대전환'])}</div></div>
       <div class="crx-cond-cell"><div class="l">납부조건</div><div class="v">${fmt(c['납부조건'])}</div></div>
