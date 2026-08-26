@@ -1284,7 +1284,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         <button class="cr-contract-pdf-btn" id="crMgmtCtrBtn" onclick="openMgmtContractModal(window._crCurrentNo)" title="표준 위수탁 계약서(자기관리형-임대인) 발행" style="white-space:nowrap">🏢 위수탁</button>
         <button class="cr-contract-pdf-btn" id="crSubAgreementBtn" onclick="generateSubAgreement(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (부속합의)" style="white-space:nowrap">📋 부속합의</button>
         <button class="cr-contract-pdf-btn" id="crIncomeReceiptBtn" onclick="openIncomeReceiptModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (납부증빙)" style="background:#059669;color:#fff;border-color:#059669;white-space:nowrap">💰 납부증빙</button>
-        <button class="cr-contract-pdf-btn" id="crFeeCalcBtn" onclick="openFeeCalcModal(window._crCurrentNo)" title="수수료 / 일할 계산기" style="background:#4F46E5;color:#fff;border-color:#4F46E5">🧮 수수료</button>
+        <button class="cr-contract-pdf-btn" id="crFeeCalcBtn" onclick="openFeeCalcModal(window._crCurrentNo)" title="카드 수수료 / 일할 임대료 / 중개 보수료 계산기" style="background:#4F46E5;color:#fff;border-color:#4F46E5">🧮 계산기</button><!-- [v567] 수수료 → 계산기 -->
         <button class="cr-contract-pdf-btn" id="crDelqReportBtn" onclick="openReportChooser(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (연체 대응 REPORT)" style="background:#DC2626;color:#fff;border-color:#DC2626">📊 리포트</button>
       </div>
       <div id="crListBox" style="display:none">
@@ -14619,6 +14619,14 @@ function openFeeCalcModal(contractNo){
   var vatNum = parseAmt(contract ? (contract['부가세']||'') : '');
   var wolseNum = parseAmt(contract ? (contract['월세']||'') : '') || (rentNum - vatNum > 0 ? rentNum - vatNum : rentNum);
   var billAuto = rentNum + (fcRentOnly ? 0 : feeNum);
+  /* [v567] 중개 보수료 탭 — 파트너관리·계약상세와 동일 기준(보증금 AG · 월세+부가세 AH+AI · 계약기간 12개월 미만 0원) */
+  var brkDep = (typeof cmgParseAmount==='function' ? cmgParseAmount(vac && vac.deposit) : parseAmt(vac && vac.deposit)) || parseAmt(contract ? (contract['보증금(원)']||contract['보증금']||'') : '');
+  var brkRent = (typeof cmgParseAmount==='function' ? cmgParseAmount(vac && (vac.monthRent || vac.rent)) : 0) || parseAmt(contract ? (contract['월세']||'') : '');
+  var brkMonths = (function(){ try{
+    if (typeof cmgParseStartDate!=='function' || typeof cmgMonthsBetween!=='function' || !vac) return 0;
+    var _s = cmgParseStartDate(vac.startDate), _e = cmgParseStartDate(vac.endDate);
+    return (_s && _e) ? cmgMonthsBetween(_s, _e) : 0;
+  }catch(_e){ return 0; } })();
 
   closeFeeCalcModal();
   var m = document.createElement('div');
@@ -14630,12 +14638,13 @@ function openFeeCalcModal(contractNo){
   m.innerHTML =
       '<div style="background:#fff;border-radius:12px;width:780px;max-width:96vw;max-height:92vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)">'
     +   '<div style="padding:18px 24px;background:linear-gradient(135deg,#4F46E5,#4338CA);color:#fff;display:flex;align-items:center;justify-content:space-between;border-radius:12px 12px 0 0">'
-    +     '<div style="font-size:17px;font-weight:800">🧮 수수료 & 일할계산 <span style="font-size:12px;font-weight:500;opacity:.85;margin-left:8px">계약번호: '+contractNo+'</span></div>'
+    +     '<div style="font-size:17px;font-weight:800">🧮 계산기 <span style="font-size:12px;font-weight:500;opacity:.85;margin-left:8px">계약번호: '+(contractNo||'—')+'</span></div>'   /* [v567] */
     +     '<button onclick="closeFeeCalcModal()" style="background:rgba(255,255,255,.2);color:#fff;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px">✕</button>'
     +   '</div>'
     +   '<div style="padding:6px 24px 0;display:flex;border-bottom:1px solid #E5E7EB">'
     +     '<button id="fcTab1" onclick="switchFeeCalcTab(1)" style="flex:1;padding:14px 12px;background:transparent;border:none;border-bottom:3px solid #4F46E5;color:#4338CA;font-weight:800;font-size:13.5px;cursor:pointer">💳 카드 수수료 계산</button>'
-    +     '<button id="fcTab2" onclick="switchFeeCalcTab(2)" style="flex:1;padding:14px 12px;background:transparent;border:none;border-bottom:3px solid transparent;color:#6B7280;font-weight:700;font-size:13.5px;cursor:pointer">📅 일할 계산</button>'
+    +     '<button id="fcTab2" onclick="switchFeeCalcTab(2)" style="flex:1;padding:14px 12px;background:transparent;border:none;border-bottom:3px solid transparent;color:#6B7280;font-weight:700;font-size:13.5px;cursor:pointer">📅 일할 임대료</button>'
+    +     '<button id="fcTab3" onclick="switchFeeCalcTab(3)" style="flex:1;padding:14px 12px;background:transparent;border:none;border-bottom:3px solid transparent;color:#6B7280;font-weight:700;font-size:13.5px;cursor:pointer">🏢 중개 보수료</button>'   /* [v567] */
     +   '</div>'
 
     // ====== 탭1: 카드 수수료 ======
@@ -14717,6 +14726,38 @@ function openFeeCalcModal(contractNo){
     +     '<div id="fcDayResult" style="background:#F0FDF4;border:2px solid #10B981;border-radius:8px;padding:14px 18px;margin-top:8px"></div>'
     +   '</div>'
 
+    // ====== [v567] 탭3: 중개 보수료 — 파트너관리·계약상세와 동일 계산식 ======
+    +   '<div id="fcSection3" style="padding:18px 24px;display:none">'
+    +     '<div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:11.5px;color:#065F46;line-height:1.6">'
+    +       '<b>계산 기준</b> (파트너관리 정산·계약상세와 동일) · 거래금액 = 보증금 + 월세×100 <span style="opacity:.8">(5천만원 미만이면 보증금 + 월세×70)</span><br>'
+    +       '구간별 요율 — 5천만 미만 0.5%<span style="opacity:.75">(한도 20만)</span> · 5천만~1억 0.4%<span style="opacity:.75">(한도 30만)</span> · 1억~6억 0.3% · 6억~12억 0.4% · 12억~15억 0.5% · 15억 이상 0.6%<br>'
+    +       '<b>계약기간 12개월 미만은 0원</b> · 부가세 10% 별도'
+    +     '</div>'
+    +     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
+    +       '<div>'
+    +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">보증금</label>'
+    +         '<input id="fcBrkDep" type="text" value="'+(brkDep>0?brkDep.toLocaleString():'')+'" placeholder="0" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcBrk()">'
+    +       '</div>'
+    +       '<div>'
+    +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">월세 <span style="font-weight:500;color:#6B7280">(월세+부가세)</span></label>'
+    +         '<input id="fcBrkRent" type="text" value="'+(brkRent>0?brkRent.toLocaleString():'')+'" placeholder="0" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcBrk()">'
+    +       '</div>'
+    +     '</div>'
+    +     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
+    +       '<div>'
+    +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">계약기간 (개월)</label>'
+    +         '<input id="fcBrkMonths" type="number" min="0" max="120" value="'+(brkMonths>0?brkMonths:12)+'" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcBrk()">'
+    +         '<div style="font-size:10.5px;color:#6B7280;margin-top:4px">'+(brkMonths>0?('계약 시작~만기 '+brkMonths+'개월 자동'):'검색 결과 없음 — 직접 입력')+'</div>'
+    +       '</div>'
+    +       '<div>'
+    +         '<label style="display:block;font-size:11.5px;color:#374151;font-weight:700;margin-bottom:5px">분할 지급 (회차)</label>'
+    +         '<input id="fcBrkSplit" type="number" min="1" max="12" value="1" style="width:100%;padding:9px 11px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px" oninput="recalcBrk()">'
+    +         '<div style="font-size:10.5px;color:#6B7280;margin-top:4px">1이면 일시 지급</div>'
+    +       '</div>'
+    +     '</div>'
+    +     '<div id="fcBrkResult" style="background:#F0FDF4;border:2px solid #10B981;border-radius:8px;padding:14px 18px;margin-top:8px"></div>'
+    +   '</div>'
+
     +   '<div style="padding:12px 24px 18px;text-align:right;border-top:1px solid #E5E7EB">'
     +     '<button onclick="closeFeeCalcModal()" style="background:#6B7280;color:#fff;border:none;padding:9px 18px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer">닫기</button>'
     +   '</div>'
@@ -14726,14 +14767,64 @@ function openFeeCalcModal(contractNo){
   // [v153] 백드롭 클릭 닫힘 제거 — 입력 도중 의도치 않게 닫히는 현상 방지. 닫기는 ✕ / 닫기 버튼만 사용.
   recalcFee();
   recalcDay();
+  recalcBrk();   /* [v567] */
 }
 
 function switchFeeCalcTab(idx){
-  document.getElementById('fcSection1').style.display = idx===1 ? 'block':'none';
-  document.getElementById('fcSection2').style.display = idx===2 ? 'block':'none';
-  var t1 = document.getElementById('fcTab1'), t2 = document.getElementById('fcTab2');
-  if (idx===1) { t1.style.borderBottomColor='#4F46E5'; t1.style.color='#4338CA'; t1.style.fontWeight='800'; t2.style.borderBottomColor='transparent'; t2.style.color='#6B7280'; t2.style.fontWeight='700'; }
-  else { t2.style.borderBottomColor='#4F46E5'; t2.style.color='#4338CA'; t2.style.fontWeight='800'; t1.style.borderBottomColor='transparent'; t1.style.color='#6B7280'; t1.style.fontWeight='700'; }
+  /* [v567] 3탭 — 카드 수수료 / 일할 임대료 / 중개 보수료 */
+  [1,2,3].forEach(function(i){
+    var sec = document.getElementById('fcSection'+i);
+    if (sec) sec.style.display = (idx===i ? 'block' : 'none');
+    var tab = document.getElementById('fcTab'+i);
+    if (tab) {
+      var on = (idx===i);
+      tab.style.borderBottomColor = on ? '#4F46E5' : 'transparent';
+      tab.style.color = on ? '#4338CA' : '#6B7280';
+      tab.style.fontWeight = on ? '800' : '700';
+    }
+  });
+}
+
+/* [v567] 중개 보수료 계산 — calcBrokerage(파트너관리·계약상세 공용) + 12개월 미만 0원 + VAT 10% */
+function recalcBrk(){
+  try {
+    var box = document.getElementById('fcBrkResult');
+    if (!box) return;
+    var pn = function(id){ var el=document.getElementById(id); return el ? (parseFloat(String(el.value||'').replace(/[^0-9.\-]/g,''))||0) : 0; };
+    var dep = pn('fcBrkDep'), rent = pn('fcBrkRent');
+    var months = pn('fcBrkMonths'), split = Math.max(1, Math.min(12, pn('fcBrkSplit')||1));
+    var won = function(n){ return '₩' + Math.round(n).toLocaleString('ko-KR'); };
+    if (!rent && !dep) { box.innerHTML = '<div style="font-size:12px;color:#6B7280;text-align:center;padding:6px 0">보증금·월세를 입력하면 중개 보수료를 계산합니다</div>'; return; }
+    var isShort = months > 0 && months < 12;
+    var supply = isShort ? 0 : calcBrokerage(dep, rent);
+    var vat = Math.round(supply * 0.1), total = supply + vat;
+    // 거래금액 · 적용 구간 표기
+    var base = dep + rent * 100; var conv = '월세×100';
+    if (base < 5e7) { base = dep + rent * 70; conv = '월세×70 (5천만원 미만 환산)'; }
+    var seg = base < 5e7 ? '5천만 미만 · 0.5% (한도 20만)'
+            : base < 1e8 ? '5천만~1억 · 0.4% (한도 30만)'
+            : base < 6e8 ? '1억~6억 · 0.3%'
+            : base < 1.2e9 ? '6억~12억 · 0.4%'
+            : base < 1.5e9 ? '12억~15억 · 0.5%' : '15억 이상 · 0.6%';
+    var row = function(l, v, strong, color){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:'+(strong?'14px':'12.5px')+'">'
+        + '<span style="color:'+(strong?'#065F46':'#374151')+';font-weight:'+(strong?'800':'600')+'">'+l+'</span>'
+        + '<b style="color:'+(color||(strong?'#047857':'#111827'))+';font-weight:'+(strong?'800':'700')+'">'+v+'</b></div>'; };
+    var html = '';
+    if (isShort) {
+      html += '<div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:#92400E;font-weight:700">⚠ 계약기간 '+months+'개월 — 12개월 미만이므로 중개 보수료 <b>0원</b> (정산 제외)</div>';
+    }
+    html += '<div style="font-size:11px;color:#6B7280;margin-bottom:6px">거래금액 '+won(base)+' <span style="opacity:.8">('+conv+')</span> · 적용 구간 <b style="color:#047857">'+seg+'</b></div>';
+    html += row('중개 보수료 (공급가액)', won(supply));
+    html += row('부가세 10%', won(vat));
+    html += '<div style="border-top:1px dashed #A7F3D0;margin:6px 0"></div>';
+    html += row('합계 (부가세 포함)', won(total), true);
+    if (split > 1) html += row(split+'회 분할 시 1회당', won(total/split), false, '#4338CA');
+    box.innerHTML = html;
+  } catch(e) {
+    var b2 = document.getElementById('fcBrkResult');
+    if (b2) b2.innerHTML = '<div style="font-size:12px;color:#DC2626">계산 오류: '+(e.message||e)+'</div>';
+  }
 }
 
 function switchFeePattern(p){
