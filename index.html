@@ -5477,6 +5477,9 @@ async function renderSettlementView(){
     /* [v554] 발생월 클릭 → 상세 리스트 — 코호트 집계와 동일 조건으로 행 단위 보존 */
     var _cohRows={};   // { '2025-10'|'prev' : { A:[], E:[] } }
     var _nmMap={}; V.forEach(function(v){ var c=String(v.no||'').trim(); if(c) _nmMap[c]={nm:(v.tenant1Name||v.tenantName||'-'), tel:(v.tenantPhone||'-')}; });
+    /* [v571] 연체채권 집계기 — R=검색기간 발생분, A=전체 누적 */
+    var _dZ=function(){ return {active:0,ended:0,rent:0,exit:0,cs:{}}; };
+    var _dR=_dZ(), _dA=_dZ();
     var winLen=Math.max(4,_mKeys.length);   // [v515] 기간이 4개월 초과 시 전체 표시, 이하면 최근 4개월
     var win=[]; for(var k=winLen-1;k>=0;k--){ var d=new Date(+cmKey.slice(0,4), +cmKey.slice(5,7)-1-k, 1); win.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
     P.forEach(function(p){
@@ -5510,9 +5513,16 @@ async function renderSettlementView(){
       tgt.cs[String(p['계약번호']||'').trim()]=1;
       var _lb = isRent(p) ? '임대료' : (isFee(p) ? '수수료' : (isExitStl(p) ? '퇴실정산' : '변동관리비'));   /* [v570] */
       tgt.k[_lb]=(tgt.k[_lb]||0)+1;
-      /* [v570] 연체채권 총액 = 임대료 + 퇴실정산만 (수수료·순수 변동관리비 제외) */
-      if(out>0 && isDebtItem(p)){ if(ended) window.__stlEndedOut=(window.__stlEndedOut||0)+out; else window.__stlActiveOut=(window.__stlActiveOut||0)+out;
-        if(isRent(p)) window.__stlRentOut=(window.__stlRentOut||0)+out; else window.__stlExitOut=(window.__stlExitOut||0)+out; }
+      /* [v570] 연체채권 총액 = 임대료 + 퇴실정산만 (수수료·순수 변동관리비 제외)
+         [v571] 기간검색 연동 — _dR=검색기간 발생분 / _dA=전체 누적 (토글로 선택) */
+      if(out>0 && isDebtItem(p)){
+        var _tg = monthsInR[bm] ? [_dR,_dA] : [_dA];
+        _tg.forEach(function(D){
+          if(ended) D.ended+=out; else D.active+=out;
+          if(isRent(p)) D.rent+=out; else D.exit+=out;
+          D.cs[String(p['계약번호']||'').trim()]=1;
+        });
+      }
     });
     // [v521] 그룹별 누적 미회수 (버튼 라벨·표에 사용)
     var _co=function(m,k){ return ((coh[m]||{})[k]||_z()).out; };
@@ -5520,10 +5530,12 @@ async function renderSettlementView(){
     var totE = prevG.E.out + win.reduce(function(s,m){ return s+_co(m,'E'); },0);
     var prevGen = prevG.A.gen + prevG.E.gen, prevOut = prevG.A.out + prevG.E.out;
     var totalOut = totA + totE;
-    var outActive=window.__stlActiveOut||0, outEnded=window.__stlEndedOut||0;
-    var outRent=window.__stlRentOut||0, outExit=window.__stlExitOut||0;   /* [v570] 항목별 내역 */
+    /* [v570/571] 연체채권 — 기간검색 발생분(range) / 전체 누적(all) 토글 */
+    var _dScope=(window._stlDebtScope==='all')?'all':'range';
+    var _dSel=(_dScope==='all')?_dA:_dR, _dOth=(_dScope==='all')?_dR:_dA;
+    var outActive=_dSel.active, outEnded=_dSel.ended, outRent=_dSel.rent, outExit=_dSel.exit;
+    var outCs=Object.keys(_dSel.cs).length, othTot=_dOth.active+_dOth.ended;
     totalOut = outActive + outEnded;   /* [v570] 연체채권 총액 = 임대료+퇴실정산 (수수료 제외) — 계약중/종료 합과 일치 */
-    window.__stlActiveOut=0; window.__stlEndedOut=0; window.__stlRentOut=0; window.__stlExitOut=0;
 
     // ── [v513/v515] 기간 KPI — 청구 / 납부 / 대위변제 / 정산예정 (상단 통합 기간검색 기준) ──
     // [v537] 주거용/상업용/TOTAL 구분 필터 (계약관리 N열 계약형태 기준, 디폴트 TOTAL)
@@ -5745,8 +5757,16 @@ async function renderSettlementView(){
       +  '<div style="font-size:9.5px;opacity:.6;margin-top:5px">입금내역(gid=131074722) 청소비 청구 · 납기일 '+rlbl+' (검색기간 연동) · 실입금 = 청구 − 미납 (납부예정 제외) · 구분 = 청구서명 \'퇴실\' 포함 여부</div>'
       +  '</div>'
       +'<div style="flex:1.2;min-width:300px;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:12px;padding:12px 14px;color:#7F1D1D">'
-      +  '<div style="font-size:12px;font-weight:800;margin-bottom:6px">📕 연체채권 총액 <span style="font-weight:400;font-size:10px">— 임대료 + 퇴실정산 <span style="opacity:.7">(수수료 제외)</span></span></div>'   /* [v570] */
-      +  '<div style="font-size:24px;font-weight:800">'+mil(totalOut)+'</div>'
+      +  '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+      +    '<span style="font-size:12px;font-weight:800">📕 연체채권 총액</span>'
+      +    '<span style="font-weight:400;font-size:10px;opacity:.85">— 임대료 + 퇴실정산 <span style="opacity:.75">(수수료 제외)</span></span>'
+      /* [v571] 기간검색 연동 토글 */
+      +    (function(){ var ch=function(k,lb,tip){ var on=(_dScope===k);
+           return '<span title="'+tip+'" onclick="stl_setDebtScope(\''+k+'\')" style="cursor:pointer;font-size:9.5px;font-weight:800;border-radius:10px;padding:2px 8px;border:1px solid '+(on?'#B91C1C':'#FCA5A5')+';background:'+(on?'#B91C1C':'#fff')+';color:'+(on?'#fff':'#B91C1C')+'">'+lb+'</span>'; };
+           return '<span style="margin-left:auto;display:inline-flex;gap:4px">'+ch('range','기간','검색기간에 발생한 청구분만 집계')+ch('all','전체 누적','기간 이전 미회수분까지 전부 집계')+'</span>'; })()
+      +  '</div>'
+      +  '<div style="font-size:24px;font-weight:800">'+mil(totalOut)+'<span style="font-size:11px;font-weight:700;opacity:.65"> · '+outCs+'명</span></div>'
+      +  '<div style="font-size:9.5px;opacity:.75;margin-top:1px">'+(_dScope==='range'?('검색기간 '+rlbl+' 발생분 <span style="opacity:.85">· 전체 누적 '+mil(othTot)+'</span>'):('전체 누적 (기간 이전 포함) <span style="opacity:.85">· 검색기간 발생분 '+mil(othTot)+'</span>'))+'</div>'   /* [v571] */
       +  '<div style="display:flex;gap:8px;margin-top:8px">'
       +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">계약중</div><div style="font-size:15px;font-weight:800;color:#B45309">'+mil(outActive)+'</div></div>'
       +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">계약종료 (퇴실채권)</div><div style="font-size:15px;font-weight:800;color:#B91C1C">'+mil(outEnded)+'</div></div>'
@@ -6089,6 +6109,8 @@ function stl_setRange(){
   window._stlP.r1 = a||null; window._stlP.r2 = b||null;
   if(a && b){ window._stlP.period='range'; renderSettlementView(); }
 }
+/* [v571] 연체채권 총액 집계 범위 — range(검색기간 발생분) / all(전체 누적) */
+function stl_setDebtScope(k){ window._stlDebtScope=(k==='all'?'all':'range'); renderSettlementView(); }
 function stl_clearRange(){ window._stlP = window._stlP || {period:'day'}; window._stlP.r1=null; window._stlP.r2=null; window._stlP.period='day'; renderSettlementView(); }
 // [v532.1] 월 단위 이동 — delta:-1 전월 / +1 다음달 / 0 이번달. 기간검색을 해당 월 1일~말일로 설정
 function stl_shiftMonth(delta){
