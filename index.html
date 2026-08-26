@@ -5780,10 +5780,13 @@ async function renderSettlementView(){
       /* [v571] 기간검색 연동 토글 */
       +    (function(){ var ch=function(k,lb,tip){ var on=(_dScope===k);
            return '<span title="'+tip+'" onclick="stl_setDebtScope(\''+k+'\')" style="cursor:pointer;font-size:9.5px;font-weight:800;border-radius:10px;padding:2px 8px;border:1px solid '+(on?'#B91C1C':'#FCA5A5')+';background:'+(on?'#B91C1C':'#fff')+';color:'+(on?'#fff':'#B91C1C')+'">'+lb+'</span>'; };
-           return '<span style="margin-left:auto;display:inline-flex;gap:4px">'+ch('range','기간','검색기간에 발생한 청구분만 집계')+ch('all','전체 누적','기간 이전 미회수분까지 전부 집계')+'</span>'; })()
+           return '<span style="margin-left:auto;display:inline-flex;gap:4px">'+ch('range','기간','검색기간이 걸친 발생월의 청구분만 집계 (청구서가 월 단위라 하루만 검색해도 그 달 전체가 잡힙니다)')+ch('all','전체 누적','기간 이전 미회수분까지 전부 집계')+'</span>'; })()
       +  '</div>'
       +  '<div style="font-size:24px;font-weight:800">'+mil(totalOut)+'<span style="font-size:11px;font-weight:700;opacity:.65"> · '+outCs+'명</span></div>'
-      +  '<div style="font-size:9.5px;opacity:.75;margin-top:1px">'+(_dScope==='range'?('검색기간 '+rlbl+' 발생분 <span style="opacity:.85">· 전체 누적 '+mil(othTot)+'</span>'):('전체 누적 (기간 이전 포함) <span style="opacity:.85">· 검색기간 발생분 '+mil(othTot)+'</span>'))+'</div>'   /* [v571] */
+      /* [v572.1] 라벨 정정 — 청구서가 월 단위라 집계는 '발생월' 기준. 하루만 검색해도 그 달 전체가 잡히므로 월 범위를 명시 */
+      +  '<div style="font-size:9.5px;opacity:.75;margin-top:1px">'+(_dScope==='range'
+           ? ('<b>'+cmLbl+'</b>월 발생분 <span style="opacity:.8">(검색기간 '+rlbl+'가 걸친 달)</span> <span style="opacity:.85">· 전체 누적 '+mil(othTot)+'</span>')
+           : ('전체 누적 (기간 이전 포함) <span style="opacity:.85">· <b>'+cmLbl+'</b>월 발생분 '+mil(othTot)+'</span>'))+'</div>'
       +  '<div style="display:flex;gap:8px;margin-top:8px">'
       +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">계약중</div><div style="font-size:15px;font-weight:800;color:#B45309">'+mil(outActive)+'</div></div>'
       +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">계약종료 (퇴실채권)</div><div style="font-size:15px;font-weight:800;color:#B91C1C">'+mil(outEnded)+'</div></div>'
