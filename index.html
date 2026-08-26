@@ -5407,6 +5407,10 @@ async function renderSettlementView(){
     };
     var isRent = function(p){ return String(p['납부종류']||'').trim()==='임대료' && String(p['청구서명']||'').indexOf('수수료')<0; };
     var isFee  = function(p){ return String(p['청구서명']||'').indexOf('수수료')>=0; };
+    /* [v570] 퇴실정산 청구 — 청구서명에 '퇴실'+'정산' (납부종류는 변동관리비/기타계약금으로 내려옴) */
+    var isExitStl = function(p){ var b=String(p['청구서명']||''); return b.indexOf('수수료')<0 && b.indexOf('퇴실')>=0 && b.indexOf('정산')>=0; };
+    /* [v570] 연체채권 집계 대상 = 임대료 + 퇴실정산 (수수료·순수 변동관리비 제외) */
+    var isDebtItem = function(p){ return isRent(p) || isExitStl(p); };
     var alive  = function(p){ var s=String(p['계약상태']||'').trim(); return s!=='삭제' && s!=='계약 철회'; };
     var isFirstMonth = function(p){ var bm=billMonth(p); return bm && startMap[String(p['계약번호']||'').trim()]===bm; };
 
@@ -5477,7 +5481,7 @@ async function renderSettlementView(){
     var win=[]; for(var k=winLen-1;k>=0;k--){ var d=new Date(+cmKey.slice(0,4), +cmKey.slice(5,7)-1-k, 1); win.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
     P.forEach(function(p){
       if(!alive(p)) return;
-      if(!isRent(p) && !isFee(p) && String(p['납부종류']||'').trim()!=='변동관리비') return;
+      if(!isRent(p) && !isFee(p) && !isExitStl(p) && String(p['납부종류']||'').trim()!=='변동관리비') return;   /* [v570] 퇴실정산(기타계약금) 행 포함 */
       var st=String(p['납부상태']||'').trim();
       var days=parseInt(String(p['연체일수']==null?'':p['연체일수']).replace(/[^0-9\-]/g,''),10)||0;
       var isLate = days>0 || st==='연체중' || st==='분납중';
@@ -5499,14 +5503,16 @@ async function renderSettlementView(){
       (function(){ var _c9=String(p['계약번호']||'').trim(); var _i9=_nmMap[_c9]||{};
         if(!_cohRows[_rk]) _cohRows[_rk]={A:[],E:[]};
         _cohRows[_rk][gk].push({ cno:_c9, nm:_i9.nm||'-', tel:_i9.tel||'-', bm:bm,
-          ty:(isRent(p)?'임대료':(isFee(p)?'수수료':'변동관리비')), rty:String(p['납부종류']||'').trim(), bill:String(p['청구서명']||'').trim(),   /* [v555.1] rty=원본 납부종류 */
+          ty:(isRent(p)?'임대료':(isFee(p)?'수수료':(isExitStl(p)?'퇴실정산':'변동관리비'))), rty:String(p['납부종류']||'').trim(), bill:String(p['청구서명']||'').trim(),   /* [v555.1] rty=원본 납부종류 · [v570] 퇴실정산 구분 */
           due:String(p['납기일']||'').trim(), pay:String(p['납부일']||'').trim(), st:String(p['납부상태']||'').trim(),
           days:days, gen:gen, rec:paid, out:out, ck:(ended?'종료':'계약중') }); })();
       // [v522] 사람 수(계약번호 distinct) + 청구 종류별 라인 수
       tgt.cs[String(p['계약번호']||'').trim()]=1;
-      var _lb = isRent(p) ? '임대료' : (isFee(p) ? '수수료' : '변동관리비');
+      var _lb = isRent(p) ? '임대료' : (isFee(p) ? '수수료' : (isExitStl(p) ? '퇴실정산' : '변동관리비'));   /* [v570] */
       tgt.k[_lb]=(tgt.k[_lb]||0)+1;
-      if(out>0){ if(ended) window.__stlEndedOut=(window.__stlEndedOut||0)+out; else window.__stlActiveOut=(window.__stlActiveOut||0)+out; }
+      /* [v570] 연체채권 총액 = 임대료 + 퇴실정산만 (수수료·순수 변동관리비 제외) */
+      if(out>0 && isDebtItem(p)){ if(ended) window.__stlEndedOut=(window.__stlEndedOut||0)+out; else window.__stlActiveOut=(window.__stlActiveOut||0)+out;
+        if(isRent(p)) window.__stlRentOut=(window.__stlRentOut||0)+out; else window.__stlExitOut=(window.__stlExitOut||0)+out; }
     });
     // [v521] 그룹별 누적 미회수 (버튼 라벨·표에 사용)
     var _co=function(m,k){ return ((coh[m]||{})[k]||_z()).out; };
@@ -5515,7 +5521,9 @@ async function renderSettlementView(){
     var prevGen = prevG.A.gen + prevG.E.gen, prevOut = prevG.A.out + prevG.E.out;
     var totalOut = totA + totE;
     var outActive=window.__stlActiveOut||0, outEnded=window.__stlEndedOut||0;
-    window.__stlActiveOut=0; window.__stlEndedOut=0;
+    var outRent=window.__stlRentOut||0, outExit=window.__stlExitOut||0;   /* [v570] 항목별 내역 */
+    totalOut = outActive + outEnded;   /* [v570] 연체채권 총액 = 임대료+퇴실정산 (수수료 제외) — 계약중/종료 합과 일치 */
+    window.__stlActiveOut=0; window.__stlEndedOut=0; window.__stlRentOut=0; window.__stlExitOut=0;
 
     // ── [v513/v515] 기간 KPI — 청구 / 납부 / 대위변제 / 정산예정 (상단 통합 기간검색 기준) ──
     // [v537] 주거용/상업용/TOTAL 구분 필터 (계약관리 N열 계약형태 기준, 디폴트 TOTAL)
@@ -5737,12 +5745,14 @@ async function renderSettlementView(){
       +  '<div style="font-size:9.5px;opacity:.6;margin-top:5px">입금내역(gid=131074722) 청소비 청구 · 납기일 '+rlbl+' (검색기간 연동) · 실입금 = 청구 − 미납 (납부예정 제외) · 구분 = 청구서명 \'퇴실\' 포함 여부</div>'
       +  '</div>'
       +'<div style="flex:1.2;min-width:300px;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:12px;padding:12px 14px;color:#7F1D1D">'
-      +  '<div style="font-size:12px;font-weight:800;margin-bottom:6px">📕 연체채권 총액</div>'
+      +  '<div style="font-size:12px;font-weight:800;margin-bottom:6px">📕 연체채권 총액 <span style="font-weight:400;font-size:10px">— 임대료 + 퇴실정산 <span style="opacity:.7">(수수료 제외)</span></span></div>'   /* [v570] */
       +  '<div style="font-size:24px;font-weight:800">'+mil(totalOut)+'</div>'
       +  '<div style="display:flex;gap:8px;margin-top:8px">'
       +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">계약중</div><div style="font-size:15px;font-weight:800;color:#B45309">'+mil(outActive)+'</div></div>'
       +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 10px"><div style="font-size:10px;color:#64748B">계약종료 (퇴실채권)</div><div style="font-size:15px;font-weight:800;color:#B91C1C">'+mil(outEnded)+'</div></div>'
-      +  '</div></div>'
+      +  '</div>'
+      +  '<div style="font-size:9.5px;opacity:.72;margin-top:6px">항목별 — 임대료 <b>'+mil(outRent)+'</b> · 퇴실정산 <b>'+mil(outExit)+'</b> <span style="opacity:.8">· 서비스 수수료·변동관리비 연체는 제외</span></div>'   /* [v570] */
+      +  '</div>'
       +'<div style="flex:1.6;min-width:360px;background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:12px;padding:12px 14px;color:#78350F">'
       +  '<div style="font-size:12px;font-weight:800;margin-bottom:6px">🏦 유보금액 <span style="font-weight:400;font-size:10px">— 납부 완료 · 임대인 미정산 ('+rlbl+' 납부분 · 오늘 기준)</span></div>'
       +  '<div style="font-size:24px;font-weight:800">'+(smOk?mil(holdTot):'판별불가')+(smOk?'<span style="font-size:12px;font-weight:700;opacity:.7"> · '+holdN+'건</span>':'')+'</div>'
