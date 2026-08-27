@@ -771,6 +771,11 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 /* [v576] 오늘 입금예정 타임라인 + 빠른 메모 시간 입력 */
 .dpay-card { background:#fff; border:1px solid #E2EAF5; border-radius:12px; padding:12px 14px; margin-bottom:12px; }
 .dpay-chip { display:inline-flex; align-items:center; border:1px solid; border-radius:9px; padding:3px 9px; font-size:10.5px; font-weight:800; }
+/* [v584] 약속자 / 분납자 / 완납자 요약 */
+.dpay-kpi { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin:0 0 8px; padding:7px 11px; background:#F8FAFC; border:1px solid #E8EDF5; border-radius:9px; }
+.dpay-kpi .kv { font-size:11.5px; font-weight:700; color:#64748B; white-space:nowrap; }
+.dpay-kpi .kv b { font-size:14px; font-weight:900; font-variant-numeric:tabular-nums; margin:0 1px; }
+.dpay-kpi .sep { color:#CBD5E1; font-weight:700; }
 .dpay-list { display:flex; flex-direction:column; gap:5px; max-height:340px; overflow-y:auto; padding-right:2px; }
 .dpay-row { display:flex; align-items:center; gap:10px; border:1.5px solid; border-radius:9px; padding:6px 10px; }
 .dpay-t { font-size:14px; font-weight:900; font-variant-numeric:tabular-nums; min-width:52px; text-align:center; }
@@ -7810,7 +7815,7 @@ function dpay_listFor(dayOffset){
       var dt = null;
       if (t) { dt = new Date(today.getTime()); dt.setHours(+t.slice(0,2), +t.slice(3,5), 0, 0); }
       out.push({ cno: cno, nm: String(r.tenant||r.nm||r.name||'').trim(), person: String(r.person||'').trim(),
-        time: t, dt: dt, memo: String(r.content||'').trim(), raw: e.raw });
+        time: t, dt: dt, memo: String(r.content||'').trim(), raw: e.raw, pg: pg });   /* [v584] 진척사항 보존 */
     });
     out.sort(function(a,b){
       if (!a.dt && !b.dt) return String(a.cno).localeCompare(String(b.cno));
@@ -7852,13 +7857,40 @@ function dpay_renderCard(){
     + '<span style="font-size:11px;color:#8A97A8">' + dpay_ymd(now) + ' · 대응내역 입금예정일 기준</span>'
     + '<span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center">' + onBtn + '</span></div>';
   if (!list.length) {
-    return '<div class="dpay-card">' + head
+    var _d0 = list.doneList || [];
+    var _p0 = _d0.filter(function(x){ return x.pg === '완납'; }).length;
+    var _e0 = _d0.length - _p0;
+    var kpi0 = _d0.length ? ('<div class="dpay-kpi">'
+      + '<span class="kv">👥 약속자 <b style="color:#1A3A5C">' + _d0.length + '</b>명</span>'
+      + '<span class="sep">·</span><span class="kv">💧 분납자 <b style="color:#5B21B6">0</b>명</span>'
+      + '<span class="sep">·</span><span class="kv">✅ 완납자 <b style="color:#047857">' + _p0 + '</b>명</span>'
+      + (_e0 ? '<span class="sep">·</span><span class="kv">📗 종료 <b style="color:#475569">' + _e0 + '</b>명</span>' : '')
+      + '</div>') : '';
+    return '<div class="dpay-card">' + head + kpi0
       + '<div style="padding:14px;text-align:center;color:#94A3B8;font-size:12px">'
       + (list.doneToday ? '오늘 입금 약속 <b style="color:#047857">' + list.doneToday + '건이 모두 완납·종료 처리</b>되었습니다. 남은 대응 건이 없습니다.'
                         : '오늘 잡힌 입금 약속이 없습니다.')
       + '</div>' + dpay_doneBlock(list, CTX)
       + dpay_doneBlock(dpay_listFor(-1), CTX, { kind:'y', label:'어제 완납·종료' }) + '</div>';
   }
+  /* [v584] 약속자 / 분납자 / 완납자 — 오늘 약속한 사람을 결과별로 나눈 요약 */
+  var _dl = list.doneList || [];
+  var kPaid = 0, kEnd = 0, kSplit = 0;
+  _dl.forEach(function(x){ if (x.pg === '완납') kPaid++; else if (x.pg === '종료') kEnd++; });
+  list.forEach(function(it){ if (it.pg === '분납') kSplit++; });
+  var kAll = list.length + _dl.length;
+  var kRest = Math.max(0, kAll - kPaid - kEnd - kSplit);
+  var kv = function(lb, n, col, tip){
+    return '<span class="kv"' + (tip ? ' title="' + tip + '"' : '') + '>' + lb
+      + ' <b style="color:' + col + '">' + n + '</b>명</span>';
+  };
+  var kpi = '<div class="dpay-kpi">'
+    + kv('👥 약속자', kAll, '#1A3A5C', '오늘 입금 약속이 잡힌 계약 수 (완납·분납 포함 전체)')
+    + '<span class="sep">·</span>' + kv('💧 분납자', kSplit, '#5B21B6', '진척사항이 분납으로 기록된 건 — 일부만 받았고 잔액이 남아 있음')
+    + '<span class="sep">·</span>' + kv('✅ 완납자', kPaid, '#047857', '진척사항이 완납으로 기록된 건')
+    + (kEnd ? '<span class="sep">·</span>' + kv('📗 종료', kEnd, '#475569', '진척사항이 종료로 기록된 건') : '')
+    + (kRest ? '<span class="sep">·</span>' + kv('⏳ 진행', kRest, '#B45309', '아직 완납·분납 결과가 기록되지 않은 건 — 오늘 대응이 필요합니다') : '')
+    + '</div>';
   var nDone = 0, nSoon = 0, nWait = 0, nNone = 0;
   /* [v577] 약속 이행 이력 · 법적 절차 */
   var _t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -7960,7 +7992,7 @@ function dpay_renderCard(){
       + '<span style="font-size:13px">⏰</span><span class="dpay-mini-nm">오늘 시간이 지정된 입금 약속 ' + (list.length?'없음 (시간 미지정 ' + nNone + '건)':'없음') + '</span>'
       + '<span class="dpay-mini-right"><span class="dpay-mini-open">▲ 목록 열기</span></span></div>';
   }
-  return '<div class="dpay-card">' + head + sum + '<div class="dpay-list">' + body + '</div>'
+  return '<div class="dpay-card">' + head + kpi + sum + '<div class="dpay-list">' + body + '</div>'
     + dpay_doneBlock(list, CTX)
     + dpay_doneBlock(dpay_listFor(-1), CTX, { kind:'y', label:'어제 완납·종료' })
     + '<div style="font-size:10px;color:#94A3B8;margin-top:8px;padding-top:7px;border-top:1px solid #F1F5F9">계약별 <b>가장 최근에 잡힌 입금 약속</b>이 오늘이고 <b>아직 완납·종료되지 않은</b> 건만 올라옵니다 (약속이 다른 날로 바뀐 건, 진척사항이 완납·종료인 건은 제외) · 빠른 메모의 <b>입금시간</b>에 시간을 넣으면 시간순으로 섭니다 · 1분마다 자동 갱신 · 알림은 약속 10분 전과 정각에 1회씩</div></div>'
