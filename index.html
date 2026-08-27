@@ -776,8 +776,11 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dpay-kpi .kv { font-size:11.5px; font-weight:700; color:#64748B; white-space:nowrap; }
 .dpay-kpi .kv b { font-size:14px; font-weight:900; font-variant-numeric:tabular-nums; margin:0 1px; }
 .dpay-kpi .sep { color:#CBD5E1; font-weight:700; }
-.dpay-list { display:flex; flex-direction:column; gap:5px; max-height:340px; overflow-y:auto; padding-right:2px; }
-.dpay-row { display:flex; align-items:center; gap:10px; border:1.5px solid; border-radius:9px; padding:6px 10px; }
+/* [v588] 카드가 화면을 다 잡아먹지 않도록 — 행을 얇게, 목록은 3행 노출 + 스크롤 */
+.dpay-list { display:flex; flex-direction:column; gap:4px; max-height:184px; overflow-y:auto; padding-right:3px; }
+.dpay-list::-webkit-scrollbar { width:6px; }
+.dpay-list::-webkit-scrollbar-thumb { background:#CBD5E1; border-radius:3px; }
+.dpay-row { display:flex; align-items:center; gap:10px; border:1.5px solid; border-radius:9px; padding:4px 10px; }
 .dpay-t { font-size:14px; font-weight:900; font-variant-numeric:tabular-nums; min-width:52px; text-align:center; }
 /* [v576] 스크롤 시 축소 고정되는 얇은 띠 */
 .dpay-mini { position:fixed; z-index:240; display:none; align-items:center; gap:9px; height:40px; box-sizing:border-box;
@@ -795,8 +798,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dpay-bdg { display:inline-block; font-size:9.5px; font-weight:800; border-radius:6px; padding:1px 6px; margin-left:3px; vertical-align:1px; white-space:nowrap; }
 .dpay-amt { font-size:13px; font-weight:900; font-variant-numeric:tabular-nums; color:#B91C1C; white-space:nowrap; }
 .dpay-tel { font-size:11px; color:#0E7490; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.dpay-act { display:inline-flex; gap:3px; margin-top:3px; }
-.dpay-btn { font-size:10px; font-weight:800; border:1px solid #CBD5E1; background:#fff; border-radius:6px; padding:3px 7px; color:#475569; cursor:pointer; white-space:nowrap; font-family:inherit; }
+.dpay-act { display:inline-flex; gap:3px; margin-top:2px; }
+.dpay-btn { font-size:10px; font-weight:800; border:1px solid #CBD5E1; background:#fff; border-radius:6px; padding:2px 7px; color:#475569; cursor:pointer; white-space:nowrap; font-family:inherit; }
 .dpay-btn:hover { border-color:#4F46E5; color:#4F46E5; }
 .dpay-btn.p { background:#4F46E5; border-color:#4F46E5; color:#fff; }
 .dpay-btn.p:hover { background:#4338CA; color:#fff; }
@@ -810,6 +813,33 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dpay-fold .cnt { background:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px; padding:1px 8px; font-size:10.5px; }
 .dpay-fold .ar { margin-left:auto; color:#94A3B8; font-weight:700; font-size:10.5px; }
 /* [v583] 어제 완납·종료 — 오늘과 구분되도록 청회색 */
+/* [v587] 대응 결과 — 오늘/어제 탭 + 결과 칩 */
+.dres { border:1px solid #E7EDF5; border-radius:11px; background:#FBFDFF; padding:8px 10px; margin-bottom:8px; }
+.dres-top { display:flex; align-items:center; gap:8px; margin-bottom:7px; flex-wrap:wrap; }
+.dres-tabs { display:inline-flex; border:1px solid #DCE6F2; border-radius:8px; overflow:hidden; }
+.dres-tab { font-size:11px; font-weight:800; color:#8A97A8; background:#fff; border:none; padding:4px 13px; cursor:pointer; }
+.dres-tab.on { background:#1A3A5C; color:#fff; }
+.dres-ttl { font-size:11px; font-weight:800; color:#1A3A5C; }
+.dres-sub { font-size:10.5px; color:#94A3B8; font-weight:700; margin-left:auto; }
+.dres-chips { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+.dres-chip { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; color:#475569; background:#fff; border:1px solid #E2E8F0; border-radius:8px; padding:3px 9px; cursor:pointer; }
+.dres-chip:hover { border-color:#94A3B8; }
+.dres-chip.on { background:#1A3A5C; border-color:#1A3A5C; color:#fff; }
+.dres-chip.on b { color:#fff !important; }
+.dres-chip.z { opacity:.45; cursor:default; }
+.dres-div { width:1px; align-self:stretch; background:#DCE6F2; margin:0 4px; }
+.dres-list { margin-top:6px; max-height:250px; overflow-y:auto; }
+.dres-row { display:flex; align-items:center; gap:9px; border:1px solid #EEF2F7; background:#fff; border-radius:7px; padding:4px 10px; margin-bottom:3px; font-size:11px; }
+.dres-row .c { font-weight:800; color:#0E7490; cursor:pointer; min-width:52px; }
+.dres-row .n { font-weight:700; color:#475569; min-width:56px; white-space:nowrap; }
+.dres-row .m { color:#94A3B8; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dres-row .a { font-weight:800; color:#B91C1C; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.dres-row .p { font-size:9.5px; font-weight:800; border-radius:6px; padding:1px 7px; background:#F1F5F9; color:#475569; white-space:nowrap; }
+.dres-row .w { font-size:9.5px; font-weight:800; border-radius:6px; padding:1px 7px; background:#FEF2F2; color:#B91C1C; white-space:nowrap; }
+.dres-none { padding:9px; text-align:center; color:#94A3B8; font-size:11px; }
+.dpay-fold.n { border-color:#BFDBFE; background:#F8FBFF; color:#1D4ED8; }
+.dpay-fold.n:hover, .dpay-fold.n.on { background:#EFF6FF; border-color:#60A5FA; }
+.dpay-fold.n .cnt { background:#EFF6FF; border-color:#BFDBFE; color:#1D4ED8; }
 .dpay-fold.y { border-color:#CBD5E1; background:#FAFBFC; color:#475569; }
 .dpay-fold.y:hover, .dpay-fold.y.on { background:#F1F5F9; border-color:#94A3B8; }
 .dpay-fold.y .cnt { background:#F1F5F9; border-color:#CBD5E1; color:#475569; }
@@ -7817,10 +7847,25 @@ function dpay_listFor(dayOffset){
       out.push({ cno: cno, nm: String(r.tenant||r.nm||r.name||'').trim(), person: String(r.person||'').trim(),
         time: t, dt: dt, memo: String(r.content||'').trim(), raw: e.raw, pg: pg });   /* [v584] 진척사항 보존 */
     });
+    /* [v586] 입금내역상 받을 미납이 없는 계약은 대응 목록에서 내린다.
+       (임대인 정산·수기 처리 건이 수납관리로 기록되거나, 입금 후 진척사항을 안 바꾼 경우)
+       입금내역이 아직 로드되지 않았으면 판정을 포기하고 전부 남긴다. */
+    var DUE = dpay_dueSet(dayOffset), noDue = [];
+    if (DUE) {
+      out = out.filter(function(it){
+        if (DUE[it.cno]) return true;
+        noDue.push(it); return false;
+      });
+    }
     out.sort(function(a,b){
       if (!a.dt && !b.dt) return String(a.cno).localeCompare(String(b.cno));
       if (!a.dt) return 1; if (!b.dt) return -1;
       return a.dt - b.dt;
+    });
+    noDue.sort(function(a,b){
+      if (a.time && b.time) return a.time.localeCompare(b.time);
+      if (a.time) return -1; if (b.time) return 1;
+      return String(a.cno).localeCompare(String(b.cno));
     });
     done.sort(function(a,b){
       if (a.time && b.time) return a.time.localeCompare(b.time);
@@ -7829,7 +7874,10 @@ function dpay_listFor(dayOffset){
     });
     out.doneToday = doneCnt;   /* [v579] 오늘 약속 중 이미 완납·종료 처리된 건수 */
     out.doneList = done;       /* [v580] 접이식 목록용 */
+    out.noDueList = noDue;     /* [v586] 받을 미납이 없어 내려둔 건 */
   } catch(e){ console.warn('[v576] dpay_todayList', e); }
+  if (!out.doneList) out.doneList = [];
+  if (!out.noDueList) out.noDueList = [];
   return out;
 }
 /* 상태 — done(지남) / soon(30분 내) / wait(대기) / none(시간 미지정) */
@@ -7857,38 +7905,42 @@ function dpay_renderCard(){
     + '<span style="font-size:11px;color:#8A97A8">' + dpay_ymd(now) + ' · 대응내역 입금예정일 기준</span>'
     + '<span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center">' + onBtn + '</span></div>';
   if (!list.length) {
-    var _d0 = list.doneList || [];
+    var _d0 = list.doneList || [], _n0 = list.noDueList || [];
     var _p0 = _d0.filter(function(x){ return x.pg === '완납'; }).length;
     var _e0 = _d0.length - _p0;
-    var kpi0 = _d0.length ? ('<div class="dpay-kpi">'
-      + '<span class="kv">👥 약속자 <b style="color:#1A3A5C">' + _d0.length + '</b>명</span>'
-      + '<span class="sep">·</span><span class="kv">💧 분납자 <b style="color:#5B21B6">0</b>명</span>'
+    var _a0 = _d0.length + _n0.length;
+    var kpi0 = dpay_resBlock() + (_a0 ? ('<div class="dpay-kpi">'
+      + '<span class="kv" title="오늘 입금 약속이 잡힌 계약 수 (약속일 기준)">👥 약속자 <b style="color:#1A3A5C">' + _a0 + '</b>명</span>'
       + '<span class="sep">·</span><span class="kv">✅ 완납자 <b style="color:#047857">' + _p0 + '</b>명</span>'
       + (_e0 ? '<span class="sep">·</span><span class="kv">📗 종료 <b style="color:#475569">' + _e0 + '</b>명</span>' : '')
-      + '</div>') : '';
+      + (_n0.length ? '<span class="sep">·</span><span class="kv" title="입금내역에 받을 미납이 없어 대응 목록에서 내린 건">🧾 미납 없음 <b style="color:#1D4ED8">' + _n0.length + '</b>명</span>' : '')
+      + '</div>') : '');
     return '<div class="dpay-card">' + head + kpi0
       + '<div style="padding:14px;text-align:center;color:#94A3B8;font-size:12px">'
       + (list.doneToday ? '오늘 입금 약속 <b style="color:#047857">' + list.doneToday + '건이 모두 완납·종료 처리</b>되었습니다. 남은 대응 건이 없습니다.'
-                        : '오늘 잡힌 입금 약속이 없습니다.')
-      + '</div>' + dpay_doneBlock(list, CTX)
+                        : (_n0.length ? '오늘 대응이 필요한 입금 약속이 없습니다. (받을 미납이 없는 ' + _n0.length + '건은 아래에 있습니다)'
+                                      : '오늘 잡힌 입금 약속이 없습니다.'))
+      + '</div>' + dpay_noDueBlock(list, CTX) + dpay_doneBlock(list, CTX)
       + dpay_doneBlock(dpay_listFor(-1), CTX, { kind:'y', label:'어제 완납·종료', showAmt:true, dayOffset:-1 }) + '</div>';
   }
   /* [v584] 약속자 / 분납자 / 완납자 — 오늘 약속한 사람을 결과별로 나눈 요약 */
-  var _dl = list.doneList || [];
+  var _dl = list.doneList || [], _nd = list.noDueList || [];
   var kPaid = 0, kEnd = 0, kSplit = 0;
   _dl.forEach(function(x){ if (x.pg === '완납') kPaid++; else if (x.pg === '종료') kEnd++; });
   list.forEach(function(it){ if (it.pg === '분납') kSplit++; });
-  var kAll = list.length + _dl.length;
-  var kRest = Math.max(0, kAll - kPaid - kEnd - kSplit);
+  var kNoDue = _nd.length;
+  var kAll = list.length + _dl.length + kNoDue;
+  var kRest = Math.max(0, kAll - kPaid - kEnd - kSplit - kNoDue);
   var kv = function(lb, n, col, tip){
     return '<span class="kv"' + (tip ? ' title="' + tip + '"' : '') + '>' + lb
       + ' <b style="color:' + col + '">' + n + '</b>명</span>';
   };
-  var kpi = '<div class="dpay-kpi">'
-    + kv('👥 약속자', kAll, '#1A3A5C', '오늘 입금 약속이 잡힌 계약 수 (완납·분납 포함 전체)')
+  var kpi = dpay_resBlock() + '<div class="dpay-kpi">'
+    + kv('👥 약속자', kAll, '#1A3A5C', '오늘 입금 약속이 잡힌 계약 수 (약속일 기준 — 위 대응 결과는 대응일 기준이라 수가 다릅니다)')
     + '<span class="sep">·</span>' + kv('💧 분납자', kSplit, '#5B21B6', '진척사항이 분납으로 기록된 건 — 일부만 받았고 잔액이 남아 있음')
     + '<span class="sep">·</span>' + kv('✅ 완납자', kPaid, '#047857', '진척사항이 완납으로 기록된 건')
     + (kEnd ? '<span class="sep">·</span>' + kv('📗 종료', kEnd, '#475569', '진척사항이 종료로 기록된 건') : '')
+    + (kNoDue ? '<span class="sep">·</span>' + kv('🧾 미납 없음', kNoDue, '#1D4ED8', '입금내역에 받을 미납이 없어 대응 목록에서 내린 건 — 아래 접이식에서 확인할 수 있습니다') : '')
     + (kRest ? '<span class="sep">·</span>' + kv('⏳ 진행', kRest, '#B45309', '아직 완납·분납 결과가 기록되지 않은 건 — 오늘 대응이 필요합니다') : '')
     + '</div>';
   var nDone = 0, nSoon = 0, nWait = 0, nNone = 0;
@@ -7960,11 +8012,12 @@ function dpay_renderCard(){
       + '</div></div>';
   }).join('');
   var chip = function(n, lb, bg, bd, fg){ return n ? '<span class="dpay-chip" style="background:'+bg+';border-color:'+bd+';color:'+fg+'">'+lb+' '+n+'</span>' : ''; };
-  var sum = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px">'
+  var sum = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:7px">'
     + chip(nSoon,'곧 도래','#FFFBEB','#FCD34D','#B45309')
     + chip(nDone,'시간 경과','#FEF2F2','#FCA5A5','#B91C1C')
     + chip(nWait,'대기','#F8FAFC','#E2E8F0','#475569')
     + chip(nNone,'시간 미지정','#F8FAFC','#E2E8F0','#94A3B8')
+    + (list.length > 3 ? '<span style="font-size:10.5px;color:#94A3B8;font-weight:700;margin-left:auto" title="목록은 3건까지 보이고 나머지는 스크롤로 확인합니다">목록 ' + list.length + '건 · ▾ 스크롤</span>' : '')
     + '</div>';
   /* [v576] 스크롤로 카드가 화면을 벗어나면 대신 붙는 얇은 띠 — 다음 약속 1건 + 임박/경과 개수 */
   var nx = null;
@@ -7993,9 +8046,10 @@ function dpay_renderCard(){
       + '<span class="dpay-mini-right"><span class="dpay-mini-open">▲ 목록 열기</span></span></div>';
   }
   return '<div class="dpay-card">' + head + kpi + sum + '<div class="dpay-list">' + body + '</div>'
+    + dpay_noDueBlock(list, CTX)
     + dpay_doneBlock(list, CTX)
     + dpay_doneBlock(dpay_listFor(-1), CTX, { kind:'y', label:'어제 완납·종료', showAmt:true, dayOffset:-1 })
-    + '<div style="font-size:10px;color:#94A3B8;margin-top:8px;padding-top:7px;border-top:1px solid #F1F5F9">계약별 <b>가장 최근에 잡힌 입금 약속</b>이 오늘이고 <b>아직 완납·종료되지 않은</b> 건만 올라옵니다 (약속이 다른 날로 바뀐 건, 진척사항이 완납·종료인 건은 제외) · 빠른 메모의 <b>입금시간</b>에 시간을 넣으면 시간순으로 섭니다 · 1분마다 자동 갱신 · 알림은 약속 10분 전과 정각에 1회씩</div></div>'
+    + '<div style="font-size:10px;color:#94A3B8;margin-top:8px;padding-top:7px;border-top:1px solid #F1F5F9">계약별 <b>가장 최근에 잡힌 입금 약속</b>이 오늘이고 <b>아직 완납·종료되지 않은</b> 건만 올라옵니다 (약속이 다른 날로 바뀐 건, 진척사항이 완납·종료인 건, <b>입금내역에 받을 미납이 없는 건</b>은 제외) · 빠른 메모의 <b>입금시간</b>에 시간을 넣으면 시간순으로 섭니다 · 1분마다 자동 갱신 · 알림은 약속 10분 전과 정각에 1회씩</div></div>'
     + mini;
 }
 /* [v581] 금액 문자열 → 정수 (소수점·콤마 안전) */
@@ -8030,10 +8084,175 @@ function dpay_amtMap(dayOffset){
     return M;
   } catch(e){ console.warn('[v585] amtMap', e); return {}; }
 }
+/* [v586] 기준일 시점에 '아직 받아야 할 돈'이 있는 계약 집합 — 입금내역 기준
+   미납액이 남아 있으면서 (납부상태가 연체이거나 · 납기일이 이미 도래했거나 · 납기일이 없는) 청구가
+   하나라도 있으면 수납 대상이다. 입금내역 미로드 시 null(판정 불가)을 돌려준다. */
+function dpay_dueSet(dayOffset){
+  try {
+    var P = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData : [];
+    if (!P.length) return null;
+    var d0 = new Date(); d0.setHours(0,0,0,0);
+    if (dayOffset) d0 = new Date(d0.getTime() + dayOffset * 86400000);
+    var key = dpay_ymd(d0), lim = d0.getTime() + 86399999;
+    var C = window.__dpayDue;
+    if (!C || C._n !== P.length) C = window.__dpayDue = { _n:P.length };
+    if (C[key]) return C[key];
+    var S = {};
+    for (var i=0;i<P.length;i++){
+      var p = P[i];
+      if (dpay_num(p['미납(연체)금액(원)']) <= 0) continue;
+      var cno = _normCno(p['계약번호']); if (!cno) continue;
+      var u = dpay_num(p['미납(연체)금액(원)']);
+      var st = String(p['납부상태']||'');
+      if (st.indexOf('연체') >= 0 || st.indexOf('분납') >= 0) { S[cno] = (S[cno]||0) + u; continue; }
+      var due = _parseAnyDateCell(p['납기일']);
+      if (!due || due.getTime() <= lim) S[cno] = (S[cno]||0) + u;
+    }
+    C[key] = S;
+    return S;
+  } catch(e){ console.warn('[v586] dueSet', e); return null; }
+}
+/* [v587] 법적 절차로 분류할 업무하위 */
+var DPAY_LAW_RE = /(법적\s*조치|내용증명|지급명령|보정명령|기타집행|강제집행|가압류|소송)/;
+var DPAY_RES_DEF = [
+  { k:'pay',   lb:'📅 납부예정', col:'#B45309', tip:'진척사항이 납부약속이거나, 진척 기재 없이 입금예정일만 잡힌 건' },
+  { k:'split', lb:'💧 분납',     col:'#5B21B6', tip:'진척사항이 분납 — 일부만 받고 잔액이 남은 건' },
+  { k:'paid',  lb:'✅ 완납',     col:'#047857', tip:'진척사항이 완납으로 기록된 건' },
+  { k:'nores', lb:'📵 미수신',   col:'#B91C1C', tip:'진척사항이 미수신 — 연락이 닿지 않은 건' },
+  { k:'end',   lb:'📗 종료',     col:'#475569', tip:'진척사항이 종료로 기록된 건' },
+  { k:'blank', lb:'⚪ 미기재',   col:'#94A3B8', tip:'진척사항이 비어 있는 건 — 결과를 채워주세요' }
+];
+var DPAY_RES_EXT = [
+  { k:'law',   lb:'⚖️ 법조치',    col:'#7C2D12', tip:'업무하위가 법적 조치 검토·내용증명·지급명령·보정명령·집행인 건 (위 구분과 중복 집계)' },
+  { k:'delay', lb:'↩️ 일정 연기', col:'#0E7490', tip:'다음 입금예정일이 그날 이후로 잡힌 건 — 약속이 미뤄졌습니다 (위 구분과 중복 집계)' },
+  { k:'unrec', lb:'💸 미회수',    col:'#B91C1C', tip:'그날 입금 기록이 없고, 납기가 도래한 미납이 남아 있으며, 다음 약속도 잡히지 않은 건 (위 구분과 중복 집계)' }
+];
+/* [v587] 그 날 '대응한' 수납·연체 계약을 결과별로 집계 — 대응일 기준 (약속일 기준인 아래 목록과 다름) */
+function dpay_resultFor(dayOffset){
+  var O = { total:0, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], got:0, rest:0 };
+  try {
+    var R = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
+    var d0 = new Date(); d0.setHours(0,0,0,0);
+    if (dayOffset) d0 = new Date(d0.getTime() + dayOffset * 86400000);
+    var key = dpay_ymd(d0); O.day = key;
+    var LAST = {}, LAW = {};
+    R.forEach(function(r){
+      var ad = _parseAnyDateCell(r.date); if (!ad || dpay_ymd(ad) !== key) return;
+      var jt = String(r.jobType||'').trim();
+      if (jt !== '수납관리' && jt !== '연체관리') return;
+      var cno = _normCno(r.no != null ? r.no : r.cno); if (!cno) return;
+      var pg = String(r.progress||'').trim();
+      if (DPAY_LAW_RE.test(String(r.jobSub||'')) || pg === '강제퇴실확정') LAW[cno] = 1;
+      var ix = +r._idx || 0, prev = LAST[cno];
+      if (!prev || ix >= prev.ix) LAST[cno] = { ix:ix, r:r };
+    });
+    var AM = dpay_amtMap(dayOffset), DUE = dpay_dueSet(0) || {}, CTX = dpay_ctxMap();
+    Object.keys(LAST).forEach(function(cno){
+      var r = LAST[cno].r, pg = String(r.progress||'').trim();
+      var nx = _parseAnyDateCell(r.payDate), nxs = nx ? dpay_ymd(nx) : '';
+      var got = AM[cno] || 0, rest = DUE[cno] || 0;
+      var it = { cno:cno, nm:String(r.tenant||r.nm||r.name||'').trim() || (CTX[cno]||{}).nm || '—',
+                 person:String(r.person||'').trim(), pg:pg || '미기재', memo:String(r.content||'').trim(),
+                 next:nxs, got:got, rest:rest, sub:String(r.jobSub||'').trim() };
+      O.total++; O.got += got; O.rest += rest;
+      var g = (pg === '완납') ? 'paid' : (pg === '분납') ? 'split' : (pg === '미수신') ? 'nores'
+            : (pg === '종료') ? 'end' : (pg === '납부약속' || nxs) ? 'pay' : 'blank';
+      O[g].push(it);
+      if (LAW[cno]) O.law.push(it);
+      if (nxs && nxs > key) O.delay.push(it);
+      else if (!got && rest > 0) O.unrec.push(it);
+    });
+    ['pay','split','paid','nores','end','blank','law','delay','unrec'].forEach(function(k){
+      O[k].sort(function(a,b){ return (b.rest - a.rest) || String(a.cno).localeCompare(String(b.cno)); });
+    });
+  } catch(e){ console.warn('[v587] resultFor', e); }
+  return O;
+}
+function dpay_resTab(v){ window._dresDay = v; window._dresPick = ''; dpay_refresh(); }
+function dpay_resPick(k){ window._dresPick = (window._dresPick === k) ? '' : k; dpay_refresh(); }
+/* [v587] 대응 결과 요약 블록 */
+function dpay_resBlock(){
+  var off = (window._dresDay === 'y') ? -1 : 0;
+  var O = dpay_resultFor(off);
+  var pick = window._dresPick || '';
+  var isY = (off === -1);
+  var chip = function(d, arr, dim){
+    var n = arr.length;
+    var on = (pick === d.k && n);
+    return '<span class="dres-chip' + (on?' on':'') + (n?'':' z') + '"'
+      + (n ? ' onclick="dpay_resPick(\'' + d.k + '\')"' : '')
+      + ' title="' + (d.tip + (n ? '\n클릭하면 명단이 열립니다.' : '')).replace(/"/g,'&quot;') + '">'
+      + d.lb + ' <b style="color:' + (dim ? '#CBD5E1' : d.col) + '">' + n + '</b>명</span>';
+  };
+  var h = '<div class="dres"><div class="dres-top">'
+    + '<span class="dres-tabs">'
+    +   '<button class="dres-tab' + (isY?'':' on') + '" onclick="dpay_resTab(\'t\')">오늘</button>'
+    +   '<button class="dres-tab' + (isY?' on':'') + '" onclick="dpay_resTab(\'y\')">어제</button>'
+    + '</span>'
+    + '<span class="dres-ttl">대응 결과 <b>' + O.total + '</b>건</span>'
+    + '<span class="dres-sub">' + O.day + ' · 대응일 기준'
+    +   (isY && O.got ? ' · 회수 ₩' + O.got.toLocaleString() : '')
+    + '</span></div><div class="dres-chips">';
+  DPAY_RES_DEF.forEach(function(d){ h += chip(d, O[d.k]); });
+  h += '<span class="dres-div"></span>';
+  DPAY_RES_EXT.forEach(function(d){
+    if (d.k === 'unrec' && !isY) {
+      h += '<span class="dres-chip z" title="오늘은 입금내역 반영이 진행 중이라 미회수를 판정할 수 없습니다. 어제 탭에서 확인하세요.">'
+         + d.lb + ' <b style="color:#CBD5E1">—</b></span>';
+      return;
+    }
+    h += chip(d, O[d.k]);
+  });
+  h += '</div>';
+  if (pick && O[pick] && O[pick].length) {
+    h += '<div class="dres-list">' + O[pick].map(function(x){
+      var cq = String(x.cno).replace(/'/g, "\\'");
+      var bad = (x.pg === '완납' || x.pg === '종료') && x.rest > 0 && !x.got;
+      return '<div class="dres-row">'
+        + '<span class="c" onclick="crNavFromView(\'' + cq + '\',\'delinquency\')">' + x.cno + '</span>'
+        + '<span class="n">' + x.nm + '</span>'
+        + '<span class="m">' + (x.memo || '—') + (x.person ? ' · ' + x.person : '') + '</span>'
+        + (x.next && x.next !== O.day ? '<span class="p" title="다음 입금예정일">→ ' + x.next + '</span>' : '')
+        + (x.rest > 0 ? '<span class="a" title="납기가 도래한 미납 잔액">₩' + x.rest.toLocaleString() + '</span>' : '')
+        + (bad ? '<span class="w" title="진척사항은 ' + x.pg + '인데 납기 도래 미납이 남아 있습니다 — 확인이 필요합니다">⚠ ' + x.pg + '</span>'
+               : '<span class="p">' + x.pg + '</span>')
+        + '</div>';
+    }).join('') + '</div>';
+  }
+  if (!O.total) h += '<div class="dres-none">' + (isY ? '어제' : '오늘') + ' 기록된 수납·연체 대응이 없습니다.</div>';
+  return h + '</div>';
+}
 /* [v580] 오늘 완납·종료된 약속 — 목록 맨 아래 접이식 (기본 접힘) */
 function dpay_toggleDone(k){
-  var key = (k === 'y') ? '_dpayDoneOpenY' : '_dpayDoneOpen';
+  var key = (k === 'n') ? '_dpayNoDueOpen' : (k === 'y') ? '_dpayDoneOpenY' : '_dpayDoneOpen';
   window[key] = !window[key]; dpay_refresh();
+}
+/* [v586] 입금 약속은 잡혀 있으나 받을 미납이 없는 건 — 접이식 (기본 접힘) */
+function dpay_noDueBlock(list, CTX){
+  var D = (list && list.noDueList) || [];
+  if (!D.length) return '';
+  CTX = CTX || {};
+  var open = !!window._dpayNoDueOpen;
+  var tip = '입금 약속이 잡혀 있지만 입금내역에 받을 미납이 없는 건입니다.'
+    + '\n납기가 도래한 청구가 모두 정상납부라 오늘 받을 돈이 없습니다.'
+    + '\n임대인 정산·수기 처리 건이 수납관리로 기록됐거나, 입금 후 진척사항을 바꾸지 않은 경우입니다.'
+    + '\n대응 목록에서는 내려두되 여기서 확인·정리할 수 있습니다.';
+  var h = '<div class="dpay-fold n' + (open?' on':'') + '" onclick="dpay_toggleDone(\'n\')" title="' + tip.replace(/"/g,'&quot;') + '">'
+    + '<span>🧾</span><span>미납 없음</span>'
+    + '<span class="cnt">' + D.length + '건</span>'
+    + '<span style="font-size:10px;color:#94A3B8;font-weight:700">입금내역 기준 받을 금액 없음</span>'
+    + '<span class="ar">' + (open ? '▴ 접기' : '▾ 펼쳐서 보기') + '</span></div>';
+  if (!open) return h;
+  h += '<div class="dpay-done">' + D.map(function(x){
+    var cq = String(x.cno).replace(/'/g, "\\'");
+    return '<div class="dpay-drow">'
+      + '<div class="dt">' + (x.time || '--:--') + '</div>'
+      + '<div class="dnm"><span style="color:#0E7490;cursor:pointer" onclick="crNavFromView(\'' + cq + '\',\'delinquency\')">' + x.cno + '</span> ' + (x.nm || (CTX[x.cno]||{}).nm || '—') + '</div>'
+      + '<div class="dmemo">' + (x.memo || '—') + (x.person ? ' · ' + x.person : '') + '</div>'
+      + '<button class="dpay-btn" onclick="dpay_memo(\'' + cq + '\',{cat1:\'수납관리\',progress:\'종료\'},event)" title="진척사항을 종료로 정리 — 이 계약의 빠른 메모로 이동">✍️ 정리</button>'
+      + '<span class="dok" style="background:#EFF6FF;color:#1D4ED8">' + (x.pg || '진행') + '</span></div>';
+  }).join('') + '</div>';
+  return h;
 }
 function dpay_doneBlock(list, CTX, opt){
   var D = (list && list.doneList) || [];
