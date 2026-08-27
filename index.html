@@ -837,6 +837,22 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dres-row .p { font-size:9.5px; font-weight:800; border-radius:6px; padding:1px 7px; background:#F1F5F9; color:#475569; white-space:nowrap; }
 .dres-row .w { font-size:9.5px; font-weight:800; border-radius:6px; padding:1px 7px; background:#FEF2F2; color:#B91C1C; white-space:nowrap; }
 .dres-none { padding:9px; text-align:center; color:#94A3B8; font-size:11px; }
+/* [v589] 전일 성적표 배지 */
+.dres-sc { display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-bottom:7px; padding:6px 8px; background:#fff; border:1px solid #E7EDF5; border-radius:9px; }
+.dres-sc .g { font-size:15px; font-weight:900; color:#fff; border-radius:8px; padding:2px 11px; letter-spacing:.5px; }
+.dres-sc .g.gA { background:#047857; } .dres-sc .g.gB { background:#1D4ED8; } .dres-sc .g.gC { background:#B45309; }
+.dres-sc .g.gD { background:#C2410C; } .dres-sc .g.gE { background:#B91C1C; } .dres-sc .g.gX { background:#CBD5E1; }
+.dres-sc .s { font-size:11px; font-weight:800; color:#1A3A5C; }
+.dres-sc .s b { font-size:15px; font-weight:900; font-variant-numeric:tabular-nums; }
+.dres-sc .lb { font-size:10px; font-weight:800; color:#94A3B8; margin-right:2px; }
+.dres-sc .bd { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; color:#475569; background:#F8FAFC; border:1px solid #E8EDF5; border-radius:8px; padding:3px 9px; }
+.dres-sc .bd.k { cursor:pointer; } .dres-sc .bd.k:hover { border-color:#94A3B8; }
+.dres-sc .bd.on { background:#1A3A5C; border-color:#1A3A5C; color:#fff; }
+.dres-sc .bd i { font-style:normal; font-size:10px; color:#94A3B8; font-weight:700; }
+.dres-sc .bd.on i { color:#CBD5E1; }
+.dres-sc .bd em { font-style:normal; font-size:10px; font-weight:800; }
+.dres-sc .bd em.up { color:#047857; } .dres-sc .bd em.dn { color:#B91C1C; }
+.dres-sc .bd.on em.up { color:#6EE7B7; } .dres-sc .bd.on em.dn { color:#FCA5A5; }
 .dpay-fold.n { border-color:#BFDBFE; background:#F8FBFF; color:#1D4ED8; }
 .dpay-fold.n:hover, .dpay-fold.n.on { background:#EFF6FF; border-color:#60A5FA; }
 .dpay-fold.n .cnt { background:#EFF6FF; border-color:#BFDBFE; color:#1D4ED8; }
@@ -8129,7 +8145,7 @@ var DPAY_RES_EXT = [
 ];
 /* [v587] 그 날 '대응한' 수납·연체 계약을 결과별로 집계 — 대응일 기준 (약속일 기준인 아래 목록과 다름) */
 function dpay_resultFor(dayOffset){
-  var O = { total:0, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], got:0, rest:0 };
+  var O = { total:0, gotCnt:0, blankPg:0, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], got:0, rest:0 };
   try {
     var R = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
     var d0 = new Date(); d0.setHours(0,0,0,0);
@@ -8155,6 +8171,8 @@ function dpay_resultFor(dayOffset){
                  person:String(r.person||'').trim(), pg:pg || '미기재', memo:String(r.content||'').trim(),
                  next:nxs, got:got, rest:rest, sub:String(r.jobSub||'').trim() };
       O.total++; O.got += got; O.rest += rest;
+      if (got > 0) O.gotCnt++;
+      if (!pg) O.blankPg++;   /* [v589] 진척사항 기재 여부 — 그룹 분류와 별개로 센다 */
       var g = (pg === '완납') ? 'paid' : (pg === '분납') ? 'split' : (pg === '미수신') ? 'nores'
             : (pg === '종료') ? 'end' : (pg === '납부약속' || nxs) ? 'pay' : 'blank';
       O[g].push(it);
@@ -8167,6 +8185,71 @@ function dpay_resultFor(dayOffset){
     });
   } catch(e){ console.warn('[v587] resultFor', e); }
   return O;
+}
+/* [v589] 하루 성적 — 약속 이행률(60%) · 대응 회수율(20%) · 기록 완성도(20%)
+   이행률만으로는 미수신·법조치 대응이 안 보이고, 회수율만 보면 담당자가 통제할 수 없는 대상까지
+   분모에 들어가 늘 낮게 나온다. 셋을 가중평균해 하루를 한 등급으로 요약한다. */
+function dpay_scoreFor(off){
+  var C = window.__dpayScore;
+  if (!C || C._d !== dpay_ymd(new Date())) C = window.__dpayScore = { _d: dpay_ymd(new Date()) };
+  var ck = 'k' + off;
+  if (C[ck]) return C[ck];
+  var S = { none:true, grade:'—', gk:'gX', score:null, r1:null, r2:0, r3:0, amt:0,
+            nProm:0, nKept:0, nDl:0, nGot:0, unrec:0, unrecAmt:0, kept:[], broke:[] };
+  try {
+    var O = dpay_resultFor(off), L = dpay_listFor(off), AM = dpay_amtMap(off), DUE = dpay_dueSet(0) || {};
+    var seen = {}, pk = [];
+    [].concat(Array.prototype.slice.call(L), L.doneList || [], L.noDueList || []).forEach(function(x){
+      if (!x || !x.cno || seen[x.cno]) return; seen[x.cno] = 1; pk.push(x);
+    });
+    pk.forEach(function(x){
+      var it = { cno:x.cno, nm:x.nm || '—', person:x.person || '', pg:x.pg || '미기재',
+                 memo:x.memo || '', next:'', got:AM[x.cno] || 0, rest:DUE[x.cno] || 0 };
+      (it.got > 0 ? S.kept : S.broke).push(it);
+    });
+    S.broke.sort(function(a,b){ return (b.rest - a.rest) || String(a.cno).localeCompare(String(b.cno)); });
+    S.nProm = pk.length; S.nKept = S.kept.length; S.nDl = O.total; S.nGot = O.gotCnt;
+    S.amt = O.got; S.unrec = O.unrec.length;
+    O.unrec.forEach(function(x){ S.unrecAmt += x.rest; });
+    if (!O.total && !pk.length) { C[ck] = S; return S; }
+    S.none = false;
+    S.r1 = pk.length ? Math.round(100 * S.nKept / pk.length) : null;
+    S.r2 = O.total ? Math.round(100 * O.gotCnt / O.total) : 0;
+    S.r3 = O.total ? Math.round(100 * (O.total - O.blankPg) / O.total) : 0;
+    var sum = 0, w = 0;
+    if (S.r1 !== null) { sum += S.r1 * 0.6; w += 0.6; }
+    sum += S.r2 * 0.2; w += 0.2;
+    sum += S.r3 * 0.2; w += 0.2;
+    S.score = Math.round(sum / w);
+    S.grade = S.score >= 75 ? 'A' : S.score >= 60 ? 'B' : S.score >= 45 ? 'C' : S.score >= 30 ? 'D' : 'E';
+    S.gk = 'g' + S.grade;
+  } catch(e){ console.warn('[v589] scoreFor', e); }
+  C[ck] = S;
+  return S;
+}
+/* [v589] 전일 성적표 배지 */
+function dpay_scoreBar(off){
+  var S = dpay_scoreFor(off), Pv = dpay_scoreFor(off - 1);
+  if (S.none) return '';
+  var pick = window._dresPick || '';
+  var arrow = function(cur, prev){
+    if (prev == null || cur == null || prev === cur) return '';
+    var up = cur > prev;
+    return ' <em class="' + (up?'up':'dn') + '" title="전일 ' + prev + '">' + (up?'▲':'▼') + '</em>';
+  };
+  var w = function(n){ return '₩' + Math.round(n||0).toLocaleString(); };
+  return '<div class="dres-sc">'
+    + '<span class="g ' + S.gk + '" title="종합 성적 — 약속 이행률 60% + 대응 회수율 20% + 기록 완성도 20%&#10;A 75점 이상 · B 60 · C 45 · D 30 · E 30 미만">' + S.grade + '</span>'
+    + '<span class="s"><b>' + S.score + '</b>점' + arrow(S.score, Pv.none ? null : Pv.score) + '</span>'
+    + '<span class="lb">종합 성적</span>'
+    + '<span class="bd k' + (pick==='broke'?' on':'') + '"' + (S.broke.length ? ' onclick="dpay_resPick(\'broke\')"' : '')
+    +   ' title="입금예정일이 그날이었던 계약 중 실제 입금이 확인된 비율입니다.&#10;클릭하면 약속을 지키지 않은 명단이 열립니다.">'
+    +   '🎯 이행 ' + (S.r1 == null ? '—' : S.r1 + '%') + ' <i>' + S.nKept + '/' + S.nProm + '</i>' + arrow(S.r1, Pv.none ? null : Pv.r1) + '</span>'
+    + '<span class="bd" title="그날 입금내역에 납부일이 찍힌 실납부액 합계입니다">💰 ' + w(S.amt) + arrow(S.amt, Pv.none ? null : Pv.amt) + '</span>'
+    + '<span class="bd" title="그날 대응 기록 중 진척사항이 채워진 비율입니다 — 미기재가 많으면 위 지표가 모두 왜곡됩니다">📝 기록 ' + S.r3 + '%' + arrow(S.r3, Pv.none ? null : Pv.r3) + '</span>'
+    + '<span class="bd k' + (pick==='unrec'?' on':'') + '"' + (S.unrec ? ' onclick="dpay_resPick(\'unrec\')"' : '')
+    +   ' title="그날 입금이 없고 납기 도래 미납이 남았으며 다음 약속도 없는 건입니다">💸 미회수 ' + S.unrec + '명 <i>' + w(S.unrecAmt) + '</i></span>'
+    + '</div>';
 }
 function dpay_resTab(v){ window._dresDay = v; window._dresPick = ''; dpay_refresh(); }
 function dpay_resPick(k){ window._dresPick = (window._dresPick === k) ? '' : k; dpay_refresh(); }
@@ -8192,7 +8275,9 @@ function dpay_resBlock(){
     + '<span class="dres-ttl">대응 결과 <b>' + O.total + '</b>건</span>'
     + '<span class="dres-sub">' + O.day + ' · 대응일 기준'
     +   (isY && O.got ? ' · 회수 ₩' + O.got.toLocaleString() : '')
-    + '</span></div><div class="dres-chips">';
+    + '</span></div>'
+    + (isY ? dpay_scoreBar(off) : '')
+    + '<div class="dres-chips">';
   DPAY_RES_DEF.forEach(function(d){ h += chip(d, O[d.k]); });
   h += '<span class="dres-div"></span>';
   DPAY_RES_EXT.forEach(function(d){
@@ -8204,8 +8289,9 @@ function dpay_resBlock(){
     h += chip(d, O[d.k]);
   });
   h += '</div>';
-  if (pick && O[pick] && O[pick].length) {
-    h += '<div class="dres-list">' + O[pick].map(function(x){
+  var PL = (pick === 'broke') ? (isY ? dpay_scoreFor(off).broke : []) : O[pick];
+  if (pick && PL && PL.length) {
+    h += '<div class="dres-list">' + PL.map(function(x){
       var cq = String(x.cno).replace(/'/g, "\\'");
       var bad = (x.pg === '완납' || x.pg === '종료') && x.rest > 0 && !x.got;
       return '<div class="dres-row">'
