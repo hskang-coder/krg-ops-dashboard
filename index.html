@@ -5490,6 +5490,9 @@ async function renderSettlementView(){
     P.forEach(function(p){
       if(!alive(p)) return;
       if(!isRent(p) && !isFee(p) && !isExitStl(p) && String(p['납부종류']||'').trim()!=='변동관리비') return;   /* [v570] 퇴실정산(기타계약금) 행 포함 */
+      /* [v575] 서비스수수료·잔여서비스수수료는 KRG가 '받을 돈'이라 대위변제 성격이 아님 → ③ 발생·회수 집계에서 완전 제외
+         (납부종류가 변동관리비로 내려오는 수수료 청구도 청구서명 '수수료' 매칭으로 함께 제외) */
+      if(isFee(p)) return;
       var st=String(p['납부상태']||'').trim();
       var days=parseInt(String(p['연체일수']==null?'':p['연체일수']).replace(/[^0-9\-]/g,''),10)||0;
       var isLate = days>0 || st==='연체중' || st==='분납중';
@@ -5871,9 +5874,10 @@ async function renderSettlementView(){
       E:'※ <b style="color:#D97706">계약종료(퇴실)</b>만 — 이미 나간 임차인 채권이라 회수율이 급락합니다. 90일 초과분은 법적 절차 검토 대상.'
     }[dlqK];
     html+='<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:12px 14px;margin-bottom:10px">'
-      +'<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:3px">③ 월별 연체 발생 · 회수 현황</div>'
+      +'<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:3px">③ 월별 연체 발생 · 회수 현황 <span style="font-size:10px;font-weight:700;color:#B45309;background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:2px 8px;vertical-align:2px">수수료 제외</span></div>'   /* [v575] */
       +'<div style="font-size:11px;color:#5A6A8A;margin-bottom:8px;line-height:1.6">'
       +'<b>매달 임대료가 얼마나 밀렸고, 그중 지금까지 얼마를 돌려받았는지</b> 보여주는 표입니다. 한 번 밀린 금액은 그 달에 고정되고, 회수액만 시간이 지나며 쌓입니다.'
+      +'<br><span style="color:#B45309">※ [v575] <b>임차인이 안 낸 돈(KRG 대위변제 대상)</b>만 집계합니다 — 서비스수수료·잔여서비스수수료는 KRG가 받을 채권이라 발생·회수·상세 명단에서 모두 제외됩니다.</span>'
       +'</div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px;align-items:center">'
       + dbtn('T','전체', totA+totE) + dbtn('A','🔵 계약중', totA) + dbtn('E','🟠 계약종료(퇴실)', totE)
@@ -5957,9 +5961,12 @@ function stl_cohModal(key, keepSort, keepDay){
     var rowsAll=(dk==='A')?g.A.slice():(dk==='E')?g.E.slice():g.A.concat(g.E);
     /* [v555.1] 납부종류 필터 (전체/임대료/변동관리비/기타계약금) + 청구서명 그룹 필터 */
     var _grpOf=function(b){ b=String(b||'');
-      if(b.indexOf('퇴실정산')>=0) return '퇴실정산금';
+      /* [v575] '퇴실 정산금'처럼 공백이 들어간 표기도 퇴실정산으로 묶음 (기존엔 전부 '기타'로 빠졌음) */
+      if(/퇴실\s*정산/.test(b)) return '퇴실정산금';
       if(b.indexOf('잔여')>=0&&b.indexOf('수수료')>=0) return '잔여서비스수수료';
       if(b.indexOf('수수료')>=0) return '서비스수수료';
+      if(/청소/.test(b)) return '청소비';                       /* [v575] */
+      if(/법비용|법무|소송|내용증명/.test(b)) return '법비용';   /* [v575] */
       if(b.indexOf('관리비')>=0) return '변동관리비';
       if(b.indexOf('임대료')>=0||b.indexOf('월세')>=0) return '임대료';
       return '기타'; };
@@ -6036,6 +6043,7 @@ function stl_cohModal(key, keepSort, keepDay){
       +'<div style="display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid #EEF2F7">'
       +  '<span style="width:11px;height:11px;border-radius:3px;background:#DC2626"></span>'
       +  '<b style="font-size:14px;color:#1A3A5C">'+lbl+' 연체 발생 · 회수 상세</b>'
+      +  '<span title="서비스수수료·잔여서비스수수료는 KRG가 받을 채권이라 제외 — 임차인이 안 낸 돈(대위변제 대상)만 집계" style="font-size:9.5px;font-weight:800;color:#B45309;background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:2px 7px;cursor:help">수수료 제외</span>'   /* [v575] */
       +  '<span style="font-size:11.5px;color:#8A97A8">'+dLbl+' · '+Object.keys(cs).length+'명 · '+rows.length+'건</span>'
       +  '<span style="margin-left:auto;display:flex;gap:6px">'
       +    '<button onclick="stl_cohExcel()" style="background:#1d4ed8;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">⬇️ 엑셀</button>'
