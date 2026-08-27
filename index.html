@@ -7871,7 +7871,7 @@ function dpay_renderCard(){
       + (list.doneToday ? '오늘 입금 약속 <b style="color:#047857">' + list.doneToday + '건이 모두 완납·종료 처리</b>되었습니다. 남은 대응 건이 없습니다.'
                         : '오늘 잡힌 입금 약속이 없습니다.')
       + '</div>' + dpay_doneBlock(list, CTX)
-      + dpay_doneBlock(dpay_listFor(-1), CTX, { kind:'y', label:'어제 완납·종료' }) + '</div>';
+      + dpay_doneBlock(dpay_listFor(-1), CTX, { kind:'y', label:'어제 완납·종료', showAmt:true, dayOffset:-1 }) + '</div>';
   }
   /* [v584] 약속자 / 분납자 / 완납자 — 오늘 약속한 사람을 결과별로 나눈 요약 */
   var _dl = list.doneList || [];
@@ -7994,7 +7994,7 @@ function dpay_renderCard(){
   }
   return '<div class="dpay-card">' + head + kpi + sum + '<div class="dpay-list">' + body + '</div>'
     + dpay_doneBlock(list, CTX)
-    + dpay_doneBlock(dpay_listFor(-1), CTX, { kind:'y', label:'어제 완납·종료' })
+    + dpay_doneBlock(dpay_listFor(-1), CTX, { kind:'y', label:'어제 완납·종료', showAmt:true, dayOffset:-1 })
     + '<div style="font-size:10px;color:#94A3B8;margin-top:8px;padding-top:7px;border-top:1px solid #F1F5F9">계약별 <b>가장 최근에 잡힌 입금 약속</b>이 오늘이고 <b>아직 완납·종료되지 않은</b> 건만 올라옵니다 (약속이 다른 날로 바뀐 건, 진척사항이 완납·종료인 건은 제외) · 빠른 메모의 <b>입금시간</b>에 시간을 넣으면 시간순으로 섭니다 · 1분마다 자동 갱신 · 알림은 약속 10분 전과 정각에 1회씩</div></div>'
     + mini;
 }
@@ -8003,62 +8003,32 @@ function dpay_num(v){
   var m = String(v==null?'':v).replace(/,/g,'').match(/-?\d+(?:\.\d+)?/);
   return m ? Math.round(parseFloat(m[0])) : 0;
 }
-/* [v581] 계약별 오늘 회수 금액 — 정확값 우선, 없으면 추정
-   ① 입금내역에 '오늘' 납부일로 기록된 실납부액(청구−미납)이 있으면 그 값 (exact)
-   ② 없으면 미납이 남은 청구 중 '가장 이른 납기월' 한 달치 미납 합계 (추정)
-      입금내역 반영이 하루 이상 늦어, 완납 처리한 건이 아직 미납으로 남아 있는 점을 이용한다.
-      부분 납부(일부만 입금)인 경우 실제보다 크게 잡힐 수 있어 '약'으로 표기한다. */
-function dpay_amtMap(){
+/* [v585] 계약별 '그 날' 실제 회수 금액 — 입금내역 납부일 기준 (추정 없음)
+   납부일이 그 날짜인 청구 행의 (최종 청구금액 − 미납액)을 계약별로 합산한다.
+   앞서 쓰던 '미납액으로 추정' 방식은 부분 납부를 과대 계상해 폐기.
+   dayOffset 0=오늘, -1=어제. 날짜별로 캐시한다. */
+function dpay_amtMap(dayOffset){
   try {
     var P = Array.isArray(paymentRawData) ? paymentRawData : [];
     if (!P.length) return {};
-    var td = dpay_ymd(new Date());
-    if (window.__dpayAmt && window.__dpayAmt._n === P.length && window.__dpayAmt._d === td) return window.__dpayAmt.m;
-    var acc = {};
+    var d0 = new Date(); d0.setHours(0,0,0,0);
+    if (dayOffset) d0 = new Date(d0.getTime() + dayOffset * 86400000);
+    var key = dpay_ymd(d0);
+    var C = window.__dpayAmt;
+    if (!C || C._n !== P.length) C = window.__dpayAmt = { _n:P.length };
+    if (C[key]) return C[key];
+    var M = {};
     for (var i=0;i<P.length;i++){
       var p = P[i];
-      var cno = _normCno(p['계약번호']); if(!cno) continue;
-      var a = acc[cno] || (acc[cno] = { paid:0, months:{} });
-      var out = dpay_num(p['미납(연체)금액(원)']);
-      var pay = _parseAnyDateCell(p['납부일']);
-      if (pay && dpay_ymd(pay) === td) a.paid += Math.max(0, dpay_num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) - out);
-      if (out > 0) {
-        var k = '', d0 = _parseAnyDateCell(p['납기일']);
-        if (d0) k = d0.getFullYear() + '-' + String(d0.getMonth()+1).padStart(2,'0');
-        else { var mm = String(p['청구서명']||'').match(/(\d{4})\s*년\s*(\d{1,2})\s*월/); if (mm) k = mm[1] + '-' + String(+mm[2]).padStart(2,'0'); }
-        if (k) a.months[k] = (a.months[k]||0) + out;
-      }
+      var pay = _parseAnyDateCell(p['납부일']); if (!pay) continue;
+      if (dpay_ymd(pay) !== key) continue;
+      var cno = _normCno(p['계약번호']); if (!cno) continue;
+      var v = dpay_num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) - dpay_num(p['미납(연체)금액(원)']);
+      if (v > 0) M[cno] = (M[cno] || 0) + v;
     }
-    var M = {};
-    Object.keys(acc).forEach(function(c){
-      var a = acc[c];
-      if (a.paid > 0) { M[c] = { amt:a.paid, exact:true }; return; }
-      var ks = Object.keys(a.months).sort();
-      if (ks.length) M[c] = { amt:a.months[ks[0]], exact:false, ym:ks[0] };
-    });
-    window.__dpayAmt = { _n:P.length, _d:td, m:M };
+    C[key] = M;
     return M;
-  } catch(e){ console.warn('[v581] amtMap', e); return {}; }
-}
-/* [v582] 메모에 적힌 금액 추출 — 부분 납부 보정용
-   담당자는 전액 완납이면 "하나은행 완납확인"만 쓰고, 일부만 받으면 금액을 적는 경향이 있다.
-   전화번호(010-5352-8746) · 회차 표기 (2) · 연도(2026년)를 먼저 걷어내고,
-   콤마가 있거나 '원/만원' 단위가 붙은 숫자만 금액으로 인정한다. 없으면 null. */
-var DPAY_PHONE_RE = /0\d{1,2}[-.)\s]?\d{3,4}[-.\s]?\d{4}/g;
-function dpay_memoAmt(text){
-  try {
-    var t = String(text||'').replace(DPAY_PHONE_RE,' ').replace(/\(\s*\d+\s*\)/g,' ').replace(/20\d{2}\s*년/g,' ');
-    var re = /(\d{1,3}(?:,\d{3})+|\d+)\s*(만원|만|원)?/g, m, best = null;
-    while ((m = re.exec(t))) {
-      var raw = m[1], unit = m[2] || '';
-      var v = parseInt(raw.replace(/,/g,''), 10);
-      if (unit === '만원' || unit === '만') v *= 10000;
-      else if (raw.indexOf(',') < 0 && unit !== '원') continue;   /* 단위·콤마 없는 맨숫자는 금액으로 보지 않음 */
-      if (!(v >= 10000 && v <= 50000000)) continue;
-      if (best === null || v < best) best = v;
-    }
-    return best;
-  } catch(_){ return null; }
+  } catch(e){ console.warn('[v585] amtMap', e); return {}; }
 }
 /* [v580] 오늘 완납·종료된 약속 — 목록 맨 아래 접이식 (기본 접힘) */
 function dpay_toggleDone(k){
@@ -8072,27 +8042,23 @@ function dpay_doneBlock(list, CTX, opt){
   var kind = opt.kind || 't';                       /* 't'=오늘, 'y'=어제 */
   var label = opt.label || '오늘 완납·종료';
   var open = !!window[(kind === 'y') ? '_dpayDoneOpenY' : '_dpayDoneOpen'];
-  /* [v581] 회수 금액 — 정확값(입금내역 반영분) 우선, 나머지는 추정
-     [v582] 메모에 금액이 적혀 있고 추정보다 작으면 그 값으로 낮춰 잡는다 (부분 납부 보정) */
-  var AM = dpay_amtMap();
-  var resolve = function(x){
-    var a = AM[x.cno], mv = dpay_memoAmt(x.memo);
-    if (a && a.exact) return a;
-    if (mv && (!a || mv < a.amt)) return { amt:mv, exact:false, memo:true, ym:(a?a.ym:'') };
-    return a;
-  };
-  var RS = {}, tot = 0, nEx = 0, nEs = 0, nMemo = 0;
-  D.forEach(function(x){
-    var a = resolve(x); RS[x.cno] = a;
-    if (a && a.amt > 0) { tot += a.amt; if (a.exact) nEx++; else { nEs++; if (a.memo) nMemo++; } }
-  });
+  /* [v585] 금액은 입금내역 '납부일' 기준 실납부액만 사용 (추정 없음).
+     오늘은 아직 입금이 들어오는 중이라 중간 합계가 오해를 부르므로 건수만 표시하고,
+     하루가 끝난 어제분에만 금액을 붙인다. */
+  var showAmt = !!opt.showAmt;
+  var AM = showAmt ? dpay_amtMap(opt.dayOffset || 0) : {};
+  var tot = 0, nHit = 0;
+  D.forEach(function(x){ var v = AM[x.cno]; if (v > 0) { tot += v; nHit++; } });
+  var nMiss = D.length - nHit;
   var tip = '입금 약속 중 진척사항이 완납·종료로 기록된 건입니다.'
-    + (tot ? '\n금액 산출 — 입금내역에 납부로 기록된 건 ' + nEx + '개는 실제 납부액, 나머지 ' + nEs + '개는 미납이 남은 가장 이른 납기월 한 달치로 추정했습니다'
-             + (nMemo ? ' (그중 ' + nMemo + '개는 메모에 적힌 금액으로 낮춰 잡음)' : '')
-             + '. 부분 납부는 실제보다 크게 잡힐 수 있어 대략치입니다.' : '');
+    + (showAmt
+        ? '\n금액 = 입금내역의 납부일이 그 날짜인 청구의 실납부액(청구금액 − 미납액) 합계입니다.'
+          + (nMiss ? ' ' + nMiss + '건은 입금내역에 그 날짜 납부 기록이 없어 합계에서 빠졌습니다.' : '')
+        : '\n금액은 표시하지 않습니다 — 오늘은 입금내역 반영이 진행 중이라 중간 합계가 실제와 다릅니다. 어제분은 아래에서 금액까지 확인하실 수 있습니다.');
   var h = '<div class="dpay-fold' + (open?' on':'') + (kind === 'y' ? ' y' : '') + '" onclick="dpay_toggleDone(\'' + kind + '\')" title="' + tip.replace(/"/g,'&quot;') + '">'
     + '<span>' + (kind === 'y' ? '📗' : '✅') + '</span><span>' + label + '</span>'
-    + '<span class="cnt">' + D.length + '건' + (tot ? ' · ' + (nEs ? '약 ' : '') + '₩' + tot.toLocaleString() : '') + '</span>'
+    + '<span class="cnt">' + D.length + '건' + (showAmt && tot ? ' · ₩' + tot.toLocaleString() : '') + '</span>'
+    + (showAmt && nMiss ? '<span style="font-size:10px;color:#94A3B8;font-weight:700">납부 기록 없음 ' + nMiss + '건</span>' : '')
     + '<span class="ar">' + (open ? '▴ 접기' : '▾ 펼쳐서 보기') + '</span></div>';
   if (!open) return h;
   h += '<div class="dpay-done">' + D.map(function(x){
@@ -8101,13 +8067,10 @@ function dpay_doneBlock(list, CTX, opt){
       + '<div class="dt">' + (x.time || '--:--') + '</div>'
       + '<div class="dnm"><span style="color:#0E7490;cursor:pointer" onclick="crNavFromView(\'' + cq + '\',\'delinquency\')">' + x.cno + '</span> ' + (x.nm || (CTX[x.cno]||{}).nm || '—') + '</div>'
       + '<div class="dmemo">' + (x.memo || '—') + (x.person ? ' · ' + x.person : '') + '</div>'
-      + (function(){ var a = RS[x.cno];
-          if (!a || !(a.amt > 0)) return '<span class="damt" style="color:#E2E8F0">—</span>';
-          var tt = a.exact ? '입금내역에 납부로 기록된 실제 금액입니다'
-                 : (a.memo ? '메모에 적힌 금액입니다 (부분 납부로 보고 추정치보다 낮춰 잡음)'
-                           : '추정치 — ' + (a.ym||'') + ' 청구분 미납액 기준 (입금내역 반영 전)');
-          return '<span class="damt" title="' + tt + '">'
-            + (a.exact ? '' : '<span class="ap">약</span>') + '₩' + a.amt.toLocaleString() + '</span>'; })()
+      + (function(){ if (!showAmt) return '';
+          var v = AM[x.cno];
+          if (!(v > 0)) return '<span class="damt" style="color:#E2E8F0" title="입금내역에 그 날짜 납부 기록이 없습니다">—</span>';
+          return '<span class="damt" title="입금내역 납부일 기준 실납부액입니다">₩' + v.toLocaleString() + '</span>'; })()
       + '<span class="dok">' + x.pg + '</span></div>';
   }).join('') + '</div>';
   return h;
