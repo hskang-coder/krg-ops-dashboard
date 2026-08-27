@@ -810,6 +810,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dpay-drow .dnm { font-size:11.5px; font-weight:700; color:#64748B; white-space:nowrap; }
 .dpay-drow .dmemo { font-size:11px; color:#94A3B8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
 .dpay-drow .dok { font-size:9.5px; font-weight:800; background:#ECFDF5; color:#047857; border-radius:6px; padding:1px 7px; white-space:nowrap; }
+.dpay-drow .damt { font-size:11.5px; font-weight:800; color:#64748B; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.dpay-drow .damt .ap { font-size:9.5px; font-weight:700; color:#CBD5E1; margin-right:2px; }
 @keyframes dpayPulse { 0%,100% { box-shadow:0 0 0 0 rgba(245,158,11,.45); } 50% { box-shadow:0 0 0 5px rgba(245,158,11,0); } }
 .okpi-fld-time { max-width:132px; }
 .dlq-rate-section {
@@ -7951,6 +7953,48 @@ function dpay_renderCard(){
     + '<div style="font-size:10px;color:#94A3B8;margin-top:8px;padding-top:7px;border-top:1px solid #F1F5F9">계약별 <b>가장 최근에 잡힌 입금 약속</b>이 오늘이고 <b>아직 완납·종료되지 않은</b> 건만 올라옵니다 (약속이 다른 날로 바뀐 건, 진척사항이 완납·종료인 건은 제외) · 빠른 메모의 <b>입금시간</b>에 시간을 넣으면 시간순으로 섭니다 · 1분마다 자동 갱신 · 알림은 약속 10분 전과 정각에 1회씩</div></div>'
     + mini;
 }
+/* [v581] 금액 문자열 → 정수 (소수점·콤마 안전) */
+function dpay_num(v){
+  var m = String(v==null?'':v).replace(/,/g,'').match(/-?\d+(?:\.\d+)?/);
+  return m ? Math.round(parseFloat(m[0])) : 0;
+}
+/* [v581] 계약별 오늘 회수 금액 — 정확값 우선, 없으면 추정
+   ① 입금내역에 '오늘' 납부일로 기록된 실납부액(청구−미납)이 있으면 그 값 (exact)
+   ② 없으면 미납이 남은 청구 중 '가장 이른 납기월' 한 달치 미납 합계 (추정)
+      입금내역 반영이 하루 이상 늦어, 완납 처리한 건이 아직 미납으로 남아 있는 점을 이용한다.
+      부분 납부(일부만 입금)인 경우 실제보다 크게 잡힐 수 있어 '약'으로 표기한다. */
+function dpay_amtMap(){
+  try {
+    var P = Array.isArray(paymentRawData) ? paymentRawData : [];
+    if (!P.length) return {};
+    var td = dpay_ymd(new Date());
+    if (window.__dpayAmt && window.__dpayAmt._n === P.length && window.__dpayAmt._d === td) return window.__dpayAmt.m;
+    var acc = {};
+    for (var i=0;i<P.length;i++){
+      var p = P[i];
+      var cno = _normCno(p['계약번호']); if(!cno) continue;
+      var a = acc[cno] || (acc[cno] = { paid:0, months:{} });
+      var out = dpay_num(p['미납(연체)금액(원)']);
+      var pay = _parseAnyDateCell(p['납부일']);
+      if (pay && dpay_ymd(pay) === td) a.paid += Math.max(0, dpay_num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) - out);
+      if (out > 0) {
+        var k = '', d0 = _parseAnyDateCell(p['납기일']);
+        if (d0) k = d0.getFullYear() + '-' + String(d0.getMonth()+1).padStart(2,'0');
+        else { var mm = String(p['청구서명']||'').match(/(\d{4})\s*년\s*(\d{1,2})\s*월/); if (mm) k = mm[1] + '-' + String(+mm[2]).padStart(2,'0'); }
+        if (k) a.months[k] = (a.months[k]||0) + out;
+      }
+    }
+    var M = {};
+    Object.keys(acc).forEach(function(c){
+      var a = acc[c];
+      if (a.paid > 0) { M[c] = { amt:a.paid, exact:true }; return; }
+      var ks = Object.keys(a.months).sort();
+      if (ks.length) M[c] = { amt:a.months[ks[0]], exact:false, ym:ks[0] };
+    });
+    window.__dpayAmt = { _n:P.length, _d:td, m:M };
+    return M;
+  } catch(e){ console.warn('[v581] amtMap', e); return {}; }
+}
 /* [v580] 오늘 완납·종료된 약속 — 목록 맨 아래 접이식 (기본 접힘) */
 function dpay_toggleDone(){ window._dpayDoneOpen = !window._dpayDoneOpen; dpay_refresh(); }
 function dpay_doneBlock(list, CTX){
@@ -7958,9 +8002,14 @@ function dpay_doneBlock(list, CTX){
   if (!D.length) return '';
   CTX = CTX || {};
   var open = !!window._dpayDoneOpen;
-  var h = '<div class="dpay-fold' + (open?' on':'') + '" onclick="dpay_toggleDone()" title="오늘 입금 약속 중 진척사항이 완납·종료로 기록된 건입니다">'
+  /* [v581] 회수 금액 — 정확값(입금내역 반영분) 우선, 나머지는 추정 */
+  var AM = dpay_amtMap(), tot = 0, nEx = 0, nEs = 0;
+  D.forEach(function(x){ var a = AM[x.cno]; if (a && a.amt > 0) { tot += a.amt; if (a.exact) nEx++; else nEs++; } });
+  var tip = '오늘 입금 약속 중 진척사항이 완납·종료로 기록된 건입니다.'
+    + (tot ? '\n금액 산출 — 입금내역에 오늘 납부로 기록된 건 ' + nEx + '개는 실제 납부액, 나머지 ' + nEs + '개는 미납이 남은 가장 이른 납기월 한 달치로 추정했습니다. 부분 납부는 실제보다 크게 잡힐 수 있어 대략치입니다.' : '');
+  var h = '<div class="dpay-fold' + (open?' on':'') + '" onclick="dpay_toggleDone()" title="' + tip.replace(/"/g,'&quot;') + '">'
     + '<span>✅</span><span>오늘 완납·종료</span>'
-    + '<span class="cnt">' + D.length + '건</span>'
+    + '<span class="cnt">' + D.length + '건' + (tot ? ' · ' + (nEs ? '약 ' : '') + '₩' + tot.toLocaleString() : '') + '</span>'
     + '<span class="ar">' + (open ? '▴ 접기' : '▾ 펼쳐서 보기') + '</span></div>';
   if (!open) return h;
   h += '<div class="dpay-done">' + D.map(function(x){
@@ -7969,6 +8018,10 @@ function dpay_doneBlock(list, CTX){
       + '<div class="dt">' + (x.time || '--:--') + '</div>'
       + '<div class="dnm"><span style="color:#0E7490;cursor:pointer" onclick="crNavFromView(\'' + cq + '\',\'delinquency\')">' + x.cno + '</span> ' + (x.nm || (CTX[x.cno]||{}).nm || '—') + '</div>'
       + '<div class="dmemo">' + (x.memo || '—') + (x.person ? ' · ' + x.person : '') + '</div>'
+      + (function(){ var a = AM[x.cno];
+          if (!a || !(a.amt > 0)) return '<span class="damt" style="color:#E2E8F0">—</span>';
+          return '<span class="damt"' + (a.exact ? ' title="입금내역에 오늘 납부로 기록된 실제 금액입니다"' : ' title="추정치 — ' + (a.ym||'') + ' 청구분 미납액 기준 (입금내역 반영 전)"') + '>'
+            + (a.exact ? '' : '<span class="ap">약</span>') + '₩' + a.amt.toLocaleString() + '</span>'; })()
       + '<span class="dok">' + x.pg + '</span></div>';
   }).join('') + '</div>';
   return h;
