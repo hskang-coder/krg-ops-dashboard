@@ -798,6 +798,18 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dpay-btn.g { background:#ECFDF5; border-color:#A7F3D0; color:#047857; }
 .dpay-btn.g:hover { background:#D1FAE5; color:#047857; }
 .dpay-col { text-align:right; white-space:nowrap; }
+/* [v580] 오늘 완납·종료 — 목록 맨 아래 접이식 */
+.dpay-fold { margin-top:7px; border:1px dashed #A7F3D0; border-radius:9px; padding:7px 11px; font-size:11.5px; font-weight:800; color:#047857; background:#F8FDFA; cursor:pointer; display:flex; align-items:center; gap:7px; }
+.dpay-fold:hover { background:#ECFDF5; border-style:solid; }
+.dpay-fold.on { background:#ECFDF5; border-style:solid; }
+.dpay-fold .cnt { background:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px; padding:1px 8px; font-size:10.5px; }
+.dpay-fold .ar { margin-left:auto; color:#94A3B8; font-weight:700; font-size:10.5px; }
+.dpay-done { margin-top:5px; max-height:230px; overflow-y:auto; padding-right:2px; }
+.dpay-drow { display:flex; align-items:center; gap:10px; border:1px solid #EEF2F7; background:#FCFDFE; border-radius:7px; padding:4px 10px; margin-bottom:3px; }
+.dpay-drow .dt { font-size:11px; font-weight:800; color:#CBD5E1; min-width:52px; text-align:center; font-variant-numeric:tabular-nums; }
+.dpay-drow .dnm { font-size:11.5px; font-weight:700; color:#64748B; white-space:nowrap; }
+.dpay-drow .dmemo { font-size:11px; color:#94A3B8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+.dpay-drow .dok { font-size:9.5px; font-weight:800; background:#ECFDF5; color:#047857; border-radius:6px; padding:1px 7px; white-space:nowrap; }
 @keyframes dpayPulse { 0%,100% { box-shadow:0 0 0 0 rgba(245,158,11,.45); } 50% { box-shadow:0 0 0 5px rgba(245,158,11,0); } }
 .okpi-fld-time { max-width:132px; }
 .dlq-rate-section {
@@ -7633,6 +7645,8 @@ function _parseAnyDateCell(cell) {
 //   · 알림은 약속 10분 전 1회 + 정각 1회. 발송 이력은 localStorage에 날짜별로 남겨 중복 방지
 // ══════════════════════════════════════════════════════════════
 function dpay_ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+/* [v579] 약속 기록일 → 약속일 최대 간격(일). 이보다 먼 미래를 가리키는 기록은 잔여 데이터로 보고 무시 */
+var DPAY_PROMISE_MAX_DAYS = 60;
 /* [v577] 계약별 대응 정보 — 연체관리 표(_dlqTableRows) 우선, 없으면 계약 시트에서 보완 */
 function dpay_ctxMap(){
   var M = {};
@@ -7734,34 +7748,69 @@ function dpay_memo(cno, preset, ev){
     } catch(_){}
   }, 700);
 }
-/* 오늘 입금예정 목록 — [{cno,nm,person,time,dt,memo}] 시간 오름차순 (시간 없는 건은 뒤) */
+/* 오늘 입금예정 목록 — [{cno,nm,person,time,dt,memo}] 시간 오름차순 (시간 없는 건은 뒤)
+   [v579] 계약별로 '가장 최신 입금 약속' 1건만 보고, 그 약속일이 오늘인 계약만 출력한다.
+     대응내역은 누적 기록이라 예전 기록의 입금예정일이 오늘 날짜인 경우가 많고(1년 전 기록 등),
+     같은 날 뒤 기록에서 약속이 다른 날로 바뀌거나 완납 처리된 경우도 있어
+     '입금예정일 = 오늘인 모든 행'을 뽑으면 이미 끝난 건까지 올라온다. */
 function dpay_todayList(){
   var out = [];
   try {
     var R = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
     var today = new Date(); today.setHours(0,0,0,0);
-    var seen = {};
+    /* 1) 계약별 최신 입금 약속 — 대응일 기준, 같은 날이면 시트 행 순서(_idx)가 뒤인 것 */
+    var LAST = {};
     R.forEach(function(r){
       var raw = String(r.payDate||'').trim(); if (!raw) return;
       var jt = String(r.jobType||'').trim();
       if (jt && jt !== '수납관리' && jt !== '연체관리') return;   /* 입금 약속만 */
-      var d = _parseAnyDateCell(raw); if (!d) return;
+      if (!_parseAnyDateCell(raw)) return;
+      var cno = _normCno(r.no != null ? r.no : r.cno); if (!cno) return;
+      var ad = _parseAnyDateCell(r.date);
+      /* 약속을 적은 날과 약속일의 간격이 비정상적으로 크면 살아있는 약속이 아님
+         (1년 전 기록의 입금예정일이 오늘 날짜인 잔여 데이터를 걸러낸다) */
+      if (ad) {
+        var pd0 = _parseAnyDateCell(raw);
+        if (pd0 && Math.round((pd0 - ad) / 86400000) > DPAY_PROMISE_MAX_DAYS) return;
+      }
+      var t = ad ? ad.getTime() : 0, ix = +r._idx || 0;
+      var prev = LAST[cno];
+      if (!prev || t > prev.t || (t === prev.t && ix >= prev.ix)) LAST[cno] = { t:t, ix:ix, r:r, raw:raw };
+    });
+    /* 2) 그 최신 약속이 '오늘'이고, 아직 끝나지 않은 계약만
+          (진척사항이 완납·종료면 그 약속은 이미 종결 — 담당자가 대응할 것이 없다) */
+    var doneCnt = 0, done = [];
+    Object.keys(LAST).forEach(function(cno){
+      var e = LAST[cno], r = e.r;
+      var d = _parseAnyDateCell(e.raw); if (!d) return;
       d.setHours(0,0,0,0);
       if (d.getTime() !== today.getTime()) return;
-      var cno = _normCno(r.no != null ? r.no : r.cno);
-      var t = okpi_dtTime(raw);
-      var key = cno + '|' + t;
-      if (seen[key]) return; seen[key] = 1;
+      var pg = String(r.progress||'').trim();
+      var tt = okpi_dtTime(e.raw);
+      if (pg === '완납' || pg === '종료') {
+        doneCnt++;
+        done.push({ cno: cno, nm: String(r.tenant||r.nm||r.name||'').trim(), person: String(r.person||'').trim(),
+          time: tt, memo: String(r.content||'').trim(), pg: pg });
+        return;
+      }
+      var t = okpi_dtTime(e.raw);
       var dt = null;
       if (t) { dt = new Date(today.getTime()); dt.setHours(+t.slice(0,2), +t.slice(3,5), 0, 0); }
       out.push({ cno: cno, nm: String(r.tenant||r.nm||r.name||'').trim(), person: String(r.person||'').trim(),
-        time: t, dt: dt, memo: String(r.content||'').trim(), raw: raw });
+        time: t, dt: dt, memo: String(r.content||'').trim(), raw: e.raw });
     });
     out.sort(function(a,b){
       if (!a.dt && !b.dt) return String(a.cno).localeCompare(String(b.cno));
       if (!a.dt) return 1; if (!b.dt) return -1;
       return a.dt - b.dt;
     });
+    done.sort(function(a,b){
+      if (a.time && b.time) return a.time.localeCompare(b.time);
+      if (a.time) return -1; if (b.time) return 1;
+      return String(a.cno).localeCompare(String(b.cno));
+    });
+    out.doneToday = doneCnt;   /* [v579] 오늘 약속 중 이미 완납·종료 처리된 건수 */
+    out.doneList = done;       /* [v580] 접이식 목록용 */
   } catch(e){ console.warn('[v576] dpay_todayList', e); }
   return out;
 }
@@ -7782,21 +7831,25 @@ function dpay_renderCard(){
     : (perm === 'unsupported' || perm === 'denied')
       ? '<span title="브라우저 주소창 왼쪽 자물쇠 → 알림 허용으로 바꿔주세요" style="font-size:10.5px;font-weight:800;color:#94A3B8;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:9px;padding:3px 9px;cursor:help">🔕 알림 ' + (perm==='denied'?'차단됨':'미지원') + '</span>'
       : '<button onclick="dpay_askPerm()" style="font-size:10.5px;font-weight:800;color:#fff;background:#4F46E5;border:none;border-radius:9px;padding:4px 11px;cursor:pointer">🔔 알림 켜기</button>';
+  /* [v577] 계약 정보(이름·금액·연락처) — 대응 목록과 완납 접이식 양쪽에서 사용 */
+  var CTX = dpay_ctxMap();
+  var W = function(n){ return '₩' + Math.round(n||0).toLocaleString(); };
   var head = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">'
     + '<span style="font-size:13px;font-weight:800;color:#1A3A5C">⏰ 오늘 입금예정</span>'
     + '<span style="font-size:11px;color:#8A97A8">' + dpay_ymd(now) + ' · 대응내역 입금예정일 기준</span>'
     + '<span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center">' + onBtn + '</span></div>';
   if (!list.length) {
     return '<div class="dpay-card">' + head
-      + '<div style="padding:14px;text-align:center;color:#94A3B8;font-size:12px">오늘 잡힌 입금 약속이 없습니다.</div></div>';
+      + '<div style="padding:14px;text-align:center;color:#94A3B8;font-size:12px">'
+      + (list.doneToday ? '오늘 입금 약속 <b style="color:#047857">' + list.doneToday + '건이 모두 완납·종료 처리</b>되었습니다. 남은 대응 건이 없습니다.'
+                        : '오늘 잡힌 입금 약속이 없습니다.')
+      + '</div>' + dpay_doneBlock(list, CTX) + '</div>';
   }
   var nDone = 0, nSoon = 0, nWait = 0, nNone = 0;
-  /* [v577] 대응에 필요한 정보 — 계약 정보 · 약속 이행 이력 · 법적 절차를 한 번에 준비 */
-  var CTX = dpay_ctxMap();
+  /* [v577] 약속 이행 이력 · 법적 절차 */
   var _t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   var PRM = dpay_promiseMap(_t0);
   var LGL = dpay_legalMap();
-  var W = function(n){ return '₩' + Math.round(n||0).toLocaleString(); };
   var bdg = function(txt, bg, fg, tip){
     return '<span class="dpay-bdg" style="background:' + bg + ';color:' + fg + '"' + (tip?' title="'+tip+'"':'') + '>' + txt + '</span>';
   };
@@ -7894,8 +7947,31 @@ function dpay_renderCard(){
       + '<span class="dpay-mini-right"><span class="dpay-mini-open">▲ 목록 열기</span></span></div>';
   }
   return '<div class="dpay-card">' + head + sum + '<div class="dpay-list">' + body + '</div>'
-    + '<div style="font-size:10px;color:#94A3B8;margin-top:8px;padding-top:7px;border-top:1px solid #F1F5F9">빠른 메모의 <b>입금시간</b>에 시간을 넣으면 여기에 시간순으로 섭니다 · 1분마다 자동 갱신 · 알림은 약속 10분 전과 정각에 1회씩 · 스크롤을 내리면 위에 얇은 띠로 따라옵니다</div></div>'
+    + dpay_doneBlock(list, CTX)
+    + '<div style="font-size:10px;color:#94A3B8;margin-top:8px;padding-top:7px;border-top:1px solid #F1F5F9">계약별 <b>가장 최근에 잡힌 입금 약속</b>이 오늘이고 <b>아직 완납·종료되지 않은</b> 건만 올라옵니다 (약속이 다른 날로 바뀐 건, 진척사항이 완납·종료인 건은 제외) · 빠른 메모의 <b>입금시간</b>에 시간을 넣으면 시간순으로 섭니다 · 1분마다 자동 갱신 · 알림은 약속 10분 전과 정각에 1회씩</div></div>'
     + mini;
+}
+/* [v580] 오늘 완납·종료된 약속 — 목록 맨 아래 접이식 (기본 접힘) */
+function dpay_toggleDone(){ window._dpayDoneOpen = !window._dpayDoneOpen; dpay_refresh(); }
+function dpay_doneBlock(list, CTX){
+  var D = (list && list.doneList) || [];
+  if (!D.length) return '';
+  CTX = CTX || {};
+  var open = !!window._dpayDoneOpen;
+  var h = '<div class="dpay-fold' + (open?' on':'') + '" onclick="dpay_toggleDone()" title="오늘 입금 약속 중 진척사항이 완납·종료로 기록된 건입니다">'
+    + '<span>✅</span><span>오늘 완납·종료</span>'
+    + '<span class="cnt">' + D.length + '건</span>'
+    + '<span class="ar">' + (open ? '▴ 접기' : '▾ 펼쳐서 보기') + '</span></div>';
+  if (!open) return h;
+  h += '<div class="dpay-done">' + D.map(function(x){
+    var cq = String(x.cno).replace(/'/g, "\\'");
+    return '<div class="dpay-drow">'
+      + '<div class="dt">' + (x.time || '--:--') + '</div>'
+      + '<div class="dnm"><span style="color:#0E7490;cursor:pointer" onclick="crNavFromView(\'' + cq + '\',\'delinquency\')">' + x.cno + '</span> ' + (x.nm || (CTX[x.cno]||{}).nm || '—') + '</div>'
+      + '<div class="dmemo">' + (x.memo || '—') + (x.person ? ' · ' + x.person : '') + '</div>'
+      + '<span class="dok">' + x.pg + '</span></div>';
+  }).join('') + '</div>';
+  return h;
 }
 /* [v576] 띠 클릭 → 카드로 되돌아가기 */
 function dpay_scrollTop(){
