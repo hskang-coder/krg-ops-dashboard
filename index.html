@@ -768,6 +768,26 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-wrap { padding: 20px 16px 48px; max-width: 1500px; margin: 0 auto; }
 
 /* ── 연체율 섹션 ── */
+/* [v576] 오늘 입금예정 타임라인 + 빠른 메모 시간 입력 */
+.dpay-card { background:#fff; border:1px solid #E2EAF5; border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+.dpay-chip { display:inline-flex; align-items:center; border:1px solid; border-radius:9px; padding:3px 9px; font-size:10.5px; font-weight:800; }
+.dpay-list { display:flex; flex-direction:column; gap:5px; max-height:290px; overflow-y:auto; padding-right:2px; }
+.dpay-row { display:flex; align-items:center; gap:10px; border:1.5px solid; border-radius:9px; padding:6px 10px; }
+.dpay-t { font-size:14px; font-weight:900; font-variant-numeric:tabular-nums; min-width:52px; text-align:center; }
+/* [v576] 스크롤 시 축소 고정되는 얇은 띠 */
+.dpay-mini { position:fixed; z-index:240; display:none; align-items:center; gap:9px; height:40px; box-sizing:border-box;
+  background:#fff; border:1.5px solid #C7D2FE; border-radius:10px; box-shadow:0 5px 18px rgba(15,23,42,.14); padding:0 12px; cursor:pointer; }
+.dpay-mini.on { display:flex; }
+.dpay-mini:hover { border-color:#4F46E5; }
+.dpay-mini-t { font-size:14px; font-weight:900; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.dpay-mini-nm { font-size:12px; font-weight:800; color:#1A3A5C; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.dpay-mini-rel { font-size:11px; font-weight:700; color:#64748B; white-space:nowrap; }
+.dpay-mini-right { margin-left:auto; display:flex; gap:5px; align-items:center; white-space:nowrap; }
+.dpay-mini-open { font-size:10.5px; font-weight:800; color:#4F46E5; background:#EEF2FF; border-radius:8px; padding:3px 9px; }
+.dpay-mini-chip { font-size:10px; font-weight:800; border:1px solid; border-radius:8px; padding:2px 7px; }
+.dpay-soon { animation:dpayPulse 1.6s ease-in-out infinite; }
+@keyframes dpayPulse { 0%,100% { box-shadow:0 0 0 0 rgba(245,158,11,.45); } 50% { box-shadow:0 0 0 5px rgba(245,158,11,0); } }
+.okpi-fld-time { max-width:132px; }
 .dlq-rate-section {
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -7593,6 +7613,229 @@ function _parseAnyDateCell(cell) {
   return null;
 }
 
+// ══════════════════════════════════════════════════════════════
+// [v576] 오늘 입금예정 타임라인 + 리마인드 알림
+//   대응내역(gid=554798125) D열의 입금예정일이 '오늘'인 건을 시간순으로 세워두고,
+//   시간이 다가오면 색으로, 브라우저 알림을 켜두면 팝업으로 담당자에게 알려줌.
+//   · 시간이 없는 약속은 '시간 미지정'으로 맨 뒤에 모음
+//   · 알림은 약속 10분 전 1회 + 정각 1회. 발송 이력은 localStorage에 날짜별로 남겨 중복 방지
+// ══════════════════════════════════════════════════════════════
+function dpay_ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+/* 오늘 입금예정 목록 — [{cno,nm,person,time,dt,memo}] 시간 오름차순 (시간 없는 건은 뒤) */
+function dpay_todayList(){
+  var out = [];
+  try {
+    var R = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
+    var today = new Date(); today.setHours(0,0,0,0);
+    var seen = {};
+    R.forEach(function(r){
+      var raw = String(r.payDate||'').trim(); if (!raw) return;
+      var jt = String(r.jobType||'').trim();
+      if (jt && jt !== '수납관리' && jt !== '연체관리') return;   /* 입금 약속만 */
+      var d = _parseAnyDateCell(raw); if (!d) return;
+      d.setHours(0,0,0,0);
+      if (d.getTime() !== today.getTime()) return;
+      var cno = _normCno(r.no != null ? r.no : r.cno);
+      var t = okpi_dtTime(raw);
+      var key = cno + '|' + t;
+      if (seen[key]) return; seen[key] = 1;
+      var dt = null;
+      if (t) { dt = new Date(today.getTime()); dt.setHours(+t.slice(0,2), +t.slice(3,5), 0, 0); }
+      out.push({ cno: cno, nm: String(r.tenant||r.nm||r.name||'').trim(), person: String(r.person||'').trim(),
+        time: t, dt: dt, memo: String(r.content||'').trim(), raw: raw });
+    });
+    out.sort(function(a,b){
+      if (!a.dt && !b.dt) return String(a.cno).localeCompare(String(b.cno));
+      if (!a.dt) return 1; if (!b.dt) return -1;
+      return a.dt - b.dt;
+    });
+  } catch(e){ console.warn('[v576] dpay_todayList', e); }
+  return out;
+}
+/* 상태 — done(지남) / soon(30분 내) / wait(대기) / none(시간 미지정) */
+function dpay_state(it, now){
+  if (!it.dt) return 'none';
+  var diff = (it.dt - now) / 60000;
+  if (diff < 0) return 'done';
+  if (diff <= 30) return 'soon';
+  return 'wait';
+}
+function dpay_renderCard(){
+  var list = dpay_todayList();
+  var now = new Date();
+  var perm = (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported';
+  var onBtn = (perm === 'granted')
+    ? '<span style="font-size:10.5px;font-weight:800;color:#15803D;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:9px;padding:3px 9px">🔔 알림 켜짐</span>'
+    : (perm === 'unsupported' || perm === 'denied')
+      ? '<span title="브라우저 주소창 왼쪽 자물쇠 → 알림 허용으로 바꿔주세요" style="font-size:10.5px;font-weight:800;color:#94A3B8;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:9px;padding:3px 9px;cursor:help">🔕 알림 ' + (perm==='denied'?'차단됨':'미지원') + '</span>'
+      : '<button onclick="dpay_askPerm()" style="font-size:10.5px;font-weight:800;color:#fff;background:#4F46E5;border:none;border-radius:9px;padding:4px 11px;cursor:pointer">🔔 알림 켜기</button>';
+  var head = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">'
+    + '<span style="font-size:13px;font-weight:800;color:#1A3A5C">⏰ 오늘 입금예정</span>'
+    + '<span style="font-size:11px;color:#8A97A8">' + dpay_ymd(now) + ' · 대응내역 입금예정일 기준</span>'
+    + '<span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center">' + onBtn + '</span></div>';
+  if (!list.length) {
+    return '<div class="dpay-card">' + head
+      + '<div style="padding:14px;text-align:center;color:#94A3B8;font-size:12px">오늘 잡힌 입금 약속이 없습니다.</div></div>';
+  }
+  var nDone = 0, nSoon = 0, nWait = 0, nNone = 0;
+  var body = list.map(function(it){
+    var st = dpay_state(it, now);
+    if (st==='done') nDone++; else if (st==='soon') nSoon++; else if (st==='wait') nWait++; else nNone++;
+    var C = { done:{bg:'#FEF2F2',bd:'#FCA5A5',fg:'#B91C1C',tag:'시간 경과'},
+              soon:{bg:'#FFFBEB',bd:'#FCD34D',fg:'#B45309',tag:'곧 도래'},
+              wait:{bg:'#F8FAFC',bd:'#E2E8F0',fg:'#475569',tag:'대기'},
+              none:{bg:'#F8FAFC',bd:'#E2E8F0',fg:'#94A3B8',tag:'시간 미지정'} }[st];
+    var mins = it.dt ? Math.round((it.dt - now)/60000) : null;
+    var rel = (mins === null) ? ''
+      : (mins >= 0 ? ((mins >= 60 ? Math.floor(mins/60)+'시간 '+(mins%60)+'분' : mins+'분') + ' 남음')
+                   : ((-mins >= 60 ? Math.floor(-mins/60)+'시간 '+((-mins)%60)+'분' : (-mins)+'분') + ' 지남'));
+    return '<div class="dpay-row' + (st==='soon'?' dpay-soon':'') + '" style="background:' + C.bg + ';border-color:' + C.bd + '">'
+      + '<div class="dpay-t" style="color:' + C.fg + '">' + (it.time || '--:--') + '</div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:12px;font-weight:800;color:#1A3A5C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+      +     '<span style="color:#0E7490;cursor:pointer" onclick="crNavFromView(\'' + it.cno + '\',\'delinquency\')">' + it.cno + '</span> ' + (it.nm || '—')
+      +     (it.person ? ' <span style="font-size:10px;color:#94A3B8;font-weight:700">· ' + it.person + '</span>' : '')
+      +   '</div>'
+      +   '<div style="font-size:11px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (it.memo || '—') + '</div>'
+      + '</div>'
+      + '<div style="text-align:right;white-space:nowrap">'
+      +   '<div style="font-size:10px;font-weight:800;color:' + C.fg + '">' + C.tag + '</div>'
+      +   (rel ? '<div style="font-size:10px;color:#94A3B8;font-weight:700">' + rel + '</div>' : '')
+      + '</div></div>';
+  }).join('');
+  var chip = function(n, lb, bg, bd, fg){ return n ? '<span class="dpay-chip" style="background:'+bg+';border-color:'+bd+';color:'+fg+'">'+lb+' '+n+'</span>' : ''; };
+  var sum = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px">'
+    + chip(nSoon,'곧 도래','#FFFBEB','#FCD34D','#B45309')
+    + chip(nDone,'시간 경과','#FEF2F2','#FCA5A5','#B91C1C')
+    + chip(nWait,'대기','#F8FAFC','#E2E8F0','#475569')
+    + chip(nNone,'시간 미지정','#F8FAFC','#E2E8F0','#94A3B8')
+    + '</div>';
+  /* [v576] 스크롤로 카드가 화면을 벗어나면 대신 붙는 얇은 띠 — 다음 약속 1건 + 임박/경과 개수 */
+  var nx = null;
+  for (var i9=0;i9<list.length;i9++){ if (list[i9].dt && list[i9].dt >= now) { nx = list[i9]; break; } }
+  if (!nx) { for (var j9=list.length-1;j9>=0;j9--){ if (list[j9].dt) { nx = list[j9]; break; } } }
+  var mini;
+  if (nx) {
+    var nm2 = Math.round((nx.dt - now)/60000);
+    var up  = nm2 >= 0;
+    var rel2 = (Math.abs(nm2) >= 60 ? Math.floor(Math.abs(nm2)/60)+'시간 '+(Math.abs(nm2)%60)+'분' : Math.abs(nm2)+'분') + (up ? ' 남음' : ' 지남');
+    var col2 = up ? (nm2 <= 30 ? '#B45309' : '#1A3A5C') : '#B91C1C';
+    mini = '<div class="dpay-mini" id="dpayMini" onclick="dpay_scrollTop()" title="클릭하면 오늘 입금예정 목록으로 이동">'
+      + '<span style="font-size:13px">⏰</span>'
+      + '<span class="dpay-mini-t" style="color:' + col2 + '">' + (nx.time || '--:--') + '</span>'
+      + '<span class="dpay-mini-nm">' + nx.cno + ' ' + (nx.nm || '—') + (nx.person ? ' <span style="font-size:10px;color:#94A3B8;font-weight:700">· ' + nx.person + '</span>' : '') + '</span>'
+      + '<span class="dpay-mini-rel" style="color:' + col2 + '">' + rel2 + '</span>'
+      + '<span class="dpay-mini-right">'
+      +   (nSoon ? '<span class="dpay-mini-chip" style="background:#FFFBEB;border-color:#FCD34D;color:#B45309">곧 도래 ' + nSoon + '</span>' : '')
+      +   (nDone ? '<span class="dpay-mini-chip" style="background:#FEF2F2;border-color:#FCA5A5;color:#B91C1C">경과 ' + nDone + '</span>' : '')
+      +   '<span class="dpay-mini-open">▲ 목록 열기</span>'
+      + '</span></div>';
+  } else {
+    mini = '<div class="dpay-mini" id="dpayMini" onclick="dpay_scrollTop()">'
+      + '<span style="font-size:13px">⏰</span><span class="dpay-mini-nm">오늘 시간이 지정된 입금 약속 ' + (list.length?'없음 (시간 미지정 ' + nNone + '건)':'없음') + '</span>'
+      + '<span class="dpay-mini-right"><span class="dpay-mini-open">▲ 목록 열기</span></span></div>';
+  }
+  return '<div class="dpay-card">' + head + sum + '<div class="dpay-list">' + body + '</div>'
+    + '<div style="font-size:10px;color:#94A3B8;margin-top:8px;padding-top:7px;border-top:1px solid #F1F5F9">빠른 메모의 <b>입금시간</b>에 시간을 넣으면 여기에 시간순으로 섭니다 · 1분마다 자동 갱신 · 알림은 약속 10분 전과 정각에 1회씩 · 스크롤을 내리면 위에 얇은 띠로 따라옵니다</div></div>'
+    + mini;
+}
+/* [v576] 띠 클릭 → 카드로 되돌아가기 */
+function dpay_scrollTop(){
+  try {
+    var card = document.querySelector('#dpayTodayBox .dpay-card'); if (!card) return;
+    var hd = document.querySelector('.header');
+    var off = (hd ? hd.offsetHeight : 0) + 10;
+    var y = card.getBoundingClientRect().top + window.pageYOffset - off;
+    window.scrollTo({ top: Math.max(0, y), behavior:'smooth' });
+  } catch(_){}
+}
+/* [v576] 카드가 헤더 위로 사라지면 띠를 띄우고, 가로 위치·폭을 본문 컬럼에 맞춤 */
+function dpay_syncMini(){
+  try {
+    var box = document.getElementById('dpayTodayBox');
+    var mini = document.getElementById('dpayMini');
+    if (!box || !mini) return;
+    var card = box.querySelector('.dpay-card');
+    /* 뷰가 숨겨져 있으면(display:none) offsetParent가 null → 띠도 숨김 */
+    if (!card || card.offsetParent === null) { mini.classList.remove('on'); return; }
+    var hd = document.querySelector('.header');
+    var hdH = hd ? hd.offsetHeight : 0;
+    var r = card.getBoundingClientRect();
+    if (r.bottom >= hdH + 6) { mini.classList.remove('on'); return; }
+    var br = box.getBoundingClientRect();
+    mini.style.left = Math.round(br.left) + 'px';
+    mini.style.width = Math.round(br.width) + 'px';
+    mini.style.top = (hdH + 6) + 'px';
+    mini.classList.add('on');
+  } catch(_){}
+}
+function dpay_askPerm(){
+  try {
+    if (typeof Notification === 'undefined') return;
+    var p = Notification.requestPermission();
+    if (p && typeof p.then === 'function') p.then(function(){ dpay_refresh(); });
+    else setTimeout(dpay_refresh, 300);
+  } catch(e){ console.warn('[v576] 알림 권한', e); }
+}
+/* 알림 중복 방지 — 키: YYYY-MM-DD|계약번호|HH:MM|pre|due */
+function dpay_fired(key){
+  try {
+    var k = 'dpayFired:' + dpay_ymd(new Date());
+    var m = JSON.parse(localStorage.getItem(k) || '{}');
+    if (m[key]) return true;
+    m[key] = 1; localStorage.setItem(k, JSON.stringify(m));
+    return false;
+  } catch(_){
+    window.__dpayFired = window.__dpayFired || {};
+    if (window.__dpayFired[key]) return true;
+    window.__dpayFired[key] = 1; return false;
+  }
+}
+function dpay_checkAlarms(){
+  try {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    var now = new Date(), ymd = dpay_ymd(now);
+    dpay_todayList().forEach(function(it){
+      if (!it.dt) return;
+      var mins = Math.round((it.dt - now) / 60000);
+      var kind = (mins <= 10 && mins > 0) ? 'pre' : ((mins <= 0 && mins > -2) ? 'due' : '');
+      if (!kind) return;
+      var key = ymd + '|' + it.cno + '|' + it.time + '|' + kind;
+      if (dpay_fired(key)) return;
+      var title = (kind === 'pre') ? ('⏰ ' + mins + '분 뒤 입금예정 — ' + (it.nm||it.cno))
+                                   : ('🔔 입금예정 시간 — ' + (it.nm||it.cno));
+      var n = new Notification(title, {
+        body: it.time + ' · 계약 ' + it.cno + (it.person ? ' · 담당 ' + it.person : '') + (it.memo ? '\n' + it.memo : ''),
+        tag: 'dpay-' + it.cno + '-' + it.time + '-' + kind
+      });
+      n.onclick = function(){ try { window.focus(); crNavFromView(it.cno, 'delinquency'); n.close(); } catch(_){} };
+    });
+  } catch(e){ console.warn('[v576] 알람 체크', e); }
+}
+function dpay_refresh(){
+  try {
+    var host = document.getElementById('dpayTodayBox');
+    if (!host) return;
+    host.innerHTML = dpay_renderCard();
+    dpay_syncMini();
+  } catch(e){ console.warn('[v576] dpay_refresh', e); }
+}
+if (!window.__dpayScrollBound) {
+  window.__dpayScrollBound = 1;
+  window.addEventListener('scroll', function(){
+    if (window.__dpayRaf) return;
+    window.__dpayRaf = requestAnimationFrame(function(){ window.__dpayRaf = 0; dpay_syncMini(); });
+  }, { passive:true });
+  window.addEventListener('resize', dpay_syncMini);
+}
+/* 1분마다 카드 갱신 + 30초마다 알람 체크 */
+if (!window.__dpayTimer) {
+  window.__dpayTimer = setInterval(function(){
+    try { if (document.getElementById('dpayTodayBox')) dpay_refresh(); } catch(_){}
+  }, 60000);
+  window.__dpayAlarmTimer = setInterval(dpay_checkAlarms, 30000);
+}
+
 // gid=554798125 → 납부예정일 현황 (C열)
 function parseDailyForPayDate(resp, delinqRows) {
   // delinqRows: gid=1953907648에서 k=정상, bp=연체인 계약 목록
@@ -7693,11 +7936,12 @@ function parseDailyForPayDate(resp, delinqRows) {
     const dRaw  = entry ? (entry.payDateRaw || '') : '';
     const content = entry ? entry.content : '-';
     let dateStr = '-', payStatus = null;
+    const payTime = okpi_dtTime(dRaw);   /* [v576] D열에 시간이 함께 적혀 있으면 추출 */
     if (d) {
       d.setHours(0,0,0,0);
       const mm = String(d.getMonth()+1).padStart(2,'0');
       const dd = String(d.getDate()).padStart(2,'0');
-      dateStr = `${d.getFullYear()}.${mm}.${dd}`;
+      dateStr = `${d.getFullYear()}.${mm}.${dd}` + (payTime ? ` ${payTime}` : '');   /* [v576] */
       if (d.getTime() < todayTime)      { payStatus = 'past';   past++; }
       else if (d.getTime() === todayTime){ payStatus = 'today';  todayCount++; }
       else                               { payStatus = 'future'; future++; }
@@ -7719,7 +7963,7 @@ function parseDailyForPayDate(resp, delinqRows) {
       // [v278] 대응일 파싱 실패해도 원본 텍스트 표시 (─ 표시 방지)
       actionDateStr = aDateRaw;
     }
-    payDateMap[cno] = { dateStr, payStatus, content, actionDateStr };
+    payDateMap[cno] = { dateStr, payStatus, content, actionDateStr, payTime, payRaw: dRaw };   /* [v576] */
   });
   return { past, today: todayCount, future, payDateMap };
 }
@@ -8085,6 +8329,9 @@ function buildDlqUI(d1, d2, d3, d4) {
   inner.innerHTML = `
   <div class="dlq-wrap">
 
+    <!-- [v576] 오늘 입금예정 타임라인 (1분마다 자동 갱신) -->
+    <div id="dpayTodayBox"></div>
+
     <!-- 연체율 섹션 -->
     <div class="dlq-rate-section">
       <div class="dlq-rate-left">
@@ -8277,6 +8524,7 @@ function buildDlqUI(d1, d2, d3, d4) {
 
   </div>
   `;
+  try { dpay_refresh(); dpay_checkAlarms(); } catch(_v576){}   /* [v576] 오늘 입금예정 타임라인 */
 
   // 통합 테이블 행 데이터: d4.dlqCnoSet 전체 기준으로 구성 (계약중 연체자 전원 표시)
   const _dlqSet = (d4 && d4.dlqCnoSet) ? d4.dlqCnoSet : new Set();
@@ -22446,7 +22694,7 @@ function okpi_injectCss(){
     + '.okpi-ck-bar-fill{height:100%;background:#4F46E5;transition:width .3s}'
     + '.okpi-ck-bar-fill.good{background:#10B981}.okpi-ck-bar-fill.mid{background:#F59E0B}.okpi-ck-bar-fill.low{background:#EF4444}'
     + '.okpi-form-wrap{background:#fff;border:1.5px solid #E5E7EB;border-radius:8px;padding:10px 12px;margin-bottom:12px;position:relative}'
-    + '.okpi-form-row{display:grid;grid-template-columns:0.7fr 0.7fr 0.9fr 1.1fr 1.3fr 0.95fr 0.95fr 1.5fr 0.5fr;gap:6px;align-items:end}' /* [v221] 진척사항 컬럼 추가 (9컬럼) */
+    + '.okpi-form-row{display:grid;grid-template-columns:0.7fr 0.7fr 0.9fr 1.1fr 1.3fr 0.92fr 0.6fr 0.92fr 1.5fr 0.5fr;gap:6px;align-items:end}' /* [v221] 진척사항 · [v576] 시간 컬럼 추가 (10컬럼) */
     + '.okpi-fld{min-width:0;position:relative}'
     + '.okpi-fld label{display:block;font-size:9.5px;color:#6B7280;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + '.okpi-fld-input{width:100%;height:30px;padding:0 8px;border:1.5px solid #D1D5DB;border-radius:5px;font-size:11.5px;box-sizing:border-box;outline:none;background:#fff;font-family:inherit;color:#1F2937}'
@@ -23339,6 +23587,44 @@ function okpi_form_onCat2Change(){
   } catch(e){ console.warn('[okpi] cat2 change:', e); }
 }
 
+// ══════════════════════════════════════════════════════════════
+// [v576] 입금예정 '시간' — D열에 'YYYY-MM-DD HH:MM' 형태로 함께 저장
+//   · 시간은 선택 입력. 비우면 기존과 동일하게 날짜만 저장됨(기존 7,694건과 호환)
+//   · 대시보드 날짜 파서(_parseAnyDateCell)는 시간을 무시하고 날짜만 뽑으므로
+//     기존 연체표·경과일·납부약속 트래커는 전부 그대로 동작
+// ══════════════════════════════════════════════════════════════
+/* 'YYYY-MM-DD 14:30' / '2026년 8월 27일 14:30' → 'HH:MM' (없으면 '') */
+function okpi_dtTime(raw){
+  var m = String(raw==null?'':raw).match(/(\d{1,2}):(\d{2})/);
+  if (!m) return '';
+  var h = Math.min(23, parseInt(m[1],10)||0), mi = Math.min(59, parseInt(m[2],10)||0);
+  return String(h).padStart(2,'0') + ':' + String(mi).padStart(2,'0');
+}
+/* 시간까지 반영한 Date (시간 없으면 00:00) */
+function okpi_dtOf(raw){
+  var d = _parseAnyDateCell(raw); if (!d) return null;
+  var t = okpi_dtTime(raw);
+  if (t) d.setHours(+t.slice(0,2), +t.slice(3,5), 0, 0); else d.setHours(0,0,0,0);
+  return d;
+}
+/* 표시용 — 시간이 있으면 배지로 덧붙임 */
+function okpi_dtBadge(raw){
+  var t = okpi_dtTime(raw);
+  return t ? ' <span style="display:inline-block;background:#EEF2FF;color:#4338CA;border-radius:5px;padding:0 5px;font-size:10px;font-weight:800;margin-left:2px">' + t + '</span>' : '';
+}
+
+/* [v576] 시간 입력칸 라벨 — D열 라벨에 맞춰 전환 (칸은 항상 노출: 숨기면 그리드가 밀려 메모칸이 좁아짐) */
+function okpi_form_timeLabel(cat1){
+  var lbl = okpi_form_dueLabel(cat1);
+  return (lbl === '입금예정일') ? '입금시간' : (lbl === '실퇴실일') ? '퇴실시간' : '연락시간';
+}
+function okpi_form_syncTimeFld(cat1){
+  try {
+    var tl = document.getElementById('okpiF_dueTimeLabel');
+    if (tl) tl.textContent = okpi_form_timeLabel(cat1);
+  } catch(_){}
+}
+
 // D열 라벨 동적 변경
 function okpi_form_dueLabel(cat1){
   if (cat1 === '수납관리' || cat1 === '연체관리') return '입금예정일';
@@ -23364,6 +23650,7 @@ function okpi_form_onCat1Change(){
     if (sel2) sel2.innerHTML = okpi_form_cat2Options(c1);
     var lblD = document.getElementById('okpiF_dueLabel');
     if (lblD) lblD.textContent = okpi_form_dueLabel(c1);
+    okpi_form_syncTimeFld(c1);   /* [v576] 시간 입력 라벨 동기화 */
     var memoEl = document.getElementById('okpiF_memo');
     if (memoEl) memoEl.placeholder = okpi_form_memoPlaceholder(c1);
     // [v221] 진척사항 옵션 동적 갱신 · [v558] 2차 값 반영
@@ -23502,6 +23789,7 @@ function okpi_form_reset(keepContext){
       }
     } catch(_cx){}
     document.getElementById('okpiF_dueDate').value = '';
+    try { var _tt = document.getElementById('okpiF_dueTime'); if (_tt) _tt.value = ''; } catch(_t576){}   /* [v576] */
     document.getElementById('okpiF_memo').value = '';
     var info = document.getElementById('okpiF_info');
     if (info) { info.style.display = 'none'; info.innerHTML = ''; }
@@ -23530,6 +23818,12 @@ function okpi_form_submit(){
       }
     } catch(_sx){}
     var dueDate = document.getElementById('okpiF_dueDate').value;
+    /* [v576] 시간이 입력돼 있으면 'YYYY-MM-DD HH:MM'으로 합쳐 D열에 저장 (날짜 없으면 시간은 무시) */
+    try {
+      var _tEl = document.getElementById('okpiF_dueTime');
+      var _tVal = _tEl ? String(_tEl.value||'').trim() : '';
+      if (dueDate && _tVal && /^\d{1,2}:\d{2}$/.test(_tVal)) dueDate = dueDate + ' ' + _tVal;
+    } catch(_t576s){}
     var memo = document.getElementById('okpiF_memo').value;
     var dateInput = document.getElementById('okpiF_date').value;
 
@@ -23749,6 +24043,9 @@ function okpi_renderForm(){
     +     '</div>'
     +     '<div class="okpi-fld"><label id="okpiF_dueLabel">' + okpi_form_dueLabel(c1Default) + '</label>'
     +       '<input type="date" id="okpiF_dueDate" class="okpi-fld-input"></div>'
+    /* [v576] 입금예정 시간 — 선택 입력. 비우면 기존처럼 날짜만 저장 */
+    +     '<div class="okpi-fld okpi-fld-time" id="okpiF_dueTimeBox"><label id="okpiF_dueTimeLabel">' + okpi_form_timeLabel(c1Default) + '<span class="okpi-tag-new" style="background:#EEF2FF;color:#4338CA">선택</span></label>'
+    +       '<input type="time" id="okpiF_dueTime" class="okpi-fld-input" step="600" title="입금 약속 시간 — 비워두면 날짜만 저장됩니다"></div>'
     +     '<div class="okpi-fld"><label>진척사항<span class="okpi-tag-new">I</span></label>'
     +       '<select id="okpiF_progress" class="okpi-fld-input">' + okpi_form_progressOptions(c1Default) + '</select></div>'
     +     '<div class="okpi-fld"><label>메모<span class="okpi-tag-req">*</span></label>'
@@ -23809,7 +24106,7 @@ function crQF_render(no, tenantName){
       + '<div class="cr-qf-card">'
       +   '<div class="cr-qf-hd">⚡ 빠른 메모 입력 <span class="cr-qf-ctx">현재: ' + ctx + '</span><button type="button" class="crx-memo-toggle" onclick="document.getElementById(\'crQuickFormHost\').classList.toggle(\'collapsed\')">접기 / 펼치기</button></div>'
       +   '<div class="okpi-form-wrap">'
-      +     '<div class="okpi-form-row" style="grid-template-columns:0.7fr 0.7fr 0.9fr 1.1fr 0.95fr 0.95fr 1.5fr 0.5fr">' /* [v221] 진척사항 컬럼 추가 (8컬럼) */
+      +     '<div class="okpi-form-row" style="grid-template-columns:0.7fr 0.7fr 0.9fr 1.1fr 0.92fr 0.6fr 0.92fr 1.5fr 0.5fr">' /* [v221] 진척사항 · [v576] 시간 컬럼 추가 (9컬럼) */
       +       '<div class="okpi-fld"><label>일자<span class="okpi-tag-auto">자동</span></label>'
       +         '<input type="date" id="okpiF_date" value="' + todayStr + '" class="okpi-fld-input okpi-fld-auto"></div>'
       +       '<div class="okpi-fld"><label>담당자<span class="okpi-tag-req">*</span></label>'
@@ -23825,6 +24122,9 @@ function crQF_render(no, tenantName){
       +         '<select id="okpiF_cat2" class="okpi-fld-input" onchange="okpi_form_onCat2Change()">' + c2Opts + '</select></div>'
       +       '<div class="okpi-fld"><label id="okpiF_dueLabel">' + okpi_form_dueLabel(c1Default) + '</label>'
       +         '<input type="date" id="okpiF_dueDate" class="okpi-fld-input"></div>'
+      /* [v576] 입금예정 시간 */
+      +       '<div class="okpi-fld okpi-fld-time" id="okpiF_dueTimeBox"><label id="okpiF_dueTimeLabel">' + okpi_form_timeLabel(c1Default) + '<span class="okpi-tag-new" style="background:#EEF2FF;color:#4338CA">선택</span></label>'
+      +         '<input type="time" id="okpiF_dueTime" class="okpi-fld-input" step="600" title="입금 약속 시간 — 비워두면 날짜만 저장됩니다"></div>'
       +       '<div class="okpi-fld"><label>진척사항<span class="okpi-tag-new">I</span></label>'
       +         '<select id="okpiF_progress" class="okpi-fld-input">' + okpi_form_progressOptions(c1Default) + '</select></div>'
       +       '<div class="okpi-fld"><label>메모<span class="okpi-tag-req">*</span></label>'
