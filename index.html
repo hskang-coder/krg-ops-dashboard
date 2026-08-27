@@ -771,7 +771,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 /* [v576] 오늘 입금예정 타임라인 + 빠른 메모 시간 입력 */
 .dpay-card { background:#fff; border:1px solid #E2EAF5; border-radius:12px; padding:12px 14px; margin-bottom:12px; }
 .dpay-chip { display:inline-flex; align-items:center; border:1px solid; border-radius:9px; padding:3px 9px; font-size:10.5px; font-weight:800; }
-.dpay-list { display:flex; flex-direction:column; gap:5px; max-height:290px; overflow-y:auto; padding-right:2px; }
+.dpay-list { display:flex; flex-direction:column; gap:5px; max-height:340px; overflow-y:auto; padding-right:2px; }
 .dpay-row { display:flex; align-items:center; gap:10px; border:1.5px solid; border-radius:9px; padding:6px 10px; }
 .dpay-t { font-size:14px; font-weight:900; font-variant-numeric:tabular-nums; min-width:52px; text-align:center; }
 /* [v576] 스크롤 시 축소 고정되는 얇은 띠 */
@@ -786,6 +786,18 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dpay-mini-open { font-size:10.5px; font-weight:800; color:#4F46E5; background:#EEF2FF; border-radius:8px; padding:3px 9px; }
 .dpay-mini-chip { font-size:10px; font-weight:800; border:1px solid; border-radius:8px; padding:2px 7px; }
 .dpay-soon { animation:dpayPulse 1.6s ease-in-out infinite; }
+/* [v577] 대응에 필요한 정보 — 배지 · 금액 · 연락처 · 액션 버튼 */
+.dpay-bdg { display:inline-block; font-size:9.5px; font-weight:800; border-radius:6px; padding:1px 6px; margin-left:3px; vertical-align:1px; white-space:nowrap; }
+.dpay-amt { font-size:13px; font-weight:900; font-variant-numeric:tabular-nums; color:#B91C1C; white-space:nowrap; }
+.dpay-tel { font-size:11px; color:#0E7490; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.dpay-act { display:inline-flex; gap:3px; margin-top:3px; }
+.dpay-btn { font-size:10px; font-weight:800; border:1px solid #CBD5E1; background:#fff; border-radius:6px; padding:3px 7px; color:#475569; cursor:pointer; white-space:nowrap; font-family:inherit; }
+.dpay-btn:hover { border-color:#4F46E5; color:#4F46E5; }
+.dpay-btn.p { background:#4F46E5; border-color:#4F46E5; color:#fff; }
+.dpay-btn.p:hover { background:#4338CA; color:#fff; }
+.dpay-btn.g { background:#ECFDF5; border-color:#A7F3D0; color:#047857; }
+.dpay-btn.g:hover { background:#D1FAE5; color:#047857; }
+.dpay-col { text-align:right; white-space:nowrap; }
 @keyframes dpayPulse { 0%,100% { box-shadow:0 0 0 0 rgba(245,158,11,.45); } 50% { box-shadow:0 0 0 5px rgba(245,158,11,0); } }
 .okpi-fld-time { max-width:132px; }
 .dlq-rate-section {
@@ -7621,6 +7633,107 @@ function _parseAnyDateCell(cell) {
 //   · 알림은 약속 10분 전 1회 + 정각 1회. 발송 이력은 localStorage에 날짜별로 남겨 중복 방지
 // ══════════════════════════════════════════════════════════════
 function dpay_ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+/* [v577] 계약별 대응 정보 — 연체관리 표(_dlqTableRows) 우선, 없으면 계약 시트에서 보완 */
+function dpay_ctxMap(){
+  var M = {};
+  try {
+    (window._dlqTableRows||[]).forEach(function(r){
+      var k=_normCno(r.cno); if(!k) return;
+      M[k] = { nm:(r.nm&&r.nm!=='-')?r.nm:'', tel:(r.tel&&r.tel!=='-')?r.tel:'', amt:+r.amt||0,
+               days:+r.days||0, grade:(r.grade&&r.grade!=='-')?r.grade:'',
+               dtype:(r['연체구분']&&r['연체구분']!=='-')?r['연체구분']:'', cs:r.contractStatus||'' };
+    });
+    (Array.isArray(vacancyRawData)?vacancyRawData:[]).forEach(function(v){
+      var k=_normCno(v.no); if(!k) return;
+      var e = M[k] || (M[k]={nm:'',tel:'',amt:0,days:0,grade:'',dtype:'',cs:''});
+      if(!e.nm)  e.nm  = String(v.tenant1Name||v.tenantName||'').trim();
+      if(!e.tel) e.tel = String(v.tenantPhone||'').trim();
+      if(!e.cs)  e.cs  = (String(v.contractKind||'').indexOf('종료')>=0)?'종료':'계약중';
+    });
+  } catch(e){ console.warn('[v577] ctxMap', e); }
+  return M;
+}
+/* [v577] 약속 이행 이력 — 오늘 이전 입금 약속 횟수와 그중 미이행 건수
+   이행 판정: 약속일 -2일 ~ +3일 사이에 납부 기록(납부상태에 '납부' 포함)이 있으면 이행 */
+function dpay_promiseMap(todayT){
+  var PH = {}, PAY = {};
+  try {
+    (Array.isArray(paymentRawData)?paymentRawData:[]).forEach(function(x){
+      if(String(x['납부상태']||'').indexOf('납부')<0) return;
+      var d=_parseAnyDateCell(x['납부일']); if(!d) return;
+      var k=_normCno(x['계약번호']); if(!k) return;
+      d.setHours(0,0,0,0); (PAY[k]||(PAY[k]=[])).push(d.getTime());
+    });
+    var seen = {};
+    (typeof daeungRawData!=='undefined'&&Array.isArray(daeungRawData)?daeungRawData:[]).forEach(function(r){
+      var jt=String(r.jobType||'').trim();
+      if(jt && jt!=='수납관리' && jt!=='연체관리') return;
+      var d=_parseAnyDateCell(r.payDate); if(!d) return;
+      d.setHours(0,0,0,0);
+      if(d.getTime() >= todayT) return;            /* 오늘·미래 약속은 이력이 아님 */
+      var k=_normCno(r.no!=null?r.no:r.cno); if(!k) return;
+      var sk=k+'|'+d.getTime(); if(seen[sk]) return; seen[sk]=1;   /* 같은 날 중복 기록 1건으로 */
+      (PH[k]||(PH[k]=[])).push(d.getTime());
+    });
+  } catch(e){ console.warn('[v577] promiseMap', e); }
+  var OUT = {};
+  Object.keys(PH).forEach(function(k){
+    var ds=PH[k], pays=PAY[k]||[], miss=0;
+    ds.forEach(function(t){
+      var kept = pays.some(function(pt){ var g=Math.round((pt-t)/86400000); return g>=-2 && g<=3; });
+      if(!kept) miss++;
+    });
+    OUT[k] = { n:ds.length, miss:miss };
+  });
+  return OUT;
+}
+/* [v577] 진행 중인 법적 절차 — 대응내역 업무하위(F열) 최신값 */
+function dpay_legalMap(){
+  var M = {};
+  try {
+    (typeof daeungRawData!=='undefined'&&Array.isArray(daeungRawData)?daeungRawData:[]).forEach(function(r){
+      var sub=String(r.jobSub||'').trim();
+      if(!/내용증명|지급명령|보정명령|기타집행|기타조치|법적조치/.test(sub)) return;
+      var k=_normCno(r.no!=null?r.no:r.cno); if(!k) return;
+      var d=_parseAnyDateCell(r.date); var t=d?d.getTime():0;
+      if(!M[k] || t>=M[k].t) M[k]={t:t, sub:sub};
+    });
+  } catch(e){ console.warn('[v577] legalMap', e); }
+  return M;
+}
+/* [v577] 액션 — 전화 / 대응 리포트(독촉 문구) / 메모 기록 / 입금확인 */
+function dpay_call(tel, ev){
+  try { if(ev) ev.stopPropagation(); } catch(_){}
+  var t = String(tel||'').replace(/[^0-9+]/g,'');
+  if(!t){ alert('등록된 연락처가 없습니다.'); return; }
+  try { if(navigator.clipboard) navigator.clipboard.writeText(tel); } catch(_){}
+  try { window.location.href = 'tel:' + t; } catch(_){}
+}
+function dpay_dun(cno, ev){
+  try { if(ev) ev.stopPropagation(); } catch(_){}
+  if(typeof window._dpReport === 'function'){ window._dpReport(cno); return; }
+  alert('대응 리포트를 불러오지 못했습니다. 연체관리 표에서 확인해 주세요.');
+}
+function dpay_memo(cno, preset, ev){
+  try { if(ev) ev.stopPropagation(); } catch(_){}
+  window._dpayPreset = preset || null;   /* {cat1, progress} */
+  try { crNavFromView(cno, 'delinquency'); } catch(_){}
+  setTimeout(function(){
+    try {
+      var ps = window._dpayPreset; if(!ps) return;
+      var c1 = document.getElementById('okpiF_cat1');
+      if(c1 && ps.cat1){ c1.value = ps.cat1; okpi_form_onCat1Change(); }
+      var pr = document.getElementById('okpiF_progress');
+      if(pr && ps.progress){
+        var hit = Array.prototype.some.call(pr.options, function(o){ return o.value===ps.progress; });
+        if(hit) pr.value = ps.progress;
+      }
+      var focusId = ps.focus || 'okpiF_memo';
+      var el = document.getElementById(focusId); if(el) el.focus();
+      window._dpayPreset = null;
+    } catch(_){}
+  }, 700);
+}
 /* 오늘 입금예정 목록 — [{cno,nm,person,time,dt,memo}] 시간 오름차순 (시간 없는 건은 뒤) */
 function dpay_todayList(){
   var out = [];
@@ -7678,6 +7791,15 @@ function dpay_renderCard(){
       + '<div style="padding:14px;text-align:center;color:#94A3B8;font-size:12px">오늘 잡힌 입금 약속이 없습니다.</div></div>';
   }
   var nDone = 0, nSoon = 0, nWait = 0, nNone = 0;
+  /* [v577] 대응에 필요한 정보 — 계약 정보 · 약속 이행 이력 · 법적 절차를 한 번에 준비 */
+  var CTX = dpay_ctxMap();
+  var _t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  var PRM = dpay_promiseMap(_t0);
+  var LGL = dpay_legalMap();
+  var W = function(n){ return '₩' + Math.round(n||0).toLocaleString(); };
+  var bdg = function(txt, bg, fg, tip){
+    return '<span class="dpay-bdg" style="background:' + bg + ';color:' + fg + '"' + (tip?' title="'+tip+'"':'') + '>' + txt + '</span>';
+  };
   var body = list.map(function(it){
     var st = dpay_state(it, now);
     if (st==='done') nDone++; else if (st==='soon') nSoon++; else if (st==='wait') nWait++; else nNone++;
@@ -7689,18 +7811,53 @@ function dpay_renderCard(){
     var rel = (mins === null) ? ''
       : (mins >= 0 ? ((mins >= 60 ? Math.floor(mins/60)+'시간 '+(mins%60)+'분' : mins+'분') + ' 남음')
                    : ((-mins >= 60 ? Math.floor(-mins/60)+'시간 '+((-mins)%60)+'분' : (-mins)+'분') + ' 지남'));
+    var cx = CTX[it.cno] || {};
+    var nm = it.nm || cx.nm || '—';
+    var tel = cx.tel || '';
+    /* 배지 — 납부구분 · 등급 · 법적절차 · 약속 이행 이력 */
+    var bs = '';
+    if (cx.dtype) bs += bdg(cx.dtype, cx.dtype==='분납중'?'#EDE9FE':'#FEE2E2', cx.dtype==='분납중'?'#5B21B6':'#991B1B');
+    if (cx.grade) bs += bdg(cx.grade + '등급', '#F1F5F9', '#475569');
+    if (cx.cs === '종료') bs += bdg('계약종료', '#FEF3C7', '#92400E', '퇴실자 채권 — 보증보험·법적 절차 검토 대상');
+    var lg = LGL[it.cno];
+    if (lg) bs += bdg(lg.sub, '#FEF3C7', '#92400E', '이미 진행 중인 법적 절차입니다');
+    var ph = PRM[it.cno];
+    if (!ph) bs += bdg('첫 약속', '#ECFDF5', '#047857', '이 계약의 첫 입금 약속입니다');
+    else if (ph.miss > 0) bs += '<span class="dpay-bdg" title="약속일 기준 -2일~+3일 안에 납부 기록이 없으면 미이행으로 셉니다" style="background:#FEF2F2;border:1px solid #FCA5A5;color:#B91C1C">'
+      + (ph.n + 1) + '번째 약속 · 과거 ' + ph.miss + '회 미이행</span>';
+    else bs += bdg((ph.n + 1) + '번째 약속 · 지금까지 이행', '#ECFDF5', '#047857', '과거 약속을 모두 지킨 계약입니다');
+    /* 액션 버튼 */
+    var cq = String(it.cno).replace(/'/g, "\\'");
+    var tq = String(tel).replace(/'/g, "\\'");
+    var act = '<span class="dpay-act">'
+      + (tel ? '<button class="dpay-btn p" onclick="dpay_call(\'' + tq + '\',event)" title="클릭 시 전화 연결 · 번호가 클립보드에 복사됩니다">📞 전화</button>'
+             : '<button class="dpay-btn" disabled title="등록된 연락처가 없습니다" style="opacity:.45;cursor:not-allowed">📞 없음</button>')
+      + '<button class="dpay-btn" onclick="dpay_dun(\'' + cq + '\',event)" title="연체 대응 리포트 — 권장 액션과 독촉 문구">💬 독촉</button>'
+      + '<button class="dpay-btn" onclick="dpay_memo(\'' + cq + '\',{cat1:\'연체관리\'},event)" title="이 계약의 빠른 메모로 이동">✍️ 메모</button>'
+      + '<button class="dpay-btn g" onclick="dpay_memo(\'' + cq + '\',{cat1:\'연체관리\',progress:\'완납\'},event)" title="입금 확인 — 진척사항 완납으로 기록">✅ 입금</button>'
+      + '</span>';
     return '<div class="dpay-row' + (st==='soon'?' dpay-soon':'') + '" style="background:' + C.bg + ';border-color:' + C.bd + '">'
       + '<div class="dpay-t" style="color:' + C.fg + '">' + (it.time || '--:--') + '</div>'
       + '<div style="flex:1;min-width:0">'
       +   '<div style="font-size:12px;font-weight:800;color:#1A3A5C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
-      +     '<span style="color:#0E7490;cursor:pointer" onclick="crNavFromView(\'' + it.cno + '\',\'delinquency\')">' + it.cno + '</span> ' + (it.nm || '—')
-      +     (it.person ? ' <span style="font-size:10px;color:#94A3B8;font-weight:700">· ' + it.person + '</span>' : '')
+      +     '<span style="color:#0E7490;cursor:pointer" onclick="crNavFromView(\'' + cq + '\',\'delinquency\')">' + it.cno + '</span> ' + nm + bs
       +   '</div>'
-      +   '<div style="font-size:11px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (it.memo || '—') + '</div>'
+      +   '<div style="font-size:11px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (it.memo || '—')
+      +     (it.person ? ' <span style="color:#94A3B8;font-weight:700">· ' + it.person + '</span>' : '') + '</div>'
       + '</div>'
-      + '<div style="text-align:right;white-space:nowrap">'
+      + '<div class="dpay-col" style="min-width:112px">'
+      +   (cx.amt > 0 ? '<div class="dpay-amt">' + W(cx.amt) + '</div>' : '<div class="dpay-amt" style="color:#CBD5E1">—</div>')
+      +   '<div style="font-size:10px;color:#94A3B8;font-weight:700">' + (cx.days > 0 ? '연체 ' + cx.days + '일' : '연체일 —') + (cx.cs ? ' · ' + cx.cs : '') + '</div>'
+      + '</div>'
+      + '<div class="dpay-col" style="min-width:112px">'
+      +   (tel ? '<div class="dpay-tel">' + tel + '</div>' : '<div class="dpay-tel" style="color:#CBD5E1">연락처 없음</div>')
+      +   act
+      + '</div>'
+      + '<div class="dpay-col" style="min-width:76px">'
       +   '<div style="font-size:10px;font-weight:800;color:' + C.fg + '">' + C.tag + '</div>'
-      +   (rel ? '<div style="font-size:10px;color:#94A3B8;font-weight:700">' + rel + '</div>' : '')
+      +   (st === 'none'
+          ? '<div style="font-size:10px;color:#B45309;font-weight:800" title="통화 시 입금 시간을 받아 빠른 메모의 입금시간에 적어주세요">시간 확정 필요</div>'
+          : (rel ? '<div style="font-size:10px;color:#94A3B8;font-weight:700">' + rel + '</div>' : ''))
       + '</div></div>';
   }).join('');
   var chip = function(n, lb, bg, bd, fg){ return n ? '<span class="dpay-chip" style="background:'+bg+';border-color:'+bd+';color:'+fg+'">'+lb+' '+n+'</span>' : ''; };
@@ -7723,7 +7880,8 @@ function dpay_renderCard(){
     mini = '<div class="dpay-mini" id="dpayMini" onclick="dpay_scrollTop()" title="클릭하면 오늘 입금예정 목록으로 이동">'
       + '<span style="font-size:13px">⏰</span>'
       + '<span class="dpay-mini-t" style="color:' + col2 + '">' + (nx.time || '--:--') + '</span>'
-      + '<span class="dpay-mini-nm">' + nx.cno + ' ' + (nx.nm || '—') + (nx.person ? ' <span style="font-size:10px;color:#94A3B8;font-weight:700">· ' + nx.person + '</span>' : '') + '</span>'
+      + '<span class="dpay-mini-nm">' + nx.cno + ' ' + ((CTX[nx.cno]||{}).nm || nx.nm || '—') + (nx.person ? ' <span style="font-size:10px;color:#94A3B8;font-weight:700">· ' + nx.person + '</span>' : '') + '</span>'
+      + (((CTX[nx.cno]||{}).amt > 0) ? '<span class="dpay-amt" style="font-size:12px">' + W(CTX[nx.cno].amt) + '</span>' : '')
       + '<span class="dpay-mini-rel" style="color:' + col2 + '">' + rel2 + '</span>'
       + '<span class="dpay-mini-right">'
       +   (nSoon ? '<span class="dpay-mini-chip" style="background:#FFFBEB;border-color:#FCD34D;color:#B45309">곧 도래 ' + nSoon + '</span>' : '')
@@ -8524,7 +8682,6 @@ function buildDlqUI(d1, d2, d3, d4) {
 
   </div>
   `;
-  try { dpay_refresh(); dpay_checkAlarms(); } catch(_v576){}   /* [v576] 오늘 입금예정 타임라인 */
 
   // 통합 테이블 행 데이터: d4.dlqCnoSet 전체 기준으로 구성 (계약중 연체자 전원 표시)
   const _dlqSet = (d4 && d4.dlqCnoSet) ? d4.dlqCnoSet : new Set();
@@ -8580,6 +8737,8 @@ function buildDlqUI(d1, d2, d3, d4) {
     };
   }).filter(Boolean);
   window._dlqTableRows = [...activeRows, ...terminatedRows];
+  /* [v576] 오늘 입금예정 타임라인 · [v577] 계약정보(_dlqTableRows) 확정 후에 그려야 이름·금액·연락처가 붙는다 */
+  try { dpay_refresh(); dpay_checkAlarms(); } catch(_v576){}
   // 납부예정일 카드 인원 기본 필터(계약중) 기준으로 업데이트
   setTimeout(dlqUpdatePayCards, 50);
   window._dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all', contractStatus:'계약중', strategyFilter:'all' };
