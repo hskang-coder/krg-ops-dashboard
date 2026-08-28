@@ -837,6 +837,14 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dres-row .p { font-size:9.5px; font-weight:800; border-radius:6px; padding:1px 7px; background:#F1F5F9; color:#475569; white-space:nowrap; }
 .dres-row .w { font-size:9.5px; font-weight:800; border-radius:6px; padding:1px 7px; background:#FEF2F2; color:#B91C1C; white-space:nowrap; }
 .dres-none { padding:9px; text-align:center; color:#94A3B8; font-size:11px; }
+/* [v590] 계약자 / 종료자 구분 */
+.dres-who { display:inline-flex; border:1px solid #DCE6F2; border-radius:8px; overflow:hidden; }
+.dres-who button { font-size:10.5px; font-weight:800; color:#8A97A8; background:#fff; border:none; border-left:1px solid #EEF2F7; padding:4px 10px; cursor:pointer; font-family:inherit; }
+.dres-who button:first-child { border-left:none; }
+.dres-who button.on { background:#EEF3FA; color:#1A3A5C; }
+.dres-who button.on.e { background:#FFF7ED; color:#9A3412; }
+.dres-who button b { font-variant-numeric:tabular-nums; }
+.dres-row .e { font-size:9.5px; font-weight:800; border-radius:6px; padding:1px 6px; background:#FFF7ED; color:#9A3412; white-space:nowrap; }
 /* [v589] 전일 성적표 배지 */
 .dres-sc { display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-bottom:7px; padding:6px 8px; background:#fff; border:1px solid #E7EDF5; border-radius:9px; }
 .dres-sc .g { font-size:15px; font-weight:900; color:#fff; border-radius:8px; padding:2px 11px; letter-spacing:.5px; }
@@ -8128,6 +8136,34 @@ function dpay_dueSet(dayOffset){
     return S;
   } catch(e){ console.warn('[v586] dueSet', e); return null; }
 }
+/* [v590] 계약별 계약상태 — 입금내역 N열(계약상태)이 원본.
+   비어 있으면 수납 파싱분(incomeRawData) → 연체표·계약시트(ctxMap) 순으로 보완한다. */
+function dpay_csMap(){
+  var P = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData : [];
+  var C = window.__dpayCs;
+  if (C && C._n === P.length) return C;
+  var M = { _n:P.length };
+  try {
+    P.forEach(function(x){
+      var k = _normCno(x['계약번호']); if (!k || M[k]) return;
+      var v = String(x['계약상태']||'').trim(); if (v) M[k] = v;
+    });
+    (typeof incomeRawData !== 'undefined' && Array.isArray(incomeRawData) ? incomeRawData : []).forEach(function(r){
+      var k = _normCno(r.no != null ? r.no : r.cno); if (!k || M[k]) return;
+      var v = String(r.contractStatus||'').trim(); if (v) M[k] = v;
+    });
+    var CTX = dpay_ctxMap();
+    Object.keys(CTX).forEach(function(k){ if (!M[k] && CTX[k].cs) M[k] = CTX[k].cs; });
+  } catch(e){ console.warn('[v590] csMap', e); }
+  window.__dpayCs = M;
+  return M;
+}
+/* 종료자 = 계약상태가 계약중·입주예정이 아닌 계약 (종료 / 계약 철회 / 삭제) */
+function dpay_isEnded(cno){
+  var v = String(dpay_csMap()[cno] || '').trim();
+  if (!v) return false;
+  return v !== '계약중' && v !== '입주예정' && v !== '정상';
+}
 /* [v587] 법적 절차로 분류할 업무하위 */
 var DPAY_LAW_RE = /(법적\s*조치|내용증명|지급명령|보정명령|기타집행|강제집행|가압류|소송)/;
 var DPAY_RES_DEF = [
@@ -8144,8 +8180,11 @@ var DPAY_RES_EXT = [
   { k:'unrec', lb:'💸 미회수',    col:'#B91C1C', tip:'그날 입금 기록이 없고, 납기가 도래한 미납이 남아 있으며, 다음 약속도 잡히지 않은 건 (위 구분과 중복 집계)' }
 ];
 /* [v587] 그 날 '대응한' 수납·연체 계약을 결과별로 집계 — 대응일 기준 (약속일 기준인 아래 목록과 다름) */
-function dpay_resultFor(dayOffset){
-  var O = { total:0, gotCnt:0, blankPg:0, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], got:0, rest:0 };
+function dpay_resultFor(dayOffset, who){
+  who = who || '';
+  var CK = window.__dpayRes;
+  if (!CK || CK._d !== dpay_ymd(new Date())) CK = window.__dpayRes = { _d: dpay_ymd(new Date()) };
+  var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, who:who, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], got:0, rest:0 };
   try {
     var R = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
     var d0 = new Date(); d0.setHours(0,0,0,0);
@@ -8164,12 +8203,17 @@ function dpay_resultFor(dayOffset){
     });
     var AM = dpay_amtMap(dayOffset), DUE = dpay_dueSet(0) || {}, CTX = dpay_ctxMap();
     Object.keys(LAST).forEach(function(cno){
+      /* [v590] 계약자 / 종료자 구분 — 전체 인원수는 필터와 무관하게 세어 둔다 */
+      var ended = dpay_isEnded(cno);
+      if (ended) O.nEnd++; else O.nAct++;
+      if (who === 'a' && ended) return;
+      if (who === 'e' && !ended) return;
       var r = LAST[cno].r, pg = String(r.progress||'').trim();
       var nx = _parseAnyDateCell(r.payDate), nxs = nx ? dpay_ymd(nx) : '';
       var got = AM[cno] || 0, rest = DUE[cno] || 0;
       var it = { cno:cno, nm:String(r.tenant||r.nm||r.name||'').trim() || (CTX[cno]||{}).nm || '—',
                  person:String(r.person||'').trim(), pg:pg || '미기재', memo:String(r.content||'').trim(),
-                 next:nxs, got:got, rest:rest, sub:String(r.jobSub||'').trim() };
+                 next:nxs, got:got, rest:rest, ended:ended, sub:String(r.jobSub||'').trim() };
       O.total++; O.got += got; O.rest += rest;
       if (got > 0) O.gotCnt++;
       if (!pg) O.blankPg++;   /* [v589] 진척사항 기재 여부 — 그룹 분류와 별개로 센다 */
@@ -8189,22 +8233,27 @@ function dpay_resultFor(dayOffset){
 /* [v589] 하루 성적 — 약속 이행률(60%) · 대응 회수율(20%) · 기록 완성도(20%)
    이행률만으로는 미수신·법조치 대응이 안 보이고, 회수율만 보면 담당자가 통제할 수 없는 대상까지
    분모에 들어가 늘 낮게 나온다. 셋을 가중평균해 하루를 한 등급으로 요약한다. */
-function dpay_scoreFor(off){
+function dpay_scoreFor(off, who){
+  who = who || '';
   var C = window.__dpayScore;
   if (!C || C._d !== dpay_ymd(new Date())) C = window.__dpayScore = { _d: dpay_ymd(new Date()) };
-  var ck = 'k' + off;
+  var ck = 'k' + off + '|' + who;
   if (C[ck]) return C[ck];
   var S = { none:true, grade:'—', gk:'gX', score:null, r1:null, r2:0, r3:0, amt:0,
             nProm:0, nKept:0, nDl:0, nGot:0, unrec:0, unrecAmt:0, kept:[], broke:[] };
   try {
-    var O = dpay_resultFor(off), L = dpay_listFor(off), AM = dpay_amtMap(off), DUE = dpay_dueSet(0) || {};
+    var O = dpay_resultFor(off, who), L = dpay_listFor(off), AM = dpay_amtMap(off), DUE = dpay_dueSet(0) || {};
     var seen = {}, pk = [];
     [].concat(Array.prototype.slice.call(L), L.doneList || [], L.noDueList || []).forEach(function(x){
-      if (!x || !x.cno || seen[x.cno]) return; seen[x.cno] = 1; pk.push(x);
+      if (!x || !x.cno || seen[x.cno]) return; seen[x.cno] = 1;
+      var ended = dpay_isEnded(x.cno);
+      if (who === 'a' && ended) return;
+      if (who === 'e' && !ended) return;
+      pk.push(x);
     });
     pk.forEach(function(x){
       var it = { cno:x.cno, nm:x.nm || '—', person:x.person || '', pg:x.pg || '미기재',
-                 memo:x.memo || '', next:'', got:AM[x.cno] || 0, rest:DUE[x.cno] || 0 };
+                 memo:x.memo || '', next:'', got:AM[x.cno] || 0, rest:DUE[x.cno] || 0, ended:dpay_isEnded(x.cno) };
       (it.got > 0 ? S.kept : S.broke).push(it);
     });
     S.broke.sort(function(a,b){ return (b.rest - a.rest) || String(a.cno).localeCompare(String(b.cno)); });
@@ -8228,8 +8277,8 @@ function dpay_scoreFor(off){
   return S;
 }
 /* [v589] 전일 성적표 배지 */
-function dpay_scoreBar(off){
-  var S = dpay_scoreFor(off), Pv = dpay_scoreFor(off - 1);
+function dpay_scoreBar(off, who){
+  var S = dpay_scoreFor(off, who), Pv = dpay_scoreFor(off - 1, who);
   if (S.none) return '';
   var pick = window._dresPick || '';
   var arrow = function(cur, prev){
@@ -8252,11 +8301,15 @@ function dpay_scoreBar(off){
     + '</div>';
 }
 function dpay_resTab(v){ window._dresDay = v; window._dresPick = ''; dpay_refresh(); }
+/* [v590] 계약자 / 종료자 필터 — '' 전체 · 'a' 계약자 · 'e' 종료자 */
+function dpay_resWho(v){ window._dresWho = (window._dresWho === v) ? '' : v; window._dresPick = ''; dpay_refresh(); }
 function dpay_resPick(k){ window._dresPick = (window._dresPick === k) ? '' : k; dpay_refresh(); }
 /* [v587] 대응 결과 요약 블록 */
 function dpay_resBlock(){
   var off = (window._dresDay === 'y') ? -1 : 0;
-  var O = dpay_resultFor(off);
+  var who = window._dresWho || '';
+  var All = dpay_resultFor(off, '');
+  var O = who ? dpay_resultFor(off, who) : All;
   var pick = window._dresPick || '';
   var isY = (off === -1);
   var chip = function(d, arr, dim){
@@ -8272,11 +8325,18 @@ function dpay_resBlock(){
     +   '<button class="dres-tab' + (isY?'':' on') + '" onclick="dpay_resTab(\'t\')">오늘</button>'
     +   '<button class="dres-tab' + (isY?' on':'') + '" onclick="dpay_resTab(\'y\')">어제</button>'
     + '</span>'
-    + '<span class="dres-ttl">대응 결과 <b>' + O.total + '</b>건</span>'
+    + '<span class="dres-who">'
+    +   '<button class="' + (who===''?'on':'') + '" onclick="dpay_resWho(\'\')" title="계약중·종료를 모두 봅니다">전체 <b>' + All.total + '</b></button>'
+    +   '<button class="' + (who==='a'?'on':'') + '" onclick="dpay_resWho(\'a\')" title="계약상태가 계약중·입주예정인 계약만 — 진행 중인 임대차의 수납 대응입니다">👤 계약자 <b>' + All.nAct + '</b></button>'
+    +   '<button class="e ' + (who==='e'?'on':'') + '" onclick="dpay_resWho(\'e\')" title="계약상태가 종료·철회·삭제인 계약만 — 퇴실 정산금·잔여 채권 회수 대응입니다">🚪 종료자 <b>' + All.nEnd + '</b></button>'
+    + '</span>'
+    + '<span class="dres-ttl">대응 결과 <b>' + O.total + '</b>건'
+    +   (who ? '<span style="font-size:10px;color:#94A3B8;font-weight:800"> · ' + (who==='a'?'계약자':'종료자') + '만</span>' : '')
+    + '</span>'
     + '<span class="dres-sub">' + O.day + ' · 대응일 기준'
     +   (isY && O.got ? ' · 회수 ₩' + O.got.toLocaleString() : '')
     + '</span></div>'
-    + (isY ? dpay_scoreBar(off) : '')
+    + (isY ? dpay_scoreBar(off, who) : '')
     + '<div class="dres-chips">';
   DPAY_RES_DEF.forEach(function(d){ h += chip(d, O[d.k]); });
   h += '<span class="dres-div"></span>';
@@ -8289,7 +8349,7 @@ function dpay_resBlock(){
     h += chip(d, O[d.k]);
   });
   h += '</div>';
-  var PL = (pick === 'broke') ? (isY ? dpay_scoreFor(off).broke : []) : O[pick];
+  var PL = (pick === 'broke') ? (isY ? dpay_scoreFor(off, who).broke : []) : O[pick];
   if (pick && PL && PL.length) {
     h += '<div class="dres-list">' + PL.map(function(x){
       var cq = String(x.cno).replace(/'/g, "\\'");
@@ -8297,6 +8357,7 @@ function dpay_resBlock(){
       return '<div class="dres-row">'
         + '<span class="c" onclick="crNavFromView(\'' + cq + '\',\'delinquency\')">' + x.cno + '</span>'
         + '<span class="n">' + x.nm + '</span>'
+        + (!who && dpay_isEnded(x.cno) ? '<span class="e" title="계약상태 ' + (dpay_csMap()[x.cno]||'종료') + ' — 퇴실 정산금·잔여 채권 대응입니다">🚪 종료</span>' : '')
         + '<span class="m">' + (x.memo || '—') + (x.person ? ' · ' + x.person : '') + '</span>'
         + (x.next && x.next !== O.day ? '<span class="p" title="다음 입금예정일">→ ' + x.next + '</span>' : '')
         + (x.rest > 0 ? '<span class="a" title="납기가 도래한 미납 잔액">₩' + x.rest.toLocaleString() + '</span>' : '')
