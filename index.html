@@ -1875,6 +1875,71 @@ function switchView(view) {
 //   완료된 뒤의 재호출은 기존과 100% 동일하게 매번 새로 fetch (신선도·기존 동작 불변).
 //   초기 로딩 시 계약관리(Raw DATA)·입금내역(Raw DATA)이 2회씩 중복 호출되던 낭비 제거.
 window._sheetInflight = window._sheetInflight || {};
+/* ══════════════════════════════════════════════════════════════
+   [v595] gviz 공용 캐시 — window.fetch를 gviz 요청에 한해 감싼다.
+   측정: 입금내역 41.7MB/5.9s · 대응내역 4.7MB/4.6s · 계약 5.4MB · 연체 5.1MB.
+   탭 진입마다 같은 시트를 통째로 다시 받던 것이 체감 속도의 대부분이라,
+   호출부(fetch 헬퍼 6종)는 그대로 두고 그 아래층에서만:
+     · TTL 60초 메모리 캐시 — 같은 시트(gid/sheet/range 기준, _t 캐시버스터 무시)면 재다운로드 없이 즉시
+     · 동시 요청 합치기 — 여러 뷰가 같은 시트를 동시에 불러도 다운로드는 1회
+     · 쓰기 자동 무효화 — Apps Script(빠른 메모 저장 등) 요청이 나가면 캐시 전체 비움
+   끄기: 콘솔에서 window._gvizCacheOff = true (즉시 원래 동작 복귀)
+   TTL 조정: window._gvizTTL = 밀리초
+   ══════════════════════════════════════════════════════════════ */
+(function(){
+  if (window.__gvizWrapped) return;
+  window.__gvizWrapped = true;
+  var realFetch = window.fetch.bind(window);
+  var mem = {};      /* key → { t:저장시각, text, status, headers } */
+  var inflight = {}; /* key → Promise<{text,status}> */
+  function keyOf(u){
+    try {
+      var q = u.split('?');
+      var parts = (q[1] || '').split('&').filter(function(kv){ return kv.slice(0,3) !== '_t=' && kv.slice(0,2) !== '_='; });
+      parts.sort();
+      return q[0] + '?' + parts.join('&');
+    } catch(_e){ return u; }
+  }
+  function bust(reason){
+    var n = Object.keys(mem).length;
+    if (n) console.log('[v595] gviz 캐시 비움 (' + reason + ') — ' + n + '건');
+    mem = {};
+  }
+  window._gvizBust = bust;
+  window.fetch = function(input, init){
+    var url = (typeof input === 'string') ? input : (input && input.url) || '';
+    var method = ((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+    /* 쓰기(또는 Apps Script 호출)가 나가면 다음 조회는 시트를 새로 받는다 */
+    if (url.indexOf('script.google.com') >= 0 || (method !== 'GET' && url.indexOf('docs.google.com') >= 0)) {
+      bust('쓰기 감지');
+      return realFetch(input, init);
+    }
+    var isGviz = url.indexOf('docs.google.com') >= 0 && url.indexOf('/gviz/tq') >= 0 && method === 'GET';
+    if (!isGviz || window._gvizCacheOff) return realFetch(input, init);
+    var ttl = (typeof window._gvizTTL === 'number') ? window._gvizTTL : 60000;
+    var k = keyOf(url);
+    var hit = mem[k];
+    if (hit && (Date.now() - hit.t) < ttl) {
+      return Promise.resolve(new Response(hit.text, { status: hit.status || 200, headers: { 'Content-Type': 'text/plain' } }));
+    }
+    if (inflight[k]) {
+      return inflight[k].then(function(r){ return new Response(r.text, { status: r.status || 200, headers: { 'Content-Type': 'text/plain' } }); });
+    }
+    var t0 = Date.now();
+    var pr = realFetch(input, init).then(function(res){
+      return res.text().then(function(text){
+        var rec = { t: Date.now(), text: text, status: res.status };
+        if (res.ok && text && text.length > 50) mem[k] = rec;
+        console.log('[v595] gviz ' + (Math.round(text.length/104858)/10) + 'MB · ' + ((Date.now()-t0)/1000).toFixed(1) + 's — ' + (k.match(/gid=\d+|sheet=[^&]+/) || ['?'])[0]);
+        return rec;
+      });
+    });
+    inflight[k] = pr;
+    var clear = function(){ if (inflight[k] === pr) delete inflight[k]; };
+    pr.then(clear, clear);
+    return pr.then(function(r){ return new Response(r.text, { status: r.status || 200, headers: { 'Content-Type': 'text/plain' } }); });
+  };
+})();
 function _sheetFetchShared(fkey, doFetch){
   if (window._sheetInflight[fkey]) return window._sheetInflight[fkey];
   const p = doFetch();
