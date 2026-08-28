@@ -8184,7 +8184,7 @@ function dpay_resultFor(dayOffset, who){
   who = who || '';
   var CK = window.__dpayRes;
   if (!CK || CK._d !== dpay_ymd(new Date())) CK = window.__dpayRes = { _d: dpay_ymd(new Date()) };
-  var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, who:who, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], got:0, rest:0 };
+  var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, who:who, payReady:true, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], got:0, rest:0 };
   try {
     var R = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
     var d0 = new Date(); d0.setHours(0,0,0,0);
@@ -8201,7 +8201,9 @@ function dpay_resultFor(dayOffset, who){
       var ix = +r._idx || 0, prev = LAST[cno];
       if (!prev || ix >= prev.ix) LAST[cno] = { ix:ix, r:r };
     });
-    var AM = dpay_amtMap(dayOffset), DUE = dpay_dueSet(0) || {}, CTX = dpay_ctxMap();
+    var _DUE0 = dpay_dueSet(0);
+    O.payReady = _DUE0 !== null;   /* [v591] 입금내역 미로드면 미회수 판정 불가 */
+    var AM = dpay_amtMap(dayOffset), DUE = _DUE0 || {}, CTX = dpay_ctxMap();
     Object.keys(LAST).forEach(function(cno){
       /* [v590] 계약자 / 종료자 구분 — 전체 인원수는 필터와 무관하게 세어 둔다 */
       var ended = dpay_isEnded(cno);
@@ -8235,12 +8237,16 @@ function dpay_resultFor(dayOffset, who){
    분모에 들어가 늘 낮게 나온다. 셋을 가중평균해 하루를 한 등급으로 요약한다. */
 function dpay_scoreFor(off, who){
   who = who || '';
+  var _pn = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData.length : 0;
+  var _dn = (typeof daeungRawData  !== 'undefined' && Array.isArray(daeungRawData))  ? daeungRawData.length  : 0;
+  var _sig = dpay_ymd(new Date()) + '|' + _pn + '|' + _dn;   /* [v591] 시트가 뒤늦게 로드되면 캐시 무효화 */
   var C = window.__dpayScore;
-  if (!C || C._d !== dpay_ymd(new Date())) C = window.__dpayScore = { _d: dpay_ymd(new Date()) };
+  if (!C || C._d !== _sig) C = window.__dpayScore = { _d: _sig };
   var ck = 'k' + off + '|' + who;
   if (C[ck]) return C[ck];
-  var S = { none:true, grade:'—', gk:'gX', score:null, r1:null, r2:0, r3:0, amt:0,
+  var S = { none:true, payReady:true, grade:'—', gk:'gX', score:null, r1:null, r2:0, r3:0, amt:0,
             nProm:0, nKept:0, nDl:0, nGot:0, unrec:0, unrecAmt:0, kept:[], broke:[] };
+  S.payReady = _pn > 0;   /* [v591] 입금내역이 없으면 이행·회수·미회수를 판정할 수 없다 */
   try {
     var O = dpay_resultFor(off, who), L = dpay_listFor(off), AM = dpay_amtMap(off), DUE = dpay_dueSet(0) || {};
     var seen = {}, pk = [];
@@ -8280,6 +8286,12 @@ function dpay_scoreFor(off, who){
 function dpay_scoreBar(off, who){
   var S = dpay_scoreFor(off, who), Pv = dpay_scoreFor(off - 1, who);
   if (S.none) return '';
+  if (!S.payReady) {
+    /* [v591] 입금내역 로드 전 — 잘못된 0점을 보여주지 않는다. 로드가 끝나면 자동 갱신(1분 주기)으로 채워진다 */
+    return '<div class="dres-sc"><span class="g gX">—</span>'
+      + '<span class="s" style="color:#94A3B8">성적 집계 대기</span>'
+      + '<span class="lb">입금내역을 아직 불러오는 중입니다 — 잠시 후 자동으로 표시됩니다</span></div>';
+  }
   var pick = window._dresPick || '';
   var arrow = function(cur, prev){
     if (prev == null || cur == null || prev === cur) return '';
@@ -8341,8 +8353,10 @@ function dpay_resBlock(){
   DPAY_RES_DEF.forEach(function(d){ h += chip(d, O[d.k]); });
   h += '<span class="dres-div"></span>';
   DPAY_RES_EXT.forEach(function(d){
-    if (d.k === 'unrec' && !isY) {
-      h += '<span class="dres-chip z" title="오늘은 입금내역 반영이 진행 중이라 미회수를 판정할 수 없습니다. 어제 탭에서 확인하세요.">'
+    if (d.k === 'unrec' && (!isY || !O.payReady)) {
+      h += '<span class="dres-chip z" title="' + (!isY
+             ? '오늘은 입금내역 반영이 진행 중이라 미회수를 판정할 수 없습니다. 어제 탭에서 확인하세요.'
+             : '입금내역을 아직 불러오는 중이라 미회수를 판정할 수 없습니다. 잠시 후 자동으로 표시됩니다.') + '">'
          + d.lb + ' <b style="color:#CBD5E1">—</b></span>';
       return;
     }
