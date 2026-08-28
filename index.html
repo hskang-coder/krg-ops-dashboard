@@ -8011,8 +8011,7 @@ function dpay_renderCard(){
       + (list.doneToday ? '오늘 입금 약속 <b style="color:#047857">' + list.doneToday + '건이 모두 완납·종료 처리</b>되었습니다. 남은 대응 건이 없습니다.'
                         : (_n0.length ? '오늘 대응이 필요한 입금 약속이 없습니다. (받을 미납이 없는 ' + _n0.length + '건은 아래에 있습니다)'
                                       : '오늘 잡힌 입금 약속이 없습니다.'))
-      + '</div>' + dpay_noDueBlock(list, CTX) + dpay_doneBlock(list, CTX)
-      + dpay_doneBlock(dpay_listFor(-1), CTX, { kind:'y', label:'어제 완납·종료', showAmt:true, dayOffset:-1 }) + '</div>';
+      + '</div>' + dpay_noDueBlock(list, CTX) + dpay_doneBlock(list, CTX) + '</div>';   /* [v596] 어제 실적은 운영관리 > 연체 대응 결과로 이동 */
   }
   /* [v584] 약속자 / 분납자 / 완납자 — 오늘 약속한 사람을 결과별로 나눈 요약 */
   var _dl = list.doneList || [], _nd = list.noDueList || [];
@@ -8142,8 +8141,7 @@ function dpay_renderCard(){
   }
   return '<div class="dpay-card">' + head + kpi + sum + '<div class="dpay-list">' + body + '</div>'
     + dpay_noDueBlock(list, CTX)
-    + dpay_doneBlock(list, CTX)
-    + dpay_doneBlock(dpay_listFor(-1), CTX, { kind:'y', label:'어제 완납·종료', showAmt:true, dayOffset:-1 })
+    + dpay_doneBlock(list, CTX)   /* [v596] 어제 완납·종료 접이식 제거 — 운영관리 > 연체 대응 결과(기준일=어제)에서 확인 */
     + '<div style="font-size:10px;color:#94A3B8;margin-top:8px;padding-top:7px;border-top:1px solid #F1F5F9">계약별 <b>가장 최근에 잡힌 입금 약속</b>이 오늘이고 <b>아직 완납·종료되지 않은</b> 건만 올라옵니다 (약속이 다른 날로 바뀐 건, 진척사항이 완납·종료인 건, <b>입금내역에 받을 미납이 없는 건</b>은 제외) · 빠른 메모의 <b>입금시간</b>에 시간을 넣으면 시간순으로 섭니다 · 1분마다 자동 갱신 · 알림은 약속 10분 전과 정각에 1회씩</div></div>'
     + mini;
 }
