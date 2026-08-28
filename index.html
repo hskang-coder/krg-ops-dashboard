@@ -7935,7 +7935,7 @@ function dpay_renderCard(){
     var _p0 = _d0.filter(function(x){ return x.pg === '완납'; }).length;
     var _e0 = _d0.length - _p0;
     var _a0 = _d0.length + _n0.length;
-    var kpi0 = dpay_resBlock() + (_a0 ? ('<div class="dpay-kpi">'
+    var kpi0 = (_a0 ? ('<div class="dpay-kpi">'
       + '<span class="kv" title="오늘 입금 약속이 잡힌 계약 수 (약속일 기준)">👥 약속자 <b style="color:#1A3A5C">' + _a0 + '</b>명</span>'
       + '<span class="sep">·</span><span class="kv">✅ 완납자 <b style="color:#047857">' + _p0 + '</b>명</span>'
       + (_e0 ? '<span class="sep">·</span><span class="kv">📗 종료 <b style="color:#475569">' + _e0 + '</b>명</span>' : '')
@@ -7961,7 +7961,7 @@ function dpay_renderCard(){
     return '<span class="kv"' + (tip ? ' title="' + tip + '"' : '') + '>' + lb
       + ' <b style="color:' + col + '">' + n + '</b>명</span>';
   };
-  var kpi = dpay_resBlock() + '<div class="dpay-kpi">'
+  var kpi = '<div class="dpay-kpi">'
     + kv('👥 약속자', kAll, '#1A3A5C', '오늘 입금 약속이 잡힌 계약 수 (약속일 기준 — 위 대응 결과는 대응일 기준이라 수가 다릅니다)')
     + '<span class="sep">·</span>' + kv('💧 분납자', kSplit, '#5B21B6', '진척사항이 분납으로 기록된 건 — 일부만 받았고 잔액이 남아 있음')
     + '<span class="sep">·</span>' + kv('✅ 완납자', kPaid, '#047857', '진척사항이 완납으로 기록된 건')
@@ -8318,18 +8318,24 @@ function dpay_scoreBar(off, who){
     +   ' title="그날 입금이 없고 납기 도래 미납이 남았으며 다음 약속도 없는 건입니다">💸 미회수 ' + S.unrec + '명 <i>' + w(S.unrecAmt) + '</i></span>'
     + '</div>';
 }
-function dpay_resTab(v){ window._dresDay = v; window._dresPick = ''; dpay_refresh(); }
+/* [v594] 결과 블록은 운영관리로 이동 — #dresBox 안에서만 다시 그린다 */
+function dres_render(){
+  var box = document.getElementById('dresBox');
+  if (box) box.innerHTML = dpay_resBlock();
+  else dpay_refresh();   /* 안전망 */
+}
+function dpay_resTab(v){ window._dresOff = (v === 'y') ? -1 : 0; window._dresPick = ''; dres_render(); }
 /* [v590] 계약자 / 종료자 필터 — '' 전체 · 'a' 계약자 · 'e' 종료자 */
-function dpay_resWho(v){ window._dresWho = (window._dresWho === v) ? '' : v; window._dresPick = ''; dpay_refresh(); }
-function dpay_resPick(k){ window._dresPick = (window._dresPick === k) ? '' : k; dpay_refresh(); }
+function dpay_resWho(v){ window._dresWho = (window._dresWho === v) ? '' : v; window._dresPick = ''; dres_render(); }
+function dpay_resPick(k){ window._dresPick = (window._dresPick === k) ? '' : k; dres_render(); }
 /* [v587] 대응 결과 요약 블록 */
 function dpay_resBlock(){
-  var off = (window._dresDay === 'y') ? -1 : 0;
+  var off = (typeof window._dresOff === 'number') ? Math.min(0, window._dresOff) : 0;
   var who = window._dresWho || '';
   var All = dpay_resultFor(off, '');
   var O = who ? dpay_resultFor(off, who) : All;
   var pick = window._dresPick || '';
-  var isY = (off === -1);
+  var isY = (off < 0);   /* [v594] 지난 날짜면 금액·성적·미회수까지 확정치로 보여준다 */
   var chip = function(d, arr, dim){
     var n = arr.length;
     var on = (pick === d.k && n);
@@ -8338,10 +8344,11 @@ function dpay_resBlock(){
       + ' title="' + (d.tip + (n ? '\n클릭하면 명단이 열립니다.' : '')).replace(/"/g,'&quot;') + '">'
       + d.lb + ' <b style="color:' + (dim ? '#CBD5E1' : d.col) + '">' + n + '</b>명</span>';
   };
+  var _wd = ['일','월','화','수','목','금','토'];
+  var _dd = new Date(); _dd.setHours(0,0,0,0); _dd = new Date(_dd.getTime() + off * 86400000);
   var h = '<div class="dres"><div class="dres-top">'
     + '<span class="dres-tabs">'
-    +   '<button class="dres-tab' + (isY?'':' on') + '" onclick="dpay_resTab(\'t\')">오늘</button>'
-    +   '<button class="dres-tab' + (isY?' on':'') + '" onclick="dpay_resTab(\'y\')">어제</button>'
+    +   '<button class="dres-tab' + (off===0?' on':'') + '"' + (off===0?'':' onclick="dpay_resTab(\'t\')"') + '>' + O.day + ' (' + _wd[_dd.getDay()] + ')' + (off===0?' · 오늘':'') + '</button>'
     + '</span>'
     + '<span class="dres-who">'
     +   '<button class="' + (who===''?'on':'') + '" onclick="dpay_resWho(\'\')" title="계약중·종료를 모두 봅니다">전체 <b>' + All.total + '</b></button>'
@@ -8361,7 +8368,7 @@ function dpay_resBlock(){
   DPAY_RES_EXT.forEach(function(d){
     if (d.k === 'unrec' && (!isY || !O.payReady)) {
       h += '<span class="dres-chip z" title="' + (!isY
-             ? '오늘은 입금내역 반영이 진행 중이라 미회수를 판정할 수 없습니다. 어제 탭에서 확인하세요.'
+             ? '오늘은 입금내역 반영이 진행 중이라 미회수를 판정할 수 없습니다. 지난 날짜를 선택하면 확인할 수 있습니다.'
              : '입금내역을 아직 불러오는 중이라 미회수를 판정할 수 없습니다. 잠시 후 자동으로 표시됩니다.') + '">'
          + d.lb + ' <b style="color:#CBD5E1">—</b></span>';
       return;
@@ -8386,7 +8393,7 @@ function dpay_resBlock(){
         + '</div>';
     }).join('') + '</div>';
   }
-  if (!O.total) h += '<div class="dres-none">' + (isY ? '어제' : '오늘') + ' 기록된 수납·연체 대응이 없습니다.</div>';
+  if (!O.total) h += '<div class="dres-none">' + O.day + '에 기록된 수납·연체 대응이 없습니다.</div>';
   return h + '</div>';
 }
 /* [v580] 오늘 완납·종료된 약속 — 목록 맨 아래 접이식 (기본 접힘) */
@@ -8440,7 +8447,7 @@ function dpay_doneBlock(list, CTX, opt){
     + (showAmt
         ? '\n금액 = 입금내역의 납부일이 그 날짜인 청구의 실납부액(청구금액 − 미납액) 합계입니다.'
           + (nMiss ? ' ' + nMiss + '건은 입금내역에 그 날짜 납부 기록이 없어 합계에서 빠졌습니다.' : '')
-        : '\n금액은 표시하지 않습니다 — 오늘은 입금내역 반영이 진행 중이라 중간 합계가 실제와 다릅니다. 어제분은 아래에서 금액까지 확인하실 수 있습니다.');
+        : '\n금액은 표시하지 않습니다 — 오늘은 입금내역 반영이 진행 중이라 중간 합계가 실제와 다릅니다.');
   var h = '<div class="dpay-fold' + (open?' on':'') + (kind === 'y' ? ' y' : '') + '" onclick="dpay_toggleDone(\'' + kind + '\')" title="' + tip.replace(/"/g,'&quot;') + '">'
     + '<span>' + (kind === 'y' ? '📗' : '✅') + '</span><span>' + label + '</span>'
     + '<span class="cnt">' + D.length + '건' + (showAmt && tot ? ' · ₩' + tot.toLocaleString() : '') + '</span>'
@@ -23847,7 +23854,9 @@ function okpi_renderTopBar(k){
     +   '<button class="okpi-btn ' + pf('week') + '" onclick="okpi_setPeriod(\'week\')">주</button>'
     +   '<button class="okpi-btn ' + pf('month') + '" onclick="okpi_setPeriod(\'month\')">월</button>'
     +   '<span style="margin-left:12px;font-size:11px;color:#6B7280">기준일:</span>'
+    +   '<button class="okpi-btn" onclick="okpi_shiftDate(-1)" title="이전 ' + (window._okpi.period==='day'?'날':window._okpi.period==='week'?'주':'달') + '로 이동">◀</button>'
     +   '<input type="date" class="okpi-input" value="' + dateInput + '" onchange="okpi_setDate(this.value)">'
+    +   '<button class="okpi-btn" onclick="okpi_shiftDate(1)" title="다음 ' + (window._okpi.period==='day'?'날':window._okpi.period==='week'?'주':'달') + '로 이동">▶</button>'
     +   '<button class="okpi-btn" style="margin-left:8px" onclick="okpi_setDate(null)">오늘</button>'
     + '</div>'
     + '<div class="okpi-period-bar">'
@@ -24094,6 +24103,15 @@ function okpi_setDate(v){
     var parts = v.split('-');
     window._okpi.date = new Date(+parts[0], +parts[1]-1, +parts[2]);
   }
+  okpi_render();
+}
+/* [v594] 기준일 좌우 이동 — 기간 단위(일=1일, 주=7일, 월=1개월)만큼 */
+function okpi_shiftDate(dir){
+  var d = new Date(window._okpi.date || new Date()); d.setHours(0,0,0,0);
+  var pr = window._okpi.period || 'day';
+  if (pr === 'month') d.setMonth(d.getMonth() + dir);
+  else d.setDate(d.getDate() + (pr === 'week' ? 7 : 1) * dir);
+  window._okpi.date = d;
   okpi_render();
 }
 
@@ -25096,8 +25114,21 @@ async function okpi_render(){
     try{ var _cr=await okpi_fetchRaw('554798125'); _callRows=okpi_parseResp(_cr); }catch(_e){ console.warn('[okpi] 대응내역 fetch 실패:', _e); }   /* [v557] */
     var _callPeriod = (window._okpi&&window._okpi.period)||'day';
     var _callRange = okpi_getRange(_callPeriod, (window._okpi&&window._okpi.date)||new Date());
+    /* [v594] 연체 대응 결과 — 기준일을 따라간다 (주/월이면 기간 마지막 날, 미래는 오늘까지) */
+    try {
+      if ((!Array.isArray(paymentRawData) || !paymentRawData.length) && typeof gvizToObjects === 'function') {
+        var _pR = await okpi_fetchRaw('131074722');
+        paymentRawData = gvizToObjects(_pR).filter(function(x){ return _krNo(x); });
+        console.log('[v594] okpi 입금내역 로드:', paymentRawData.length, '건');
+      }
+    } catch(_pe){ console.warn('[v594] okpi 입금내역 로드 실패:', _pe); }
+    var _t0 = new Date(); _t0.setHours(0,0,0,0);
+    var _anchor = new Date(Math.min((_callPeriod === 'day' ? _callRange.start : _callRange.end).getTime(), _t0.getTime()));
+    window._dresOff = Math.round((_anchor.getTime() - _t0.getTime()) / 86400000);
     host.innerHTML = '<div class="okpi-wrap">'
       + okpi_renderTopBar(k)
+      + '<div class="okpi-section-title">📋 연체 대응 결과 <span class="pill">일자별 · 기준일 연동</span></div>'
+      + '<div id="dresBox">' + dpay_resBlock() + '</div>'
       + okpi_respSection(_callRows, _callRange, _callPeriod)   /* [v557] 담당자별 대응 KPI */
       + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
       + okpi_renderChart(k)
