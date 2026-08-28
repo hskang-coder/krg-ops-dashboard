@@ -7617,26 +7617,27 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
   //   ※ 이전: activeMap.days(모든 납부종류 max) → 임대료 days가 1~3이어도 변동관리비 days가 4+면 상위 버킷으로 누락
   //   ※ 현재: extDlqCnoSet의 각 cno별 contractDetails.days(임대료/연체중·분납중 max ad29) 기준
   let s1to3=0, s1to15=0, s1to30=0, sOver30=0;
+  let day1=0, day2=0, day3=0;   /* [v592] 1~3일 구간의 일수별 세부 */
   let activeDelinqAmt = 0;
   const typeBreakdown = {};
+  const bump = function(d){
+    if (d === 1) day1++; else if (d === 2) day2++; else if (d === 3) day3++;
+    if (d >= 1 && d <= 3)   s1to3++;
+    if (d >= 1 && d <= 15)  s1to15++;
+    if (d >= 1 && d <= 30)  s1to30++;
+    if (d > 30)             sOver30++;
+  };
   if (extDlqCnoSet) {
     extDlqCnoSet.forEach(function(cno){
       const det = contractDetails[cno] || { days:0, tipo:'기타' };
-      const d = det.days || 0;
-      if (d >= 1 && d <= 3)   s1to3++;
-      if (d >= 1 && d <= 15)  s1to15++;
-      if (d >= 1 && d <= 30)  s1to30++;
-      if (d > 30)             sOver30++;
+      bump(det.days || 0);
       const t = det.group || det.tipo || '기타';
       typeBreakdown[t] = (typeBreakdown[t] || 0) + 1;
     });
   } else {
     // 폴백: 이전 activeMap 방식
     Object.values(activeMap).forEach(v => {
-      if (v.days >= 1 && v.days <= 3)   s1to3++;
-      if (v.days >= 1 && v.days <= 15)  s1to15++;
-      if (v.days >= 1 && v.days <= 30)  s1to30++;
-      if (v.days > 30)                  sOver30++;
+      bump(v.days || 0);
       const t = v.tipo || '기타';
       typeBreakdown[t] = (typeBreakdown[t] || 0) + 1;
     });
@@ -7646,7 +7647,8 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
   let endedDelinqAmt = 0;
   Object.values(endedMap).forEach(v => { endedDelinqAmt += v.amt; });
   return {
-    segs: { s1to3, s1to15, s1to30, sOver30 },
+    segs: { s1to3, s1to15, s1to30, sOver30, day1, day2, day3,
+            s4to15: s1to15 - s1to3, s16to30: s1to30 - s1to15 },   /* [v592] 구간 세부 */
     contractDetails,
     typeBreakdown,
     activeDelinqAmt,
@@ -9077,18 +9079,21 @@ function buildDlqUI(d1, d2, d3, d4) {
         <div class="dlq-stat-label">1일 ~ 3일</div>
         <div class="dlq-stat-num">${d2.segs.s1to3}명</div>
         <div class="dlq-stat-sub">${totalContracts>0?(d2.segs.s1to3/totalContracts*100).toFixed(2):'0.00'}%</div>
+        <div class="dlq-stat-sub" style="font-size:10px;color:#64748B" title="연체일수별 세부 인원">1일 ${d2.segs.day1||0}명 · 2일 ${d2.segs.day2||0}명 · 3일 ${d2.segs.day3||0}명</div>
       </div>
       <div class="dlq-stat-card c-orange">
         <div class="dlq-stat-icon" style="color:#f97316">🟡</div>
         <div class="dlq-stat-label">15일 이하</div>
         <div class="dlq-stat-num">${d2.segs.s1to15}명</div>
         <div class="dlq-stat-sub">${totalContracts>0?(d2.segs.s1to15/totalContracts*100).toFixed(2):'0.00'}%</div>
+        <div class="dlq-stat-sub" style="font-size:10px;color:#64748B" title="누적(1~15일) 중 이 구간만의 인원">4일 ~ 15일 ${d2.segs.s4to15||0}명</div>
       </div>
       <div class="dlq-stat-card c-yellow">
         <div class="dlq-stat-icon" style="color:#eab308">🟠</div>
         <div class="dlq-stat-label">30일 이하</div>
         <div class="dlq-stat-num">${d2.segs.s1to30}명</div>
         <div class="dlq-stat-sub">${totalContracts>0?(d2.segs.s1to30/totalContracts*100).toFixed(2):'0.00'}%</div>
+        <div class="dlq-stat-sub" style="font-size:10px;color:#64748B" title="누적(1~30일) 중 이 구간만의 인원">16일 ~ 30일 ${d2.segs.s16to30||0}명</div>
       </div>
       <div class="dlq-stat-card c-dark">
         <div class="dlq-stat-icon" style="color:#dc2626">🔴</div>
