@@ -24475,8 +24475,8 @@ function okpi_form_cat2Options(cat1){
 // [v221] 진척사항 옵션 — 1차 카테고리별 (I열 저장)
 window._okpiProgress = {
   '계약(입주)관리': ['', '대응중', '종료', '협의중'],
-  '수납관리':       ['', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v578] 종료 추가 */
-  '연체관리':       ['', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v578] 종료 추가 */
+  '수납관리':       ['', '납부약속', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v578] 종료 추가 · [v599] 납부약속 직접 선택 */
+  '연체관리':       ['', '납부약속', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v578] 종료 추가 · [v599] 납부약속 직접 선택 */
   '갱신관리':       ['', '갱신희망', '묵시적갱신', '만기퇴실예정', '갱신거절', '조건부승인'],
   '중도퇴실관리':   ['', '실제퇴실완료(개문포함)', '임대인합의전(청소,보증금확인)', '임대인합의완료(계약해지)', '부동산컨설팅확정', '부동산컨설팅제외(만기퇴실)', '후임세입자입주확정'],   /* [v550.4] · [v553.1] 합의완료 추가 · [v566] 후임세입자입주확정 — 퇴실관리에선 컨설팅제외 그룹 소속 */
   '퇴실관리':       ['', '대응중', '종료', '협의중']   // [v547]
@@ -24743,20 +24743,28 @@ function okpi_form_submit(){
     var memo = document.getElementById('okpiF_memo').value;
     var dateInput = document.getElementById('okpiF_date').value;
 
-    if (!person || !cat1 || !memo || !memo.trim()) {
-      okpi_form_toast('담당자/업무구분/메모는 필수입니다', 'error');
-      // 비어있는 필수 필드 강조
-      ['okpiF_person','okpiF_cat1','okpiF_memo'].forEach(function(id){
+    /* [v599] 진척사항을 검증 전에 확정 — 수납·연체관리 + 입금예정일이면 '납부약속' 자동 채움 유지 */
+    var progEl = document.getElementById('okpiF_progress');
+    var progress = progEl ? (progEl.value || '') : '';
+    if (!progress && dueDate && (cat1 === '수납관리' || cat1 === '연체관리')) {
+      progress = '납부약속';
+    }
+    /* [v599] 2차·진척사항 필수 추가 */
+    if (!person || !cat1 || !cat2 || !progress || !memo || !memo.trim()) {
+      okpi_form_toast('담당자/1차/2차/진척사항/메모는 필수입니다'
+        + (!progress ? ' (수납·연체관리는 입금예정일을 넣으면 진척사항이 납부약속으로 자동 기록됩니다)' : ''), 'error');
+      // 비어있는 필수 필드 강조 — 자동 채움 반영된 실효값 기준
+      var _eff599 = { okpiF_person: person, okpiF_cat1: cat1, okpiF_cat2: cat2, okpiF_progress: progress, okpiF_memo: memo };
+      Object.keys(_eff599).forEach(function(id){
         var el = document.getElementById(id);
         if (!el) return;
-        var v = (el.value||'').trim();
-        if (!v) el.classList.add('okpi-fld-req');
+        if (!String(_eff599[id] == null ? '' : _eff599[id]).trim()) el.classList.add('okpi-fld-req');
         else el.classList.remove('okpi-fld-req');
       });
       return;
     }
     // 통과 시 강조 제거
-    ['okpiF_person','okpiF_cat1','okpiF_memo'].forEach(function(id){
+    ['okpiF_person','okpiF_cat1','okpiF_cat2','okpiF_progress','okpiF_memo'].forEach(function(id){
       var el = document.getElementById(id);
       if (el) el.classList.remove('okpi-fld-req');
     });
@@ -24790,13 +24798,7 @@ function okpi_form_submit(){
       }
     };
 
-    // [v221] 진척사항 (I열) — 폼에서 선택. 빈값이면 미입력
-    var progEl = document.getElementById('okpiF_progress');
-    var progress = progEl ? (progEl.value || '') : '';
-    // [v221] 납부약속 자동: dueDate가 입력되고 진척사항이 비어있고 cat1이 수납/연체관리면 '납부약속'으로 자동 설정
-    if (!progress && dueDate && (cat1 === '수납관리' || cat1 === '연체관리')) {
-      progress = '납부약속';
-    }
+    // [v221→v599] 진척사항(progress)은 검증 단계(위)에서 확정됨 — 납부약속 자동 포함
     // [v226] 진단 로그 — progress 값이 폼에서 정상 추출되는지 확인
     console.log('[v226] kpi_log 전송 — progress:', JSON.stringify(progress), 'progEl 존재:', !!progEl, 'progEl.value:', progEl ? JSON.stringify(progEl.value) : 'N/A');
     var params = new URLSearchParams({
@@ -24951,8 +24953,8 @@ function okpi_renderForm(){
     +         '<option value="" selected>— 선택 —</option>' /* [v314] 디폴트 빈값 */
     +         Object.keys(window._okpiCat).map(function(k){ return '<option' + (k===c1Default?' selected':'') + '>' + k + '</option>'; }).join('')
     +       '</select></div>'
-    +     '<div class="okpi-fld"><label>2차<span class="okpi-tag-new">F</span></label>'
-    +       '<select id="okpiF_cat2" class="okpi-fld-input" onchange="okpi_form_onCat2Change()">' + c2Opts + '</select></div>'
+    +     '<div class="okpi-fld"><label>2차<span class="okpi-tag-req">*</span></label>'
+    +       '<select id="okpiF_cat2" class="okpi-fld-input okpi-fld-required" onchange="okpi_form_onCat2Change()">' + c2Opts + '</select></div>'
     +     '<div class="okpi-fld okpi-fld-search"><label>검색</label>'
     +       '<input type="text" id="okpiF_search" class="okpi-fld-input okpi-fld-search-input" placeholder="이름2자/계약번호4자리" oninput="okpi_form_onSearchInput()" autocomplete="off">'
     +       '<div id="okpiF_acBox" class="okpi-ac-box" style="display:none"></div>'
@@ -24962,8 +24964,8 @@ function okpi_renderForm(){
     /* [v576] 입금예정 시간 — 선택 입력. 비우면 기존처럼 날짜만 저장 */
     +     '<div class="okpi-fld okpi-fld-time" id="okpiF_dueTimeBox"><label id="okpiF_dueTimeLabel">' + okpi_form_timeLabel(c1Default) + '<span class="okpi-tag-new" style="background:#EEF2FF;color:#4338CA">선택</span></label>'
     +       '<input type="time" id="okpiF_dueTime" class="okpi-fld-input" step="600" title="입금 약속 시간 — 비워두면 날짜만 저장됩니다"></div>'
-    +     '<div class="okpi-fld"><label>진척사항<span class="okpi-tag-new">I</span></label>'
-    +       '<select id="okpiF_progress" class="okpi-fld-input">' + okpi_form_progressOptions(c1Default) + '</select></div>'
+    +     '<div class="okpi-fld"><label>진척사항<span class="okpi-tag-req">*</span></label>'
+    +       '<select id="okpiF_progress" class="okpi-fld-input okpi-fld-required">' + okpi_form_progressOptions(c1Default) + '</select></div>'
     +     '<div class="okpi-fld"><label>메모<span class="okpi-tag-req">*</span></label>'
     +       '<input type="text" id="okpiF_memo" class="okpi-fld-input okpi-fld-required" placeholder="' + okpi_form_memoPlaceholder(c1Default) + '"></div>'
     +     '<button type="button" id="okpiF_submitBtn" class="okpi-form-submit" onclick="okpi_form_submit()">+ 기록</button>'
@@ -25034,15 +25036,15 @@ function crQF_render(no, tenantName){
       +           '<option value="" selected>— 선택 —</option>' /* [v314] 디폴트 빈값 */
       +           Object.keys(window._okpiCat).map(function(k){ return '<option' + (k===c1Default?' selected':'') + '>' + k + '</option>'; }).join('')
       +         '</select></div>'
-      +       '<div class="okpi-fld"><label>2차<span class="okpi-tag-new">F</span></label>'
-      +         '<select id="okpiF_cat2" class="okpi-fld-input" onchange="okpi_form_onCat2Change()">' + c2Opts + '</select></div>'
+      +       '<div class="okpi-fld"><label>2차<span class="okpi-tag-req">*</span></label>'
+      +         '<select id="okpiF_cat2" class="okpi-fld-input okpi-fld-required" onchange="okpi_form_onCat2Change()">' + c2Opts + '</select></div>'
       +       '<div class="okpi-fld"><label id="okpiF_dueLabel">' + okpi_form_dueLabel(c1Default) + '</label>'
       +         '<input type="date" id="okpiF_dueDate" class="okpi-fld-input"></div>'
       /* [v576] 입금예정 시간 */
       +       '<div class="okpi-fld okpi-fld-time" id="okpiF_dueTimeBox"><label id="okpiF_dueTimeLabel">' + okpi_form_timeLabel(c1Default) + '<span class="okpi-tag-new" style="background:#EEF2FF;color:#4338CA">선택</span></label>'
       +         '<input type="time" id="okpiF_dueTime" class="okpi-fld-input" step="600" title="입금 약속 시간 — 비워두면 날짜만 저장됩니다"></div>'
-      +       '<div class="okpi-fld"><label>진척사항<span class="okpi-tag-new">I</span></label>'
-      +         '<select id="okpiF_progress" class="okpi-fld-input">' + okpi_form_progressOptions(c1Default) + '</select></div>'
+      +       '<div class="okpi-fld"><label>진척사항<span class="okpi-tag-req">*</span></label>'
+      +         '<select id="okpiF_progress" class="okpi-fld-input okpi-fld-required">' + okpi_form_progressOptions(c1Default) + '</select></div>'
       +       '<div class="okpi-fld"><label>메모<span class="okpi-tag-req">*</span></label>'
       +         '<input type="text" id="okpiF_memo" class="okpi-fld-input okpi-fld-required" placeholder="' + okpi_form_memoPlaceholder(c1Default) + '"></div>'
       +       '<button type="button" id="okpiF_submitBtn" class="okpi-form-submit" onclick="okpi_form_submit()">+ 기록</button>'
