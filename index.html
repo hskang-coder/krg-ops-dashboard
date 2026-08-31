@@ -296,6 +296,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .pt-chip-first { background: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
 .pt-chip-active { background: #F5F3FF; color: #4F46E5; border: 1px solid #DDD6FE; }
 .pt-chip-mgmt  { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
+.pt-chip-revx  { background: #FDF2F8; color: #BE185D; border: 1px solid #FBCFE8; } /* [v598] 심사확대 */
 /* [v37] pt-table 컴팩트 + 컬럼별 폭 제어 */
 /* [v416] 가로 스크롤 없이 전 컬럼 표시 — 고정 레이아웃 + 컬럼 폭 지정 + 글자/여백 축소 */
 .pt-table { width: 100%; border-collapse: collapse; font-size: 10.5px; table-layout: fixed; }
@@ -5065,12 +5066,13 @@ function renderPaymentTargets() {
     return { r, contract, vacancy, payments, hasDelinq, isFirst, isActive, cat, phone, name };
   });
 
-  const counts = { 전체: categorized.length, 전월연체:0, 첫납부:0, 계약중:0, 수납관리대상:0 };
+  const counts = { 전체: categorized.length, 전월연체:0, 첫납부:0, 계약중:0, 수납관리대상:0, 심사확대:0 }; // [v598]
   let delinqNormal=0, delinqOther=0, firstNormal=0, firstOther=0;
   categorized.forEach(x => {
     if (counts[x.cat] !== undefined) counts[x.cat]++;
     const ps = String(x.r.payStatus || '');
     if ((x.cat === '전월연체' || x.cat === '첫납부') && !ps.includes('정상납부')) counts['수납관리대상']++;
+    if (ptRevX(x.vacancy)) counts['심사확대']++; // [v598]
     if (x.cat === '전월연체') { ps.includes('정상납부') ? delinqNormal++ : delinqOther++; }
     if (x.cat === '첫납부')   { ps.includes('정상납부') ? firstNormal++  : firstOther++;  }
   });
@@ -5082,7 +5084,9 @@ function renderPaymentTargets() {
       ? categorized.filter(x =>
           (x.cat === '전월연체' || x.cat === '첫납부') &&
           !String(x.r.payStatus || '').includes('정상납부'))
-      : categorized.filter(x => x.cat === ptFilter.category);
+      : ptFilter.category === '심사확대'
+        ? categorized.filter(x => !!ptRevX(x.vacancy)) /* [v598] */
+        : categorized.filter(x => x.cat === ptFilter.category);
 
   // ── 요약 패널 헬퍼 ──
   const mkBar = (cnt, totalN, color) => {
@@ -5103,6 +5107,7 @@ function renderPaymentTargets() {
     { key:'전월연체',  cls:'pt-chip-delinq', label:`전월연체 ${counts['전월연체']}건` },
     { key:'첫납부',   cls:'pt-chip-first',  label:`첫납부 ${counts['첫납부']}건` },
     { key:'계약중',   cls:'pt-chip-active', label:`계약중 ${counts['계약중']}건` },
+    { key:'심사확대', cls:'pt-chip-revx',   label:`🔍 심사확대 ${counts['심사확대']}건` }, // [v598]
   ];
   const chips = chipDefs.map(c =>
     `<span class="pt-summary-chip ${c.cls}${ptFilter.category===c.key?' active':''}"
@@ -5153,8 +5158,9 @@ function renderPaymentTargets() {
                 <td class="pt-td-content" style="font-size:11px;color:#374151" title="${content.replace(/"/g,'&quot;')}">${shortC}</td>`;
       })()}
       <td>${tagHtml(x)}</td>
+      <td style="text-align:center">${ptRevXBadge(x.vacancy)}</td>${''/* [v598] 심사확대대상 */}
     </tr>`;
-  }).join('') || '<tr><td colspan="13" style="text-align:center;color:#8A97A8;padding:22px;line-height:1.6"><b>선택 기간에 납기 도래(청구서 생성) 건이 없습니다.</b><br><span style="font-size:11px;color:#B0BDCE">이 표는 입금내역 시트에 <b>실제 생성된 청구서</b>의 납기일만 집계합니다. 해당 일자의 청구서가 아직 생성되지 않았을 수 있습니다. (정기 납기일 기준 예상 인원은 연체관리 &gt; 일자별 추이의 \'납부대상\' 차트에서 확인)</span></td></tr>';
+  }).join('') || '<tr><td colspan="15" style="text-align:center;color:#8A97A8;padding:22px;line-height:1.6"><b>선택 기간에 납기 도래(청구서 생성) 건이 없습니다.</b><br><span style="font-size:11px;color:#B0BDCE">이 표는 입금내역 시트에 <b>실제 생성된 청구서</b>의 납기일만 집계합니다. 해당 일자의 청구서가 아직 생성되지 않았을 수 있습니다. (정기 납기일 기준 예상 인원은 연체관리 &gt; 일자별 추이의 \'납부대상\' 차트에서 확인)</span></td></tr>';
 
   window._ptDisplayRows = display.map(x => {
     const { r, vacancy } = x;
@@ -5180,7 +5186,8 @@ function renderPaymentTargets() {
       '납기일': r.dueDate || '—',
       '최근 대응일': dm.latestDateStr || '—',
       '최근 대응내용': dm.latestContent || '—',
-      '수납 대상': tagLabel
+      '수납 대상': tagLabel,
+      '심사확대대상': (() => { const xx = ptRevX(x.vacancy); return xx ? xx.kind + ' · ' + xx.raw : '—'; })() // [v598]
     };
   });
 
@@ -5239,7 +5246,7 @@ function renderPaymentTargets() {
       <div style="padding:10px 20px 4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${chips}<button onclick="ptGenFirstSms()" style="margin-left:auto;background:#0EA5E9;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📩 첫납부문자</button><button onclick="ptGenDelinqSms()" style="background:#DC2626;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📩 전월연체문자</button><button onclick="downloadPtExcel()" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ 엑셀 다운로드</button></div>
       <div style="padding:4px 20px 8px;font-size:11px;color:#94A3B8">표시 ${display.length}건</div>
       <div style="overflow-x:auto"><table class="pt-table">
-        <colgroup><col style="width:3%"><col style="width:6%"><col style="width:9%"><col style="width:8%"><col style="width:5%"><col style="width:5%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:18%"><col style="width:6%"></colgroup>
+        <colgroup><col style="width:3%"><col style="width:6%"><col style="width:9%"><col style="width:8%"><col style="width:5%"><col style="width:5%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:13%"><col style="width:6%"><col style="width:5%"></colgroup>
         <thead><tr>
           <th style="width:30px;text-align:center"><input type="checkbox" onchange="ptSelectAll(this.checked)" title="전체 선택"></th>
           <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">계약번호<span class="pt-sort-arrow"></span></th>
@@ -5255,6 +5262,7 @@ function renderPaymentTargets() {
           <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">최근 대응일<span class="pt-sort-arrow"></span></th>
           <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">최근 대응내용<span class="pt-sort-arrow"></span></th>
           <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">수납 대상<span class="pt-sort-arrow"></span></th>
+          <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="계약시트 R열(계약심사) — 거절 포함 전부 + 승인(금액초과)">심사확대대상<span class="pt-sort-arrow"></span></th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
@@ -5267,6 +5275,25 @@ function parseKorDate(str) {
   const m = str.match(/(\d{4})[.\-\/\s]+(\d{1,2})[.\-\/\s]+(\d{1,2})/);
   if (m) return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
   return null;
+}
+
+/* [v598] 심사확대대상 판정 — 계약시트 R열(계약심사) 기반.
+   '거절'이 포함된 모든 값(조합형 승인+거절(실거주대체) 포함) → 거절,
+   '승인'이면서 '금액초과' 포함 → 승인. 그 외(-, 공란, 일반 승인 등)는 대상 아님. */
+function ptRevX(vac){
+  var rv = String((vac && vac.reviewResult) == null ? '' : vac.reviewResult).trim();
+  if (!rv || rv === '-' || rv === '—') return null;
+  if (rv.indexOf('거절') >= 0) return { kind:'거절', raw:rv };
+  if (rv.indexOf('승인') >= 0 && rv.indexOf('금액초과') >= 0) return { kind:'승인', raw:rv };
+  return null;
+}
+function ptRevXBadge(vac){
+  var x = ptRevX(vac);
+  if (!x) return '—';
+  var C = x.kind === '거절'
+    ? ['#FEF2F2','#FECACA','#B91C1C']
+    : ['#FFF7ED','#FED7AA','#C2410C'];
+  return '<span class="pt-tag" style="background:' + C[0] + ';border:1px solid ' + C[1] + ';color:' + C[2] + ';cursor:help" title="계약심사: ' + x.raw.replace(/"/g,'&quot;') + '">' + x.kind + '</span>';
 }
 
 // [v415] 수납관리 표 헤더 클릭 정렬 — 렌더된 행을 직접 정렬(숫자·날짜·텍스트 자동 인식, 빈값(—)은 항상 아래)
