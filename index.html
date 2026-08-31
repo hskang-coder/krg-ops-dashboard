@@ -3069,7 +3069,7 @@ function buildRespSummary(responses){
 function _respIsLegal(r){
   if(String(r.jobType||'').trim()!=='연체관리')return false;
   var n=String(r.jobSub||'').replace(/\s/g,'');
-  return n.indexOf('법적조치검토')>=0||n.indexOf('내용증명발송')>=0||n.indexOf('지급명령')>=0||n.indexOf('보정명령')>=0||n.indexOf('기타집행')>=0||n.indexOf('기타조치')>=0;
+  return n.indexOf('법적조치검토')>=0||n.indexOf('내용증명발송')>=0||n.indexOf('지급명령')>=0||n.indexOf('보정명령')>=0||n.indexOf('기타집행')>=0||n.indexOf('기타조치')>=0;   /* [v600] 지급명령 도달·확정은 '지급명령' 키워드로 커버 */
 }
 function buildJobFilterBar(responses) {
   const sel = window._respJobFilter || '전체';
@@ -4770,7 +4770,7 @@ function downloadDlqLegalExcel(){
   var rows = window._dlqLegalExportRows || [];
   if (!rows.length) { alert('다운로드할 데이터가 없습니다.'); return; }
   if (typeof XLSX === 'undefined') { alert('라이브러리 로딩 중입니다. 잠시 후 다시 시도해 주세요.'); return; }
-  var mNae=function(s){return s.indexOf('내용증명발송')>=0;}, mJi=function(s){return s.indexOf('지급명령')>=0;}, mBo=function(s){return s.indexOf('보정명령')>=0;}, mEtc=function(s){return s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0;}, mAll=function(s){return s.indexOf('내용증명발송')>=0||s.indexOf('지급명령')>=0||s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0||s.indexOf('보정명령')>=0;};
+  var mNae=function(s){return s.indexOf('내용증명발송')>=0;}, mJi=function(s){return s.indexOf('지급명령')>=0&&s.indexOf('지급명령도달')<0&&s.indexOf('지급명령확정')<0;}, mBo=function(s){return s.indexOf('보정명령')>=0;}, mEtc=function(s){return s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0;}, mDo=function(s){return s.indexOf('지급명령도달')>=0;}, mHw=function(s){return s.indexOf('지급명령확정')>=0;}, mAll=function(s){return s.indexOf('내용증명발송')>=0||s.indexOf('지급명령')>=0||s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0||s.indexOf('보정명령')>=0;};   /* [v600] */
   var dt=function(rec){return rec?(_dlqDt(rec.date)||'기재'):'';};
   var data = rows.map(function(r){
     var cno=String(r.cno||'').trim();
@@ -4781,11 +4781,12 @@ function downloadDlqLegalExcel(){
       '임(전)차인':r.nm||'-', '연락처':r.tel||'-', '연체금액':r.amt||0, '위약금':_dlqPenalty(cno)||0, '점수':_dlqScore(cno)||'',
       '내용증명':dt(_dlqLegalLatest(cno,mNae)), '지급명령':dt(_dlqLegalLatest(cno,mJi)),
       '보정명령':dt(_dlqLegalLatest(cno,mBo)), '기타집행':dt(_dlqLegalLatest(cno,mEtc)),
+      '도달':dt(_dlqLegalLatest(cno,mDo)), '확정':dt(_dlqLegalLatest(cno,mHw)),   /* [v600] */
       '진척사항':prog?(prog.content||prog.progress||''):''
     };
   });
   var ws = XLSX.utils.json_to_sheet(data);
-  ws['!cols']=[{wch:9},{wch:8},{wch:11},{wch:8},{wch:9},{wch:13},{wch:14},{wch:12},{wch:12},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:40}];
+  ws['!cols']=[{wch:9},{wch:8},{wch:11},{wch:8},{wch:9},{wch:13},{wch:14},{wch:12},{wch:12},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:40}];   /* [v600] 도달·확정 */
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '법무진척');
   var today=(function(){var t=new Date();return t.getFullYear()+String(t.getMonth()+1).padStart(2,'0')+String(t.getDate()).padStart(2,'0');})();
@@ -4832,6 +4833,8 @@ function downloadDlqExcel() {
       if(rs.some(d=>String(d.jobSub).replace(/\s/g,'').indexOf('내용증명발송')>=0))arr.push('내용증명');
       if(rs.some(d=>String(d.jobSub).indexOf('지급명령')>=0))arr.push('지급명령');
       if(rs.some(d=>{var s=String(d.jobSub||'');return s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0;}))arr.push('기타');
+      if(rs.some(d=>String(d.jobSub||'').replace(/\s/g,'').indexOf('지급명령도달')>=0))arr.push('도달');   /* [v600] */
+      if(rs.some(d=>String(d.jobSub||'').replace(/\s/g,'').indexOf('지급명령확정')>=0))arr.push('확정');   /* [v600] */
       return arr.length?arr.join(', '):'-';
     } catch(_) { return '-'; }
   };
@@ -9420,6 +9423,8 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-filter-btn" data-group="legalAction" onclick="dlqApplyFilter('legalAction','payment',this)">지급명령</button>
           <button class="dlq-filter-btn" data-group="legalAction" onclick="dlqApplyFilter('legalAction','amend',this)">보정명령</button>
           <button class="dlq-filter-btn" data-group="legalAction" onclick="dlqApplyFilter('legalAction','etc',this)">기타집행</button>
+          <button class="dlq-filter-btn" data-group="legalAction" style="color:#0284C7" onclick="dlqApplyFilter('legalAction','dodal',this)">도달</button>
+          <button class="dlq-filter-btn" data-group="legalAction" style="color:#7C3AED" onclick="dlqApplyFilter('legalAction','hwak',this)">확정</button>
           <button class="dlq-filter-btn" data-group="legalAction" onclick="dlqApplyFilter('legalAction','none',this)">미진행</button>
         </div>
       </div>
@@ -9529,11 +9534,15 @@ function dlqRenderTableRows() {
         const hasPayment = subRows.some(d => String(d.jobSub).indexOf('지급명령') >= 0);
         const hasEtc     = subRows.some(d => { var s = String(d.jobSub||''); return s.indexOf('기타집행') >= 0 || s.indexOf('기타조치') >= 0; });
         const hasAmend   = subRows.some(d => String(d.jobSub||'').indexOf('보정명령') >= 0);
+        const hasDodal   = subRows.some(d => String(d.jobSub||'').replace(/\s/g,'').indexOf('지급명령도달') >= 0);   /* [v600] */
+        const hasHwak    = subRows.some(d => String(d.jobSub||'').replace(/\s/g,'').indexOf('지급명령확정') >= 0);   /* [v600] */
         if (legalAction === 'content' && !hasContent) return false;
         if (legalAction === 'payment' && !hasPayment) return false;
         if (legalAction === 'amend'   && !hasAmend)   return false;
         if (legalAction === 'etc'     && !hasEtc)     return false;
-        if (legalAction === 'none'    && (hasContent || hasPayment || hasEtc || hasAmend)) return false;
+        if (legalAction === 'dodal'   && !hasDodal)   return false;
+        if (legalAction === 'hwak'    && !hasHwak)    return false;
+        if (legalAction === 'none'    && (hasContent || hasPayment || hasEtc || hasAmend || hasDodal || hasHwak)) return false;
       } catch(_) { /* 안전 폴백 — 필터 무시 */ }
     }
     // 연체구분 필터 (임대료/변동관리비)
@@ -9696,10 +9705,13 @@ function dlqRenderTableRows() {
                 var hasPayment = rows.some(function(d){ return String(d.jobSub).indexOf('지급명령') >= 0; });
                 // [v372] "기타집행" + "기타조치" 둘 다 매칭 — 폼 옵션에 "기타조치" 추가됨
                 var hasEtc     = rows.some(function(d){ var s = String(d.jobSub||''); return s.indexOf('기타집행') >= 0 || s.indexOf('기타조치') >= 0; });
-                var pill = function(label, active) {
-                  return '<span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;background:' + (active ? '#16A34A' : '#F3F4F6') + ';color:' + (active ? '#fff' : '#9CA3AF') + ';margin-right:1px;letter-spacing:-0.3px" title="' + label + '">' + (active ? '●' : '○') + label + '</span>';
+                /* [v600] 지급명령 도달·확정 — 기존과 다른 색 */
+                var hasDodal   = rows.some(function(d){ return String(d.jobSub||'').replace(/\s/g,'').indexOf('지급명령도달') >= 0; });
+                var hasHwak    = rows.some(function(d){ return String(d.jobSub||'').replace(/\s/g,'').indexOf('지급명령확정') >= 0; });
+                var pill = function(label, active, col) {
+                  return '<span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;background:' + (active ? (col||'#16A34A') : '#F3F4F6') + ';color:' + (active ? '#fff' : '#9CA3AF') + ';margin-right:1px;letter-spacing:-0.3px" title="' + label + '">' + (active ? '●' : '○') + label + '</span>';
                 };
-                return pill('내용', hasContent) + pill('지급', hasPayment) + pill('기타', hasEtc);
+                return pill('내용', hasContent) + pill('지급', hasPayment) + pill('기타', hasEtc) + pill('도달', hasDodal, '#0284C7') + pill('확정', hasHwak, '#7C3AED');
               } catch(_) { return '<span style="color:#D1D5DB">-</span>'; }
             })()}</td>
             <td class="dlq-tbl-content">${shortContent}</td>
@@ -10235,14 +10247,16 @@ function dlqRenderLegalTableRows(rows, container){
   window._dlqLegalExportRows = rows;
   var pill=function(rec, amber){ if(!rec)return '<span style="color:#D1D5DB">—</span>'; var bg=amber?'#FAEEDA':'#E6F1FB',fg=amber?'#854F0B':'#0C447C'; return '<span style="display:inline-block;background:'+bg+';color:'+fg+';font-size:11px;padding:2px 7px;border-radius:6px;white-space:nowrap">'+(_dlqDt(rec.date)||'기재')+'</span>'; };
   var mNae=function(s){return s.indexOf('내용증명발송')>=0;};
-  var mJi =function(s){return s.indexOf('지급명령')>=0;};
+  var mJi =function(s){return s.indexOf('지급명령')>=0&&s.indexOf('지급명령도달')<0&&s.indexOf('지급명령확정')<0;};   /* [v600] 신청·진행만 */
   var mBo =function(s){return s.indexOf('보정명령')>=0;};
   var mEtc=function(s){return s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0;};
+  var mDo=function(s){return s.indexOf('지급명령도달')>=0;}, mHw=function(s){return s.indexOf('지급명령확정')>=0;};   /* [v600] */
   var mAll=function(s){return s.indexOf('내용증명발송')>=0||s.indexOf('지급명령')>=0||s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0||s.indexOf('보정명령')>=0;};
   var esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
   var body = rows.map(function(r){
     var cno=String(r.cno||'').trim();
     var nae=_dlqLegalLatest(cno,mNae), ji=_dlqLegalLatest(cno,mJi), bo=_dlqLegalLatest(cno,mBo), etc=_dlqLegalLatest(cno,mEtc);
+    var dod=_dlqLegalLatest(cno,mDo), hwk=_dlqLegalLatest(cno,mHw);   /* [v600] */
     var prog=_dlqLegalLatest(cno,mAll);
     var pen=_dlqPenalty(cno);
     var sc=_dlqScore(cno);
@@ -10266,17 +10280,21 @@ function dlqRenderLegalTableRows(rows, container){
       +'<td>'+pill(ji,false)+'</td>'
       +'<td>'+pill(bo,true)+'</td>'
       +'<td>'+pill(etc,false)+'</td>'
+      +'<td>'+(dod?'<span style="display:inline-block;background:#DCFCE7;color:#166534;font-size:11px;padding:2px 7px;border-radius:6px;white-space:nowrap">'+(_dlqDt(dod.date)||'기재')+'</span>':'<span style="color:#D1D5DB">—</span>')+'</td>'
+      +'<td>'+(hwk?'<span style="display:inline-block;background:#EDE9FE;color:#5B21B6;font-size:11px;padding:2px 7px;border-radius:6px;white-space:nowrap">'+(_dlqDt(hwk.date)||'기재')+'</span>':'<span style="color:#D1D5DB">—</span>')+'</td>'
       +'<td class="dlq-tbl-content" style="color:'+(active?'#854F0B':'#374151')+'">'+(prog?esc(prog.content||prog.progress||'-'):'<span style="color:#D1D5DB">—</span>')+'</td>'
       +'</tr>';
   }).join('');
   container.innerHTML = '<div style="overflow-x:auto"><table class="dlq-tbl"><thead><tr>'
     +'<th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>'
     +'<th>계약번호</th><th>그룹</th><th>계약정보</th><th>연체일수</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th><th>연락처</th><th>연체금액</th><th>위약금</th>'
-    +'<th title="KCB 점수 (법적조치 검토/내용증명 발송 메모)">점수</th><th>내용증명</th><th>지급명령</th><th title="보정명령 대응">보정명령</th><th>기타집행</th><th>진척사항</th>'
+    +'<th title="KCB 점수 (법적조치 검토/내용증명 발송 메모)">점수</th><th>내용증명</th><th>지급명령</th><th title="보정명령 대응">보정명령</th><th>기타집행</th><th title="업무하위 \'지급명령 도달\' 최근 일자">도달</th><th title="업무하위 \'지급명령 확정\' 최근 일자">확정</th><th>진척사항</th>'
     +'</tr></thead><tbody>'+body+'</tbody></table></div>'
     +'<div class="dlq-tbl-count" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+rows.length+'건 · 법무 진척 뷰'
     +'<span style="font-size:11px;color:#6b7280"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#B5D4F4;vertical-align:-1px;margin-right:3px"></span>완료·접수 일자</span>'
     +'<span style="font-size:11px;color:#6b7280"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#FAC775;vertical-align:-1px;margin-right:3px"></span>보정 요함</span>'
+    +'<span style="font-size:11px;color:#6b7280"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#86EFAC;vertical-align:-1px;margin-right:3px"></span>도달</span>'
+    +'<span style="font-size:11px;color:#6b7280"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#C4B5FD;vertical-align:-1px;margin-right:3px"></span>확정</span>'
     +'</div>';
 }
 
@@ -24428,7 +24446,7 @@ window._okpiCat = {
   //   그룹1: 일상 대응 (전화/이미지/현장)
   //   그룹2: 법적 절차 (검토 → 발송 → 진행 → 집행)
   //   그룹3: 종료/기타
-  '연체관리':    ['전화응대','내용증명이미지발송','현장방문','---','법적 조치 검토','내용증명 발송','지급명령 진행','보정명령 대응','기타집행','---','중도퇴실 처리','계약 종료자 대응','기타'],
+  '연체관리':    ['전화응대','내용증명이미지발송','현장방문','---','법적 조치 검토','내용증명 발송','지급명령 진행','보정명령 대응','기타집행','지급명령 도달','지급명령 확정','---','중도퇴실 처리','계약 종료자 대응','기타'],   /* [v600] 도달·확정 단계 추가 */
   // [v540/v540.1] 상태확정 그룹 — 선택 시 DR F열에 저장되어 공실상태로 대시보드에 즉시 반영 (_vacDrOverride)
   //   {h:} = 그룹 헤더(선택불가), {v:,t:} = 저장값/표시문구 분리 (시트에는 v만 저장)
   // [v545] 과정 옵션 간소화 — 중도퇴실문의 → 계약해지확정 → 실제퇴실 (+기타). 구 값(신청 접수·정산 협의 등)은 기존 기록에서 계속 인식
