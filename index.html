@@ -7869,7 +7869,7 @@ function dpay_legalMap(){
   try {
     (typeof daeungRawData!=='undefined'&&Array.isArray(daeungRawData)?daeungRawData:[]).forEach(function(r){
       var sub=String(r.jobSub||'').trim();
-      if(!/내용증명|지급명령|보정명령|기타집행|기타조치|법적조치/.test(sub)) return;
+      if(!/내용증명(?!\s*이미지)|지급명령|보정명령|기타집행|기타조치|법적조치/.test(sub)) return;   /* [v601] 내용증명이미지발송 제외 */
       var k=_normCno(r.no!=null?r.no:r.cno); if(!k) return;
       var d=_parseAnyDateCell(r.date); var t=d?d.getTime():0;
       if(!M[k] || t>=M[k].t) M[k]={t:t, sub:sub};
@@ -8264,7 +8264,7 @@ function dpay_isEnded(cno){
   return v !== '계약중' && v !== '입주예정' && v !== '정상';
 }
 /* [v587] 법적 절차로 분류할 업무하위 */
-var DPAY_LAW_RE = /(법적\s*조치|내용증명|지급명령|보정명령|기타집행|강제집행|가압류|소송)/;
+var DPAY_LAW_RE = /(법적\s*조치|내용증명(?!\s*이미지)|지급명령|보정명령|기타집행|강제집행|가압류|소송)/;   /* [v601] 내용증명이미지발송 제외 */
 var DPAY_RES_DEF = [
   { k:'pay',   lb:'📅 납부예정', col:'#B45309', tip:'진척사항이 납부약속이거나, 진척 기재 없이 입금예정일만 잡힌 건' },
   { k:'split', lb:'💧 분납',     col:'#5B21B6', tip:'진척사항이 분납 — 일부만 받고 잔액이 남은 건' },
