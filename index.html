@@ -4780,8 +4780,9 @@ function downloadDlqLegalExcel(){
       '연체일수':r.days||0, '계약상태':r.contractStatus||'계약중', '공실상태':r.vacancyStatus||'-',
       '임(전)차인':r.nm||'-', '연락처':r.tel||'-', '연체금액':r.amt||0, '위약금':_dlqPenalty(cno)||0, '점수':_dlqScore(cno)||'',
       '내용증명':dt(_dlqLegalLatest(cno,mNae)), '지급명령':dt(_dlqLegalLatest(cno,mJi)),
-      '보정명령':dt(_dlqLegalLatest(cno,mBo)), '기타집행':dt(_dlqLegalLatest(cno,mEtc)),
-      '도달':dt(_dlqLegalLatest(cno,mDo)), '확정':dt(_dlqLegalLatest(cno,mHw)),   /* [v600] */
+      '보정명령':dt(_dlqLegalLatest(cno,mBo)),
+      '도달':dt(_dlqLegalLatest(cno,mDo)), '확정':dt(_dlqLegalLatest(cno,mHw)),   /* [v600·v603] 절차 순 */
+      '기타집행':dt(_dlqLegalLatest(cno,mEtc)),
       '진척사항':prog?(prog.content||prog.progress||''):''
     };
   });
@@ -9424,7 +9425,7 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-filter-btn" data-group="legalAction" onclick="dlqApplyFilter('legalAction','amend',this)">보정명령</button>
           <button class="dlq-filter-btn" data-group="legalAction" style="color:#0284C7" onclick="dlqApplyFilter('legalAction','dodal',this)">도달</button>
           <button class="dlq-filter-btn" data-group="legalAction" style="color:#7C3AED" onclick="dlqApplyFilter('legalAction','hwak',this)">확정</button>
-          <button class="dlq-filter-btn" data-group="legalAction" onclick="dlqApplyFilter('legalAction','etc',this)">기타집행</button>
+          <button class="dlq-filter-btn" data-group="legalAction" style="color:#D97706" onclick="dlqApplyFilter('legalAction','etc',this)">기타집행</button>
           <button class="dlq-filter-btn" data-group="legalAction" onclick="dlqApplyFilter('legalAction','none',this)">미진행</button>
         </div>
       </div>
@@ -9711,7 +9712,7 @@ function dlqRenderTableRows() {
                 var pill = function(label, active, col) {
                   return '<span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;background:' + (active ? (col||'#16A34A') : '#F3F4F6') + ';color:' + (active ? '#fff' : '#9CA3AF') + ';margin-right:1px;letter-spacing:-0.3px" title="' + label + '">' + (active ? '●' : '○') + label + '</span>';
                 };
-                return pill('내용', hasContent) + pill('지급', hasPayment) + pill('도달', hasDodal, '#0284C7') + pill('확정', hasHwak, '#7C3AED') + pill('기타', hasEtc);   /* [v602] 절차 순 */
+                return pill('내용', hasContent) + pill('지급', hasPayment) + pill('도달', hasDodal, '#0284C7') + pill('확정', hasHwak, '#7C3AED') + pill('기타', hasEtc, '#D97706');   /* [v602] 절차 순 · [v603] 기타=주황 */
               } catch(_) { return '<span style="color:#D1D5DB">-</span>'; }
             })()}</td>
             <td class="dlq-tbl-content">${shortContent}</td>
@@ -10279,16 +10280,16 @@ function dlqRenderLegalTableRows(rows, container){
       +'<td>'+pill(nae,false)+'</td>'
       +'<td>'+pill(ji,false)+'</td>'
       +'<td>'+pill(bo,true)+'</td>'
-      +'<td>'+pill(etc,false)+'</td>'
       +'<td>'+(dod?'<span style="display:inline-block;background:#DCFCE7;color:#166534;font-size:11px;padding:2px 7px;border-radius:6px;white-space:nowrap">'+(_dlqDt(dod.date)||'기재')+'</span>':'<span style="color:#D1D5DB">—</span>')+'</td>'
       +'<td>'+(hwk?'<span style="display:inline-block;background:#EDE9FE;color:#5B21B6;font-size:11px;padding:2px 7px;border-radius:6px;white-space:nowrap">'+(_dlqDt(hwk.date)||'기재')+'</span>':'<span style="color:#D1D5DB">—</span>')+'</td>'
+      +'<td>'+pill(etc,false)+'</td>'
       +'<td class="dlq-tbl-content" style="color:'+(active?'#854F0B':'#374151')+'">'+(prog?esc(prog.content||prog.progress||'-'):'<span style="color:#D1D5DB">—</span>')+'</td>'
       +'</tr>';
   }).join('');
   container.innerHTML = '<div style="overflow-x:auto"><table class="dlq-tbl"><thead><tr>'
     +'<th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>'
     +'<th>계약번호</th><th>그룹</th><th>계약정보</th><th>연체일수</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th><th>연락처</th><th>연체금액</th><th>위약금</th>'
-    +'<th title="KCB 점수 (법적조치 검토/내용증명 발송 메모)">점수</th><th>내용증명</th><th>지급명령</th><th title="보정명령 대응">보정명령</th><th>기타집행</th><th title="업무하위 \'지급명령 도달\' 최근 일자">도달</th><th title="업무하위 \'지급명령 확정\' 최근 일자">확정</th><th>진척사항</th>'
+    +'<th title="KCB 점수 (법적조치 검토/내용증명 발송 메모)">점수</th><th>내용증명</th><th>지급명령</th><th title="보정명령 대응">보정명령</th><th title="업무하위 \'지급명령 도달\' 최근 일자">도달</th><th title="업무하위 \'지급명령 확정\' 최근 일자">확정</th><th>기타집행</th><th>진척사항</th>'
     +'</tr></thead><tbody>'+body+'</tbody></table></div>'
     +'<div class="dlq-tbl-count" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+rows.length+'건 · 법무 진척 뷰'
     +'<span style="font-size:11px;color:#6b7280"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#B5D4F4;vertical-align:-1px;margin-right:3px"></span>완료·접수 일자</span>'
