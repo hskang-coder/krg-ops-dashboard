@@ -24543,7 +24543,7 @@ window._okpiProgress = {
   '수납관리':       ['', '재통화예정', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v578] 종료 추가 · [v599→v606] 납부약속→재통화예정 (납부약속은 입금예정일 입력 시 자동 기록) */
   '연체관리':       ['', '재통화예정', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v578] 종료 추가 · [v599→v606] 납부약속→재통화예정 (납부약속은 입금예정일 입력 시 자동 기록) */
   '갱신관리':       ['', '갱신희망', '묵시적갱신', '만기퇴실예정', '갱신거절', '조건부승인'],
-  '중도퇴실관리':   ['', '실제퇴실완료(개문포함)', '임대인합의전(청소,보증금확인)', '임대인합의완료(계약해지)', '부동산컨설팅확정', '부동산컨설팅제외(만기퇴실)', '후임세입자입주확정'],   /* [v550.4] · [v553.1] 합의완료 추가 · [v566] 후임세입자입주확정 — 퇴실관리에선 컨설팅제외 그룹 소속 */
+  '중도퇴실관리':   ['', '실제퇴실완료(개문포함)', '임대인합의전(청소,보증금확인)', '임대인합의완료(계약해지)', '부동산컨설팅확정', '부동산컨설팅제외(만기퇴실)', '후임세입자입주확정', '종료'],   /* [v609] 종료 추가 */   /* [v550.4] · [v553.1] 합의완료 추가 · [v566] 후임세입자입주확정 — 퇴실관리에선 컨설팅제외 그룹 소속 */
   '퇴실관리':       ['', '대응중', '종료', '협의중']   // [v547]
 };
 /* [v558] 2차 선택값별 추가 진척 카테고리 (확장 훅) — [v558.1] 자진 퇴실 사유는 2차 상태확정 옵션으로 이동, 여기서는 제거 */
@@ -25785,6 +25785,7 @@ function renderExitMgmtView(){
     var _zd8=function(d){ return d? new Date(Math.floor(d/10000), Math.floor(d/100)%100-1, d%100) : null; };
     var _zdays=function(a,b){ return Math.round((a-b)/864e5); };
     // 계약별 DR 기록 집계 (중도퇴실관리 + 퇴실관리)
+    var _EXM_STAGE9={'실제퇴실완료(개문포함)':1,'임대인합의전(청소,보증금확인)':1,'임대인합의완료(계약해지)':1,'부동산컨설팅확정':1,'부동산컨설팅제외(만기퇴실)':1,'후임세입자입주확정':1};   /* [v609] 강제퇴실 단계값 */
     var _zrec={};
     (Array.isArray(daeungRawData)?daeungRawData:[]).forEach(function(r){
       var jt=String(r.jobType||''); if(jt.indexOf('퇴실관리')===-1) return;
@@ -25793,9 +25794,13 @@ function renderExitMgmtView(){
       var R=_zrec[cno]||(_zrec[cno]={first:0,last:0,li:0,lv:'',mid:false,lp:'',lpD:0,lpI:0});
       if(!R.first||d<R.first) R.first=d;
       if(d>R.last||(d===R.last&&ix>=R.li)){ R.last=d; R.li=ix; R.lv=String(r.jobSub||'').trim(); R.lc=String(r.content||'').trim(); }   /* [v548.6] 최신 대응내용 보존 */
-      /* [v553.4] 진척사항(I열)은 '최근 기재된' 값 유지 — 이후 기록에 진척사항이 비어 있어도 확정된 단계가 미입력으로 되돌아가지 않도록 */
+      /* [v553.4] 진척사항(I열)은 '최근 기재된' 값 유지
+         [v609] 단계값 우선 — 이후 단순 문의 기록이 '종료' 등 비단계 진척이어도 확정 단계가 미입력·비단계로 밀리지 않음 */
       var _p9=String(r.progress||'').trim();
-      if(_p9&&(d>R.lpD||(d===R.lpD&&ix>=R.lpI))){ R.lpD=d; R.lpI=ix; R.lp=_p9; }
+      if(_p9){
+        if(_EXM_STAGE9[_p9]===1){ if(!R.lpS||d>R.lpD||(d===R.lpD&&ix>=R.lpI)){ R.lpD=d; R.lpI=ix; R.lp=_p9; R.lpS=true; } }
+        else if(!R.lpS&&(d>R.lpD||(d===R.lpD&&ix>=R.lpI))){ R.lpD=d; R.lpI=ix; R.lp=_p9; }
+      }
       if(jt.indexOf('중도퇴실관리')>=0) R.mid=true;
     });
     var _zrow=function(cno,extra){ var _v2=vMap[cno]||{}; var R=_zrec[cno]; var _st2=String(_v2.status||'').trim();
