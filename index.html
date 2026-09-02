@@ -3536,7 +3536,42 @@ function buildStrategyCards() {
 
   const sf = (window._dlqFilterState||{}).strategyFilter || 'all';
 
-  const card = (key, borderCls, badgeCls, btnCls, urgency, icon, title, num, sub, desc, btnTxt) => {
+  /* [v612] 즉각 법적 대응 카드 — 계약중/종료 토글 + 법적 단계별 인원 */
+  const _lgStatus = window._dlqLegalCardStatus || 'active';
+  const lgCnt = {nae:0,ji:0,bo:0,dodal:0,hwak:0,etc:0};
+  try {
+    if (typeof _dlqLegalFirst==='function' && typeof daeungRawData!=='undefined' && Array.isArray(daeungRawData) && daeungRawData.length) {
+      const lgRows = rows.filter(r => _lgStatus==='active' ? (r.contractStatus||'계약중')==='계약중' : (r.contractStatus||'계약중')!=='계약중');
+      const mNae=x=>x.indexOf('내용증명발송')>=0;
+      const mJi=x=>x.indexOf('지급명령')>=0&&x.indexOf('지급명령도달')<0&&x.indexOf('지급명령확정')<0;
+      const mBo=x=>x.indexOf('보정명령')>=0;
+      const mDo=x=>x.indexOf('지급명령도달')>=0;
+      const mHw=x=>x.indexOf('지급명령확정')>=0;
+      const mEt=x=>x.indexOf('기타집행')>=0||x.indexOf('기타조치')>=0;
+      lgRows.forEach(r => {
+        const cno=String(r.cno||'').trim(); if(!cno) return;
+        if(_dlqLegalFirst(cno,mNae)) lgCnt.nae++;
+        if(_dlqLegalFirst(cno,mJi)) lgCnt.ji++;
+        if(_dlqLegalLatest(cno,mBo)) lgCnt.bo++;
+        if(_dlqLegalLatest(cno,mDo)) lgCnt.dodal++;
+        if(_dlqLegalLatest(cno,mHw)) lgCnt.hwak++;
+        if(_dlqLegalLatest(cno,mEt)) lgCnt.etc++;
+      });
+    }
+  } catch(_e){}
+  const legalExtra = (function(){
+    const chip=(v,lbl)=>'<span onclick="event.stopPropagation();window._dlqLegalCardStatus=\''+v+'\';buildStrategyCards()" style="cursor:pointer;padding:2px 9px;border-radius:10px;font-size:10.5px;font-weight:700;'+(_lgStatus===v?'background:#DC2626;color:#fff':'background:#F1F5F9;color:#64748B')+'">'+lbl+'</span>';
+    const line=(lbl,n)=>'<div style="display:flex;justify-content:space-between;gap:6px;font-size:11px;color:#475569;white-space:nowrap"><span>'+lbl+'</span><b style="color:'+(n>0?'#B91C1C':'#94A3B8')+'">'+n+'명</b></div>';
+    return '<div onclick="event.stopPropagation()" style="margin:8px 0 2px;padding:8px 10px;background:#FEF7F7;border:1px solid #FECACA;border-radius:8px;cursor:default">'
+      +'<div style="display:flex;gap:5px;margin-bottom:6px;align-items:center"><span style="font-size:10px;color:#9CA3AF;font-weight:700;margin-right:2px">단계별 현황</span>'+chip('active','계약중')+chip('ended','종료')+'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 14px">'
+      +line('내용증명 발행',lgCnt.nae)+line('지급명령 도달',lgCnt.dodal)
+      +line('지급명령 발행',lgCnt.ji)+line('지급명령 확정',lgCnt.hwak)
+      +line('보정명령 대응',lgCnt.bo)+line('기타집행',lgCnt.etc)
+      +'</div></div>';
+  })();
+
+  const card = (key, borderCls, badgeCls, btnCls, urgency, icon, title, num, sub, desc, btnTxt, extra) => {
     const isActive = sf === key;
     return `<div class="sb2-card ${borderCls}${isActive?' sb2-active':''}" onclick="dlqApplyStrategyFilter('${isActive?'all':key}')">
       <span class="sb2-badge ${badgeCls}">${urgency}</span>
@@ -3544,6 +3579,7 @@ function buildStrategyCards() {
       <div class="sb2-num" style="color:${isActive?'#1d4ed8':badgeCls==='sb2-urg'?'#dc2626':badgeCls==='sb2-warn'?'#d97706':'#374151'}">${num}명</div>
       <div class="sb2-sub">${sub}</div>
       <div class="sb2-desc">${desc}</div>
+      ${extra||''}
       <button class="sb2-btn ${btnCls}" onclick="event.stopPropagation();dlqApplyStrategyFilter('${isActive?'all':key}')">→ ${btnTxt}</button>
     </div>`;
   };
@@ -3558,7 +3594,7 @@ function buildStrategyCards() {
         ${card('legal','sb2-border-red','sb2-urg','sb2-btn-red','긴급','⚠️','즉각 법적 대응',c.legal,
           '전체 계약중 연체자의 '+pct(c.legal)+'%',
           '즉각적인 법적 조치(내용증명·지급명령) 또는 CB 등록이 필요한 최우선 대응 대상',
-          '내용증명 발송 즉시 검토')}
+          '내용증명 발송 즉시 검토', legalExtra)}
         ${card('overdue','sb2-border-orng','sb2-urg','sb2-btn-orng','긴급','📅','납부일 초과 미납',c.overdue,
           '오늘 기준 납부일 초과',
           '약정 납부일이 이미 지났으나 미납 상태. 즉시 연락 및 입금 확인 또는 재협의 필요',
