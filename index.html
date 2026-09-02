@@ -844,6 +844,12 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dres-who button:first-child { border-left:none; }
 .dres-who button.on { background:#EEF3FA; color:#1A3A5C; }
 .dres-who button.on.e { background:#FFF7ED; color:#9A3412; }
+.dres-who button.on.k2 { background:#ECFDF5; color:#047857; }
+.dres-who button.on.p2 { background:#EEF2FF; color:#4338CA; }
+.dres-row .ps { font-size:9.5px; font-weight:800; border-radius:6px; padding:1px 7px; white-space:nowrap; }
+.dres-row .ps-oh { background:#EEF2FF; color:#4338CA; }
+.dres-row .ps-ky { background:#ECFDF5; color:#047857; }
+.dres-row .ps-x { background:#F1F5F9; color:#64748B; }
 .dres-who button b { font-variant-numeric:tabular-nums; }
 .dres-row .e { font-size:9.5px; font-weight:800; border-radius:6px; padding:1px 6px; background:#FFF7ED; color:#9A3412; white-space:nowrap; }
 /* [v589] 전일 성적표 배지 */
@@ -8321,11 +8327,11 @@ var DPAY_RES_EXT = [
   { k:'unrec', lb:'💸 미회수',    col:'#B91C1C', tip:'그날 입금 기록이 없고, 납기가 도래한 미납이 남아 있으며, 다음 약속도 잡히지 않은 건 (위 구분과 중복 집계)' }
 ];
 /* [v587] 그 날 '대응한' 수납·연체 계약을 결과별로 집계 — 대응일 기준 (약속일 기준인 아래 목록과 다름) */
-function dpay_resultFor(dayOffset, who){
-  who = who || '';
+function dpay_resultFor(dayOffset, who, person){
+  who = who || ''; person = person || '';   /* [v615] 대응자 필터 */
   var CK = window.__dpayRes;
   if (!CK || CK._d !== dpay_ymd(new Date())) CK = window.__dpayRes = { _d: dpay_ymd(new Date()) };
-  var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, who:who, payReady:true, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], got:0, rest:0 };
+  var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, pCnt:{}, who:who, person:person, payReady:true, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], got:0, rest:0 };
   try {
     var R = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
     var d0 = new Date(); d0.setHours(0,0,0,0);
@@ -8337,6 +8343,9 @@ function dpay_resultFor(dayOffset, who){
       var jt = String(r.jobType||'').trim();
       if (jt !== '수납관리' && jt !== '연체관리') return;
       var cno = _normCno(r.no != null ? r.no : r.cno); if (!cno) return;
+      var ps9 = String(r.person||'').trim();   /* [v615] 대응자 집계 후 필터 */
+      if (ps9) { if (!O.pCnt[ps9]) O.pCnt[ps9] = {}; O.pCnt[ps9][cno] = 1; }
+      if (person && ps9.indexOf(person) < 0) return;
       var pg = String(r.progress||'').trim();
       if (DPAY_LAW_RE.test(String(r.jobSub||'')) || pg === '강제퇴실확정') LAW[cno] = 1;
       var ix = +r._idx || 0, prev = LAST[cno];
@@ -8381,26 +8390,27 @@ function dpay_resultFor(dayOffset, who){
 /* [v589] 하루 성적 — 약속 이행률(60%) · 대응 회수율(20%) · 기록 완성도(20%)
    이행률만으로는 미수신·법조치 대응이 안 보이고, 회수율만 보면 담당자가 통제할 수 없는 대상까지
    분모에 들어가 늘 낮게 나온다. 셋을 가중평균해 하루를 한 등급으로 요약한다. */
-function dpay_scoreFor(off, who){
-  who = who || '';
+function dpay_scoreFor(off, who, person){
+  who = who || ''; person = person || '';   /* [v615] */
   var _pn = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData.length : 0;
   var _dn = (typeof daeungRawData  !== 'undefined' && Array.isArray(daeungRawData))  ? daeungRawData.length  : 0;
   var _sig = dpay_ymd(new Date()) + '|' + _pn + '|' + _dn;   /* [v591] 시트가 뒤늦게 로드되면 캐시 무효화 */
   var C = window.__dpayScore;
   if (!C || C._d !== _sig) C = window.__dpayScore = { _d: _sig };
-  var ck = 'k' + off + '|' + who;
+  var ck = 'k' + off + '|' + who + '|' + person;
   if (C[ck]) return C[ck];
   var S = { none:true, payReady:true, grade:'—', gk:'gX', score:null, r1:null, r2:0, r3:0, amt:0,
             nProm:0, nKept:0, nDl:0, nGot:0, unrec:0, unrecAmt:0, kept:[], broke:[] };
   S.payReady = _pn > 0;   /* [v591] 입금내역이 없으면 이행·회수·미회수를 판정할 수 없다 */
   try {
-    var O = dpay_resultFor(off, who), L = dpay_listFor(off), AM = dpay_amtMap(off), DUE = dpay_dueSet(0) || {};
+    var O = dpay_resultFor(off, who, person), L = dpay_listFor(off), AM = dpay_amtMap(off), DUE = dpay_dueSet(0) || {};
     var seen = {}, pk = [];
     [].concat(Array.prototype.slice.call(L), L.doneList || [], L.noDueList || []).forEach(function(x){
       if (!x || !x.cno || seen[x.cno]) return; seen[x.cno] = 1;
       var ended = dpay_isEnded(x.cno);
       if (who === 'a' && ended) return;
       if (who === 'e' && !ended) return;
+      if (person && String(x.person||'').trim().indexOf(person) < 0) return;   /* [v615] */
       pk.push(x);
     });
     pk.forEach(function(x){
@@ -8430,8 +8440,8 @@ function dpay_scoreFor(off, who){
   return S;
 }
 /* [v589] 전일 성적표 배지 */
-function dpay_scoreBar(off, who){
-  return dpay_scoreBarHtml(dpay_scoreFor(off, who), dpay_scoreFor(off - 1, who), '', '전일');
+function dpay_scoreBar(off, who, person){
+  return dpay_scoreBarHtml(dpay_scoreFor(off, who, person), dpay_scoreFor(off - 1, who, person), '', '전일');
 }
 function dpay_scoreBarHtml(S, Pv, note, prevLb){
   if (S.none) return '';
@@ -8463,16 +8473,17 @@ function dpay_scoreBarHtml(S, Pv, note, prevLb){
 }
 /* [v597] 기간 합산 대응 결과 — off1..off2 각 날짜의 결과(그날 마지막 기록 기준)를 더한다.
    회수액·미회수는 오늘(off=0)을 제외 — 입금내역 반영이 진행 중이라 미확정이기 때문. */
-function dpay_resultRange(off1, off2, who){
-  who = who || '';
-  var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, who:who, payReady:true, day:'', days:0, exclToday:false,
+function dpay_resultRange(off1, off2, who, person){
+  who = who || ''; person = person || '';   /* [v615] */
+  var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, pCnt:{}, who:who, person:person, payReady:true, day:'', days:0, exclToday:false,
             pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], got:0, rest:0 };
   try {
     var d0 = '', d1 = '';
     for (var off = off1; off <= off2; off++){
-      var d = dpay_resultFor(off, who);
+      var d = dpay_resultFor(off, who, person);
       if (!d0) d0 = d.day; d1 = d.day;
       O.total += d.total; O.blankPg += d.blankPg; O.nAct += d.nAct; O.nEnd += d.nEnd; O.days++;
+      Object.keys(d.pCnt||{}).forEach(function(k9){ if(!O.pCnt[k9]) O.pCnt[k9]={}; Object.keys(d.pCnt[k9]).forEach(function(c9){ O.pCnt[k9][c9]=1; }); });   /* [v615] */
       if (!d.payReady) O.payReady = false;
       var tag = d.day;
       ['pay','split','paid','nores','end','blank','law','delay'].forEach(function(k){
@@ -8492,8 +8503,8 @@ function dpay_resultRange(off1, off2, who){
   return O;
 }
 /* [v597] 기간 성적 — 일별 성적의 원값(약속·이행·회수·기재)을 합산해 다시 계산. 오늘은 제외 */
-function dpay_scoreRange(span, who){
-  who = who || '';
+function dpay_scoreRange(span, who, person){
+  who = who || ''; person = person || '';   /* [v615] */
   var S = { none:true, payReady:true, grade:'—', gk:'gX', score:null, r1:null, r2:0, r3:0, amt:0,
             nProm:0, nKept:0, nDl:0, nGot:0, nBlank:0, unrec:0, unrecAmt:0, kept:[], broke:[] };
   try {
@@ -8501,7 +8512,7 @@ function dpay_scoreRange(span, who){
     if (b < span.a) return S;
     var t0 = new Date(); t0.setHours(0,0,0,0);
     for (var off = span.a; off <= b; off++){
-      var d = dpay_scoreFor(off, who);
+      var d = dpay_scoreFor(off, who, person);
       if (!d.payReady) S.payReady = false;
       if (d.none) continue;
       S.none = false;
@@ -8526,11 +8537,11 @@ function dpay_scoreRange(span, who){
   } catch(e){ console.warn('[v597] scoreRange', e); }
   return S;
 }
-function dpay_scoreRangeBar(span, who){
-  var S = dpay_scoreRange(span, who);
+function dpay_scoreRangeBar(span, who, person){
+  var S = dpay_scoreRange(span, who, person);
   if (S.none) return '';
   var len = span.b - span.a + 1;
-  var Pv = dpay_scoreRange({ a: span.a - len, b: span.b - len }, who);
+  var Pv = dpay_scoreRange({ a: span.a - len, b: span.b - len }, who, person);
   return dpay_scoreBarHtml(S, Pv, (span.b === 0 ? '오늘 제외 · ' : '') + '기간 합산', '전기간');
 }
 /* [v594] 결과 블록은 운영관리로 이동 — #dresBox 안에서만 다시 그린다 */
@@ -8542,6 +8553,8 @@ function dres_render(){
 function dpay_resTab(v){ window._dresOff = (v === 'y') ? -1 : 0; window._dresPick = ''; dres_render(); }
 /* [v590] 계약자 / 종료자 필터 — '' 전체 · 'a' 계약자 · 'e' 종료자 */
 function dpay_resWho(v){ window._dresWho = (window._dresWho === v) ? '' : v; window._dresPick = ''; dres_render(); }
+/* [v615] 대응자(담당자) 필터 — '' 전체 · 이름 부분일치 */
+function dpay_resPerson(v){ window._dresPerson = (window._dresPerson === v) ? '' : v; window._dresPick = ''; dres_render(); }
 function dpay_resPick(k){ window._dresPick = (window._dresPick === k) ? '' : k; dres_render(); }
 /* [v587] 대응 결과 요약 블록 */
 function dpay_resBlock(){
@@ -8549,8 +8562,9 @@ function dpay_resBlock(){
   var span = window._dresSpan || null;
   var isRange = !!(span && span.a < span.b);   /* [v597] 주/월 기간 합산 */
   var who = window._dresWho || '';
-  var All = isRange ? dpay_resultRange(span.a, span.b, '') : dpay_resultFor(off, '');
-  var O = who ? (isRange ? dpay_resultRange(span.a, span.b, who) : dpay_resultFor(off, who)) : All;
+  var psel = window._dresPerson || '';   /* [v615] 대응자 필터 */
+  var All = isRange ? dpay_resultRange(span.a, span.b, '', '') : dpay_resultFor(off, '', '');
+  var O = (who || psel) ? (isRange ? dpay_resultRange(span.a, span.b, who, psel) : dpay_resultFor(off, who, psel)) : All;
   var pick = window._dresPick || '';
   var isY = isRange ? (span.a < 0) : (off < 0);   /* [v594] 지난 날짜면 금액·성적·미회수까지 확정치로 보여준다 */
   var chip = function(d, arr, dim){
@@ -8575,14 +8589,23 @@ function dpay_resBlock(){
     +   '<button class="' + (who==='a'?'on':'') + '" onclick="dpay_resWho(\'a\')" title="계약상태가 계약중·입주예정인 계약만 — 진행 중인 임대차의 수납 대응입니다">👤 계약자 <b>' + All.nAct + '</b></button>'
     +   '<button class="e ' + (who==='e'?'on':'') + '" onclick="dpay_resWho(\'e\')" title="계약상태가 종료·철회·삭제인 계약만 — 퇴실 정산금·잔여 채권 회수 대응입니다">🚪 종료자 <b>' + All.nEnd + '</b></button>'
     + '</span>'
+    + (function(){   /* [v615] 대응자 필터 토글 — 결과·점수 모두 반영 */
+        var pn = function(nm){ var t=0, P9=All.pCnt||{}; Object.keys(P9).forEach(function(k9){ if (k9.indexOf(nm)>=0) t += Object.keys(P9[k9]).length; }); return t; };
+        return '<span class="dres-who" title="대응자(담당자) 기준으로 결과와 성적을 봅니다">'
+          + '<button class="' + (psel===''?'on':'') + '" onclick="dpay_resPerson(\'\')">대응자 전체</button>'
+          + '<button class="' + (psel==='김영철'?'on k2':'') + '" onclick="dpay_resPerson(\'김영철\')" title="김영철 담당 대응만 — 성적도 김영철 기준으로 재계산됩니다">🧑‍🔧 김영철 <b>' + pn('김영철') + '</b></button>'
+          + '<button class="' + (psel==='오진선'?'on p2':'') + '" onclick="dpay_resPerson(\'오진선\')" title="오진선 담당 대응만 — 성적도 오진선 기준으로 재계산됩니다">⚖️ 오진선 <b>' + pn('오진선') + '</b></button>'
+          + '</span>';
+      })()
     + '<span class="dres-ttl">대응 결과 <b>' + O.total + '</b>건'
     +   (who ? '<span style="font-size:10px;color:#94A3B8;font-weight:800"> · ' + (who==='a'?'계약자':'종료자') + '만</span>' : '')
+    +   (psel ? '<span style="font-size:10px;color:#0F766E;font-weight:800"> · ' + psel + ' 대응만</span>' : '')
     + '</span>'
     + '<span class="dres-sub">' + O.day + ' · 대응일 기준'
     +   (isRange ? ' · ' + O.days + '일 합산' + (O.exclToday ? ' (회수·미회수는 오늘 제외)' : '') : '')
     +   (isY && O.got ? ' · 회수 ₩' + O.got.toLocaleString() : '')
     + '</span></div>'
-    + (isY ? (isRange ? dpay_scoreRangeBar(span, who) : dpay_scoreBar(off, who)) : '')
+    + (isY ? (isRange ? dpay_scoreRangeBar(span, who, psel) : dpay_scoreBar(off, who, psel)) : '')
     + '<div class="dres-chips">';
   DPAY_RES_DEF.forEach(function(d){ h += chip(d, O[d.k]); });
   h += '<span class="dres-div"></span>';
@@ -8597,7 +8620,7 @@ function dpay_resBlock(){
     h += chip(d, O[d.k]);
   });
   h += '</div>';
-  var PL = (pick === 'broke') ? (isY ? (isRange ? dpay_scoreRange(span, who).broke : dpay_scoreFor(off, who).broke) : []) : O[pick];
+  var PL = (pick === 'broke') ? (isY ? (isRange ? dpay_scoreRange(span, who, psel).broke : dpay_scoreFor(off, who, psel).broke) : []) : O[pick];
   if (pick && PL && PL.length) {
     h += '<div class="dres-list">' + PL.map(function(x){
       var cq = String(x.cno).replace(/'/g, "\\'");
@@ -8607,8 +8630,10 @@ function dpay_resBlock(){
         + '<span class="n">' + x.nm + '</span>'
         + (x.day ? '<span class="p" title="대응일 ' + x.day + '">' + String(x.day).slice(5) + '</span>' : '')
         + (!who && dpay_isEnded(x.cno) ? '<span class="e" title="계약상태 ' + (dpay_csMap()[x.cno]||'종료') + ' — 퇴실 정산금·잔여 채권 대응입니다">🚪 종료</span>' : '')
-        + '<span class="m">' + (x.memo || '—') + (x.person ? ' · ' + x.person : '') + '</span>'
+        + (x.person ? '<span class="ps ' + (String(x.person).indexOf('오진선')>=0?'ps-oh':String(x.person).indexOf('김영철')>=0?'ps-ky':'ps-x') + '" title="대응자(담당자)">' + x.person + '</span>' : '')
+        + '<span class="m">' + (x.memo || '—') + '</span>'
         + (x.next && x.next !== O.day ? '<span class="p" title="다음 입금예정일">→ ' + x.next + '</span>' : '')
+        + (x.got > 0 ? '<span class="a" style="color:#047857" title="회수금액 — 납부일이 검색일(' + (x.day || O.day) + ')인 입금액 합계">+₩' + x.got.toLocaleString() + '</span>' : '')
         + (x.rest > 0 ? '<span class="a" title="납기가 도래한 미납 잔액">₩' + x.rest.toLocaleString() + '</span>' : '')
         + (bad ? '<span class="w" title="진척사항은 ' + x.pg + '인데 납기 도래 미납이 남아 있습니다 — 확인이 필요합니다">⚠ ' + x.pg + '</span>'
                : '<span class="p">' + x.pg + '</span>')
