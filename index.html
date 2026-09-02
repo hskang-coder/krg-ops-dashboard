@@ -9615,6 +9615,7 @@ function dlqRenderTableRows() {
   <div style="overflow-x:auto">
     <table class="dlq-tbl">
       <thead><tr>
+        <th style="width:34px;text-align:center" title="표시 순번">No</th>
         <th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>
         <th>계약번호</th><th title="gid=1953907648 BT열 — 연체외주">연체외주</th><th>그룹</th><th>계약정보</th>
         <th>연체일수</th><th>납부구분</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th>
@@ -9622,7 +9623,7 @@ function dlqRenderTableRows() {
         <th>연락처</th><th>연체금액</th><th title="시작일 25.6.1 이후 계약자: 임대료 × 4개월 (gid=1953907648 W열 ≥ 2025-06-01, AK열 × 4)">위약금</th><th>대응일</th><th>입금예정일</th><th title="gid=554798125 F열='법적조치 검토' 행의 H열 점수 (숫자)">점수</th><th title="gid=554798125 F열 기재 유무 (내용증명/지급명령/기타집행)">법적진행</th><th>최근 대응 내용</th>
       </tr></thead>
       <tbody>
-        ${rows.map(r => {
+        ${rows.map((r, _ri) => {
           const gc = gradeClass(r.grade||'');
           const dc = dayClass(r.days||0);
           const payColor = r.payStatus==='past'?'#ef4444':r.payStatus==='today'?'#f59e0b':r.payStatus==='urgent'?'#dc2626':'#22c55e';
@@ -9655,6 +9656,7 @@ function dlqRenderTableRows() {
             } catch(_e) { return '<span style="color:#D1D5DB">-</span>'; }
           })();
           return `<tr class="dlq-tbl-row" onclick="dlqGoToContract('${r.cno}')">
+            <td style="text-align:center;padding:4px 6px;font-size:11px;font-weight:700;color:#94A3B8">${_ri+1}</td>
             <td onclick="event.stopPropagation()" style="text-align:center;padding:4px">
               <input type="checkbox" class="dlq-cb dlq-row-cb" value="${r.cno}" onchange="dlqToggleSelect('${r.cno}',this.checked)">
             </td>
@@ -10311,7 +10313,7 @@ function dlqRenderLegalTableRows(rows, container){
   /* [v607] 표 내 평균 소요일 선계산 */
   var _ddArr=[]; rows.forEach(function(r){ var x=_dlqJiToDodalDays(String(r.cno||'').trim()); if(x) _ddArr.push(x.days); });
   var _ddAvg=_ddArr.length ? _ddArr.reduce(function(a,b){return a+b;},0)/_ddArr.length : null;
-  var body = rows.map(function(r){
+  var body = rows.map(function(r,_ri){
     var cno=String(r.cno||'').trim();
     var nae=_dlqLegalFirst(cno,mNae), ji=_dlqLegalFirst(cno,mJi), bo=_dlqLegalLatest(cno,mBo), etc=_dlqLegalLatest(cno,mEtc);   /* [v608] 내용증명·지급명령=최초 */
     var dod=_dlqLegalLatest(cno,mDo), hwk=_dlqLegalLatest(cno,mHw);   /* [v600] */
@@ -10322,6 +10324,7 @@ function dlqRenderLegalTableRows(rows, container){
     var cs=r.contractStatus||'계약중';
     var csBg=cs==='계약중'?'#dbeafe':(cs==='종료(3개월이내)'?'#fef3c7':'#f3f4f6'), csFg=cs==='계약중'?'#1d4ed8':(cs==='종료(3개월이내)'?'#d97706':'#6b7280');
     return '<tr class="dlq-tbl-row" onclick="dlqGoToContract(\''+cno+'\')"'+(active?' style="background:#FDF7EC"':'')+'>'
+      +'<td style="text-align:center;padding:4px 6px;font-size:11px;font-weight:700;color:#94A3B8">'+(_ri+1)+'</td>'
       +'<td onclick="event.stopPropagation()" style="text-align:center;padding:4px"><input type="checkbox" class="dlq-cb dlq-row-cb" value="'+cno+'" onchange="dlqToggleSelect(\''+cno+'\',this.checked)"></td>'
       +'<td><span class="dlq-tbl-cno">'+cno+'</span></td>'
       +'<td><span class="dlq-tbl-group">'+(r.group||'-')+'</span></td>'
@@ -10355,6 +10358,7 @@ function dlqRenderLegalTableRows(rows, container){
       +'</tr>';
   }).join('');
   container.innerHTML = '<div style="overflow-x:auto"><table class="dlq-tbl"><thead><tr>'
+    +'<th style="width:34px;text-align:center" title="표시 순번">No</th>'
     +'<th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>'
     +'<th>계약번호</th><th>그룹</th><th>계약정보</th><th>연체일수</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th><th>연락처</th><th>연체금액</th><th>위약금</th>'
     +'<th title="KCB 점수 (법적조치 검토/내용증명 발송 메모)">점수</th><th title="최초 발송일">내용증명</th><th title="최초 신청일">지급명령</th><th title="보정명령 대응">보정명령</th><th title="업무하위 \'지급명령 도달\' 최근 일자">도달</th><th title="업무하위 \'지급명령 확정\' 최근 일자">확정</th><th>기타집행</th><th title="지급명령 최초 신청일 → 도달 최근일 소요일수 · 표 평균보다 빠르면 🔽 늦으면 🔼">도달일수</th><th>진척사항</th>'
