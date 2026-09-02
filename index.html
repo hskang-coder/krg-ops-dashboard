@@ -8322,6 +8322,7 @@ var DPAY_RES_DEF = [
   { k:'blank', lb:'⚪ 미기재',   col:'#94A3B8', tip:'진척사항이 비어 있는 건 — 결과를 채워주세요' }
 ];
 var DPAY_RES_EXT = [
+  { k:'su',    lb:'💼 수납관리',  col:'#B45309', tip:'업무구분이 수납관리로 기록된 대응 건 (위 구분과 중복 집계) — 오진선 수납 업무 확인용' },
   { k:'law',   lb:'⚖️ 법조치',    col:'#7C2D12', tip:'업무하위가 법적 조치 검토·내용증명·지급명령·보정명령·집행인 건 (위 구분과 중복 집계)' },
   { k:'delay', lb:'↩️ 일정 연기', col:'#0E7490', tip:'다음 입금예정일이 그날 이후로 잡혔거나(약속 연기 — 위 구분과 중복 집계), 진척이 재통화예정으로 기록된 건' },
   { k:'unrec', lb:'💸 미회수',    col:'#B91C1C', tip:'그날 입금 기록이 없고, 납기가 도래한 미납이 남아 있으며, 다음 약속도 잡히지 않은 건 (위 구분과 중복 집계)' }
@@ -8331,13 +8332,13 @@ function dpay_resultFor(dayOffset, who, person){
   who = who || ''; person = person || '';   /* [v615] 대응자 필터 */
   var CK = window.__dpayRes;
   if (!CK || CK._d !== dpay_ymd(new Date())) CK = window.__dpayRes = { _d: dpay_ymd(new Date()) };
-  var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, pCnt:{}, who:who, person:person, payReady:true, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], got:0, rest:0 };
+  var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, pCnt:{}, who:who, person:person, payReady:true, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], su:[], got:0, rest:0 };
   try {
     var R = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
     var d0 = new Date(); d0.setHours(0,0,0,0);
     if (dayOffset) d0 = new Date(d0.getTime() + dayOffset * 86400000);
     var key = dpay_ymd(d0); O.day = key;
-    var LAST = {}, LAW = {};
+    var LAST = {}, LAW = {}, PAY9 = {};   /* [v617] 수납관리 기록 계약 */
     R.forEach(function(r){
       var ad = _parseAnyDateCell(r.date); if (!ad || dpay_ymd(ad) !== key) return;
       var jt = String(r.jobType||'').trim();
@@ -8346,6 +8347,7 @@ function dpay_resultFor(dayOffset, who, person){
       var ps9 = String(r.person||'').trim();   /* [v615] 대응자 집계 후 필터 */
       if (ps9) { if (!O.pCnt[ps9]) O.pCnt[ps9] = {}; O.pCnt[ps9][cno] = 1; }
       if (person && ps9.indexOf(person) < 0) return;
+      if (jt === '수납관리') PAY9[cno] = 1;   /* [v617] */
       var pg = String(r.progress||'').trim();
       if (DPAY_LAW_RE.test(String(r.jobSub||'')) || pg === '강제퇴실확정') LAW[cno] = 1;
       var ix = +r._idx || 0, prev = LAST[cno];
@@ -8380,8 +8382,9 @@ function dpay_resultFor(dayOffset, who, person){
         else if (!got && rest > 0) O.unrec.push(it);
       }
       if (LAW[cno]) O.law.push(it);
+      if (PAY9[cno]) O.su.push(it);   /* [v617] */
     });
-    ['pay','split','paid','nores','end','blank','law','delay','unrec'].forEach(function(k){
+    ['pay','split','paid','nores','end','blank','law','delay','unrec','su'].forEach(function(k){
       O[k].sort(function(a,b){ return (b.rest - a.rest) || String(a.cno).localeCompare(String(b.cno)); });
     });
   } catch(e){ console.warn('[v587] resultFor', e); }
@@ -8399,6 +8402,8 @@ var DPAY_WORKMIN = [
   { re:/기타집행|강제집행|가압류|소송/, min:30, lb:'집행·소송' },
   { re:/특별송달/, min:20, lb:'특별송달' },
   { re:/현장\s*방문/, min:30, lb:'현장 방문' },
+  { re:/슬랙\s*대응/, min:5, lb:'슬랙 대응' },
+  { re:/위임\s*업무/, min:30, lb:'위임 업무' },
   { re:/KCB|신용조회|법적\s*조치\s*검토/i, min:5, lb:'KCB·법적조치 검토' }
 ];
 function dpay_workLoad(off, person){
@@ -8522,7 +8527,7 @@ function dpay_scoreBarHtml(S, Pv, note, prevLb){
     + (S.legal ? (function(){
         var bd9 = Object.keys(S.workDet||{}).map(function(k9){ var d9 = S.workDet[k9]; return k9 + ' ' + d9.n + '건·' + Math.round(d9.min) + '분'; }).join('&#10;');
         return '<span class="bd" title="하루 업무량 — 대응 유형별 표준 소요시간 합산 ÷ 기준 ' + S.wmBase + '분&#10;'
-          + '(KCB·검토 5분 · 도달/확정 10분 · 특별송달 20분 · 내용증명/지급명령/보정/집행/현장방문 30분 · 일반 5분)&#10;'
+          + '(KCB·검토/슬랙 5분 · 도달/확정 10분 · 특별송달 20분 · 내용증명/지급명령/보정/집행/현장방문/위임 30분 · 일반 5분)&#10;'
           + '종료자 대응은 ×1.5 가산' + (S.endN ? ' — 이번 기간 ' + S.endN + '건, +' + Math.round(S.endMin) + '분' : '')
           + (bd9 ? '&#10;— 내역 —&#10;' + bd9 : '') + '">'
           + '⏱️ 업무량 ' + S.rW + '% <i>' + Math.round(S.workMin) + '분</i></span>';
@@ -8534,6 +8539,9 @@ function dpay_scoreBarHtml(S, Pv, note, prevLb){
     + '<span class="bd" title="그날 대응 기록 중 진척사항이 채워진 비율입니다 — 미기재가 많으면 위 지표가 모두 왜곡됩니다">📝 기록 ' + S.r3 + '%' + arrow(S.r3, Pv.none ? null : Pv.r3) + '</span>'
     + '<span class="bd k' + (pick==='unrec'?' on':'') + '"' + (S.unrec ? ' onclick="dpay_resPick(\'unrec\')"' : '')
     +   ' title="그날 입금이 없고 납기 도래 미납이 남았으며 다음 약속도 없는 건입니다">💸 미회수 ' + S.unrec + '명 <i>' + w(S.unrecAmt) + '</i></span>'
+    + '<span style="margin-left:auto;font-size:9.5px;font-weight:700;color:#B6C2D1;white-space:nowrap" title="종합 성적 산식과 등급 기준">'
+    +   (S.legal ? '산식 업무량50·이행20·회수15·기록15 <i style="font-style:normal;color:#CBD5E1">·</i> 종료자 ×1.5' : '산식 이행60·회수20·기록20')
+    +   ' <i style="font-style:normal;color:#CBD5E1">·</i> A75+ B60 C45 D30</span>'
     + '</div>';
 }
 /* [v597] 기간 합산 대응 결과 — off1..off2 각 날짜의 결과(그날 마지막 기록 기준)를 더한다.
@@ -8541,7 +8549,7 @@ function dpay_scoreBarHtml(S, Pv, note, prevLb){
 function dpay_resultRange(off1, off2, who, person){
   who = who || ''; person = person || '';   /* [v615] */
   var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, pCnt:{}, who:who, person:person, payReady:true, day:'', days:0, exclToday:false,
-            pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], got:0, rest:0 };
+            pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], su:[], got:0, rest:0 };
   try {
     var d0 = '', d1 = '';
     for (var off = off1; off <= off2; off++){
@@ -8551,7 +8559,7 @@ function dpay_resultRange(off1, off2, who, person){
       Object.keys(d.pCnt||{}).forEach(function(k9){ if(!O.pCnt[k9]) O.pCnt[k9]={}; Object.keys(d.pCnt[k9]).forEach(function(c9){ O.pCnt[k9][c9]=1; }); });   /* [v615] */
       if (!d.payReady) O.payReady = false;
       var tag = d.day;
-      ['pay','split','paid','nores','end','blank','law','delay'].forEach(function(k){
+      ['pay','split','paid','nores','end','blank','law','delay','su'].forEach(function(k){
         d[k].forEach(function(x){ O[k].push(Object.assign({}, x, { day: tag })); });
       });
       if (off === 0) { O.exclToday = true; }
@@ -8561,7 +8569,7 @@ function dpay_resultRange(off1, off2, who, person){
       }
     }
     O.day = d0 + ' ~ ' + d1;
-    ['pay','split','paid','nores','end','blank','law','delay','unrec'].forEach(function(k){
+    ['pay','split','paid','nores','end','blank','law','delay','unrec','su'].forEach(function(k){
       O[k].sort(function(x,y){ return (y.rest - x.rest) || String(x.cno).localeCompare(String(y.cno)); });
     });
   } catch(e){ console.warn('[v597] resultRange', e); }
@@ -24660,13 +24668,13 @@ function okpi_jumpToCk(person, period){
 // 1차 → 2차 카테고리 트리
 window._okpiCat = {
   '계약(입주)관리':['전화응대(임(전)차인)','전화응대(부동산)','전화응대(임대인)','계약정보 입수','전자서명 발행','수수료 입금','중요사항 설명','날인 계약서 입수','임대차신고 보관','부동산 계약전 검토','퇴실청소비 청구','발행','종료','기타'],
-  '수납관리':    ['임대료 수납 처리','연체자 전화 대응','납부일 확정 받음','연락불가자 방문','납부 완료','분납 완료','분납 진행중','전화응대(임(전)차인)','기타'],
+  '수납관리':    ['임대료 수납 처리','연체자 전화 대응','납부일 확정 받음','연락불가자 방문','납부 완료','분납 완료','분납 진행중','전화응대(임(전)차인)','슬랙대응','위임업무','기타'],   /* [v617] 슬랙·위임 */
   '갱신관리':    ['갱신 희망 확인','갱신 협의','갱신심사 거절 안내','갱신대상 홈버튼 등록','만기 퇴실 확정','전화응대','기타'],
   // [v373] 연체관리 2차 카테고리 재정렬 + 신규 옵션 + 구분선 그룹화
   //   그룹1: 일상 대응 (전화/이미지/현장)
   //   그룹2: 법적 절차 (검토 → 발송 → 진행 → 집행)
   //   그룹3: 종료/기타
-  '연체관리':    ['전화응대','내용증명이미지발송','현장방문','---','법적 조치 검토','내용증명 발송','지급명령 진행','보정명령 대응','지급명령 도달','지급명령 확정','소송취하','기타집행','---','중도퇴실 처리','계약 종료자 대응','기타'],   /* [v600] 도달·확정 단계 추가 */
+  '연체관리':    ['전화응대','내용증명이미지발송','현장방문','슬랙대응','위임업무','---','법적 조치 검토','내용증명 발송','지급명령 진행','보정명령 대응','지급명령 도달','지급명령 확정','소송취하','기타집행','---','중도퇴실 처리','계약 종료자 대응','기타'],   /* [v600] 도달·확정 단계 추가 · [v617] 슬랙·위임 */
   // [v540/v540.1] 상태확정 그룹 — 선택 시 DR F열에 저장되어 공실상태로 대시보드에 즉시 반영 (_vacDrOverride)
   //   {h:} = 그룹 헤더(선택불가), {v:,t:} = 저장값/표시문구 분리 (시트에는 v만 저장)
   // [v545] 과정 옵션 간소화 — 중도퇴실문의 → 계약해지확정 → 실제퇴실 (+기타). 구 값(신청 접수·정산 협의 등)은 기존 기록에서 계속 인식
