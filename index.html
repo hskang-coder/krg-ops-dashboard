@@ -4787,11 +4787,12 @@ function downloadDlqLegalExcel(){
       '보정명령':dt(_dlqLegalLatest(cno,mBo)),
       '도달':dt(_dlqLegalLatest(cno,mDo)), '확정':dt(_dlqLegalLatest(cno,mHw)),   /* [v600·v603] 절차 순 */
       '기타집행':dt(_dlqLegalLatest(cno,mEtc)),
+      '도달일수':(function(){var x=_dlqJiToDodalDays(cno);return x?x.days:'';})(),   /* [v607] */
       '진척사항':prog?(prog.content||prog.progress||''):''
     };
   });
   var ws = XLSX.utils.json_to_sheet(data);
-  ws['!cols']=[{wch:9},{wch:8},{wch:11},{wch:8},{wch:9},{wch:13},{wch:14},{wch:12},{wch:12},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:40}];   /* [v600] 도달·확정 */
+  ws['!cols']=[{wch:9},{wch:8},{wch:11},{wch:8},{wch:9},{wch:13},{wch:14},{wch:12},{wch:12},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:8},{wch:40}];   /* [v600] 도달·확정 · [v607] 도달일수 */
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '법무진척');
   var today=(function(){var t=new Date();return t.getFullYear()+String(t.getMonth()+1).padStart(2,'0')+String(t.getDate()).padStart(2,'0');})();
@@ -10231,6 +10232,19 @@ function _dlqLegalLatest(cno, matchFn){
   rs.sort(function(a,b){ var dd=(typeof cG_dateNum==='function')?(cG_dateNum(b.date)-cG_dateNum(a.date)):0; if(dd!==0)return dd; return (b._idx||0)-(a._idx||0); });
   return rs[0];
 }
+/* [v607] 지급명령(신청·진행)→도달 소요일수. 둘 다 있고 도달이 이후일 때만 숫자, 아니면 null */
+function _dlqJiToDodalDays(cno){
+  try {
+    var mJi2=function(x){return x.indexOf('지급명령')>=0&&x.indexOf('지급명령도달')<0&&x.indexOf('지급명령확정')<0;};
+    var mDo2=function(x){return x.indexOf('지급명령도달')>=0;};
+    var ji=_dlqLegalLatest(cno,mJi2), dd=_dlqLegalLatest(cno,mDo2);
+    if(!ji||!dd) return null;
+    var a=_parseAnyDateCell(ji.date), b=_parseAnyDateCell(dd.date);
+    if(!a||!b) return null;
+    var days=Math.round((b.getTime()-a.getTime())/86400000);
+    return days>=0 ? { days:days, ji:_dlqDt(ji.date), dd:_dlqDt(dd.date) } : null;
+  } catch(_){ return null; }
+}
 function _dlqScore(cno){
   if(!Array.isArray(daeungRawData))return null;
   // [v424] KCB 점수 = 'KCB' 인접 3자리 (업무하위 무관)
@@ -10263,6 +10277,9 @@ function dlqRenderLegalTableRows(rows, container){
   var mDo=function(s){return s.indexOf('지급명령도달')>=0;}, mHw=function(s){return s.indexOf('지급명령확정')>=0;};   /* [v600] */
   var mAll=function(s){return s.indexOf('내용증명발송')>=0||s.indexOf('지급명령')>=0||s.indexOf('기타집행')>=0||s.indexOf('기타조치')>=0||s.indexOf('보정명령')>=0;};
   var esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  /* [v607] 표 내 평균 소요일 선계산 */
+  var _ddArr=[]; rows.forEach(function(r){ var x=_dlqJiToDodalDays(String(r.cno||'').trim()); if(x) _ddArr.push(x.days); });
+  var _ddAvg=_ddArr.length ? _ddArr.reduce(function(a,b){return a+b;},0)/_ddArr.length : null;
   var body = rows.map(function(r){
     var cno=String(r.cno||'').trim();
     var nae=_dlqLegalLatest(cno,mNae), ji=_dlqLegalLatest(cno,mJi), bo=_dlqLegalLatest(cno,mBo), etc=_dlqLegalLatest(cno,mEtc);
@@ -10292,13 +10309,24 @@ function dlqRenderLegalTableRows(rows, container){
       +'<td>'+(dod?'<span style="display:inline-block;background:#DCFCE7;color:#166534;font-size:11px;padding:2px 7px;border-radius:6px;white-space:nowrap">'+(_dlqDt(dod.date)||'기재')+'</span>':'<span style="color:#D1D5DB">—</span>')+'</td>'
       +'<td>'+(hwk?'<span style="display:inline-block;background:#EDE9FE;color:#5B21B6;font-size:11px;padding:2px 7px;border-radius:6px;white-space:nowrap">'+(_dlqDt(hwk.date)||'기재')+'</span>':'<span style="color:#D1D5DB">—</span>')+'</td>'
       +'<td>'+pill(etc,false)+'</td>'
+      +(function(){   /* [v607] 지급명령→도달 소요일수 */
+        var x=_dlqJiToDodalDays(cno);
+        if(!x) return '<td style="white-space:nowrap"><span style="color:#D1D5DB">—</span></td>';
+        var mark='', col='#334155';
+        if(_ddAvg!=null && _ddArr.length>1){
+          if(x.days < _ddAvg-0.5){ mark=' 🔽'; col='#0284C7'; }
+          else if(x.days > _ddAvg+0.5){ mark=' 🔼'; col='#DC2626'; }
+        }
+        var tip='지급명령 '+x.ji+' → 도달 '+x.dd+' · '+x.days+'일'+(_ddAvg!=null?' (표 평균 '+(Math.round(_ddAvg*10)/10)+'일)':'');
+        return '<td style="white-space:nowrap;cursor:help" title="'+tip+'"><span style="font-size:11.5px;font-weight:800;color:'+col+'">'+x.days+'일'+mark+'</span></td>';
+      })()
       +'<td class="dlq-tbl-content" style="color:'+(active?'#854F0B':'#374151')+'">'+(prog?esc(prog.content||prog.progress||'-'):'<span style="color:#D1D5DB">—</span>')+'</td>'
       +'</tr>';
   }).join('');
   container.innerHTML = '<div style="overflow-x:auto"><table class="dlq-tbl"><thead><tr>'
     +'<th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>'
     +'<th>계약번호</th><th>그룹</th><th>계약정보</th><th>연체일수</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th><th>연락처</th><th>연체금액</th><th>위약금</th>'
-    +'<th title="KCB 점수 (법적조치 검토/내용증명 발송 메모)">점수</th><th>내용증명</th><th>지급명령</th><th title="보정명령 대응">보정명령</th><th title="업무하위 \'지급명령 도달\' 최근 일자">도달</th><th title="업무하위 \'지급명령 확정\' 최근 일자">확정</th><th>기타집행</th><th>진척사항</th>'
+    +'<th title="KCB 점수 (법적조치 검토/내용증명 발송 메모)">점수</th><th>내용증명</th><th>지급명령</th><th title="보정명령 대응">보정명령</th><th title="업무하위 \'지급명령 도달\' 최근 일자">도달</th><th title="업무하위 \'지급명령 확정\' 최근 일자">확정</th><th>기타집행</th><th title="지급명령(신청·진행) 최근일 → 도달 최근일 소요일수 · 표 평균보다 빠르면 🔽 늦으면 🔼">도달일수</th><th>진척사항</th>'
     +'</tr></thead><tbody>'+body+'</tbody></table></div>'
     +'<div class="dlq-tbl-count" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+rows.length+'건 · 법무 진척 뷰'
     +'<span style="font-size:11px;color:#6b7280"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#B5D4F4;vertical-align:-1px;margin-right:3px"></span>완료·접수 일자</span>'
