@@ -4834,7 +4834,7 @@ function downloadDlqExcel() {
     try {
       if(!Array.isArray(daeungRawData))return '-';
       const c=String(cno||'').trim();
-      const rs=daeungRawData.filter(d=>d&&String(d.no||'').trim()===c&&d.jobSub);
+      const rs=daeungRawData.filter(d=>d&&String(d.no||'').trim()===c&&d.jobSub&&_dlqAfterCut(c,d.date,d._idx));   /* [v610] 소송취하 이후만 */
       const arr=[];
       if(rs.some(d=>String(d.jobSub).replace(/\s/g,'').indexOf('내용증명발송')>=0))arr.push('내용증명');
       if(rs.some(d=>String(d.jobSub).indexOf('지급명령')>=0))arr.push('지급명령');
@@ -9539,7 +9539,7 @@ function dlqRenderTableRows() {
       try {
         const cno = String(r.cno||'').trim();
         const subRows = Array.isArray(daeungRawData)
-          ? daeungRawData.filter(d => d && String(d.no||'').trim() === cno && d.jobSub)
+          ? daeungRawData.filter(d => d && String(d.no||'').trim() === cno && d.jobSub && _dlqAfterCut(cno, d.date, d._idx))   /* [v610] 소송취하 이후만 */
           : [];
         const hasContent = subRows.some(d => String(d.jobSub).replace(/\s/g,'').indexOf('내용증명발송') >= 0);
         const hasPayment = subRows.some(d => String(d.jobSub).indexOf('지급명령') >= 0);
@@ -9711,7 +9711,7 @@ function dlqRenderTableRows() {
               try {
                 if (!Array.isArray(daeungRawData)) return '<span style="color:#D1D5DB">-</span>';
                 var cno = String(r.cno||'').trim();
-                var rows = daeungRawData.filter(function(d){ return d && String(d.no||'').trim() === cno && d.jobSub; });
+                var rows = daeungRawData.filter(function(d){ return d && String(d.no||'').trim() === cno && d.jobSub && _dlqAfterCut(cno,d.date,d._idx); });   /* [v610] 소송취하 이후만 */
                 var hasContent = rows.some(function(d){ return String(d.jobSub).replace(/\s/g,'').indexOf('내용증명발송') >= 0; });
                 var hasPayment = rows.some(function(d){ return String(d.jobSub).indexOf('지급명령') >= 0; });
                 // [v372] "기타집행" + "기타조치" 둘 다 매칭 — 폼 옵션에 "기타조치" 추가됨
@@ -10225,9 +10225,31 @@ function dlqDrSlackCopy(){
   else { prompt('복사(Ctrl+C):', t); }
 }
 // ═══════════ [v452] Daily Report 끝 ═══════════
+/* [v610] 소송취하 컷오프 — 계약별 최근 '소송취하' 기록(일자·행순번). 취하 이전 법적 기록은 리셋 취급 */
+function _dlqLegalCut(cno){
+  var Prow=(typeof daeungRawData!=='undefined'&&Array.isArray(daeungRawData))?daeungRawData:[];
+  var M=window.__dlqCutMap;
+  if(!M||M._n!==Prow.length){
+    M={_n:Prow.length};
+    Prow.forEach(function(d){
+      if(!d||!d.jobSub) return;
+      if(String(d.jobSub).replace(/\s/g,'').indexOf('소송취하')<0) return;
+      var k=String(d.no||'').trim(); if(!k) return;
+      var dd=(typeof cG_dateNum==='function')?(cG_dateNum(d.date)||0):0, ix=d._idx||0;
+      var b=M[k]; if(!b||dd>b.d||(dd===b.d&&ix>b.i)) M[k]={d:dd,i:ix};
+    });
+    window.__dlqCutMap=M;
+  }
+  return M[String(cno).trim()]||null;
+}
+function _dlqAfterCut(cno,date,ix){
+  var c=_dlqLegalCut(cno); if(!c) return true;
+  var dd=(typeof cG_dateNum==='function')?(cG_dateNum(date)||0):0;
+  return dd>c.d||(dd===c.d&&(ix||0)>c.i);
+}
 function _dlqLegalLatest(cno, matchFn){
   if (!Array.isArray(daeungRawData)) return null;
-  var rs = daeungRawData.filter(function(d){ return d && String(d.no||'').trim()===String(cno).trim() && d.jobSub && matchFn(String(d.jobSub).replace(/\s/g,'')); });
+  var rs = daeungRawData.filter(function(d){ return d && String(d.no||'').trim()===String(cno).trim() && d.jobSub && matchFn(String(d.jobSub).replace(/\s/g,'')) && _dlqAfterCut(cno,d.date,d._idx); });   /* [v610] */
   if (!rs.length) return null;
   rs.sort(function(a,b){ var dd=(typeof cG_dateNum==='function')?(cG_dateNum(b.date)-cG_dateNum(a.date)):0; if(dd!==0)return dd; return (b._idx||0)-(a._idx||0); });
   return rs[0];
@@ -10235,7 +10257,7 @@ function _dlqLegalLatest(cno, matchFn){
 /* [v608] 최초 기록 — 내용증명·지급명령은 첫 발송/신청일 기준 */
 function _dlqLegalFirst(cno, matchFn){
   if (!Array.isArray(daeungRawData)) return null;
-  var rs = daeungRawData.filter(function(d){ return d && String(d.no||'').trim()===String(cno).trim() && d.jobSub && matchFn(String(d.jobSub).replace(/\s/g,'')); });
+  var rs = daeungRawData.filter(function(d){ return d && String(d.no||'').trim()===String(cno).trim() && d.jobSub && matchFn(String(d.jobSub).replace(/\s/g,'')) && _dlqAfterCut(cno,d.date,d._idx); });   /* [v610] */
   if (!rs.length) return null;
   rs.sort(function(a,b){ var dd=(typeof cG_dateNum==='function')?(cG_dateNum(a.date)-cG_dateNum(b.date)):0; if(dd!==0)return dd; return (a._idx||0)-(b._idx||0); });
   return rs[0];
@@ -24493,7 +24515,7 @@ window._okpiCat = {
   //   그룹1: 일상 대응 (전화/이미지/현장)
   //   그룹2: 법적 절차 (검토 → 발송 → 진행 → 집행)
   //   그룹3: 종료/기타
-  '연체관리':    ['전화응대','내용증명이미지발송','현장방문','---','법적 조치 검토','내용증명 발송','지급명령 진행','보정명령 대응','기타집행','지급명령 도달','지급명령 확정','---','중도퇴실 처리','계약 종료자 대응','기타'],   /* [v600] 도달·확정 단계 추가 */
+  '연체관리':    ['전화응대','내용증명이미지발송','현장방문','---','법적 조치 검토','내용증명 발송','지급명령 진행','보정명령 대응','지급명령 도달','지급명령 확정','소송취하','기타집행','---','중도퇴실 처리','계약 종료자 대응','기타'],   /* [v600] 도달·확정 단계 추가 */
   // [v540/v540.1] 상태확정 그룹 — 선택 시 DR F열에 저장되어 공실상태로 대시보드에 즉시 반영 (_vacDrOverride)
   //   {h:} = 그룹 헤더(선택불가), {v:,t:} = 저장값/표시문구 분리 (시트에는 v만 저장)
   // [v545] 과정 옵션 간소화 — 중도퇴실문의 → 계약해지확정 → 실제퇴실 (+기타). 구 값(신청 접수·정산 협의 등)은 기존 기록에서 계속 인식
