@@ -4783,7 +4783,7 @@ function downloadDlqLegalExcel(){
       '계약번호':cno, '그룹':r.group||'-', '계약정보':r.info||'-',
       '연체일수':r.days||0, '계약상태':r.contractStatus||'계약중', '공실상태':r.vacancyStatus||'-',
       '임(전)차인':r.nm||'-', '연락처':r.tel||'-', '연체금액':r.amt||0, '위약금':_dlqPenalty(cno)||0, '점수':_dlqScore(cno)||'',
-      '내용증명':dt(_dlqLegalLatest(cno,mNae)), '지급명령':dt(_dlqLegalLatest(cno,mJi)),
+      '내용증명':dt(_dlqLegalFirst(cno,mNae)), '지급명령':dt(_dlqLegalFirst(cno,mJi)),   /* [v608] 최초 일자 */
       '보정명령':dt(_dlqLegalLatest(cno,mBo)),
       '도달':dt(_dlqLegalLatest(cno,mDo)), '확정':dt(_dlqLegalLatest(cno,mHw)),   /* [v600·v603] 절차 순 */
       '기타집행':dt(_dlqLegalLatest(cno,mEtc)),
@@ -10232,12 +10232,21 @@ function _dlqLegalLatest(cno, matchFn){
   rs.sort(function(a,b){ var dd=(typeof cG_dateNum==='function')?(cG_dateNum(b.date)-cG_dateNum(a.date)):0; if(dd!==0)return dd; return (b._idx||0)-(a._idx||0); });
   return rs[0];
 }
-/* [v607] 지급명령(신청·진행)→도달 소요일수. 둘 다 있고 도달이 이후일 때만 숫자, 아니면 null */
+/* [v608] 최초 기록 — 내용증명·지급명령은 첫 발송/신청일 기준 */
+function _dlqLegalFirst(cno, matchFn){
+  if (!Array.isArray(daeungRawData)) return null;
+  var rs = daeungRawData.filter(function(d){ return d && String(d.no||'').trim()===String(cno).trim() && d.jobSub && matchFn(String(d.jobSub).replace(/\s/g,'')); });
+  if (!rs.length) return null;
+  rs.sort(function(a,b){ var dd=(typeof cG_dateNum==='function')?(cG_dateNum(a.date)-cG_dateNum(b.date)):0; if(dd!==0)return dd; return (a._idx||0)-(b._idx||0); });
+  return rs[0];
+}
+/* [v607] 지급명령(신청·진행)→도달 소요일수. 둘 다 있고 도달이 이후일 때만 숫자, 아니면 null
+   [v608] 지급명령은 '최초 신청일', 도달은 '최근 도달일' 기준 */
 function _dlqJiToDodalDays(cno){
   try {
     var mJi2=function(x){return x.indexOf('지급명령')>=0&&x.indexOf('지급명령도달')<0&&x.indexOf('지급명령확정')<0;};
     var mDo2=function(x){return x.indexOf('지급명령도달')>=0;};
-    var ji=_dlqLegalLatest(cno,mJi2), dd=_dlqLegalLatest(cno,mDo2);
+    var ji=_dlqLegalFirst(cno,mJi2), dd=_dlqLegalLatest(cno,mDo2);   /* [v608] 신청=최초 · 도달=최신 */
     if(!ji||!dd) return null;
     var a=_parseAnyDateCell(ji.date), b=_parseAnyDateCell(dd.date);
     if(!a||!b) return null;
@@ -10282,7 +10291,7 @@ function dlqRenderLegalTableRows(rows, container){
   var _ddAvg=_ddArr.length ? _ddArr.reduce(function(a,b){return a+b;},0)/_ddArr.length : null;
   var body = rows.map(function(r){
     var cno=String(r.cno||'').trim();
-    var nae=_dlqLegalLatest(cno,mNae), ji=_dlqLegalLatest(cno,mJi), bo=_dlqLegalLatest(cno,mBo), etc=_dlqLegalLatest(cno,mEtc);
+    var nae=_dlqLegalFirst(cno,mNae), ji=_dlqLegalFirst(cno,mJi), bo=_dlqLegalLatest(cno,mBo), etc=_dlqLegalLatest(cno,mEtc);   /* [v608] 내용증명·지급명령=최초 */
     var dod=_dlqLegalLatest(cno,mDo), hwk=_dlqLegalLatest(cno,mHw);   /* [v600] */
     var prog=_dlqLegalLatest(cno,mAll);
     var pen=_dlqPenalty(cno);
@@ -10326,7 +10335,7 @@ function dlqRenderLegalTableRows(rows, container){
   container.innerHTML = '<div style="overflow-x:auto"><table class="dlq-tbl"><thead><tr>'
     +'<th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>'
     +'<th>계약번호</th><th>그룹</th><th>계약정보</th><th>연체일수</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th><th>연락처</th><th>연체금액</th><th>위약금</th>'
-    +'<th title="KCB 점수 (법적조치 검토/내용증명 발송 메모)">점수</th><th>내용증명</th><th>지급명령</th><th title="보정명령 대응">보정명령</th><th title="업무하위 \'지급명령 도달\' 최근 일자">도달</th><th title="업무하위 \'지급명령 확정\' 최근 일자">확정</th><th>기타집행</th><th title="지급명령(신청·진행) 최근일 → 도달 최근일 소요일수 · 표 평균보다 빠르면 🔽 늦으면 🔼">도달일수</th><th>진척사항</th>'
+    +'<th title="KCB 점수 (법적조치 검토/내용증명 발송 메모)">점수</th><th title="최초 발송일">내용증명</th><th title="최초 신청일">지급명령</th><th title="보정명령 대응">보정명령</th><th title="업무하위 \'지급명령 도달\' 최근 일자">도달</th><th title="업무하위 \'지급명령 확정\' 최근 일자">확정</th><th>기타집행</th><th title="지급명령 최초 신청일 → 도달 최근일 소요일수 · 표 평균보다 빠르면 🔽 늦으면 🔼">도달일수</th><th>진척사항</th>'
     +'</tr></thead><tbody>'+body+'</tbody></table></div>'
     +'<div class="dlq-tbl-count" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+rows.length+'건 · 법무 진척 뷰'
     +'<span style="font-size:11px;color:#6b7280"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#B5D4F4;vertical-align:-1px;margin-right:3px"></span>완료·접수 일자</span>'
