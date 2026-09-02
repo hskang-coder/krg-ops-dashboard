@@ -8318,7 +8318,7 @@ var DPAY_RES_DEF = [
   { k:'split', lb:'💧 분납',     col:'#5B21B6', tip:'진척사항이 분납 — 일부만 받고 잔액이 남은 건' },
   { k:'paid',  lb:'✅ 완납',     col:'#047857', tip:'진척사항이 완납으로 기록된 건' },
   { k:'nores', lb:'📵 미수신',   col:'#B91C1C', tip:'진척사항이 미수신 — 연락이 닿지 않은 건' },
-  { k:'end',   lb:'📗 종료',     col:'#475569', tip:'진척사항이 종료로 기록된 건' },
+  { k:'end',   lb:'📗 대응종료', col:'#475569', tip:'진척사항이 종료(대응 종료)로 기록된 건 — 계약상태의 종료와는 다른 값입니다' },
   { k:'blank', lb:'⚪ 미기재',   col:'#94A3B8', tip:'진척사항이 비어 있는 건 — 결과를 채워주세요' }
 ];
 var DPAY_RES_EXT = [
@@ -8387,6 +8387,48 @@ function dpay_resultFor(dayOffset, who, person){
   } catch(e){ console.warn('[v587] resultFor', e); }
   return O;
 }
+/* [v616] 대응자별 하루 업무량 — 대응 기록 유형별 표준 소요시간(분) 추정
+   대응자 필터 선택 시 성적에 업무량(50%)이 반영된다. 종료자(계약 종료) 대응은 협상 난도가 높아 ×1.5 가산. */
+var DPAY_WORK_STD = 420;   /* 하루 기준 근무시간(분) = 7시간 */
+var DPAY_WORKMIN = [
+  { re:/지급명령\s*도달|지급명령\s*확정/, min:10, lb:'지급명령 도달·확정' },
+  { re:/보정명령/, min:30, lb:'보정명령 대응' },
+  { re:/내용증명\s*이미지/, min:5, lb:'내용증명 이미지 발송' },
+  { re:/내용증명/, min:30, lb:'내용증명 발송' },
+  { re:/지급명령/, min:30, lb:'지급명령 진행' },
+  { re:/기타집행|강제집행|가압류|소송/, min:30, lb:'집행·소송' },
+  { re:/특별송달/, min:20, lb:'특별송달' },
+  { re:/현장\s*방문/, min:30, lb:'현장 방문' },
+  { re:/KCB|신용조회|법적\s*조치\s*검토/i, min:5, lb:'KCB·법적조치 검토' }
+];
+function dpay_workLoad(off, person){
+  var out = { total:0, det:{}, endN:0, endMin:0 };
+  try {
+    var R = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
+    var d0 = new Date(); d0.setHours(0,0,0,0);
+    if (off) d0 = new Date(d0.getTime() + off * 86400000);
+    var key = dpay_ymd(d0);
+    R.forEach(function(r){
+      var ad = _parseAnyDateCell(r.date); if (!ad || dpay_ymd(ad) !== key) return;
+      var jt = String(r.jobType||'').trim();
+      if (jt !== '수납관리' && jt !== '연체관리') return;
+      if (person && String(r.person||'').trim().indexOf(person) < 0) return;
+      var cno9 = _normCno(r.no != null ? r.no : r.cno);
+      var t9 = String(r.jobSub||'') + ' ' + String(r.content||'');
+      var m9 = 5, lb9 = '일반 대응(전화·문자 등)';
+      for (var i9 = 0; i9 < DPAY_WORKMIN.length; i9++){
+        if (DPAY_WORKMIN[i9].re.test(t9)) { m9 = DPAY_WORKMIN[i9].min; lb9 = DPAY_WORKMIN[i9].lb; break; }
+      }
+      var ended9 = cno9 ? dpay_isEnded(cno9) : false;
+      var v9 = ended9 ? m9 * 1.5 : m9;   /* [v616] 종료자 대응 가산 */
+      if (ended9) { out.endN++; out.endMin += m9 * 0.5; }
+      out.total += v9;
+      if (!out.det[lb9]) out.det[lb9] = { n:0, min:0 };
+      out.det[lb9].n++; out.det[lb9].min += v9;
+    });
+  } catch(e){ console.warn('[v616] workLoad', e); }
+  return out;
+}
 /* [v589] 하루 성적 — 약속 이행률(60%) · 대응 회수율(20%) · 기록 완성도(20%)
    이행률만으로는 미수신·법조치 대응이 안 보이고, 회수율만 보면 담당자가 통제할 수 없는 대상까지
    분모에 들어가 늘 낮게 나온다. 셋을 가중평균해 하루를 한 등급으로 요약한다. */
@@ -8435,6 +8477,19 @@ function dpay_scoreFor(off, who, person){
     S.score = Math.round(sum / w);
     S.grade = S.score >= 75 ? 'A' : S.score >= 60 ? 'B' : S.score >= 45 ? 'C' : S.score >= 30 ? 'D' : 'E';
     S.gk = 'g' + S.grade;
+    /* [v616] 대응자 필터 선택 시 — 하루 업무량 기준 평가 (업무량 50 + 이행 20 + 회수 15 + 기록 15) */
+    if (person) {
+      var W9 = dpay_workLoad(off, person);
+      S.legal = true; S.workMin = W9.total; S.workDet = W9.det; S.endN = W9.endN; S.endMin = W9.endMin; S.wmBase = DPAY_WORK_STD;
+      S.rW = Math.min(100, Math.round(100 * W9.total / S.wmBase));
+      var sum9 = S.rW * 0.5, w9 = 0.5;
+      if (S.r1 !== null) { sum9 += S.r1 * 0.2; w9 += 0.2; }
+      sum9 += S.r2 * 0.15; w9 += 0.15;
+      sum9 += S.r3 * 0.15; w9 += 0.15;
+      S.score = Math.round(sum9 / w9);
+      S.grade = S.score >= 75 ? 'A' : S.score >= 60 ? 'B' : S.score >= 45 ? 'C' : S.score >= 30 ? 'D' : 'E';
+      S.gk = 'g' + S.grade;
+    }
   } catch(e){ console.warn('[v589] scoreFor', e); }
   C[ck] = S;
   return S;
@@ -8459,9 +8514,19 @@ function dpay_scoreBarHtml(S, Pv, note, prevLb){
   };
   var w = function(n){ return '₩' + Math.round(n||0).toLocaleString(); };
   return '<div class="dres-sc">'
-    + '<span class="g ' + S.gk + '" title="종합 성적 — 약속 이행률 60% + 대응 회수율 20% + 기록 완성도 20%&#10;A 75점 이상 · B 60 · C 45 · D 30 · E 30 미만">' + S.grade + '</span>'
+    + '<span class="g ' + S.gk + '" title="종합 성적 — ' + (S.legal
+        ? '하루 업무량 50% + 약속 이행률 20% + 대응 회수율 15% + 기록 완성도 15%&#10;(대응자 기준 · 종료자 대응 ×1.5 가산 · 이행 표본 없으면 가중 재배분)'
+        : '약속 이행률 60% + 대응 회수율 20% + 기록 완성도 20%') + '&#10;A 75점 이상 · B 60 · C 45 · D 30 · E 30 미만">' + S.grade + '</span>'
     + '<span class="s"><b>' + S.score + '</b>점' + arrow(S.score, Pv.none ? null : Pv.score) + '</span>'
-    + '<span class="lb">종합 성적' + (note ? ' · ' + note : '') + '</span>'
+    + '<span class="lb">종합 성적' + (S.legal ? ' · 업무량 기준' : '') + (note ? ' · ' + note : '') + '</span>'
+    + (S.legal ? (function(){
+        var bd9 = Object.keys(S.workDet||{}).map(function(k9){ var d9 = S.workDet[k9]; return k9 + ' ' + d9.n + '건·' + Math.round(d9.min) + '분'; }).join('&#10;');
+        return '<span class="bd" title="하루 업무량 — 대응 유형별 표준 소요시간 합산 ÷ 기준 ' + S.wmBase + '분&#10;'
+          + '(KCB·검토 5분 · 도달/확정 10분 · 특별송달 20분 · 내용증명/지급명령/보정/집행/현장방문 30분 · 일반 5분)&#10;'
+          + '종료자 대응은 ×1.5 가산' + (S.endN ? ' — 이번 기간 ' + S.endN + '건, +' + Math.round(S.endMin) + '분' : '')
+          + (bd9 ? '&#10;— 내역 —&#10;' + bd9 : '') + '">'
+          + '⏱️ 업무량 ' + S.rW + '% <i>' + Math.round(S.workMin) + '분</i></span>';
+      })() : '')
     + '<span class="bd k' + (pick==='broke'?' on':'') + '"' + (S.broke.length ? ' onclick="dpay_resPick(\'broke\')"' : '')
     +   ' title="입금예정일이 그날이었던 계약 중 실제 입금이 확인된 비율입니다.&#10;클릭하면 약속을 지키지 않은 명단이 열립니다.">'
     +   '🎯 이행 ' + (S.r1 == null ? '—' : S.r1 + '%') + ' <i>' + S.nKept + '/' + S.nProm + '</i>' + arrow(S.r1, Pv.none ? null : Pv.r1) + '</span>'
@@ -8534,6 +8599,26 @@ function dpay_scoreRange(span, who, person){
     S.score = Math.round(sum / w);
     S.grade = S.score >= 75 ? 'A' : S.score >= 60 ? 'B' : S.score >= 45 ? 'C' : S.score >= 30 ? 'D' : 'E';
     S.gk = 'g' + S.grade;
+    /* [v616] 대응자 필터 — 기간 합산 업무량 (기록 있는 날만 기준시간 합산) */
+    if (person) {
+      var W9 = { total:0, det:{}, endN:0, endMin:0 }, days9 = 0;
+      for (var o9 = span.a; o9 <= Math.min(span.b, -1); o9++){
+        var w9d = dpay_workLoad(o9, person);
+        if (w9d.total > 0) {
+          days9++; W9.total += w9d.total; W9.endN += w9d.endN; W9.endMin += w9d.endMin;
+          Object.keys(w9d.det).forEach(function(k9){ if (!W9.det[k9]) W9.det[k9] = { n:0, min:0 }; W9.det[k9].n += w9d.det[k9].n; W9.det[k9].min += w9d.det[k9].min; });
+        }
+      }
+      S.legal = true; S.workMin = W9.total; S.workDet = W9.det; S.endN = W9.endN; S.endMin = W9.endMin; S.wmBase = DPAY_WORK_STD * Math.max(1, days9);
+      S.rW = Math.min(100, Math.round(100 * W9.total / S.wmBase));
+      var sum9 = S.rW * 0.5, w9 = 0.5;
+      if (S.r1 !== null) { sum9 += S.r1 * 0.2; w9 += 0.2; }
+      sum9 += S.r2 * 0.15; w9 += 0.15;
+      sum9 += S.r3 * 0.15; w9 += 0.15;
+      S.score = Math.round(sum9 / w9);
+      S.grade = S.score >= 75 ? 'A' : S.score >= 60 ? 'B' : S.score >= 45 ? 'C' : S.score >= 30 ? 'D' : 'E';
+      S.gk = 'g' + S.grade;
+    }
   } catch(e){ console.warn('[v597] scoreRange', e); }
   return S;
 }
@@ -8625,6 +8710,7 @@ function dpay_resBlock(){
     h += '<div class="dres-list">' + PL.map(function(x){
       var cq = String(x.cno).replace(/'/g, "\\'");
       var bad = (x.pg === '완납' || x.pg === '종료') && x.rest > 0 && !x.got;
+      var pgLb9 = (x.pg === '종료') ? '대응종료' : x.pg;   /* [v616] 계약상태 종료와 구분 */
       return '<div class="dres-row">'
         + '<span class="c" onclick="crNavFromView(\'' + cq + '\',\'delinquency\')">' + x.cno + '</span>'
         + '<span class="n">' + x.nm + '</span>'
@@ -8635,8 +8721,8 @@ function dpay_resBlock(){
         + (x.next && x.next !== O.day ? '<span class="p" title="다음 입금예정일">→ ' + x.next + '</span>' : '')
         + (x.got > 0 ? '<span class="a" style="color:#047857" title="회수금액 — 납부일이 검색일(' + (x.day || O.day) + ')인 입금액 합계">+₩' + x.got.toLocaleString() + '</span>' : '')
         + (x.rest > 0 ? '<span class="a" title="납기가 도래한 미납 잔액">₩' + x.rest.toLocaleString() + '</span>' : '')
-        + (bad ? '<span class="w" title="진척사항은 ' + x.pg + '인데 납기 도래 미납이 남아 있습니다 — 확인이 필요합니다">⚠ ' + x.pg + '</span>'
-               : '<span class="p">' + x.pg + '</span>')
+        + (bad ? '<span class="w" title="진척사항은 ' + pgLb9 + '인데 납기 도래 미납이 남아 있습니다 — 확인이 필요합니다">⚠ ' + pgLb9 + '</span>'
+               : '<span class="p">' + pgLb9 + '</span>')
         + '</div>';
     }).join('') + '</div>';
   }
