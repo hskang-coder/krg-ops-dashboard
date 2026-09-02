@@ -3559,15 +3559,17 @@ function buildStrategyCards() {
       });
     }
   } catch(_e){}
-  const legalExtra = (function(){
-    const chip=(v,lbl)=>'<span onclick="event.stopPropagation();window._dlqLegalCardStatus=\''+v+'\';buildStrategyCards()" style="cursor:pointer;padding:2px 9px;border-radius:10px;font-size:10.5px;font-weight:700;'+(_lgStatus===v?'background:#DC2626;color:#fff':'background:#F1F5F9;color:#64748B')+'">'+lbl+'</span>';
-    const line=(lbl,n)=>'<div style="display:flex;justify-content:space-between;gap:6px;font-size:11px;color:#475569;white-space:nowrap"><span>'+lbl+'</span><b style="color:'+(n>0?'#B91C1C':'#94A3B8')+'">'+n+'명</b></div>';
-    return '<div onclick="event.stopPropagation()" style="margin:8px 0 2px;padding:8px 10px;background:#FEF7F7;border:1px solid #FECACA;border-radius:8px;cursor:default">'
-      +'<div style="display:flex;gap:5px;margin-bottom:6px;align-items:center"><span style="font-size:10px;color:#9CA3AF;font-weight:700;margin-right:2px">단계별 현황</span>'+chip('active','계약중')+chip('ended','종료')+'</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 14px">'
-      +line('내용증명 발행',lgCnt.nae)+line('지급명령 도달',lgCnt.dodal)
-      +line('지급명령 발행',lgCnt.ji)+line('지급명령 확정',lgCnt.hwak)
-      +line('보정명령 대응',lgCnt.bo)+line('기타집행',lgCnt.etc)
+  const legalExtra = (function(){   /* [v613] 컴팩트 퍼널형 */
+    const chip=(v,lbl)=>'<span onclick="event.stopPropagation();window._dlqLegalCardStatus=\''+v+'\';buildStrategyCards()" style="cursor:pointer;padding:1px 8px;border-radius:9px;font-size:10px;font-weight:700;'+(_lgStatus===v?'background:#DC2626;color:#fff':'background:#F1F5F9;color:#64748B')+'">'+lbl+'</span>';
+    const st=(lbl,n)=>'<span style="white-space:nowrap">'+lbl+' <b style="color:'+(n>0?'#B91C1C':'#94A3B8')+'">'+n+'명</b></span>';
+    const sep='<span style="color:#FCA5A5;font-weight:800;font-size:10px">›</span>';
+    return '<div onclick="event.stopPropagation()" style="margin:6px 0 2px;padding:6px 9px;background:#FEF7F7;border:1px solid #FECACA;border-radius:8px;cursor:default">'
+      +'<div style="display:flex;gap:5px;align-items:center;justify-content:space-between;flex-wrap:wrap">'
+      +'<span style="display:flex;gap:4px;align-items:center"><span style="font-size:10px;color:#9CA3AF;font-weight:700">단계별</span>'+chip('active','계약중')+chip('ended','종료')+'</span>'
+      +'<span style="font-size:10.5px;color:#475569;white-space:nowrap">기타집행 <b style="color:'+(lgCnt.etc>0?'#B91C1C':'#94A3B8')+'">'+lgCnt.etc+'명</b></span>'
+      +'</div>'
+      +'<div style="display:flex;gap:5px;align-items:center;margin-top:4px;font-size:10.5px;color:#475569;flex-wrap:wrap">'
+      +st('내용증명',lgCnt.nae)+sep+st('지급명령',lgCnt.ji)+sep+st('보정대응',lgCnt.bo)+sep+st('도달',lgCnt.dodal)+sep+st('확정',lgCnt.hwak)
       +'</div></div>';
   })();
 
