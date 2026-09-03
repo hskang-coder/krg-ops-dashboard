@@ -8725,6 +8725,26 @@ function dpay_resBlock(){
         + (x.day ? '<span class="p" title="대응일 ' + x.day + '">' + String(x.day).slice(5) + '</span>' : '')
         + (!who && dpay_isEnded(x.cno) ? '<span class="e" title="계약상태 ' + (dpay_csMap()[x.cno]||'종료') + ' — 퇴실 정산금·잔여 채권 대응입니다">🚪 종료</span>' : '')
         + (x.person ? '<span class="ps ' + (String(x.person).indexOf('오진선')>=0?'ps-oh':String(x.person).indexOf('김영철')>=0?'ps-ky':'ps-x') + '" title="대응자(담당자)">' + x.person + '</span>' : '')
+        + (pick === 'law' ? (function(){   /* [v618] 법조치 명단 — 법적 단계 배지 (소송취하 이후 리셋 반영) */
+            try {
+              if (typeof _dlqLegalFirst !== 'function' || typeof _dlqLegalLatest !== 'function') return '';
+              var c9 = String(x.cno||'').trim();
+              var mNae9=function(t){return t.indexOf('내용증명발송')>=0;};
+              var mJi9=function(t){return t.indexOf('지급명령')>=0&&t.indexOf('지급명령도달')<0&&t.indexOf('지급명령확정')<0;};
+              var mBo9=function(t){return t.indexOf('보정명령')>=0;};
+              var mDo9=function(t){return t.indexOf('지급명령도달')>=0;};
+              var mHw9=function(t){return t.indexOf('지급명령확정')>=0;};
+              var mEt9=function(t){return t.indexOf('기타집행')>=0||t.indexOf('기타조치')>=0;};
+              var p9=function(lbl,col,rec,tip){ return rec?'<span title="'+tip+' '+String(rec.date||'')+'" style="font-size:9px;font-weight:800;border-radius:5px;padding:1px 5px;background:'+col+';color:#fff;white-space:nowrap">'+lbl+'</span>':''; };
+              var h9 = p9('내용','#16A34A',_dlqLegalFirst(c9,mNae9),'내용증명 최초')
+                     + p9('지급','#15803D',_dlqLegalFirst(c9,mJi9),'지급명령 최초')
+                     + p9('보정','#B45309',_dlqLegalLatest(c9,mBo9),'보정명령 대응')
+                     + p9('도달','#0284C7',_dlqLegalLatest(c9,mDo9),'지급명령 도달')
+                     + p9('확정','#7C3AED',_dlqLegalLatest(c9,mHw9),'지급명령 확정')
+                     + p9('기타','#D97706',_dlqLegalLatest(c9,mEt9),'기타집행');
+              return h9 ? '<span style="display:inline-flex;gap:3px;flex-shrink:0">' + h9 + '</span>' : '';
+            } catch(e9){ return ''; }
+          })() : '')
         + '<span class="m">' + (x.memo || '—') + '</span>'
         + (x.next && x.next !== O.day ? '<span class="p" title="다음 입금예정일">→ ' + x.next + '</span>' : '')
         + (x.got > 0 ? '<span class="a" style="color:#047857" title="회수금액 — 납부일이 검색일(' + (x.day || O.day) + ')인 입금액 합계">+₩' + x.got.toLocaleString() + '</span>' : '')
