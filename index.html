@@ -7917,7 +7917,7 @@ function dpay_legalMap(){
   try {
     (typeof daeungRawData!=='undefined'&&Array.isArray(daeungRawData)?daeungRawData:[]).forEach(function(r){
       var sub=String(r.jobSub||'').trim();
-      if(!/내용증명(?!\s*이미지)|지급명령|보정명령|기타집행|기타조치|법적조치/.test(sub)) return;   /* [v601] 내용증명이미지발송 제외 */
+      if(!/내용증명(?!\s*이미지)|지급명령|보정명령|기타집행|기타조치/.test(sub)) return;   /* [v601] 내용증명이미지발송 제외 · [v620] 법적조치 검토 제외 */
       var k=_normCno(r.no!=null?r.no:r.cno); if(!k) return;
       var d=_parseAnyDateCell(r.date); var t=d?d.getTime():0;
       if(!M[k] || t>=M[k].t) M[k]={t:t, sub:sub};
@@ -8312,7 +8312,7 @@ function dpay_isEnded(cno){
   return v !== '계약중' && v !== '입주예정' && v !== '정상';
 }
 /* [v587] 법적 절차로 분류할 업무하위 */
-var DPAY_LAW_RE = /(법적\s*조치|내용증명(?!\s*이미지)|지급명령|보정명령|기타집행|강제집행|가압류|소송)/;   /* [v601] 내용증명이미지발송 제외 */
+var DPAY_LAW_RE = /(내용증명(?!\s*이미지)|지급명령|보정명령|기타집행|강제집행|가압류|소송)/;   /* [v601] 내용증명이미지발송 제외 · [v620] 법적조치 검토 제외 — 실질 법적대응만 */
 var DPAY_RES_DEF = [
   { k:'pay',   lb:'📅 납부예정', col:'#B45309', tip:'진척사항이 납부약속이거나, 진척 기재 없이 입금예정일만 잡힌 건' },
   { k:'split', lb:'💧 분납',     col:'#5B21B6', tip:'진척사항이 분납 — 일부만 받고 잔액이 남은 건' },
@@ -8323,7 +8323,7 @@ var DPAY_RES_DEF = [
 ];
 var DPAY_RES_EXT = [
   { k:'su',    lb:'💼 수납관리',  col:'#B45309', tip:'업무구분이 수납관리로 기록된 대응 건 (위 구분과 중복 집계) — 오진선 수납 업무 확인용' },
-  { k:'law',   lb:'⚖️ 법조치',    col:'#7C2D12', tip:'업무하위가 법적 조치 검토·내용증명·지급명령·보정명령·집행인 건 (위 구분과 중복 집계)' },
+  { k:'law',   lb:'⚖️ 법조치',    col:'#7C2D12', tip:'업무하위가 내용증명 발송·지급명령·보정명령·기타집행 등 실제 법적 절차인 건 (법적조치 검토·내용증명 이미지 발송·강제퇴실확정 제외 · 위 구분과 중복 집계)' },
   { k:'delay', lb:'↩️ 일정 연기', col:'#0E7490', tip:'다음 입금예정일이 그날 이후로 잡혔거나(약속 연기 — 위 구분과 중복 집계), 진척이 재통화예정으로 기록된 건' },
   { k:'unrec', lb:'💸 미회수',    col:'#B91C1C', tip:'그날 입금 기록이 없고, 납기가 도래한 미납이 남아 있으며, 다음 약속도 잡히지 않은 건 (위 구분과 중복 집계)' }
 ];
@@ -8349,7 +8349,7 @@ function dpay_resultFor(dayOffset, who, person){
       if (person && ps9.indexOf(person) < 0) return;
       if (jt === '수납관리') PAY9[cno] = 1;   /* [v617] */
       var pg = String(r.progress||'').trim();
-      if (DPAY_LAW_RE.test(String(r.jobSub||'')) || pg === '강제퇴실확정') LAW[cno] = 1;
+      if (DPAY_LAW_RE.test(String(r.jobSub||''))) LAW[cno] = 1;   /* [v620] 강제퇴실확정은 퇴실 절차 — 법조치 제외 */
       var ix = +r._idx || 0, prev = LAST[cno];
       if (!prev || ix >= prev.ix) LAST[cno] = { ix:ix, r:r };
     });
@@ -24086,7 +24086,7 @@ function okpi_calcAll(){
       var jt = String(r.jobType||'').trim();
       return jt.indexOf('수납') >= 0 || jt.indexOf('연체') >= 0;
     };
-    var legal = countBy('오진선', function(r){ return ['법적조치검토','내용증명발송','지급명령진행','기타집행'].indexOf(String(r.jobSub||'').replace(/\s/g,'')) >= 0; });
+    var legal = countBy('오진선', function(r){ return ['내용증명발송','지급명령진행','보정명령대응','기타집행'].indexOf(String(r.jobSub||'').replace(/\s/g,'')) >= 0; });   /* [v620] 검토 제외·보정 포함 */
     var ohJobLegal = countBy('오진선', function(r){ return String(r.jobSub||'').replace(/\s/g,'') === '법적조치검토'; });
     var ohJobNotice = countBy('오진선', function(r){ return String(r.jobSub||'').replace(/\s/g,'') === '내용증명발송'; });
     var ohJobOrder = countBy('오진선', function(r){ return String(r.jobSub||'').replace(/\s/g,'') === '지급명령진행'; });
