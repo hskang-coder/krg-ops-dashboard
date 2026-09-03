@@ -4853,7 +4853,7 @@ function downloadDlqExcel() {
   const statusOrder = {'계약중':0,'종료(3개월이내)':1,'종료':2};
   let filtered = [...rows].filter(r => {
     if (cs !== 'all' && (r.contractStatus||'계약중') !== cs) return false;
-    if (days !== 'all') { const d=r.days||0; if(days==='1to3'&&!(d>=1&&d<=3))return false; if(days==='4to15'&&!(d>=1&&d<=15))return false; if(days==='16to30'&&!(d>=1&&d<=30))return false; if(days==='over30'&&!(d>30))return false; }
+    if (days !== 'all') { const d=r.days||0; if(days==='1to3'&&!(d>=1&&d<=3))return false; if(days==='4to15'&&!(d>=4&&d<=15))return false; if(days==='16to30'&&!(d>=16&&d<=30))return false; if(days==='over30'&&!(d>30))return false; }   /* [v619] 배타 구간 */
     if (pay !== 'all' && r.payStatus !== pay) return false;
     if (search && !(`${r.cno} ${r.nm}`).toLowerCase().includes(search)) return false;
     if (sf !== 'all') {
@@ -9438,7 +9438,7 @@ function buildDlqUI(d1, d2, d3, d4) {
 
     <!-- 6개 카드 -->
     <div class="dlq-cards-row">
-      <div class="dlq-stat-card c-red">
+      <div class="dlq-stat-card c-red" onclick="dlqCardDays('all')" style="cursor:pointer" title="클릭하면 아래 연체자 리스트의 연체일수 필터가 해제됩니다">
         <div class="dlq-stat-icon">👥</div>
         <div class="dlq-stat-label">전체 연체자<br>(계약중)</div>
         <div class="dlq-stat-num">${imdaCount}명</div>
@@ -9446,28 +9446,28 @@ function buildDlqUI(d1, d2, d3, d4) {
           <span style="background:#ede9fe;color:#4F46E5;border-radius:4px;padding:1px 5px;font-size:10px">변동관리비 ${byunCount}명</span>
         </div>
       </div>
-      <div class="dlq-stat-card c-green">
+      <div class="dlq-stat-card c-green" onclick="dlqCardDays('1to3')" style="cursor:pointer" title="클릭하면 아래 연체자 리스트가 1~3일 구간으로 필터링됩니다">
         <div class="dlq-stat-icon" style="color:#22c55e">🟢</div>
         <div class="dlq-stat-label">1일 ~ 3일</div>
         <div class="dlq-stat-num">${d2.segs.s1to3}명</div>
         <div class="dlq-stat-sub">${totalContracts>0?(d2.segs.s1to3/totalContracts*100).toFixed(2):'0.00'}%</div>
         <div class="dlq-stat-sub" style="font-size:10px;color:#64748B" title="연체일수별 세부 인원">1일 ${d2.segs.day1||0}명 · 2일 ${d2.segs.day2||0}명 · 3일 ${d2.segs.day3||0}명</div>
       </div>
-      <div class="dlq-stat-card c-orange">
+      <div class="dlq-stat-card c-orange" onclick="dlqCardDays('4to15')" style="cursor:pointer" title="클릭하면 아래 연체자 리스트가 4~15일 구간으로 필터링됩니다">
         <div class="dlq-stat-icon" style="color:#f97316">🟡</div>
-        <div class="dlq-stat-label">15일 이하</div>
-        <div class="dlq-stat-num">${d2.segs.s1to15}명</div>
-        <div class="dlq-stat-sub">${totalContracts>0?(d2.segs.s1to15/totalContracts*100).toFixed(2):'0.00'}%</div>
-        <div class="dlq-stat-sub" style="font-size:10px;color:#64748B" title="누적(1~15일) 중 이 구간만의 인원">4일 ~ 15일 ${d2.segs.s4to15||0}명</div>
+        <div class="dlq-stat-label">4일 ~ 15일</div>
+        <div class="dlq-stat-num">${d2.segs.s4to15||0}명</div>
+        <div class="dlq-stat-sub">${totalContracts>0?((d2.segs.s4to15||0)/totalContracts*100).toFixed(2):'0.00'}%</div>
+        <div class="dlq-stat-sub" style="font-size:10px;color:#64748B" title="1일부터 누적한 인원">누적 15일 이하 ${d2.segs.s1to15}명</div>
       </div>
-      <div class="dlq-stat-card c-yellow">
+      <div class="dlq-stat-card c-yellow" onclick="dlqCardDays('16to30')" style="cursor:pointer" title="클릭하면 아래 연체자 리스트가 16~30일 구간으로 필터링됩니다">
         <div class="dlq-stat-icon" style="color:#eab308">🟠</div>
-        <div class="dlq-stat-label">30일 이하</div>
-        <div class="dlq-stat-num">${d2.segs.s1to30}명</div>
-        <div class="dlq-stat-sub">${totalContracts>0?(d2.segs.s1to30/totalContracts*100).toFixed(2):'0.00'}%</div>
-        <div class="dlq-stat-sub" style="font-size:10px;color:#64748B" title="누적(1~30일) 중 이 구간만의 인원">16일 ~ 30일 ${d2.segs.s16to30||0}명</div>
+        <div class="dlq-stat-label">16일 ~ 30일</div>
+        <div class="dlq-stat-num">${d2.segs.s16to30||0}명</div>
+        <div class="dlq-stat-sub">${totalContracts>0?((d2.segs.s16to30||0)/totalContracts*100).toFixed(2):'0.00'}%</div>
+        <div class="dlq-stat-sub" style="font-size:10px;color:#64748B" title="1일부터 누적한 인원">누적 30일 이하 ${d2.segs.s1to30}명</div>
       </div>
-      <div class="dlq-stat-card c-dark">
+      <div class="dlq-stat-card c-dark" onclick="dlqCardDays('over30')" style="cursor:pointer" title="클릭하면 아래 연체자 리스트가 30일 초과 구간으로 필터링됩니다">
         <div class="dlq-stat-icon" style="color:#dc2626">🔴</div>
         <div class="dlq-stat-label">30일 초과</div>
         <div class="dlq-stat-num">${d2.segs.sOver30}명</div>
@@ -9585,8 +9585,8 @@ function buildDlqUI(d1, d2, d3, d4) {
           <span class="dlq-filter-label">연체일수</span>
           <button class="dlq-filter-btn active" data-group="days" onclick="dlqApplyFilter('days','all',this)">전체</button>
           <button class="dlq-filter-btn" data-group="days" onclick="dlqApplyFilter('days','1to3',this)">1~3일</button>
-          <button class="dlq-filter-btn" data-group="days" onclick="dlqApplyFilter('days','4to15',this)">15일이하</button>
-          <button class="dlq-filter-btn" data-group="days" onclick="dlqApplyFilter('days','16to30',this)">30일이하</button>
+          <button class="dlq-filter-btn" data-group="days" onclick="dlqApplyFilter('days','4to15',this)">4~15일</button>
+          <button class="dlq-filter-btn" data-group="days" onclick="dlqApplyFilter('days','16to30',this)">16~30일</button>
           <button class="dlq-filter-btn" data-group="days" onclick="dlqApplyFilter('days','over30',this)">30일초과</button>
         </div>
         <div class="dlq-filter-group">
@@ -9686,6 +9686,14 @@ function buildDlqUI(d1, d2, d3, d4) {
 // ── 연체자 테이블 필터 & 렌더 ──────────────────────────────
 let _dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all', contractStatus:'계약중', strategyFilter:'all' };
 
+/* [v619] 상단 구간 카드 클릭 → 아래 연체자 리스트 연체일수 필터 (같은 카드 재클릭 시 해제) */
+function dlqCardDays(v){
+  var cur = (window._dlqFilterState || {}).days || 'all';
+  var nv = (cur === v) ? 'all' : v;
+  var btn = document.querySelector('.dlq-filter-btn[data-group="days"][onclick*="\'days\',\'' + nv + '\'"]');
+  dlqApplyFilter('days', nv, btn || null);
+  if (nv !== 'all') setTimeout(function(){ var el = document.getElementById('dlqTableContainer'); if (el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }, 60);
+}
 function dlqApplyFilter(type, val, btn) {
   if (!window._dlqFilterState) window._dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all' };
   if (type === 'search') {
@@ -9737,9 +9745,9 @@ function dlqRenderTableRows() {
     }
     if (days && days !== 'all') {
       const d = r.days || 0;
-      if (days === '1to3'   && !(d >= 1 && d <= 3))  return false;
-      if (days === '4to15'  && !(d >= 1 && d <= 15)) return false;
-      if (days === '16to30' && !(d >= 1 && d <= 30)) return false;
+      if (days === '1to3'   && !(d >= 1 && d <= 3))   return false;
+      if (days === '4to15'  && !(d >= 4 && d <= 15))  return false;   /* [v619] 배타 구간 */
+      if (days === '16to30' && !(d >= 16 && d <= 30)) return false;   /* [v619] 배타 구간 */
       if (days === 'over30' && !(d > 30))             return false;
     }
     if (pay && pay !== 'all' && r.payStatus !== pay) return false;
