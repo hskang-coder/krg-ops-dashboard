@@ -8324,8 +8324,8 @@ var DPAY_RES_DEF = [
 var DPAY_RES_EXT = [
   { k:'su',    lb:'💼 수납관리',  col:'#B45309', tip:'업무구분이 수납관리로 기록된 대응 건 (위 구분과 중복 집계) — 오진선 수납 업무 확인용' },
   { k:'law',   lb:'⚖️ 법조치',    col:'#7C2D12', tip:'업무하위가 내용증명 발송·지급명령·보정명령·기타집행 등 실제 법적 절차인 건 (법적조치 검토·내용증명 이미지 발송·강제퇴실확정 제외 · 위 구분과 중복 집계)' },
-  { k:'fix',   lb:'📌 납부일 확정', col:'#0369A1', tip:'납부 예정이 없던 연체자에게 납부일을 새로 확정받은 건 — 진척사항 \'납부일 확정\' 기재 기준 (위 구분과 중복 집계)' },
-  { k:'delay', lb:'↩️ 일정 연기', col:'#0E7490', tip:'현재 미납 잔액이 남은 연체자 중 기존 납기일에서 납부를 미룬 건 — 다음 입금예정일이 그날 이후로 잡혔거나 진척이 재통화예정인 경우 (위 구분과 중복 집계)' },
+  { k:'fix',   lb:'📌 납부일 확정', col:'#0369A1', tip:'그날 새 입금예정일이 잡힌 연체자 중 기존 약속이 없던 대상 — 최근 14일 내 약속 기록과 유효한 미래 약속이 없으면 시스템이 자동 판정 (위 구분과 중복 집계)' },
+  { k:'delay', lb:'↩️ 일정 변경', col:'#0E7490', tip:'기존 약속이 있던 연체자(미납 잔존)가 납부일을 다시 잡았거나 재통화예정으로 유보한 건 — 시스템 자동 판정 (위 구분과 중복 집계)' },
   { k:'unrec', lb:'💸 미회수',    col:'#B91C1C', tip:'그날 입금 기록이 없고, 납기가 도래한 미납이 남아 있으며, 다음 약속도 잡히지 않은 건 (위 구분과 중복 집계)' }
 ];
 /* [v587] 그 날 '대응한' 수납·연체 계약을 결과별로 집계 — 대응일 기준 (약속일 기준인 아래 목록과 다름) */
@@ -8354,6 +8354,22 @@ function dpay_resultFor(dayOffset, who, person){
       var ix = +r._idx || 0, prev = LAST[cno];
       if (!prev || ix >= prev.ix) LAST[cno] = { ix:ix, r:r };
     });
+    /* [v623] 그날 대응한 계약의 '기존 약속' 여부 — 그날 이전 기록 중 최근 14일 내 입금예정일 기재 or 유효한 미래 약속 */
+    var PRIOR = {};
+    (function(){
+      var lim9 = d0.getTime() - 14 * 86400000, k9 = d0.getTime();
+      for (var i9 = 0; i9 < R.length; i9++){
+        var r9 = R[i9]; if (!r9) continue;
+        var jt9 = String(r9.jobType||'').trim();
+        if (jt9 !== '수납관리' && jt9 !== '연체관리') continue;
+        if (!String(r9.payDate||'').trim()) continue;
+        var c9 = _normCno(r9.no != null ? r9.no : r9.cno); if (!c9 || !LAST[c9] || PRIOR[c9]) continue;
+        var rd9 = _parseAnyDateCell(r9.date); if (!rd9 || rd9.getTime() >= k9) continue;
+        if (rd9.getTime() >= lim9) { PRIOR[c9] = 1; continue; }
+        var pd9 = _parseAnyDateCell(r9.payDate);
+        if (pd9 && pd9.getTime() >= k9) PRIOR[c9] = 1;
+      }
+    })();
     var _DUE0 = dpay_dueSet(0);
     O.payReady = _DUE0 !== null;   /* [v591] 입금내역 미로드면 미회수 판정 불가 */
     var AM = dpay_amtMap(dayOffset), DUE = _DUE0 || {}, CTX = dpay_ctxMap();
@@ -8373,14 +8389,15 @@ function dpay_resultFor(dayOffset, who, person){
       if (got > 0) O.gotCnt++;
       if (!pg) O.blankPg++;   /* [v589] 진척사항 기재 여부 — 그룹 분류와 별개로 센다 */
       var g = (pg === '완납') ? 'paid' : (pg === '분납') ? 'split' : (pg === '미수신') ? 'nores'
-            : (pg === '종료') ? 'end' : (pg === '납부약속' || pg === '납부일 확정' || nxs) ? 'pay' : 'blank';
-      if (pg === '납부일 확정') O.fix.push(it);   /* [v621] */
+            : (pg === '종료') ? 'end' : (pg === '납부약속' || pg === '납부일 확정' || pg === '일정 변경' || nxs) ? 'pay' : 'blank';
+      if (nxs && nxs >= key && rest > 0 && !PRIOR[cno]) O.fix.push(it);   /* [v623] 첫 약속 — 시스템 자동 판정 */
+      else if (pg === '납부일 확정') O.fix.push(it);   /* 과거 수동 기재 호환 */
       if (pg === '재통화예정') {   /* [v606] 결론 유보 → 일정 연기 그룹 (main 그룹 제외) */
         if (rest > 0) O.delay.push(it);   /* [v621] 현재 미납 잔존자만 = 납부 연기자 */
         if (!got && rest > 0) O.unrec.push(it);
       } else {
         O[g].push(it);
-        if (nxs && nxs > key && rest > 0) O.delay.push(it);   /* [v621] 현재 미납 잔존자만 */
+        if (nxs && nxs > key && rest > 0 && (PRIOR[cno] || pg === '일정 변경')) O.delay.push(it);   /* [v623] 기존 약속 있던 대상만 = 일정 변경 */
         else if (!got && rest > 0) O.unrec.push(it);
       }
       if (LAW[cno]) O.law.push(it);
@@ -24751,8 +24768,8 @@ function okpi_form_cat2Options(cat1){
 // [v221] 진척사항 옵션 — 1차 카테고리별 (I열 저장)
 window._okpiProgress = {
   '계약(입주)관리': ['', '대응중', '종료', '협의중'],
-  '수납관리':       ['', '납부일 확정', '재통화예정', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v621] 납부일 확정 — 납부 예정 없던 연체자에게 일정을 새로 확정받은 경우 */
-  '연체관리':       ['', '납부일 확정', '재통화예정', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v621] 납부일 확정 */
+  '수납관리':       ['', '재통화예정', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v623] 납부일 확정/일정 변경은 시스템 자동 판정 — 옵션 제거 */
+  '연체관리':       ['', '재통화예정', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v623] */
   '갱신관리':       ['', '갱신희망', '묵시적갱신', '만기퇴실예정', '갱신거절', '조건부승인'],
   '중도퇴실관리':   ['', '실제퇴실완료(개문포함)', '임대인합의전(청소,보증금확인)', '임대인합의완료(계약해지)', '부동산컨설팅확정', '부동산컨설팅제외(만기퇴실)', '후임세입자입주확정', '종료'],   /* [v609] 종료 추가 */   /* [v550.4] · [v553.1] 합의완료 추가 · [v566] 후임세입자입주확정 — 퇴실관리에선 컨설팅제외 그룹 소속 */
   '퇴실관리':       ['', '대응중', '종료', '협의중']   // [v547]
@@ -25019,7 +25036,8 @@ function okpi_form_submit(){
     var memo = document.getElementById('okpiF_memo').value;
     var dateInput = document.getElementById('okpiF_date').value;
 
-    /* [v599] 진척사항을 검증 전에 확정 — 수납·연체관리 + 입금예정일이면 '납부약속' 자동 채움 유지 */
+    /* [v599→v623] 진척 미선택 안전망 — 입금예정일만 있으면 '납부약속' 기록.
+       납부일 확정/일정 변경 구분은 시트에 적지 않고 대시보드가 집계 시 이력으로 자동 판정한다. */
     var progEl = document.getElementById('okpiF_progress');
     var progress = progEl ? (progEl.value || '') : '';
     if (!progress && dueDate && (cat1 === '수납관리' || cat1 === '연체관리')) {
