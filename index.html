@@ -8324,7 +8324,8 @@ var DPAY_RES_DEF = [
 var DPAY_RES_EXT = [
   { k:'su',    lb:'💼 수납관리',  col:'#B45309', tip:'업무구분이 수납관리로 기록된 대응 건 (위 구분과 중복 집계) — 오진선 수납 업무 확인용' },
   { k:'law',   lb:'⚖️ 법조치',    col:'#7C2D12', tip:'업무하위가 내용증명 발송·지급명령·보정명령·기타집행 등 실제 법적 절차인 건 (법적조치 검토·내용증명 이미지 발송·강제퇴실확정 제외 · 위 구분과 중복 집계)' },
-  { k:'delay', lb:'↩️ 일정 연기', col:'#0E7490', tip:'다음 입금예정일이 그날 이후로 잡혔거나(약속 연기 — 위 구분과 중복 집계), 진척이 재통화예정으로 기록된 건' },
+  { k:'fix',   lb:'📌 납부일 확정', col:'#0369A1', tip:'납부 예정이 없던 연체자에게 납부일을 새로 확정받은 건 — 진척사항 \'납부일 확정\' 기재 기준 (위 구분과 중복 집계)' },
+  { k:'delay', lb:'↩️ 일정 연기', col:'#0E7490', tip:'현재 미납 잔액이 남은 연체자 중 기존 납기일에서 납부를 미룬 건 — 다음 입금예정일이 그날 이후로 잡혔거나 진척이 재통화예정인 경우 (위 구분과 중복 집계)' },
   { k:'unrec', lb:'💸 미회수',    col:'#B91C1C', tip:'그날 입금 기록이 없고, 납기가 도래한 미납이 남아 있으며, 다음 약속도 잡히지 않은 건 (위 구분과 중복 집계)' }
 ];
 /* [v587] 그 날 '대응한' 수납·연체 계약을 결과별로 집계 — 대응일 기준 (약속일 기준인 아래 목록과 다름) */
@@ -8332,7 +8333,7 @@ function dpay_resultFor(dayOffset, who, person){
   who = who || ''; person = person || '';   /* [v615] 대응자 필터 */
   var CK = window.__dpayRes;
   if (!CK || CK._d !== dpay_ymd(new Date())) CK = window.__dpayRes = { _d: dpay_ymd(new Date()) };
-  var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, pCnt:{}, who:who, person:person, payReady:true, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], su:[], got:0, rest:0 };
+  var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, pCnt:{}, who:who, person:person, payReady:true, day:'', pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], su:[], fix:[], got:0, rest:0 };
   try {
     var R = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
     var d0 = new Date(); d0.setHours(0,0,0,0);
@@ -8372,19 +8373,20 @@ function dpay_resultFor(dayOffset, who, person){
       if (got > 0) O.gotCnt++;
       if (!pg) O.blankPg++;   /* [v589] 진척사항 기재 여부 — 그룹 분류와 별개로 센다 */
       var g = (pg === '완납') ? 'paid' : (pg === '분납') ? 'split' : (pg === '미수신') ? 'nores'
-            : (pg === '종료') ? 'end' : (pg === '납부약속' || nxs) ? 'pay' : 'blank';
+            : (pg === '종료') ? 'end' : (pg === '납부약속' || pg === '납부일 확정' || nxs) ? 'pay' : 'blank';
+      if (pg === '납부일 확정') O.fix.push(it);   /* [v621] */
       if (pg === '재통화예정') {   /* [v606] 결론 유보 → 일정 연기 그룹 (main 그룹 제외) */
-        O.delay.push(it);
+        if (rest > 0) O.delay.push(it);   /* [v621] 현재 미납 잔존자만 = 납부 연기자 */
         if (!got && rest > 0) O.unrec.push(it);
       } else {
         O[g].push(it);
-        if (nxs && nxs > key) O.delay.push(it);
+        if (nxs && nxs > key && rest > 0) O.delay.push(it);   /* [v621] 현재 미납 잔존자만 */
         else if (!got && rest > 0) O.unrec.push(it);
       }
       if (LAW[cno]) O.law.push(it);
       if (PAY9[cno]) O.su.push(it);   /* [v617] */
     });
-    ['pay','split','paid','nores','end','blank','law','delay','unrec','su'].forEach(function(k){
+    ['pay','split','paid','nores','end','blank','law','delay','unrec','su','fix'].forEach(function(k){
       O[k].sort(function(a,b){ return (b.rest - a.rest) || String(a.cno).localeCompare(String(b.cno)); });
     });
   } catch(e){ console.warn('[v587] resultFor', e); }
@@ -8549,7 +8551,7 @@ function dpay_scoreBarHtml(S, Pv, note, prevLb){
 function dpay_resultRange(off1, off2, who, person){
   who = who || ''; person = person || '';   /* [v615] */
   var O = { total:0, gotCnt:0, blankPg:0, nAct:0, nEnd:0, pCnt:{}, who:who, person:person, payReady:true, day:'', days:0, exclToday:false,
-            pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], su:[], got:0, rest:0 };
+            pay:[], split:[], paid:[], nores:[], end:[], blank:[], law:[], delay:[], unrec:[], su:[], fix:[], got:0, rest:0 };
   try {
     var d0 = '', d1 = '';
     for (var off = off1; off <= off2; off++){
@@ -8559,7 +8561,7 @@ function dpay_resultRange(off1, off2, who, person){
       Object.keys(d.pCnt||{}).forEach(function(k9){ if(!O.pCnt[k9]) O.pCnt[k9]={}; Object.keys(d.pCnt[k9]).forEach(function(c9){ O.pCnt[k9][c9]=1; }); });   /* [v615] */
       if (!d.payReady) O.payReady = false;
       var tag = d.day;
-      ['pay','split','paid','nores','end','blank','law','delay','su'].forEach(function(k){
+      ['pay','split','paid','nores','end','blank','law','delay','su','fix'].forEach(function(k){
         d[k].forEach(function(x){ O[k].push(Object.assign({}, x, { day: tag })); });
       });
       if (off === 0) { O.exclToday = true; }
@@ -8569,7 +8571,7 @@ function dpay_resultRange(off1, off2, who, person){
       }
     }
     O.day = d0 + ' ~ ' + d1;
-    ['pay','split','paid','nores','end','blank','law','delay','unrec','su'].forEach(function(k){
+    ['pay','split','paid','nores','end','blank','law','delay','unrec','su','fix'].forEach(function(k){
       O[k].sort(function(x,y){ return (y.rest - x.rest) || String(x.cno).localeCompare(String(y.cno)); });
     });
   } catch(e){ console.warn('[v597] resultRange', e); }
@@ -24749,8 +24751,8 @@ function okpi_form_cat2Options(cat1){
 // [v221] 진척사항 옵션 — 1차 카테고리별 (I열 저장)
 window._okpiProgress = {
   '계약(입주)관리': ['', '대응중', '종료', '협의중'],
-  '수납관리':       ['', '재통화예정', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v578] 종료 추가 · [v599→v606] 납부약속→재통화예정 (납부약속은 입금예정일 입력 시 자동 기록) */
-  '연체관리':       ['', '재통화예정', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v578] 종료 추가 · [v599→v606] 납부약속→재통화예정 (납부약속은 입금예정일 입력 시 자동 기록) */
+  '수납관리':       ['', '납부일 확정', '재통화예정', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v621] 납부일 확정 — 납부 예정 없던 연체자에게 일정을 새로 확정받은 경우 */
+  '연체관리':       ['', '납부일 확정', '재통화예정', '미수신', '분납', '완납', '강제퇴실확정', '종료'],   /* [v621] 납부일 확정 */
   '갱신관리':       ['', '갱신희망', '묵시적갱신', '만기퇴실예정', '갱신거절', '조건부승인'],
   '중도퇴실관리':   ['', '실제퇴실완료(개문포함)', '임대인합의전(청소,보증금확인)', '임대인합의완료(계약해지)', '부동산컨설팅확정', '부동산컨설팅제외(만기퇴실)', '후임세입자입주확정', '종료'],   /* [v609] 종료 추가 */   /* [v550.4] · [v553.1] 합의완료 추가 · [v566] 후임세입자입주확정 — 퇴실관리에선 컨설팅제외 그룹 소속 */
   '퇴실관리':       ['', '대응중', '종료', '협의중']   // [v547]
