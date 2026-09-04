@@ -2237,7 +2237,7 @@ function parseDailyReport(resp) {
 // ═══════════════════════════════════════════
 // [v540.1] 인식 목록 — 신규 입력 체계(강제퇴실 4종 + 불가항력 4종 + 자진 1종)에
 //   과거 기록 호환용(퇴실완료·만기퇴실예정·대위변제퇴실)을 더한 12종. 입력 드롭다운은 _okpiCat 참조.
-window._VAC_STAT9 = ['퇴실완료','중도퇴실','강제퇴실(공실)','강제퇴실(연체)','만기퇴실예정','강제퇴실(갱신불가)','강제퇴실(계약위반)','임대인사유퇴실','대위변제퇴실','사망','물건하자','월세부담','주위환경',
+window._VAC_STAT9 = ['퇴실완료','중도퇴실','강제퇴실(공실)','강제퇴실(연체)','만기퇴실예정','만기퇴실','강제퇴실(갱신불가)','강제퇴실(계약위반)','임대인사유퇴실','대위변제퇴실','사망','물건하자','월세부담','주위환경',
   '중도퇴실(자진)-룸상태불만·건물환경','중도퇴실(자진)-이동','중도퇴실(자진)-직장이동','중도퇴실(자진)-동거인불화','중도퇴실(자진)-갱신후해지','중도퇴실(자진)-개인사정'];   /* [v558.1] 자진 사유 세분 · [v562] 주위환경(불가항력) 추가 — 룸상태불만은 입력 옵션에서 제외됐지만 기존 기록 인식 위해 유지 · [v562.1] 이동(직장,청약 등) 신설, 직장이동은 기존 기록 인식용 유지 */
 /* [v558.2] 상태확정 인식 — 시트 직접 입력 표기 변형 허용:
    ① 공백 차이 무시('중도퇴실(자진) - 직장이동') ② 표준값 + 구분자(-·(—) 뒤 설명이 붙은 변형('물건하자-계약 물건 하자로 인한 퇴실') 인정.
@@ -24737,7 +24737,9 @@ window._okpiCat = {
     {v:'물건하자',          t:'물건하자 — 곰팡이, 누수'},   /* [v562] 설명 수정 */
     {v:'주위환경',          t:'주위환경 — 소음, 치안 등'},   /* [v562] 불가항력 신규 */
     {v:'월세부담',          t:'월세부담 — 임대료 부담으로 인한 퇴실'},
-    {h:'─ 상태확정 · 자진 ─'},
+    {h:'─ 상태확정 · 만기 ─'},
+  {v:'만기퇴실', t:'만기퇴실 — 로우데이터가 중도로 기재됐어도 실제 만기 퇴실 (묵시적 갱신 후 합의 퇴실 포함)'},   /* [v624] */
+  {h:'─ 상태확정 · 자진 ─'},
     {v:'중도퇴실',          t:'중도퇴실(자진) — 연체 없는 단순 퇴실'},
     /* [v558.1] 자진 퇴실 사유 세분 — F열에 사유 포함 저장, 공실상태로도 그대로 반영 · [v562] 룸상태불만·건물환경 옵션 삭제(→ 불가항력 물건하자·주위환경으로 이관, 기존 기록은 계속 인식) */
     {v:'중도퇴실(자진)-이동',              t:'중도퇴실(자진) — 이동(직장,청약 등)'},   /* [v562.1] 직장이동 → 이동(직장,청약 등) */
@@ -25644,11 +25646,19 @@ function exm_shortExp(v){
   var xd=exm_pd(v&&v.terminateDate)||exm_pd(v&&v.exitDate); if(!xd) return false;
   return Math.abs(Math.round((ed-xd)/864e5))<=31;   /* 만기 1개월 전후 */
 }
+/* [v624] 만기 인접 퇴실 보정 — 계약기간 무관, 퇴실일이 만기일 ±31일 이내면 J열 중도 기재라도 만기퇴실
+   (예: 54482 김정서 — 12개월 계약 만기 19일 전 임대인·전차인 합의 퇴실, 시트에는 중도퇴실로 기재) */
+function exm_nearExp(v){
+  var ed=exm_pd(v&&v.endDate); if(!ed) return false;
+  var xd=exm_pd(v&&v.terminateDate)||exm_pd(v&&v.exitDate); if(!xd) return false;
+  return Math.abs(Math.round((ed-xd)/864e5))<=31;
+}
 function exm_group(v){
   var s=String(v.status||'');
   if(s.indexOf('강제퇴실')>=0||s.indexOf('대위변제')>=0) return 'gz';   /* [v549.5] 강제 상태 최우선 — J열(중도퇴실 여부) 미기재여도 강제로 분류 */
+  if(s.indexOf('만기퇴실')>=0) return 'exp';   /* [v624] 상태확정 '만기퇴실' 수동 지정 최우선 */
   if(s.indexOf('사망')>=0||s.indexOf('임대인사유')>=0||s.indexOf('물건하자')>=0||s.indexOf('월세부담')>=0||s.indexOf('주위환경')>=0) return 'god';   /* [v549.10] 불가항력도 J열 무관 — 중도 계열 · [v562] 주위환경 */
-  if(exm_shortExp(v)) return 'exp';   /* [v561] 단기계약 만기 보정 — J열 중도 기재보다 우선 */
+  if(exm_shortExp(v)||exm_nearExp(v)) return 'exp';   /* [v561] 단기 만기 보정 · [v624] 만기 ±31일 이내는 전 계약 만기 분류 */
   if(!exm_isMid(v)) return exm_early(v)?'vol':'exp';   /* [v553.3] 만기 前 조기 퇴실 → 중도 */
   return 'vol';
 }
@@ -25989,7 +25999,7 @@ function renderExitMgmtView(){
     V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c3=String(v.no||'').trim(); if(c3) aliveOf[c3]={ t:String(v.terminateDate||'').trim(), r:(drReal[c3]?drReal[c3].v:String(v.exitDate||'').trim()) }; } });
     var _wRow=function(c3,src){ var _v1=vMap[c3]||{}; var _st=String(_v1.status||'').trim();
       return {cno:c3, src:src, nm:_v1.tenant1Name||_v1.tenantName||'-', addr:[_v1.propAddr,_v1.propBuilding,_v1.propRoom].filter(Boolean).join(' '), real:exm_fmtDt(aliveOf[c3].r), term:exm_fmtDt(aliveOf[c3].t),   /* [v553.3] 날짜 표기 통일 */
-        exit:(_st.indexOf('강제퇴실')>=0?'강제퇴실':(exm_shortExp(_v1)?'만기퇴실':((/중도퇴실/.test(String(_v1.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|주위환경|월세부담/.test(_st))?'중도퇴실':(exm_early(_v1,aliveOf[c3].r)?'중도퇴실':'만기퇴실')))),   /* [v547.2/549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 · [v561] 단기 만기 보정 */
+        exit:(_st.indexOf('강제퇴실')>=0?'강제퇴실':((_st.indexOf('만기퇴실')>=0||exm_shortExp(_v1)||exm_nearExp(_v1))?'만기퇴실':((/중도퇴실/.test(String(_v1.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|주위환경|월세부담/.test(_st))?'중도퇴실':(exm_early(_v1,aliveOf[c3].r)?'중도퇴실':'만기퇴실')))),   /* [v624] 만기 인접·수동 지정 보정 */   /* [v547.2/549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 · [v561] 단기 만기 보정 */
         st:(_st&&_st!=='-'?exm_stDisp(_st):'-'),   /* [v547.2] 공실상태(사유) · [v558.3] 자진 접두어 제거 */
         end:exm_fmtDt(_v1.endDate)}; };   /* [v547.3] 만기일 */
     var waitSet={};
@@ -26035,7 +26045,7 @@ function renderExitMgmtView(){
     var _zrow=function(cno,extra){ var _v2=vMap[cno]||{}; var R=_zrec[cno]; var _st2=String(_v2.status||'').trim();
       var o={cno:cno, nm:_v2.tenant1Name||_v2.tenantName||'-', addr:[_v2.propAddr,_v2.propBuilding,_v2.propRoom].filter(Boolean).join(' '),
         f:R?R.lv:'-', d:R?R.last:0, lc:(R&&R.lc?R.lc:''), lp:(R&&R.lp?R.lp:''), lpd:(R&&R.lpD?R.lpD:0), real:exm_fmtDt(drReal[cno]?drReal[cno].v:_v2.exitDate),   /* [v553.4] lpd = 진척사항 기재일 */   /* [v549.9] lc 기본 포함 · [v550.5] 진척사항 · [v553.3] 날짜 표기 통일 */
-        exit:(_st2.indexOf('강제퇴실')>=0?'강제퇴실':(exm_shortExp(_v2)?'만기퇴실':((/중도퇴실/.test(String(_v2.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|주위환경|월세부담/.test(_st2))?'중도퇴실':(exm_early(_v2,(drReal[cno]?drReal[cno].v:''))?'중도퇴실':'만기퇴실')))),   /* [v549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 · [v561] 단기 만기 보정 */
+        exit:(_st2.indexOf('강제퇴실')>=0?'강제퇴실':((_st2.indexOf('만기퇴실')>=0||exm_shortExp(_v2)||exm_nearExp(_v2))?'만기퇴실':((/중도퇴실/.test(String(_v2.jValue||''))||/중도퇴실|사망|임대인사유|물건하자|주위환경|월세부담/.test(_st2))?'중도퇴실':(exm_early(_v2,(drReal[cno]?drReal[cno].v:''))?'중도퇴실':'만기퇴실')))),   /* [v624] */   /* [v549.10] 불가항력·중도 상태도 중도퇴실 · [v553.3] 만기 前 조기 퇴실 보정 · [v561] 단기 만기 보정 */
         st:(_st2&&_st2!=='-'?exm_stDisp(_st2):'-'), end:exm_fmtDt(_v2.endDate)};   /* [v558.3] 자진 접두어 제거 */
       for(var k9 in (extra||{})) o[k9]=extra[k9]; return o; };
     var _zalive={}; V.forEach(function(v){ var k2=String(v.contractKind||'').trim(); if(k2==='정상'||k2==='계약중'){ var c=String(v.no||'').trim(); if(c) _zalive[c]=1; } });
