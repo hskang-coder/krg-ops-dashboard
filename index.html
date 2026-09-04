@@ -8311,6 +8311,31 @@ function dpay_isEnded(cno){
   if (!v) return false;
   return v !== '계약중' && v !== '입주예정' && v !== '정상';
 }
+/* [v625] 기준일 시점 연체일수 — 미납 잔존 청구 중 가장 오래된 납기 기준 */
+function dpay_dlqDaysMap(dayOffset){
+  try {
+    var P = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData : [];
+    if (!P.length) return {};
+    var d0 = new Date(); d0.setHours(0,0,0,0);
+    if (dayOffset) d0 = new Date(d0.getTime() + dayOffset * 86400000);
+    var key = dpay_ymd(d0);
+    var C = window.__dpayDlqD;
+    if (!C || C._n !== P.length) C = window.__dpayDlqD = { _n:P.length };
+    if (C[key]) return C[key];
+    var M = {};
+    for (var i = 0; i < P.length; i++){
+      var p = P[i];
+      if (dpay_num(p['미납(연체)금액(원)']) <= 0) continue;
+      var cno = _normCno(p['계약번호']); if (!cno) continue;
+      var due = _parseAnyDateCell(p['납기일']); if (!due) continue;
+      var dd = Math.floor((d0.getTime() - due.getTime()) / 86400000);
+      if (dd <= 0) continue;
+      if (!M[cno] || dd > M[cno]) M[cno] = dd;
+    }
+    C[key] = M;
+    return M;
+  } catch(e){ return {}; }
+}
 /* [v587] 법적 절차로 분류할 업무하위 */
 var DPAY_LAW_RE = /(내용증명(?!\s*이미지)|지급명령|보정명령|기타집행|강제집행|가압류|소송)/;   /* [v601] 내용증명이미지발송 제외 · [v620] 법적조치 검토 제외 — 실질 법적대응만 */
 var DPAY_RES_DEF = [
@@ -8733,6 +8758,7 @@ function dpay_resBlock(){
   });
   h += '</div>';
   var PL = (pick === 'broke') ? (isY ? (isRange ? dpay_scoreRange(span, who, psel).broke : dpay_scoreFor(off, who, psel).broke) : []) : O[pick];
+  var DLQD = dpay_dlqDaysMap(isRange ? Math.min(span.b, 0) : off);   /* [v625] 연체일수 (기간 조회 시 마지막 날 기준) */
   if (pick && PL && PL.length) {
     h += '<div class="dres-list">' + PL.map(function(x){
       var cq = String(x.cno).replace(/'/g, "\\'");
@@ -8741,6 +8767,12 @@ function dpay_resBlock(){
       return '<div class="dres-row">'
         + '<span class="c" onclick="crNavFromView(\'' + cq + '\',\'delinquency\')">' + x.cno + '</span>'
         + '<span class="n">' + x.nm + '</span>'
+        + (function(){   /* [v625] 연체일수 */
+            var d8 = DLQD[String(x.cno||'').trim()] || 0;
+            if (!(d8 > 0)) return '';
+            var c8 = d8 <= 3 ? '#16A34A' : d8 <= 15 ? '#D97706' : d8 <= 30 ? '#B45309' : '#DC2626';
+            return '<span class="p" style="background:transparent;border:1px solid ' + c8 + ';color:' + c8 + '" title="연체일수 — 납기 도래 미납 중 가장 오래된 납기 기준">' + d8 + '일</span>';
+          })()
         + (x.day ? '<span class="p" title="대응일 ' + x.day + '">' + String(x.day).slice(5) + '</span>' : '')
         + (!who && dpay_isEnded(x.cno) ? '<span class="e" title="계약상태 ' + (dpay_csMap()[x.cno]||'종료') + ' — 퇴실 정산금·잔여 채권 대응입니다">🚪 종료</span>' : '')
         + (x.person ? '<span class="ps ' + (String(x.person).indexOf('오진선')>=0?'ps-oh':String(x.person).indexOf('김영철')>=0?'ps-ky':'ps-x') + '" title="대응자(담당자)">' + x.person + '</span>' : '')
@@ -8765,6 +8797,28 @@ function dpay_resBlock(){
             } catch(e9){ return ''; }
           })() : '')
         + '<span class="m">' + (x.memo || '—') + '</span>'
+        + ((pick === 'delay' && x.next) ? (function(){   /* [v625] 일정 변경 — 이전 입금예정일 표시 */
+            try {
+              var c8 = String(x.cno||'').trim(), key8 = String(x.day || O.day);
+              var best = null;
+              (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData) ? daeungRawData : []).forEach(function(r8){
+                if (!r8 || String(r8.no||'').trim() !== c8) return;
+                var jt8 = String(r8.jobType||'').trim();
+                if (jt8 !== '수납관리' && jt8 !== '연체관리') return;
+                if (!String(r8.payDate||'').trim()) return;
+                var rd8 = _parseAnyDateCell(r8.date); if (!rd8) return;
+                var rs8 = dpay_ymd(rd8); if (rs8 >= key8) return;
+                var ix8 = +r8._idx || 0;
+                if (!best || rs8 > best.d || (rs8 === best.d && ix8 > best.i)) best = { d:rs8, i:ix8, p:r8.payDate };
+              });
+              if (!best) return '';
+              var pv8 = _parseAnyDateCell(best.p); var ps8 = pv8 ? dpay_ymd(pv8) : '';
+              if (!ps8 || ps8 === x.next) return '';
+              var slip8 = '';
+              try { var b8 = _parseAnyDateCell(x.next); if (pv8 && b8) { var n8 = Math.round((b8 - pv8) / 864e5); slip8 = ' · ' + (n8 >= 0 ? '+' + n8 : n8) + '일'; } } catch(_s8){}
+              return '<span class="p" style="background:#F8FAFC;color:#94A3B8;text-decoration:line-through" title="이전 입금예정일 — 이번 기록으로 변경' + slip8 + '">' + ps8.slice(5) + '</span>';
+            } catch(_e8){ return ''; }
+          })() : '')
         + (x.next && x.next !== O.day ? '<span class="p" title="다음 입금예정일">→ ' + x.next + '</span>' : '')
         + (x.got > 0 ? '<span class="a" style="color:#047857" title="회수금액 — 납부일이 검색일(' + (x.day || O.day) + ')인 입금액 합계">+₩' + x.got.toLocaleString() + '</span>' : '')
         + (x.rest > 0 ? '<span class="a" title="납기가 도래한 미납 잔액">₩' + x.rest.toLocaleString() + '</span>' : '')
