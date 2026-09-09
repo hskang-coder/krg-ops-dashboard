@@ -302,19 +302,22 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .pt-table { width: 100%; border-collapse: collapse; font-size: 10.5px; table-layout: fixed; }
 .pt-table th { background: #0F172A; color: #fff; padding: 5px 5px; font-weight: 700; text-align: left; font-size: 10px; position: sticky; top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pt-table td { padding: 5px 5px; border-bottom: 1px solid #F0F4F8; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* [v630] 15열 구조 기준 재정의 — 13번째(최근 대응내용) 확대 */
 .pt-table th:nth-child(1),.pt-table td:nth-child(1){width:2.5%;text-align:center}
-.pt-table th:nth-child(2),.pt-table td:nth-child(2){width:6%}
-.pt-table th:nth-child(3),.pt-table td:nth-child(3){width:10%;white-space:normal;word-break:keep-all}
-.pt-table th:nth-child(4),.pt-table td:nth-child(4){width:8%}
-.pt-table th:nth-child(5),.pt-table td:nth-child(5){width:5%}
-.pt-table th:nth-child(6),.pt-table td:nth-child(6){width:6%}
-.pt-table th:nth-child(7),.pt-table td:nth-child(7){width:8%}
-.pt-table th:nth-child(8),.pt-table td:nth-child(8){width:7%}
-.pt-table th:nth-child(9),.pt-table td:nth-child(9){width:6%}
-.pt-table th:nth-child(10),.pt-table td:nth-child(10){width:8%}
-.pt-table th:nth-child(11),.pt-table td:nth-child(11){width:8%}
-.pt-table th:nth-child(12),.pt-table td:nth-child(12){width:18.5%}
-.pt-table th:nth-child(13),.pt-table td:nth-child(13){width:7%}
+.pt-table th:nth-child(2),.pt-table td:nth-child(2){width:5.5%}
+.pt-table th:nth-child(3),.pt-table td:nth-child(3){width:7%;white-space:normal;word-break:keep-all}
+.pt-table th:nth-child(4),.pt-table td:nth-child(4){width:6.5%}
+.pt-table th:nth-child(5),.pt-table td:nth-child(5){width:4%}
+.pt-table th:nth-child(6),.pt-table td:nth-child(6){width:4%}
+.pt-table th:nth-child(7),.pt-table td:nth-child(7){width:5%}
+.pt-table th:nth-child(8),.pt-table td:nth-child(8){width:5.5%}
+.pt-table th:nth-child(9),.pt-table td:nth-child(9){width:5.5%}
+.pt-table th:nth-child(10),.pt-table td:nth-child(10){width:4.5%}
+.pt-table th:nth-child(11),.pt-table td:nth-child(11){width:6%}
+.pt-table th:nth-child(12),.pt-table td:nth-child(12){width:5.5%}
+.pt-table th:nth-child(13),.pt-table td:nth-child(13){width:29.5%}
+.pt-table th:nth-child(14),.pt-table td:nth-child(14){width:5%}
+.pt-table th:nth-child(15),.pt-table td:nth-child(15){width:4%}
 /* [v425] td에 display:-webkit-box를 주면 table-cell이 깨져 컬럼이 붕괴됨 → 정상 셀 유지 + 내부 줄바꿈 */
 .pt-table td.pt-td-content { white-space: normal !important; word-break: keep-all; line-height: 1.4; overflow: hidden; }
 .pt-table tr:hover td { background: #EEF4FF; cursor: pointer; }
@@ -5212,7 +5215,7 @@ function renderPaymentTargets() {
         const dm = (window._ptDailyMap||{})[r.no] || {};
         const dateStr = dm.latestDateStr || '—';
         const content = dm.latestContent || '—';
-        const shortC = content.length > 90 ? content.substring(0,90)+'…' : content;
+        const shortC = content.length > 180 ? content.substring(0,180)+'…' : content;   /* [v630] 열 폭 확대 반영 */
         return `<td style="white-space:nowrap;font-size:11px;color:#374151">${dateStr}</td>
                 <td class="pt-td-content" style="font-size:11px;color:#374151" title="${content.replace(/"/g,'&quot;')}">${shortC}</td>`;
       })()}
@@ -5305,7 +5308,7 @@ function renderPaymentTargets() {
       <div style="padding:10px 20px 4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${chips}<button onclick="ptGenFirstSms()" style="margin-left:auto;background:#0EA5E9;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📩 첫납부문자</button><button onclick="ptGenDelinqSms()" style="background:#DC2626;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📩 전월연체문자</button><button onclick="downloadPtExcel()" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ 엑셀 다운로드</button></div>
       <div style="padding:4px 20px 8px;font-size:11px;color:#94A3B8">표시 ${display.length}건</div>
       <div style="overflow-x:auto"><table class="pt-table">
-        <colgroup><col style="width:3%"><col style="width:6%"><col style="width:9%"><col style="width:8%"><col style="width:5%"><col style="width:5%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:13%"><col style="width:6%"><col style="width:5%"></colgroup>
+        <colgroup><col style="width:2.5%"><col style="width:5.5%"><col style="width:7%"><col style="width:6.5%"><col style="width:4%"><col style="width:4%"><col style="width:5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:4.5%"><col style="width:6%"><col style="width:5.5%"><col style="width:29.5%"><col style="width:5%"><col style="width:4%"></colgroup>   <!-- [v630] 최근 대응내용 13%→29.5% 확대 -->
         <thead><tr>
           <th style="width:30px;text-align:center"><input type="checkbox" onchange="ptSelectAll(this.checked)" title="전체 선택"></th>
           <th onclick="ptSortTable(this)" style="cursor:pointer;user-select:none" title="클릭하여 정렬">계약번호<span class="pt-sort-arrow"></span></th>
