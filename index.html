@@ -1176,7 +1176,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-tbl-info { font-size:10.5px; color:#6b7280; white-space:nowrap; }
 .dlq-tbl-amt { font-weight:500; color:#374151; white-space:nowrap; font-size:11px; }
 .dlq-tbl-tel { color:#6b7280; font-size:10.5px; white-space:nowrap; }
-.dlq-tbl td.dlq-tbl-content { min-width:140px; max-width:280px; color:#374151; white-space:normal !important; word-break:keep-all; line-height:1.5; font-size:10px; }
+.dlq-tbl td.dlq-tbl-content { width:100%; min-width:340px; max-width:none; color:#374151; white-space:normal !important; word-break:keep-all; line-height:1.5; font-size:10.5px; }   /* [v631] 잔여 폭 전부 흡수 */
 .dlq-days-badge { display:inline-block; padding:2px 7px; border-radius:10px; font-size:11px; font-weight:600; }
 .dlq-days-low  { background:#dcfce7; color:#166534; }
 .dlq-days-mid  { background:#fef9c3; color:#854d0e; }
@@ -9884,10 +9884,10 @@ function dlqRenderTableRows() {
       <thead><tr>
         <th style="width:34px;text-align:center" title="표시 순번">No</th>
         <th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>
-        <th>계약번호</th><th title="gid=1953907648 BT열 — 연체외주">연체외주</th><th>그룹</th><th>계약정보</th>
+        <th>계약번호</th><th>그룹</th><th>계약정보</th>
         <th>연체일수</th><th>납부구분</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th>
         <th title="입금내역(gid=131074722) 임대료 청구 중 연체(연체납부·연체중·분납중) 발생 비율">연체율</th>
-        <th>연락처</th><th>연체금액</th><th title="시작일 25.6.1 이후 계약자: 임대료 × 4개월 (gid=1953907648 W열 ≥ 2025-06-01, AK열 × 4)">위약금</th><th>대응일</th><th>입금예정일</th><th title="gid=554798125 F열='법적조치 검토' 행의 H열 점수 (숫자)">점수</th><th title="gid=554798125 F열 기재 유무 (내용증명/지급명령/기타집행)">법적진행</th><th>최근 대응 내용</th>
+        <th>연체금액</th><th title="시작일 25.6.1 이후 계약자: 임대료 × 4개월 (gid=1953907648 W열 ≥ 2025-06-01, AK열 × 4)">위약금</th><th>대응일</th><th>입금예정일</th><th title="gid=554798125 F열='법적조치 검토' 행의 H열 점수 (숫자)">점수</th><th title="gid=554798125 F열 기재 유무 (내용증명/지급명령/기타집행)">법적진행</th><th>최근 대응 내용</th>
       </tr></thead>
       <tbody>
         ${rows.map((r, _ri) => {
@@ -9928,14 +9928,6 @@ function dlqRenderTableRows() {
               <input type="checkbox" class="dlq-cb dlq-row-cb" value="${r.cno}" onchange="dlqToggleSelect('${r.cno}',this.checked)">
             </td>
             <td><span class="dlq-tbl-cno">${r.cno}</span></td>
-            <td style="font-size:11px;text-align:center;color:#475569">${(function(){
-              try {
-                if (!Array.isArray(vacancyRawData)) return '-';
-                var vr = vacancyRawData.find(v => String(v.no||'').trim() === String(r.cno||'').trim());
-                var os = (vr && vr.outsource) ? String(vr.outsource).trim() : '';
-                return os || '-';
-              } catch(_) { return '-'; }
-            })()}</td>
             <td><span class="dlq-tbl-group">${r.group||'-'}</span></td>
             <td><span class="dlq-tbl-info">${r.info||'-'}</span></td>
             <td><span class="dlq-days-badge dlq-days-${dc}">${r.days||0}일</span></td>
@@ -9951,7 +9943,6 @@ function dlqRenderTableRows() {
               var col=m.rate>=60?'#DC2626':m.rate>=30?'#D97706':'#059669';
               return '<b style="color:'+col+'">'+m.rate+'%</b> <span style="color:#9CA3AF;font-size:10px">('+m.late+'/'+m.bill+')</span>';
             })()}</td>
-            <td class="dlq-tbl-tel">${r.tel||'-'}</td>
             <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
             <td style="white-space:nowrap;font-size:11px">${penaltyCell}</td>
             <td style="white-space:nowrap;font-size:11px;color:#374151">${r.actionDateStr&&r.actionDateStr!=='-'?r.actionDateStr:'—'}</td>
@@ -27656,7 +27647,7 @@ function renderExitMgmtView(){
     if(th){var s=document.createElement('span');s.className='dp-sind';s.textContent=dir>0?' ▲':' ▼';s.style.fontSize='9px';th.appendChild(s);}
   };
   window._dpInject=function(){
-    var __legal=window._dlqLegalView;  // [v389] 법무 뷰: 컬럼 주입은 건너뛰되 헤더 정렬은 적용
+    var __legal=true;  // [v631] 리포트·대응패턴 열 주입 중단 — 헤더 정렬 바인딩만 유지 (구 동작: window._dlqLegalView)
     var dv=document.getElementById('delinquencyView'); if(!dv)return;
     var table=dv.querySelector('table'); if(!table)return;
     var headRow=table.querySelector('thead tr')||table.querySelector('tr');
