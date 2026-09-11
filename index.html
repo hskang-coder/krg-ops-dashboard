@@ -1183,6 +1183,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-days-high { background:#ffedd5; color:#9a3412; }
 .dlq-days-crit { background:#fee2e2; color:#991b1b; }
 .dlq-pay-date-badge { font-size:11px; font-weight:600; }
+/* [v632] 긴급대응필요 — 솔리드 빨강 배지 (대응 기록은 있으나 입금예정일 미등록) */
+.dlq-urgent-badge { display:inline-block; background:#DC2626; color:#fff; font-size:10px; font-weight:800; border-radius:5px; padding:2px 8px; white-space:nowrap; letter-spacing:-.2px; }
 .dlq-tbl-count { padding:8px 14px; font-size:12px; color:#9ca3af; text-align:right; }
 
 </style>
@@ -9946,7 +9948,9 @@ function dlqRenderTableRows() {
             <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
             <td style="white-space:nowrap;font-size:11px">${penaltyCell}</td>
             <td style="white-space:nowrap;font-size:11px;color:#374151">${r.actionDateStr&&r.actionDateStr!=='-'?r.actionDateStr:'—'}</td>
-            <td>${r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-'}</td>
+            <td>${r.dateStr==='긴급대응필요'
+              ? `<span class="dlq-urgent-badge" title="대응 기록은 있으나 입금예정일이 비어 있습니다 — 즉시 입금 약속 확정 필요">⚠ 긴급대응필요</span>`
+              : (r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-')}</td>   ${''/* [v632] 긴급대응필요 배지 */}
             <td style="text-align:center;font-size:12px;font-weight:700">${(function(){
               // [v366/v367] 점수 — F열='법적조치 검토' OR '내용증명 발송' 행의 H열에서 숫자 추출
               //              띄어쓰기 변형 모두 허용 ("법적 조치 검토", "법적조치검토" 등)
