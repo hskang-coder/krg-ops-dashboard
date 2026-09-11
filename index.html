@@ -1183,6 +1183,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-days-high { background:#ffedd5; color:#9a3412; }
 .dlq-days-crit { background:#fee2e2; color:#991b1b; }
 .dlq-pay-date-badge { font-size:11px; font-weight:600; }
+/* [v633] 입금예정일 경과일수 — -1일 ~ -3일 표기 */
+.dlq-past-days { display:inline-block; margin-left:3px; background:#FEF2F2; color:#B91C1C; border:1px solid #FCA5A5; font-size:9.5px; font-weight:800; border-radius:4px; padding:1px 5px; white-space:nowrap; vertical-align:1px; }
 /* [v632] 긴급대응필요 — 솔리드 빨강 배지 (대응 기록은 있으나 입금예정일 미등록) */
 .dlq-urgent-badge { display:inline-block; background:#DC2626; color:#fff; font-size:10px; font-weight:800; border-radius:5px; padding:2px 8px; white-space:nowrap; letter-spacing:-.2px; }
 .dlq-tbl-count { padding:8px 14px; font-size:12px; color:#9ca3af; text-align:right; }
@@ -9950,7 +9952,19 @@ function dlqRenderTableRows() {
             <td style="white-space:nowrap;font-size:11px;color:#374151">${r.actionDateStr&&r.actionDateStr!=='-'?r.actionDateStr:'—'}</td>
             <td>${r.dateStr==='긴급대응필요'
               ? `<span class="dlq-urgent-badge" title="대응 기록은 있으나 입금예정일이 비어 있습니다 — 즉시 입금 약속 확정 필요">⚠ 긴급대응필요</span>`
-              : (r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>`:'-')}</td>   ${''/* [v632] 긴급대응필요 배지 */}
+              : (r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>${(function(){
+                  /* [v633] 입금예정일 경과 — 1~3일만 '-N일' 표기 (4일 이상은 생략) */
+                  try {
+                    if (r.payStatus !== 'past') return '';
+                    var m9 = String(r.dateStr||'').match(/^(\d{4})\.(\d{2})\.(\d{2})/);
+                    if (!m9) return '';
+                    var t9 = new Date(); t9.setHours(0,0,0,0);
+                    var p9 = new Date(+m9[1], +m9[2]-1, +m9[3]); p9.setHours(0,0,0,0);
+                    var n9 = Math.round((t9.getTime() - p9.getTime()) / 86400000);
+                    if (n9 < 1 || n9 > 3) return '';
+                    return '<span class="dlq-past-days" title="입금예정일이 ' + n9 + '일 지났습니다 — 약속 미이행 확인 필요">-' + n9 + '일</span>';
+                  } catch(_e9){ return ''; }
+                })()}`:'-')}</td>   ${''/* [v632] 긴급대응필요 배지 · [v633] 경과일수 */}
             <td style="text-align:center;font-size:12px;font-weight:700">${(function(){
               // [v366/v367] 점수 — F열='법적조치 검토' OR '내용증명 발송' 행의 H열에서 숫자 추출
               //              띄어쓰기 변형 모두 허용 ("법적 조치 검토", "법적조치검토" 등)
