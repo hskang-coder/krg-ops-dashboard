@@ -9507,6 +9507,10 @@ function buildDlqUI(d1, d2, d3, d4) {
   /* [v634] 구간 카드 % 분모 = 전체 연체자(계약중) — 총 계약 대비가 아닌 연체자 내 비중 */
   const _dlqPctOf = function(n){ n = n|0; return imdaCount > 0 ? (n / imdaCount * 100).toFixed(1) : '0.0'; };
   const _dlqPctTip = function(n){ return '전체 연체자 ' + (imdaCount|0) + '명 중 ' + (n|0) + '명'; };
+  /* [v635] 본문 표기: '연체자 중 23.2% · 정산대상 중 1.43%' — 오늘자 연체 인원 대비 + 전체 정산 대상자 대비 함께 */
+  const _dlqPctAll = function(n){ n = n|0; return totalContracts > 0 ? (n / totalContracts * 100).toFixed(2) : '0.00'; };
+  const _dlqPctTxt = function(n){ return '<span title="오늘자 연체 인원 ' + (imdaCount|0) + '명 중 ' + (n|0) + '명">연체자 중 <b style="color:#334155">' + _dlqPctOf(n) + '%</b></span>'
+    + '<span style="color:#CBD5E1;margin:0 4px">·</span><span title="전체 정산 대상자 ' + (totalContracts|0).toLocaleString() + '명 중 ' + (n|0) + '명">정산대상 중 <b style="color:#334155">' + _dlqPctAll(n) + '%</b></span>'; };
   inner.innerHTML = `
   <div class="dlq-wrap">
 
@@ -9541,28 +9545,28 @@ function buildDlqUI(d1, d2, d3, d4) {
         <div class="dlq-stat-icon" style="color:#22c55e">🟢</div>
         <div class="dlq-stat-label">1일 ~ 3일</div>
         <div class="dlq-stat-num">${d2.segs.s1to3}명</div>
-        <div class="dlq-stat-sub" title="${_dlqPctTip(d2.segs.s1to3)}">${_dlqPctOf(d2.segs.s1to3)}%</div>   ${''/* [v634] 연체자 내 비중 */}
+        <div class="dlq-stat-sub" title="${_dlqPctTip(d2.segs.s1to3)}">${_dlqPctTxt(d2.segs.s1to3)}</div>   ${''/* [v634] 연체자 내 비중 · [v635] 인원 함께 */}
         <div class="dlq-stat-sub" style="font-size:10px;color:#64748B" title="연체일수별 세부 인원">1일 ${d2.segs.day1||0}명 · 2일 ${d2.segs.day2||0}명 · 3일 ${d2.segs.day3||0}명</div>
       </div>
       <div class="dlq-stat-card c-orange" onclick="dlqCardDays('4to15')" style="cursor:pointer" title="클릭하면 아래 연체자 리스트가 4~15일 구간으로 필터링됩니다">
         <div class="dlq-stat-icon" style="color:#f97316">🟡</div>
         <div class="dlq-stat-label">4일 ~ 15일</div>
         <div class="dlq-stat-num">${d2.segs.s4to15||0}명</div>
-        <div class="dlq-stat-sub" title="${_dlqPctTip(d2.segs.s4to15||0)}">${_dlqPctOf(d2.segs.s4to15||0)}%</div>
+        <div class="dlq-stat-sub" title="${_dlqPctTip(d2.segs.s4to15||0)}">${_dlqPctTxt(d2.segs.s4to15||0)}</div>
         <div class="dlq-stat-sub" style="font-size:10px;color:#64748B" title="1일부터 누적한 인원">누적 15일 이하 ${d2.segs.s1to15}명</div>
       </div>
       <div class="dlq-stat-card c-yellow" onclick="dlqCardDays('16to30')" style="cursor:pointer" title="클릭하면 아래 연체자 리스트가 16~30일 구간으로 필터링됩니다">
         <div class="dlq-stat-icon" style="color:#eab308">🟠</div>
         <div class="dlq-stat-label">16일 ~ 30일</div>
         <div class="dlq-stat-num">${d2.segs.s16to30||0}명</div>
-        <div class="dlq-stat-sub" title="${_dlqPctTip(d2.segs.s16to30||0)}">${_dlqPctOf(d2.segs.s16to30||0)}%</div>
+        <div class="dlq-stat-sub" title="${_dlqPctTip(d2.segs.s16to30||0)}">${_dlqPctTxt(d2.segs.s16to30||0)}</div>
         <div class="dlq-stat-sub" style="font-size:10px;color:#64748B" title="1일부터 누적한 인원">누적 30일 이하 ${d2.segs.s1to30}명</div>
       </div>
       <div class="dlq-stat-card c-dark" onclick="dlqCardDays('over30')" style="cursor:pointer" title="클릭하면 아래 연체자 리스트가 30일 초과 구간으로 필터링됩니다">
         <div class="dlq-stat-icon" style="color:#dc2626">🔴</div>
         <div class="dlq-stat-label">30일 초과</div>
         <div class="dlq-stat-num">${d2.segs.sOver30}명</div>
-        <div class="dlq-stat-sub" title="${_dlqPctTip(d2.segs.sOver30)}">${_dlqPctOf(d2.segs.sOver30)}%</div>
+        <div class="dlq-stat-sub" title="${_dlqPctTip(d2.segs.sOver30)}">${_dlqPctTxt(d2.segs.sOver30)}</div>
       </div>
       <div class="dlq-stat-card c-indigo">
         <div class="dlq-stat-icon">📅</div>
