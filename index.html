@@ -5724,6 +5724,8 @@ async function cG_loadSettleSheet(){
 // 규칙: 정산 기준일 = 실제 입금일(납부일). 납부일+3일 = 1차 정산 시한, +6일 = 최종 시한(초과 시 경고).
 // 첫 달 임대료 = 임차인→임대인 직납 (KRG 미경유, 유보금·정산 제외. 수수료만 KRG 수입).
 // 연체 롤포워드 = 발생월 고정 코호트 (발생액 불변 · 회수는 현재까지 누적 · 손실처리 기준 미정 → 0).
+/* [v641] 법비용 청구서명 키워드 — 단일 소스 (법비용 카드·코호트·상세 모달 공용) */
+var _LAW_RE=/법비용|내용증명|지급명령|소송|송달|가처분|압류|추심|주소보정|진술최고|채권최고|인지대|집행|공탁|명도|고발|변호사|법무/;
 async function renderSettlementView(){
   var el = document.getElementById('stlBody');
   if (!el) return;
@@ -5760,6 +5762,7 @@ async function renderSettlementView(){
     var isExitStl = function(p){ var b=String(p['청구서명']||''); return b.indexOf('수수료')<0 && b.indexOf('퇴실')>=0 && b.indexOf('정산')>=0; };
     /* [v570] 연체채권 집계 대상 = 임대료 + 퇴실정산 (수수료·순수 변동관리비 제외) */
     var isDebtItem = function(p){ return isRent(p) || isExitStl(p); };
+    var isLaw = function(p){ return _LAW_RE.test(String(p['청구서명']||'')); };   /* [v641] 법비용 청구 (납부종류 무관) */
     var alive  = function(p){ var s=String(p['계약상태']||'').trim(); return s!=='삭제' && s!=='계약 철회'; };
     var isFirstMonth = function(p){ var bm=billMonth(p); return bm && startMap[String(p['계약번호']||'').trim()]===bm; };
 
@@ -5838,10 +5841,10 @@ async function renderSettlementView(){
     var win=[]; for(var k=winLen-1;k>=0;k--){ var d=new Date(+cmKey.slice(0,4), +cmKey.slice(5,7)-1-k, 1); win.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
     P.forEach(function(p){
       if(!alive(p)) return;
-      if(!isRent(p) && !isFee(p) && !isExitStl(p) && String(p['납부종류']||'').trim()!=='변동관리비') return;   /* [v570] 퇴실정산(기타계약금) 행 포함 */
+      if(!isRent(p) && !isFee(p) && !isExitStl(p) && !isLaw(p) && String(p['납부종류']||'').trim()!=='변동관리비') return;   /* [v570] 퇴실정산(기타계약금) 행 포함 · [v641] 법비용(기타계약금) 포함 */
       /* [v575] 서비스수수료·잔여서비스수수료는 KRG가 '받을 돈'이라 대위변제 성격이 아님 → ③ 발생·회수 집계에서 완전 제외
          (납부종류가 변동관리비로 내려오는 수수료 청구도 청구서명 '수수료' 매칭으로 함께 제외) */
-      if(isFee(p)) return;
+      if(isFee(p) && !isLaw(p)) return;   /* [v641] '소송진행 수수료' 같은 법비용은 수수료로 보지 않음 */
       var st=String(p['납부상태']||'').trim();
       var days=parseInt(String(p['연체일수']==null?'':p['연체일수']).replace(/[^0-9\-]/g,''),10)||0;
       var isLate = days>0 || st==='연체중' || st==='분납중';
@@ -5860,11 +5863,11 @@ async function renderSettlementView(){
       else { tgt=prevG[gk]; _rk='prev'; }
       tgt.gen+=gen; tgt.rec+=paid; tgt.out+=out; tgt.n++;
       var _c9=String(p['계약번호']||'').trim();
-      var _lb = isRent(p) ? '임대료' : (isFee(p) ? '수수료' : (isExitStl(p) ? '퇴실정산' : '변동관리비'));   /* [v570] */
+      var _lb = isLaw(p) ? '법비용' : (isRent(p) ? '임대료' : (isFee(p) ? '수수료' : (isExitStl(p) ? '퇴실정산' : '변동관리비')));   /* [v570] · [v641] 법비용 */
       /* [v554] 상세 행 보존 · [v572] 계약시작일(sd) 동봉 */
       var _rowO=(function(){ var _i9=_nmMap[_c9]||{};
         return { cno:_c9, nm:_i9.nm||'-', tel:_i9.tel||'-', bm:bm, sd:_sdStr(_c9),
-          ty:(isRent(p)?'임대료':(isFee(p)?'수수료':(isExitStl(p)?'퇴실정산':'변동관리비'))), rty:String(p['납부종류']||'').trim(), bill:String(p['청구서명']||'').trim(),   /* [v555.1] rty=원본 납부종류 · [v570] 퇴실정산 구분 */
+          ty:(isLaw(p)?'법비용':(isRent(p)?'임대료':(isFee(p)?'수수료':(isExitStl(p)?'퇴실정산':'변동관리비')))), rty:String(p['납부종류']||'').trim(), bill:String(p['청구서명']||'').trim(),   /* [v555.1] rty=원본 납부종류 · [v570] 퇴실정산 구분 · [v641] 법비용 */
           due:String(p['납기일']||'').trim(), pay:String(p['납부일']||'').trim(), st:String(p['납부상태']||'').trim(),
           days:days, gen:gen, rec:paid, out:out, ck:(ended?'종료':'계약중') }; })();
       if(!_cohRows[_rk]) _cohRows[_rk]={A:[],E:[]};
@@ -5910,7 +5913,7 @@ async function renderSettlementView(){
        청구 = 최종청구금액 · 회수 = 청구 − 미납 · 연체 = 미납 잔액(연체중/분납중) · 취소 = 삭제·계약 철회·납부상태 '취소' · 납부예정은 별도 */
     var _lwScope=(window._stlLawScope==='range')?'range':'all';
     /* [v638] 법비용 인식 키워드 — 청구서명에 아래 중 하나라도 포함되면 법비용 (홈버튼 청구서명이 '지급명령신청비용'처럼 '법비용' 없이 발행되는 경우 대응) */
-    var _lwKW=/법비용|내용증명|지급명령|소송|송달|가처분|압류|추심|주소보정|진술최고|채권최고|인지대|집행|공탁|명도|고발|변호사|법무/;
+    var _lwKW=_LAW_RE;   /* [v641] 단일 소스 */
     var _lwKind=function(b){
       var t=[['지급명령',/지급명령/],['주소보정',/주소보정/],['특별송달',/특별송달/],['가처분',/가처분/],['채권압류',/압류|추심/],['소송',/소송|명도/],['내용증명',/내용증명/],['집행',/집행/],['송달·인지대',/송달|인지대/],['진술최고',/진술최고|채권최고/],['형사고발',/고발|변호사/],['공탁',/공탁/]];
       for(var i=0;i<t.length;i++) if(t[i][1].test(b)) return t[i][0];
@@ -6377,21 +6380,22 @@ function stl_cohModal(key, keepSort, keepDay){
     var rowsAll=(dk==='A')?g.A.slice():(dk==='E')?g.E.slice():g.A.concat(g.E);
     /* [v555.1] 납부종류 필터 (전체/임대료/변동관리비/기타계약금) + 청구서명 그룹 필터 */
     var _grpOf=function(b){ b=String(b||'');
+      if(_LAW_RE.test(b)) return '법비용';   /* [v641] 법비용 키워드 우선 (수수료·관리비 글자가 섞여도 법비용) */
       /* [v575] '퇴실 정산금'처럼 공백이 들어간 표기도 퇴실정산으로 묶음 (기존엔 전부 '기타'로 빠졌음) */
       if(/퇴실\s*정산/.test(b)) return '퇴실정산금';
       if(b.indexOf('잔여')>=0&&b.indexOf('수수료')>=0) return '잔여서비스수수료';
       if(b.indexOf('수수료')>=0) return '서비스수수료';
       if(/청소/.test(b)) return '청소비';                       /* [v575] */
-      if(/법비용|법무|소송|내용증명/.test(b)) return '법비용';   /* [v575] */
       if(b.indexOf('관리비')>=0) return '변동관리비';
       if(b.indexOf('임대료')>=0||b.indexOf('월세')>=0) return '임대료';
       return '기타'; };
     var _nAll0=rowsAll.length;
     var tyF=window.__stlCohTy||'all';
-    var TYS=['임대료','변동관리비','기타계약금'];
+    var TYS=['임대료','변동관리비','기타계약금','법비용'];   /* [v641] 법비용 = 청구서명 키워드 기준 — 원본 납부종류(변동관리비/기타계약금)에서 떼어내 배타 분류 (합계 = 전체, 중복 없음) */
+    var _tyOf=function(r){ if(String(r.ty||'')==='법비용') return '법비용'; var t9=String(r.rty||r.ty||''); for(var i9=0;i9<3;i9++){ if(t9.indexOf(TYS[i9])>=0) return TYS[i9]; } return ''; };
     var tyCnt={}; TYS.forEach(function(t9){tyCnt[t9]=0;});
-    rowsAll.forEach(function(r){ var t9=String(r.rty||r.ty||''); for(var i9=0;i9<TYS.length;i9++){ if(t9.indexOf(TYS[i9])>=0){ tyCnt[TYS[i9]]++; break; } } });
-    if(tyF!=='all') rowsAll=rowsAll.filter(function(r){ return String(r.rty||r.ty||'').indexOf(tyF)>=0; });
+    rowsAll.forEach(function(r){ var k9=_tyOf(r); if(k9) tyCnt[k9]++; });
+    if(tyF!=='all') rowsAll=rowsAll.filter(function(r){ return _tyOf(r)===tyF; });
     var grpF=window.__stlCohGrp||'all';
     var grpAgg={};
     rowsAll.forEach(function(r){ var g9=_grpOf(r.bill); var a9=grpAgg[g9]||(grpAgg[g9]={gen:0,out:0,rec:0,n:0}); a9.gen+=r.gen; a9.out+=r.out; a9.rec+=r.rec; a9.n++; });
@@ -6444,7 +6448,7 @@ function stl_cohModal(key, keepSort, keepDay){
         +'<td style="padding:6px 9px;white-space:nowrap">'+r.nm+'</td>'
         +'<td style="padding:6px 9px"><span style="display:inline-block;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;'+(r.ck==='종료'?'background:#FEF3C7;color:#B45309':'background:#EFF6FF;color:#1D4ED8')+'">'+r.ck+'</span></td>'
         +'<td style="padding:6px 9px;font-size:11px;color:'+(r.sd?'#0E7490':'#CBD5E1')+';white-space:nowrap;font-weight:'+(r.sd?'700':'400')+'">'+(r.sd||'-')+'</td>'   /* [v572] 계약시작일 */
-        +'<td style="padding:6px 9px;font-size:11px;color:#475569;white-space:nowrap">'+(r.rty||r.ty)+'</td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:#475569;white-space:nowrap">'+(r.ty==='법비용'?'<b style="color:#6D28D9">법비용</b> <span style="color:#94A3B8;font-size:10px">'+(r.rty||'')+'</span>':(r.rty||r.ty))+'</td>'   /* [v641] */
         +'<td style="padding:6px 9px;font-size:11px;color:#475569"><span title="'+String(r.bill||'').replace(/"/g,'&quot;')+'" style="display:inline-block;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">'+(r.bill||'-')+'</span></td>'   /* [v555.1] 청구서명 */
         +'<td style="padding:6px 9px;font-size:11px;color:#64748B;white-space:nowrap">'+(r.due||'-')+'</td>'
         +'<td style="padding:6px 9px;text-align:right;font-weight:700;color:#DC2626;white-space:nowrap">'+W(r.gen)+'</td>'
