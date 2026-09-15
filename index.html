@@ -5908,9 +5908,16 @@ async function renderSettlementView(){
     /* [v637] ⚖️ 법비용 흐름 — 청구서명 '법비용' 행 (납부종류는 변동관리비/기타계약금으로 내려옴)
        청구 = 최종청구금액 · 회수 = 청구 − 미납 · 연체 = 미납 잔액(연체중/분납중) · 취소 = 삭제·계약 철회·납부상태 '취소' · 납부예정은 별도 */
     var _lwScope=(window._stlLawScope==='range')?'range':'all';
+    /* [v638] 법비용 인식 키워드 — 청구서명에 아래 중 하나라도 포함되면 법비용 (홈버튼 청구서명이 '지급명령신청비용'처럼 '법비용' 없이 발행되는 경우 대응) */
+    var _lwKW=/법비용|내용증명|지급명령|소송|송달|가처분|압류|추심|주소보정|진술최고|채권최고|인지대|집행|공탁|명도|고발|변호사|법무/;
+    var _lwKind=function(b){
+      var t=[['지급명령',/지급명령/],['주소보정',/주소보정/],['특별송달',/특별송달/],['가처분',/가처분/],['채권압류',/압류|추심/],['소송',/소송|명도/],['내용증명',/내용증명/],['집행',/집행/],['송달·인지대',/송달|인지대/],['진술최고',/진술최고|채권최고/],['형사고발',/고발|변호사/],['공탁',/공탁/]];
+      for(var i=0;i<t.length;i++) if(t[i][1].test(b)) return t[i][0];
+      return '법비용(일반)';
+    };
     var LW={gen:0,genN:0,cs:{},rec:0,recN:0,out:0,outN:0,outCs:{},outA:0,outE:0,cxl:0,cxlN:0,sch:0,schN:0,kinds:{}};
     P.forEach(function(p){
-      var b=String(p['청구서명']||''); if(b.indexOf('법비용')<0) return;
+      var b=String(p['청구서명']||''); if(!_lwKW.test(b)) return;
       if(_lwScope==='range' && !monthsInR[billMonth(p)]) return;
       var st=String(p['납부상태']||'').trim(), cno=String(p['계약번호']||'').trim();
       var out=num(p['미납(연체)금액(원)']);
@@ -5918,7 +5925,7 @@ async function renderSettlementView(){
       if(!alive(p) || st.indexOf('취소')>=0){ LW.cxl+=gen; LW.cxlN++; return; }
       if(gen<=0) return;
       LW.gen+=gen; LW.genN++; LW.cs[cno]=1;
-      var kd=(b.match(/법비용[_\s]*([^\s(]+)/)||[])[1]||'일반'; LW.kinds[kd]=(LW.kinds[kd]||0)+1;
+      var kd=_lwKind(b); LW.kinds[kd]=(LW.kinds[kd]||0)+1;   /* [v638] 키워드 분류 */
       if(st==='납부예정'){ LW.sch+=(out||gen); LW.schN++; return; }
       var paid=Math.max(0,gen-out);
       if(paid>0){ LW.rec+=paid; LW.recN++; }
@@ -6170,7 +6177,7 @@ async function renderSettlementView(){
       +'<div id="stlLawCard" style="flex:1.2;min-width:320px;background:#F5F3FF;border:1.5px solid #C4B5FD;border-radius:12px;padding:12px 14px;color:#3B0764">'
       +  '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
       +    '<span style="font-size:12px;font-weight:800;white-space:nowrap">⚖️ 법비용</span>'
-      +    '<span style="font-weight:400;font-size:10px;opacity:.85;min-width:0" title="입금내역 청구서명에 \'법비용\'이 포함된 청구 (납부종류는 변동관리비/기타계약금)">— 청구 → 회수·연체·취소</span>'
+      +    '<span style="font-weight:400;font-size:10px;opacity:.85;min-width:0" title="입금내역 청구서명에 법비용·내용증명·지급명령·소송·송달·가처분·압류·추심·주소보정·진술최고·인지대·집행·공탁·명도·고발·변호사 중 하나라도 포함된 청구 (납부종류는 변동관리비/기타계약금)">— 청구 → 회수·연체·취소</span>'
       +    (function(){ var ch=function(k,lb,tip){ var on=(_lwScope===k);
            return '<span title="'+tip+'" onclick="stl_setLawScope(\''+k+'\')" style="cursor:pointer;font-size:9.5px;font-weight:800;border-radius:10px;padding:2px 8px;border:1px solid '+(on?'#6D28D9':'#C4B5FD')+';background:'+(on?'#6D28D9':'#fff')+';color:'+(on?'#fff':'#6D28D9')+'">'+lb+'</span>'; };
            return '<span style="margin-left:auto;display:inline-flex;gap:4px;white-space:nowrap">'+ch('all','전체 누적','지금까지 청구한 법비용 전부 (기본)')+ch('range','기간','검색기간이 걸친 발생월의 청구분만')+'</span>'; })()
