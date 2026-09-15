@@ -5905,6 +5905,27 @@ async function renderSettlementView(){
     var outActive=_dSel.active, outEnded=_dSel.ended, outRent=_dSel.rent, outExit=_dSel.exit;
     var outCs=Object.keys(_dSel.cs).length, othTot=_dOth.active+_dOth.ended;
     totalOut = outActive + outEnded;   /* [v570] 연체채권 총액 = 임대료+퇴실정산 (수수료 제외) — 계약중/종료 합과 일치 */
+    /* [v637] ⚖️ 법비용 흐름 — 청구서명 '법비용' 행 (납부종류는 변동관리비/기타계약금으로 내려옴)
+       청구 = 최종청구금액 · 회수 = 청구 − 미납 · 연체 = 미납 잔액(연체중/분납중) · 취소 = 삭제·계약 철회·납부상태 '취소' · 납부예정은 별도 */
+    var _lwScope=(window._stlLawScope==='range')?'range':'all';
+    var LW={gen:0,genN:0,cs:{},rec:0,recN:0,out:0,outN:0,outCs:{},outA:0,outE:0,cxl:0,cxlN:0,sch:0,schN:0,kinds:{}};
+    P.forEach(function(p){
+      var b=String(p['청구서명']||''); if(b.indexOf('법비용')<0) return;
+      if(_lwScope==='range' && !monthsInR[billMonth(p)]) return;
+      var st=String(p['납부상태']||'').trim(), cno=String(p['계약번호']||'').trim();
+      var out=num(p['미납(연체)금액(원)']);
+      var gen=num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']); if(gen<=0) gen=out;
+      if(!alive(p) || st.indexOf('취소')>=0){ LW.cxl+=gen; LW.cxlN++; return; }
+      if(gen<=0) return;
+      LW.gen+=gen; LW.genN++; LW.cs[cno]=1;
+      var kd=(b.match(/법비용[_\s]*([^\s(]+)/)||[])[1]||'일반'; LW.kinds[kd]=(LW.kinds[kd]||0)+1;
+      if(st==='납부예정'){ LW.sch+=(out||gen); LW.schN++; return; }
+      var paid=Math.max(0,gen-out);
+      if(paid>0){ LW.rec+=paid; LW.recN++; }
+      if(out>0){ LW.out+=out; LW.outN++; LW.outCs[cno]=1; if(String(p['계약상태']||'').trim()==='종료') LW.outE+=out; else LW.outA+=out; }
+    });
+    LW.rate = LW.gen>0 ? Math.round(LW.rec/LW.gen*1000)/10 : 0;
+    window._stlLawLast = LW;
 
     // ── [v513/v515] 기간 KPI — 청구 / 납부 / 대위변제 / 정산예정 (상단 통합 기간검색 기준) ──
     // [v537] 주거용/상업용/TOTAL 구분 필터 (계약관리 N열 계약형태 기준, 디폴트 TOTAL)
@@ -6127,12 +6148,12 @@ async function renderSettlementView(){
       +  '</div>'
       +'<div style="flex:1.2;min-width:300px;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:12px;padding:12px 14px;color:#7F1D1D">'
       +  '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
-      +    '<span style="font-size:12px;font-weight:800">📕 연체채권 총액</span>'
+      +    '<span style="font-size:12px;font-weight:800;white-space:nowrap">📕 연체채권 총액</span>'   /* [v637] nowrap */
       +    '<span style="font-weight:400;font-size:10px;opacity:.85">— 임대료 + 퇴실정산 <span style="opacity:.75">(수수료 제외)</span></span>'
       /* [v571] 기간검색 연동 토글 */
       +    (function(){ var ch=function(k,lb,tip){ var on=(_dScope===k);
            return '<span title="'+tip+'" onclick="stl_setDebtScope(\''+k+'\')" style="cursor:pointer;font-size:9.5px;font-weight:800;border-radius:10px;padding:2px 8px;border:1px solid '+(on?'#B91C1C':'#FCA5A5')+';background:'+(on?'#B91C1C':'#fff')+';color:'+(on?'#fff':'#B91C1C')+'">'+lb+'</span>'; };
-           return '<span style="margin-left:auto;display:inline-flex;gap:4px">'+ch('range','기간','검색기간이 걸친 발생월의 청구분만 집계 (청구서가 월 단위라 하루만 검색해도 그 달 전체가 잡힙니다)')+ch('all','전체 누적','기간 이전 미회수분까지 전부 집계')+'</span>'; })()
+           return '<span style="margin-left:auto;display:inline-flex;gap:4px;white-space:nowrap">'+ch('range','기간','검색기간이 걸친 발생월의 청구분만 집계 (청구서가 월 단위라 하루만 검색해도 그 달 전체가 잡힙니다)')+ch('all','전체 누적','기간 이전 미회수분까지 전부 집계')+'</span>'; })()
       +  '</div>'
       +  '<div style="font-size:24px;font-weight:800">'+mil(totalOut)+'<span style="font-size:11px;font-weight:700;opacity:.65"> · '+outCs+'명</span></div>'
       /* [v572.1] 라벨 정정 — 청구서가 월 단위라 집계는 '발생월' 기준. 하루만 검색해도 그 달 전체가 잡히므로 월 범위를 명시 */
@@ -6145,7 +6166,31 @@ async function renderSettlementView(){
       +  '</div>'
       +  '<div style="font-size:9.5px;opacity:.72;margin-top:6px">항목별 — 임대료 <b>'+mil(outRent)+'</b> · 퇴실정산 <b>'+mil(outExit)+'</b> <span style="opacity:.8">· 서비스 수수료·변동관리비 연체는 제외</span></div>'   /* [v570] */
       +  '</div>'
-      +'<div style="flex:1.6;min-width:360px;background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:12px;padding:12px 14px;color:#78350F">'
+      /* [v637] ⚖️ 법비용 흐름 카드 */
+      +'<div id="stlLawCard" style="flex:1.2;min-width:320px;background:#F5F3FF;border:1.5px solid #C4B5FD;border-radius:12px;padding:12px 14px;color:#3B0764">'
+      +  '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+      +    '<span style="font-size:12px;font-weight:800;white-space:nowrap">⚖️ 법비용</span>'
+      +    '<span style="font-weight:400;font-size:10px;opacity:.85;min-width:0" title="입금내역 청구서명에 \'법비용\'이 포함된 청구 (납부종류는 변동관리비/기타계약금)">— 청구 → 회수·연체·취소</span>'
+      +    (function(){ var ch=function(k,lb,tip){ var on=(_lwScope===k);
+           return '<span title="'+tip+'" onclick="stl_setLawScope(\''+k+'\')" style="cursor:pointer;font-size:9.5px;font-weight:800;border-radius:10px;padding:2px 8px;border:1px solid '+(on?'#6D28D9':'#C4B5FD')+';background:'+(on?'#6D28D9':'#fff')+';color:'+(on?'#fff':'#6D28D9')+'">'+lb+'</span>'; };
+           return '<span style="margin-left:auto;display:inline-flex;gap:4px;white-space:nowrap">'+ch('all','전체 누적','지금까지 청구한 법비용 전부 (기본)')+ch('range','기간','검색기간이 걸친 발생월의 청구분만')+'</span>'; })()
+      +  '</div>'
+      +  '<div style="font-size:24px;font-weight:800" title="청구 합계 '+won(LW.gen)+'">'+mil(LW.gen)+'<span style="font-size:11px;font-weight:700;opacity:.65"> 청구 · '+LW.genN+'건 · '+Object.keys(LW.cs).length+'명</span></div>'
+      +  (function(){ var base=LW.gen+LW.cxl; if(base<=0) return '<div style="font-size:9.5px;opacity:.75;margin-top:1px">'+(_lwScope==='range'?cmLbl+'월 발생분 없음':'법비용 청구 없음')+'</div>';
+           var pr=Math.round(LW.rec/base*100), po=Math.round(LW.out/base*100), pc=Math.round(LW.cxl/base*100), ps=Math.max(0,100-pr-po-pc);
+           return '<div style="display:flex;height:7px;border-radius:4px;overflow:hidden;margin-top:6px;background:#EDE9FE" title="회수 '+pr+'% · 연체 '+po+'% · 취소 '+pc+'%'+(ps>0?' · 납부예정 '+ps+'%':'')+'">'
+             +'<span style="width:'+pr+'%;background:#16A34A"></span><span style="width:'+po+'%;background:#DC2626"></span><span style="width:'+pc+'%;background:#94A3B8"></span></div>'
+             +'<div style="font-size:9.5px;opacity:.75;margin-top:3px">'+(_lwScope==='range'?'<b>'+cmLbl+'</b>월 발생분':'전체 누적')+' · 회수율 <b>'+LW.rate+'%</b>'+(LW.schN>0?' · 납부예정 '+LW.schN+'건 '+mil(LW.sch):'')+'</div>'; })()
+      +  '<div style="display:flex;gap:6px;margin-top:8px">'
+      +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 9px" title="회수 '+won(LW.rec)+' — 청구 − 미납 (납부완료·연체납부·분납 회수분)"><div style="font-size:10px;color:#64748B">회수</div><div style="font-size:15px;font-weight:800;color:#15803D">'+mil(LW.rec)+'</div><div style="font-size:9px;color:#94A3B8">'+LW.recN+'건</div></div>'
+      +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 9px" title="연체 '+won(LW.out)+' — 미납 잔액 (연체중·분납중)"><div style="font-size:10px;color:#64748B">연체</div><div style="font-size:15px;font-weight:800;color:#B91C1C">'+mil(LW.out)+'</div><div style="font-size:9px;color:#94A3B8">'+LW.outN+'건 · '+Object.keys(LW.outCs).length+'명</div></div>'
+      +    '<div style="flex:1;background:#fff;border-radius:8px;padding:7px 9px" title="취소 '+won(LW.cxl)+' — 계약상태 삭제·계약 철회 또는 납부상태 취소 행 (시트에 취소 상태가 없으면 0건)"><div style="font-size:10px;color:#64748B">취소</div><div style="font-size:15px;font-weight:800;color:#64748B">'+mil(LW.cxl)+'</div><div style="font-size:9px;color:#94A3B8">'+LW.cxlN+'건</div></div>'
+      +  '</div>'
+      +  '<div style="font-size:9.5px;opacity:.72;margin-top:6px">연체 — 계약중 <b>'+mil(LW.outA)+'</b> · 종료 <b>'+mil(LW.outE)+'</b>'
+      +    (function(){ var ks=Object.keys(LW.kinds).sort(function(a,b){ return LW.kinds[b]-LW.kinds[a]; }); if(!ks.length) return ''; return ' <span style="opacity:.85">· 항목 '+ks.slice(0,5).map(function(k){ return k+' '+LW.kinds[k]; }).join(', ')+(ks.length>5?' 외':'')+'</span>'; })()
+      +  '</div>'
+      +  '</div>'
+      +'<div style="flex:1.45;min-width:340px;background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:12px;padding:12px 14px;color:#78350F">'   /* [v637] 1.6→1.45 */
       +  '<div style="font-size:12px;font-weight:800;margin-bottom:6px">🏦 유보금액 <span style="font-weight:400;font-size:10px">— 납부 완료 · 임대인 미정산 ('+rlbl+' 납부분 · 오늘 기준)</span></div>'
       +  '<div style="font-size:24px;font-weight:800">'+(smOk?mil(holdTot):'판별불가')+(smOk?'<span style="font-size:12px;font-weight:700;opacity:.7"> · '+holdN+'건</span>':'')+'</div>'
       +  (smOk?(
@@ -6497,6 +6542,8 @@ function stl_setRange(){
 }
 /* [v571] 연체채권 총액 집계 범위 — range(검색기간 발생분) / all(전체 누적) */
 function stl_setDebtScope(k){ window._stlDebtScope=(k==='all'?'all':'range'); renderSettlementView(); }
+/* [v637] 법비용 카드 집계 범위 — all(전체 누적, 기본) / range(검색기간 발생분) */
+function stl_setLawScope(k){ window._stlLawScope=(k==='range'?'range':'all'); renderSettlementView(); }
 /* [v572] ③ 월별 연체 코호트 집계 기준 — bill(청구 발행월) / start(계약 시작일이 검색기간 내) */
 function stl_setCohBase(k){ window._stlCohBase=(k==='start'?'start':'bill'); renderSettlementView(); }
 function stl_clearRange(){ window._stlP = window._stlP || {period:'day'}; window._stlP.r1=null; window._stlP.r2=null; window._stlP.period='day'; renderSettlementView(); }
