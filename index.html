@@ -6150,9 +6150,9 @@ async function renderSettlementView(){
     var _pcF=function(a,b){ return b>0?Math.round(a/b*1000)/10:0; };
     var _fcTile=function(o){
       return '<div style="flex:1;min-width:0;background:#fff;border-radius:8px;padding:7px 10px" title="'+String(o.tip||o.label).replace(/<[^>]+>/g,'')+'">'
-        +'<div style="font-size:10px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+o.label+'</div>'
-        +'<div style="font-size:15px;font-weight:800;color:'+o.col+';white-space:nowrap">'+o.val+(o.cnt!=null&&o.cnt!==''?'<span style="font-size:10px;color:#94A3B8;font-weight:600"> '+o.cnt+'</span>':'')+'</div>'
-        +(o.sub?'<div style="font-size:9px;color:#94A3B8;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+o.sub+'</div>':'')
+        +'<div style="font-size:10px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:14px;line-height:14px">'+o.label+'</div>'
+        +'<div style="font-size:15px;font-weight:800;color:'+o.col+';white-space:nowrap;height:20px;line-height:20px">'+o.val+(o.cnt!=null&&o.cnt!==''?'<span style="font-size:10px;color:#94A3B8;font-weight:600"> '+o.cnt+'</span>':'')+'</div>'
+        +'<div style="font-size:9px;color:#94A3B8;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:12px;line-height:12px">'+(o.sub||'&nbsp;')+'</div>'   /* [v640] 3줄 고정 → 흰 박스 높이 동일 */
         +'</div>';
     };
     var _fcBar=function(segs, track, tip){
@@ -6165,14 +6165,14 @@ async function renderSettlementView(){
     };
     var _fcCard=function(o){
       return '<div'+(o.id?' id="'+o.id+'"':'')+' class="stl-fc" style="flex:'+o.flex+';min-width:'+o.minw+'px;background:'+o.bg+';border:1.5px solid '+o.bd+';border-radius:12px;padding:12px 14px;color:'+o.fg+';display:flex;flex-direction:column">'
-        +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+        +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;min-height:20px">'   /* [v640] 칩 유무 무관 동일 높이 */
         +  '<span style="font-size:12px;font-weight:800;white-space:nowrap">'+o.icon+' '+o.title+'</span>'
-        +  '<span style="font-weight:400;font-size:10px;opacity:.85;min-width:0"'+(o.subTip?' title="'+o.subTip+'"':'')+'>— '+o.sub+'</span>'
+        +  '<span style="font-weight:400;font-size:10px;opacity:.85;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+(o.subTip||String(o.sub).replace(/<[^>]+>/g,''))+'">— '+o.sub+'</span>'   /* [v640] 1줄 고정 */
         +  (o.chips||'')
         +'</div>'
         +'<div style="font-size:24px;font-weight:800;line-height:1.2;white-space:nowrap"'+(o.headTip?' title="'+o.headTip+'"':'')+'>'+o.head+(o.headCnt?'<span style="font-size:11px;font-weight:700;opacity:.65"> '+o.headCnt+'</span>':'')+'</div>'
         +(o.bar||'<div style="height:7px;margin-top:6px"></div>')
-        +'<div style="font-size:9.5px;opacity:.75;margin-top:3px">'+(o.ctx||'&nbsp;')+'</div>'
+        +'<div style="font-size:9.5px;opacity:.75;margin-top:3px;line-height:1.4;min-height:26.6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" title="'+String(o.ctx||'').replace(/<[^>]+>/g,'').replace(/"/g,'')+'">'+(o.ctx||'&nbsp;')+'</div>'   /* [v640] 2줄 예약 → 타일 행 상단 정렬 */
         +(o.tiles&&o.tiles.length?'<div style="display:flex;gap:8px;margin-top:8px">'+o.tiles.join('')+'</div>':'')
         +'<div style="font-size:9.5px;opacity:.72;margin-top:auto;padding-top:6px">'+(o.foot||'')+'</div>'
         +'</div>';
