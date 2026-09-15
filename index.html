@@ -2803,6 +2803,88 @@ function _renderSheetBanner(){
     +'<button onclick="document.getElementById(\'sheetHealthBanner\').remove()" style="position:absolute;right:10px;top:5px;background:none;border:none;font-size:15px;color:#92400E;cursor:pointer">✕</button>';
 }
 
+// [v636] 연체관리 데이터 정합성 점검 — ① 플래그 vs 입금내역 불일치 ② 전일과 동일(미갱신) ③ 잘못된 복사 의심
+//   결과는 window._sheetIssues('[점검] ' 접두)로 합쳐 상단 배너(_renderSheetBanner)에 표시. 이상 없으면 이전 점검 항목 제거.
+function _auditHash(h, str){ str = String(str||''); for (var i=0;i<str.length;i++){ h = ((h<<5) + h + str.charCodeAt(i)) | 0; } return h; }
+function _auditISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _auditDays(aISO, bISO){ var a=new Date(aISO+'T00:00:00'), b=new Date(bISO+'T00:00:00'); return Math.round((b-a)/86400000); }
+function _auditWeekdays(aISO, bISO){ /* (a, b] 구간의 평일 수 — 주말만 지난 경우는 미갱신으로 보지 않음 */
+  var n=0, d=new Date(aISO+'T00:00:00'), end=new Date(bISO+'T00:00:00');
+  for (d.setDate(d.getDate()+1); d<=end; d.setDate(d.getDate()+1)) { var w=d.getDay(); if (w!==0 && w!==6) n++; }
+  return n;
+}
+function _auditSheetFp(resp, idxs){
+  try{
+    var rows=(resp&&resp.table&&resp.table.rows)||[]; var h=rows.length|0;
+    rows.forEach(function(r){ var c=r.c||[]; var parts=[];
+      (idxs||[]).forEach(function(i){ var x=c[i]; parts.push(x&&x.v!=null?String(x.f!=null?x.f:x.v):''); });
+      h=_auditHash(h, parts.join('|')); });
+    return { h:h, n:rows.length };
+  }catch(_){ return null; }
+}
+function _dlqDataAudit(r1, r2, r4, flagSet, daysMap){
+  try{
+    var issues=[], today=new Date(); today.setHours(0,0,0,0); var tISO=_auditISO(today);
+    var rows2=(r2&&r2.table&&r2.table.rows)||[];
+    var cols2=((r2&&r2.table&&r2.table.cols)||[]).map(function(c){return (c.label||c.id||'').trim();});
+    var iCno=findColIdx(cols2,['계약번호'],4), iCS=findColIdx(cols2,['계약상태'],13), iPS=findColIdxLast(cols2,['납부상태'],19),
+        iDays=findColIdx(cols2,['연체일수'],29), iPayNo=findColIdx(cols2,['납부번호'],17), iPayD=findColIdx(cols2,['납부일'],30),
+        iPayAmt=findColIdx(cols2,['납부금액(원)','납부금액'],26), iPayM=findColIdx(cols2,['납부방법'],31);
+    var cv=function(c,i){ var x=c[i]; if(!x||x.v==null) return ''; return String(x.f!=null?x.f:x.v).trim(); };
+    var inc=new Set(), seenNo={}, dupCnt=0, negCnt=0, h2=rows2.length|0, dlqRows=0;
+    rows2.forEach(function(r){ var c=r.c||[]; var cno=_normCno(cv(c,iCno)); if(!cno) return;
+      var ps=cv(c,iPS), cs=cv(c,iCS);
+      if(ps==='연체중'||ps==='분납중'){ dlqRows++; if(cs==='계약중') inc.add(cno); }
+      var pn=cv(c,iPayNo); if(pn){ if(seenNo[pn]) dupCnt++; else seenNo[pn]=1; }
+      var dv=cv(c,iDays); if(dv!=='' && Number(dv.replace(/[^\d.-]/g,''))<0) negCnt++;
+      h2=_auditHash(h2, cv(c,iPayD)+'|'+cv(c,iPayAmt)+'|'+cv(c,iPayM));   /* 납부 기록 필드만 — 날짜수식(연체일수 등) 제외 */
+    });
+    // ── ① 연체자 시트 플래그 ↔ 입금내역 연체중 정합성 ──
+    var flag = flagSet ? Array.from(flagSet) : [];
+    var mismatch=false;
+    if(flag.length>=5 && inc.size>=5){
+      var inter=flag.filter(function(c){return inc.has(c);}).length, mx=Math.max(flag.length, inc.size);
+      if(inter/mx < 0.7){ mismatch=true;
+        issues.push('🔴 연체자 시트 연체 플래그 '+flag.length+'건 vs 입금내역 연체중·분납중(계약중) '+inc.size+'건, 일치 '+inter+'건 — 연체자 시트(gid 418937767) 동기화 지연/오류 의심, 명단·연체일수가 부정확할 수 있음'); }
+    }
+    if(!mismatch && flag.length>=10){
+      var zero=flag.filter(function(c){ return !(daysMap && daysMap[c]>0); }).length;
+      if(zero/flag.length>0.3) issues.push('🔴 연체자 명단 '+flag.length+'건 중 '+zero+'건이 입금내역에 연체 행 없음(연체일수 0일) — 시트 동기화 확인');
+    }
+    // ── ③ 잘못된 복사/입력 의심 ──
+    if(dupCnt>20) issues.push('🔴 입금내역 납부번호 중복 '+dupCnt+'건 — 행 복사·붙여넣기 중복 의심');
+    if(negCnt>0) issues.push('⚠ 입금내역 연체일수 음수 '+negCnt+'건 — 납기일/수식 확인');
+    var hd=cols2[3]||''; if(!/^\d{1,2}\/\d{1,2}$/.test(hd)){ var r0=rows2[0]&&rows2[0].c&&rows2[0].c[3]; hd=(r0&&r0.v!=null)?String(r0.f!=null?r0.f:r0.v).trim():''; }
+    var mh=hd.match(/^(\d{1,2})\/(\d{1,2})$/);
+    if(mh && !(+mh[1]===today.getMonth()+1 && +mh[2]===today.getDate())) issues.push('⚠ 입금내역 기준일 "'+hd+'" ≠ 오늘('+(today.getMonth()+1)+'/'+today.getDate()+') — 시트 미갱신 또는 이전 데이터 복사본일 수 있음');
+    // ── ② 전일과 동일(미갱신) / 급변 — 시트 지문 비교 ──
+    var fp={ '입금내역':{h:h2,n:rows2.length,dlq:dlqRows}, '연체자':_auditSheetFp(r4,[2,48,51,54,57,62]), '계약':_auditSheetFp(r1,[0,10,25]) };
+    var key='_krgAuditFp_v636', prev={}; try{ prev=JSON.parse(localStorage.getItem(key)||'{}')||{}; }catch(_){ prev={}; }
+    var next={}, same=[];
+    Object.keys(fp).forEach(function(nm){ var cur=fp[nm], p=prev[nm]; if(!cur) return;
+      if(p && p.h===cur.h && p.n===cur.n){
+        next[nm]={h:cur.h,n:cur.n,dlq:cur.dlq,first:p.first||tISO};
+        if(_auditWeekdays(next[nm].first, tISO)>=1) same.push(nm+' 시트(마지막 변경 '+next[nm].first.slice(5).replace('-','/')+', '+_auditDays(next[nm].first,tISO)+'일째)');
+      } else {
+        next[nm]={h:cur.h,n:cur.n,dlq:cur.dlq,first:tISO};
+        if(p && p.n>0){
+          if(cur.n < p.n*0.95) issues.push('🔴 '+nm+' 시트 행수 급감 '+p.n.toLocaleString()+' → '+cur.n.toLocaleString()+'행 ('+Math.round((cur.n/p.n-1)*100)+'%) — 데이터 소실/잘못된 복사 의심');
+          if(nm==='입금내역' && p.dlq>=20 && Math.abs(cur.dlq-p.dlq)/p.dlq>0.5) issues.push('⚠ 입금내역 연체중·분납중 행 급변 '+p.dlq+' → '+cur.dlq+'건 — 납부상태 일괄 변경/복사 여부 확인');
+        }
+      }
+    });
+    if(same.length) issues.push('⚠ 전일과 데이터 동일: '+same.join(', ')+' — 시트 갱신(입금 반영) 여부 확인');
+    try{ localStorage.setItem(key, JSON.stringify(next)); }catch(_){}
+    // ── 배너 반영 ──
+    issues=issues.map(function(x){ return '[점검] '+x; });
+    window._sheetIssues=(window._sheetIssues||[]).filter(function(x){ return x.indexOf('[점검] ')!==0; }).concat(issues);
+    window._dlqAuditLast={ ts:Date.now(), issues:issues, flag:flag.length, inc:inc.size, fp:next };
+    if(issues.length){ _renderSheetBanner(); issues.forEach(function(x){ console.warn('[dataAudit]', x); }); }
+    else { var el=document.getElementById('sheetHealthBanner'); if(el && !(window._sheetIssues||[]).length) el.remove(); else if(el) _renderSheetBanner(); }
+    return issues;
+  }catch(e){ console.warn('[dataAudit]', e); return []; }
+}
+
 // [v408] 입금내역 시트 헤더 깨짐 대응 — 라벨 누락 시 positional 컬럼을 표준 라벨로 보정
 //   입금내역(Raw DATA) 시트의 1행에 제목/날짜범위가 들어가 gviz 헤더가 어긋나면
 //   '계약번호','청구서명','납기일','미납금액' 등 라벨이 비어 모든 라벨기반 화면(입금내역·연체현황·수납)이 깨진다.
@@ -9351,6 +9433,8 @@ async function renderDelinquency() {
       }
     } catch(_pE){ console.warn('[v564.1] paymentRawData sync:', _pE); }
     window._delinqDaysMap = _dlqIncomeData.delinqDaysMap || {};
+    // [v636] 데이터 정합성 점검 — 플래그 불일치 / 전일과 동일 / 잘못된 복사 의심 → 상단 배너
+    try { _dlqDataAudit(r1, r2, r4, dlqV3Data.dlqCnoSet, window._delinqDaysMap); } catch(_aE) { console.warn('[v636] audit:', _aE); }
     // [v495] 입금내역 시트 상태 자동 점검 (통화서식/헤더 이탈/납기일 공란) — 이상 시 상단 배너
     _sheetHealth(r2, '입금내역', { cnoIdx:4, billIdx:18, dueIdx:28,
       expect:[{idx:4,label:'계약번호'},{idx:19,label:'납부상태'},{idx:28,label:'납기일'},{idx:29,label:'연체일수'},{idx:27,label:'미납(연체)금액(원)'}] });
