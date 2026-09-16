@@ -1407,6 +1407,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
         <button class="cr-contract-pdf-btn" id="crMgmtCtrBtn" onclick="openMgmtContractModal(window._crCurrentNo)" title="표준 위수탁 계약서(자기관리형-임대인) 발행" style="white-space:nowrap">🏢 위수탁</button>
         <button class="cr-contract-pdf-btn" id="crSubAgreementBtn" onclick="generateSubAgreement(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (부속합의)" style="white-space:nowrap">📋 부속합의</button>
         <button class="cr-contract-pdf-btn" id="crIncomeReceiptBtn" onclick="openIncomeReceiptModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (납부증빙)" style="background:#059669;color:#fff;border-color:#059669;white-space:nowrap">💰 납부증빙</button>
+        <button class="cr-contract-pdf-btn" id="crFullPayBtn" onclick="openFullPayModal(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (완납증명서)" style="background:#0F766E;color:#fff;border-color:#0F766E;white-space:nowrap">✅ 완납증명</button><!-- [v644] -->
         <button class="cr-contract-pdf-btn" id="crFeeCalcBtn" onclick="openFeeCalcModal(window._crCurrentNo)" title="카드 수수료 / 일할 임대료 / 중개 보수료 계산기" style="background:#4F46E5;color:#fff;border-color:#4F46E5">🧮 계산기</button><!-- [v567] 수수료 → 계산기 -->
         <button class="cr-contract-pdf-btn" id="crDelqReportBtn" onclick="openReportChooser(window._crCurrentNo)" disabled title="계약 검색 후 사용 가능 (연체 대응 REPORT)" style="background:#DC2626;color:#fff;border-color:#DC2626">📊 리포트</button>
       </div>
@@ -5518,6 +5519,8 @@ function selectContractRow(no) {
   if (subBtn) { subBtn.disabled = false; subBtn.title = '부속합의서 (계약번호: ' + no + ')'; }
   var rcptBtn = document.getElementById('crIncomeReceiptBtn');
   if (rcptBtn) { rcptBtn.disabled = false; rcptBtn.title = '입금내역서 (계약번호: ' + no + ')'; }
+  var fpBtn = document.getElementById('crFullPayBtn');   /* [v644] */
+  if (fpBtn) { fpBtn.disabled = false; fpBtn.title = '완납증명서 (계약번호: ' + no + ')'; }
   var feeCalcBtn = document.getElementById('crFeeCalcBtn');
   if (feeCalcBtn) { feeCalcBtn.disabled = false; feeCalcBtn.title = '수수료계산 (계약번호: ' + no + ')'; }
   var delqRptBtn = document.getElementById('crDelqReportBtn');
@@ -16003,29 +16006,7 @@ async function generateIncomeReceipt(contractNo){
   var totalPaid = rows.reduce(function(s, r){ return s + rowPaidAmt(r); }, 0);
 
   // 한글 금액 (간단 변환)
-  var krWon = function(num){
-    var units = ['','만','억','조'];
-    var nums = ['영','일','이','삼','사','오','육','칠','팔','구'];
-    var n = Math.floor(num);
-    if (n === 0) return '영';
-    var result = '', i = 0;
-    while (n > 0) {
-      var part = n % 10000;
-      if (part > 0) {
-        var partStr = '';
-        var thousand = Math.floor(part / 1000); part = part % 1000;
-        var hundred = Math.floor(part / 100); part = part % 100;
-        var ten = Math.floor(part / 10); var one = part % 10;
-        if (thousand) partStr += (thousand > 1 ? nums[thousand] : '') + '천';
-        if (hundred) partStr += (hundred > 1 ? nums[hundred] : '') + '백';
-        if (ten) partStr += (ten > 1 ? nums[ten] : '') + '십';
-        if (one) partStr += nums[one];
-        result = partStr + units[i] + result;
-      }
-      n = Math.floor(n / 10000); i++;
-    }
-    return result;
-  };
+  var krWon = _krWonText;   /* [v644] 공용 */
 
   var refNo = (function(){var t=new Date(); return t.getFullYear() + String(t.getMonth()+1).padStart(2,'0') + String(t.getDate()).padStart(2,'0') + '-' + String(contractNo).padStart(5,'0');})();
   var todayStr = (function(){var t=new Date(); return t.getFullYear()+'년 '+(t.getMonth()+1)+'월 '+t.getDate()+'일';})();
@@ -16057,18 +16038,7 @@ async function generateIncomeReceipt(contractNo){
   var tenant = contract['임차인명'] || contract['임차인'] || '-';
 
   // [v144] 직인 — 내용증명과 동일한 이미지 사용 (window.__krgSealDataUrl), 없으면 SVG fallback
-  var sealHtml = window.__krgSealDataUrl
-    ? '<img src="' + window.__krgSealDataUrl + '" alt="인장" style="width:88px;height:88px;object-fit:contain">'
-    : '<svg width="78" height="78" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">'
-      + '<defs><path id="krgArc" d="M 50,50 m -38,0 a 38,38 0 1,1 76,0 a 38,38 0 1,1 -76,0" fill="none"/></defs>'
-      + '<circle cx="50" cy="50" r="46" fill="none" stroke="#C2185B" stroke-width="2.5"/>'
-      + '<circle cx="50" cy="50" r="41" fill="none" stroke="#C2185B" stroke-width="0.7"/>'
-      + '<text font-family="serif" font-size="9" font-weight="bold" fill="#C2185B" letter-spacing="2.5">'
-      +   '<textPath href="#krgArc" startOffset="0%">케이알지그룹 · 운영팀 · KRG GROUP ·</textPath>'
-      + '</text>'
-      + '<text x="50" y="55" text-anchor="middle" font-size="22" font-weight="900" fill="#C2185B" font-family="serif">印</text>'
-      + '<text x="50" y="68" text-anchor="middle" font-size="6.5" font-weight="700" fill="#C2185B">DIRECTOR</text>'
-      + '</svg>';
+  var sealHtml = _rcptSealHtml();   /* [v644] 공용 */
 
   var rowsHtml = rows.map(function(r, i){
     var _missed = isLandlord && missedSet.has(r);
@@ -16091,58 +16061,7 @@ async function generateIncomeReceipt(contractNo){
       + '</tr>';
   }).join('');
 
-  var css = '*{box-sizing:border-box;margin:0;padding:0}'
-    + 'body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif;color:#1F2937;background:#F3F4F6;padding:24px;line-height:1.5}'
-    + '.page{max-width:780px;margin:0 auto;background:#fff;padding:36px 44px;border:1px solid #D1D5DB;box-shadow:0 2px 6px rgba(0,0,0,.06)}'
-    + '.title{text-align:center;font-size:28px;font-weight:900;letter-spacing:18px;color:#1B3976;padding-bottom:16px;border-bottom:3px double #1B3976;margin-bottom:18px}'
-    + '.refrow{display:flex;justify-content:space-between;font-size:11px;color:#6B7280;margin-bottom:18px}'
-    + '.info-box{display:grid;grid-template-columns:120px 1fr 120px 1fr;gap:0;border:1px solid #1F2937;margin-bottom:14px;font-size:12px}'
-    + '.info-box > div{padding:8px 12px;border-right:1px solid #E5E7EB;border-bottom:1px solid #E5E7EB}'
-    + '.info-box > div:nth-child(4n){border-right:none}'
-    + '.info-box > div.lbl{background:#F3F4F6;font-weight:700;color:#374151}'
-    + '.period-info{background:#FEF3C7;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:12.5px;color:#92400E;font-weight:600;border-left:4px solid #F59E0B}'
-    + 'table.detail{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:14px}'
-    + 'table.detail th{background:#1B3976;color:#fff;padding:8px 6px;font-weight:700;border:1px solid #1B3976}'
-    + 'table.detail td{padding:7px 6px;border:1px solid #D1D5DB}'
-    + 'table.detail tr:nth-child(even) td{background:#F9FAFB}'
-    + '.total-box{background:#F0FDF4;border:2px solid #059669;padding:14px 18px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}'
-    + '.total-box .lbl{font-size:13px;font-weight:700;color:#166534}'
-    + '.total-box .amt{font-size:22px;font-weight:900;color:#065F46}'
-    + '.total-box .kr{font-size:11px;color:#166534;margin-top:2px}'
-    + '.declaration{padding:14px 18px;background:#FAFBFC;border:1px solid #D1D5DB;border-radius:6px;margin-bottom:18px;font-size:12px;line-height:1.7}'
-    + '.declaration b{color:#1B3976}'
-    + '.sign-area{margin-top:24px;text-align:right;position:relative}'
-    + '.sign-date{font-size:13px;font-weight:700;margin-bottom:14px}'
-    + '.sign-issuer-label{font-size:11px;color:#6B7280;font-weight:600;margin-bottom:4px}'
-    + '.sign-co{font-size:15px;font-weight:800;color:#1B3976;margin-bottom:6px}'
-    + '.sign-info{font-size:11.5px;color:#374151;line-height:1.65}'
-    + '.sign-stamp-wrap{display:inline-block;margin-left:18px;vertical-align:middle;position:relative;top:8px}'
-    + '.print-actions{text-align:center;padding:20px;background:#F3F4F6;margin-bottom:18px;border-radius:8px}'
-    + '.print-btn{padding:10px 22px;background:#1B3976;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;margin:0 6px;font-size:13px}'
-    + '@page{size:A4 portrait;margin:10mm 12mm}'
-    + '@media print{'
-    +   'body{background:#fff;padding:0;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
-    +   '.page{border:none;box-shadow:none;max-width:none;padding:0 6mm;margin:0;page-break-inside:avoid}'
-    +   '.print-actions{display:none}'
-    +   '.title{font-size:20px;letter-spacing:10px;padding-bottom:8px;margin-bottom:10px}'
-    +   '.refrow{margin-bottom:8px;font-size:9.5px}'
-    +   '.info-box{margin-bottom:8px;font-size:10px;grid-template-columns:90px 1fr 90px 1fr}'
-    +   '.info-box > div{padding:5px 8px}'
-    +   '.period-info{padding:6px 10px;margin-bottom:8px;font-size:10.5px;border-radius:4px}'
-    +   '.detail{font-size:10px;margin-bottom:8px}'
-    +   '.detail th{padding:5px 4px;font-size:9.5px}'
-    +   '.detail td{padding:4px 4px;font-size:10px}'
-    +   '.total-box{padding:8px 14px;margin-bottom:10px}'
-    +   '.total-box .lbl{font-size:11px}'
-    +   '.total-box .amt{font-size:18px}'
-    +   '.total-box .kr{font-size:10px}'
-    +   '.declaration{padding:8px 12px;font-size:10px;line-height:1.55;margin-bottom:10px}'
-    +   '.sign-area{margin-top:14px}'
-    +   '.sign-date{font-size:11px;margin-bottom:8px}'
-    +   '.sign-co{font-size:13px;margin-bottom:3px}'
-    +   '.sign-info{font-size:10px;line-height:1.55}'
-    +   '.sign-stamp-wrap img,.sign-stamp-wrap svg{width:70px!important;height:70px!important}'
-    + '}';
+  var css = _rcptBaseCss();   /* [v644] 공용 */
 
   // [v273] 용도별 문서 메타 + 본문 분기
   var isClose = (purpose === 'contract_close');
@@ -16314,11 +16233,136 @@ async function generateIncomeReceipt(contractNo){
       + '</div>';
   }
 
-  var html = ''
-    + '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>' + docFileName + '_' + contractNo + '_' + refNo + '</title>'
+  var html = _rcptHead(docFileName + '_' + contractNo + '_' + refNo, css)   /* [v644] 공용 */
+    + _rcptPrintScaffold(docFileName + '_' + contractNo + '_' + refNo)   /* [v644] 공용 */
+    + '<div class="page">'
+    +   '<div class="title">' + docTitle + '</div>'
+    +   '<div class="refrow"><span>발행번호: ' + refNo + '</span><span>발행일: ' + todayStr + '</span></div>'
+    +   '<div class="info-box">'
+    +     '<div class="lbl">계약번호</div><div>' + contractNo + '</div>'
+    +     '<div class="lbl">계약상태</div><div>' + contractStatusStr + '</div>'
+    +     '<div class="lbl">임(전)차인</div><div>' + tenant + '</div>'
+    +     '<div class="lbl">임대인</div><div>' + landlord + '</div>'
+    +     '<div class="lbl">계약물건</div><div style="grid-column:span 3">' + contractInfo + '</div>'
+    +     '<div class="lbl">계약기간</div><div style="grid-column:span 3">' + period + '</div>'
+    +   '</div>'
+    +   paidBlockHtml
+    +   unpaidTableHtml
+    +   settleNoticeHtml
+    +   '<div class="declaration">' + declarationHtml + '</div>'
+    +   _rcptSignHtml(todayStr, sealHtml)   /* [v644] 공용 */
+    + '</div></body></html>';
+
+  closeIncomeReceiptModal();
+  var win = window.open('', '_blank', 'width=900,height=1000,scrollbars=yes');
+  if (!win) { alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.'); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
+
+// ==================== [v644] 납부증빙 서식 공용 조각 (납부확인서·계약해지증명서·퇴실정산청구서·완납증명서 공용) ====================
+function _krWonText(num){
+    var units = ['','만','억','조'];
+    var nums = ['영','일','이','삼','사','오','육','칠','팔','구'];
+    var n = Math.floor(num);
+    if (n === 0) return '영';
+    var result = '', i = 0;
+    while (n > 0) {
+      var part = n % 10000;
+      if (part > 0) {
+        var partStr = '';
+        var thousand = Math.floor(part / 1000); part = part % 1000;
+        var hundred = Math.floor(part / 100); part = part % 100;
+        var ten = Math.floor(part / 10); var one = part % 10;
+        if (thousand) partStr += (thousand > 1 ? nums[thousand] : '') + '천';
+        if (hundred) partStr += (hundred > 1 ? nums[hundred] : '') + '백';
+        if (ten) partStr += (ten > 1 ? nums[ten] : '') + '십';
+        if (one) partStr += nums[one];
+        result = partStr + units[i] + result;
+      }
+      n = Math.floor(n / 10000); i++;
+    }
+    return result;
+}
+function _rcptSealHtml(){
+  return window.__krgSealDataUrl
+    ? '<img src="' + window.__krgSealDataUrl + '" alt="인장" style="width:88px;height:88px;object-fit:contain">'
+    : '<svg width="78" height="78" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">'
+      + '<defs><path id="krgArc" d="M 50,50 m -38,0 a 38,38 0 1,1 76,0 a 38,38 0 1,1 -76,0" fill="none"/></defs>'
+      + '<circle cx="50" cy="50" r="46" fill="none" stroke="#C2185B" stroke-width="2.5"/>'
+      + '<circle cx="50" cy="50" r="41" fill="none" stroke="#C2185B" stroke-width="0.7"/>'
+      + '<text font-family="serif" font-size="9" font-weight="bold" fill="#C2185B" letter-spacing="2.5">'
+      +   '<textPath href="#krgArc" startOffset="0%">케이알지그룹 · 운영팀 · KRG GROUP ·</textPath>'
+      + '</text>'
+      + '<text x="50" y="55" text-anchor="middle" font-size="22" font-weight="900" fill="#C2185B" font-family="serif">印</text>'
+      + '<text x="50" y="68" text-anchor="middle" font-size="6.5" font-weight="700" fill="#C2185B">DIRECTOR</text>'
+      + '</svg>';
+}
+function _rcptBaseCss(){
+  return '*{box-sizing:border-box;margin:0;padding:0}'
+    + 'body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif;color:#1F2937;background:#F3F4F6;padding:24px;line-height:1.5}'
+    + '.page{max-width:780px;margin:0 auto;background:#fff;padding:36px 44px;border:1px solid #D1D5DB;box-shadow:0 2px 6px rgba(0,0,0,.06)}'
+    + '.title{text-align:center;font-size:28px;font-weight:900;letter-spacing:18px;color:#1B3976;padding-bottom:16px;border-bottom:3px double #1B3976;margin-bottom:18px}'
+    + '.refrow{display:flex;justify-content:space-between;font-size:11px;color:#6B7280;margin-bottom:18px}'
+    + '.info-box{display:grid;grid-template-columns:120px 1fr 120px 1fr;gap:0;border:1px solid #1F2937;margin-bottom:14px;font-size:12px}'
+    + '.info-box > div{padding:8px 12px;border-right:1px solid #E5E7EB;border-bottom:1px solid #E5E7EB}'
+    + '.info-box > div:nth-child(4n){border-right:none}'
+    + '.info-box > div.lbl{background:#F3F4F6;font-weight:700;color:#374151}'
+    + '.period-info{background:#FEF3C7;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:12.5px;color:#92400E;font-weight:600;border-left:4px solid #F59E0B}'
+    + 'table.detail{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:14px}'
+    + 'table.detail th{background:#1B3976;color:#fff;padding:8px 6px;font-weight:700;border:1px solid #1B3976}'
+    + 'table.detail td{padding:7px 6px;border:1px solid #D1D5DB}'
+    + 'table.detail tr:nth-child(even) td{background:#F9FAFB}'
+    + '.total-box{background:#F0FDF4;border:2px solid #059669;padding:14px 18px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}'
+    + '.total-box .lbl{font-size:13px;font-weight:700;color:#166534}'
+    + '.total-box .amt{font-size:22px;font-weight:900;color:#065F46}'
+    + '.total-box .kr{font-size:11px;color:#166534;margin-top:2px}'
+    + '.declaration{padding:14px 18px;background:#FAFBFC;border:1px solid #D1D5DB;border-radius:6px;margin-bottom:18px;font-size:12px;line-height:1.7}'
+    + '.declaration b{color:#1B3976}'
+    + '.sign-area{margin-top:24px;text-align:right;position:relative}'
+    + '.sign-date{font-size:13px;font-weight:700;margin-bottom:14px}'
+    + '.sign-issuer-label{font-size:11px;color:#6B7280;font-weight:600;margin-bottom:4px}'
+    + '.sign-co{font-size:15px;font-weight:800;color:#1B3976;margin-bottom:6px}'
+    + '.sign-info{font-size:11.5px;color:#374151;line-height:1.65}'
+    + '.sign-stamp-wrap{display:inline-block;margin-left:18px;vertical-align:middle;position:relative;top:8px}'
+    + '.print-actions{text-align:center;padding:20px;background:#F3F4F6;margin-bottom:18px;border-radius:8px}'
+    + '.print-btn{padding:10px 22px;background:#1B3976;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;margin:0 6px;font-size:13px}'
+    + '@page{size:A4 portrait;margin:10mm 12mm}'
+    + '@media print{'
+    +   'body{background:#fff;padding:0;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +   '.page{border:none;box-shadow:none;max-width:none;padding:0 6mm;margin:0;page-break-inside:avoid}'
+    +   '.print-actions{display:none}'
+    +   '.title{font-size:20px;letter-spacing:10px;padding-bottom:8px;margin-bottom:10px}'
+    +   '.refrow{margin-bottom:8px;font-size:9.5px}'
+    +   '.info-box{margin-bottom:8px;font-size:10px;grid-template-columns:90px 1fr 90px 1fr}'
+    +   '.info-box > div{padding:5px 8px}'
+    +   '.period-info{padding:6px 10px;margin-bottom:8px;font-size:10.5px;border-radius:4px}'
+    +   '.detail{font-size:10px;margin-bottom:8px}'
+    +   '.detail th{padding:5px 4px;font-size:9.5px}'
+    +   '.detail td{padding:4px 4px;font-size:10px}'
+    +   '.total-box{padding:8px 14px;margin-bottom:10px}'
+    +   '.total-box .lbl{font-size:11px}'
+    +   '.total-box .amt{font-size:18px}'
+    +   '.total-box .kr{font-size:10px}'
+    +   '.declaration{padding:8px 12px;font-size:10px;line-height:1.55;margin-bottom:10px}'
+    +   '.sign-area{margin-top:14px}'
+    +   '.sign-date{font-size:11px;margin-bottom:8px}'
+    +   '.sign-co{font-size:13px;margin-bottom:3px}'
+    +   '.sign-info{font-size:10px;line-height:1.55}'
+    +   '.sign-stamp-wrap img,.sign-stamp-wrap svg{width:70px!important;height:70px!important}'
+    + '}';
+}
+function _rcptHead(title, css){
+  return ''
+    + '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>' + title + '</title>'
     + '<style>' + css + '</style>'
     + '<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>'
     + '</head><body>'
+  ;
+}
+function _rcptPrintScaffold(fname){
+  return ''
     + '<div class="print-actions">'
     +   '<button class="print-btn" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>'
     +   '<button class="print-btn" style="background:#0EA5E9" onclick="downloadAsJpg_()">🖼️ JPG 저장</button>'
@@ -16339,7 +16383,7 @@ async function generateIncomeReceipt(contractNo){
     +       'var dataUrl = canvas.toDataURL("image/jpeg", 0.95);'
     +       'var a = document.createElement("a");'
     +       'a.href = dataUrl;'
-    +       'a.download = ' + JSON.stringify(docFileName + '_' + contractNo + '_' + refNo + '.jpg') + ';'
+    +       'a.download = ' + JSON.stringify(fname + '.jpg') + ';'
     +       'document.body.appendChild(a); a.click(); document.body.removeChild(a);'
     +     '}).catch(function(e){'
     +       'if (actions) actions.style.display = "";'
@@ -16347,21 +16391,10 @@ async function generateIncomeReceipt(contractNo){
     +     '});'
     +   '}'
     + '<\/script>'
-    + '<div class="page">'
-    +   '<div class="title">' + docTitle + '</div>'
-    +   '<div class="refrow"><span>발행번호: ' + refNo + '</span><span>발행일: ' + todayStr + '</span></div>'
-    +   '<div class="info-box">'
-    +     '<div class="lbl">계약번호</div><div>' + contractNo + '</div>'
-    +     '<div class="lbl">계약상태</div><div>' + contractStatusStr + '</div>'
-    +     '<div class="lbl">임(전)차인</div><div>' + tenant + '</div>'
-    +     '<div class="lbl">임대인</div><div>' + landlord + '</div>'
-    +     '<div class="lbl">계약물건</div><div style="grid-column:span 3">' + contractInfo + '</div>'
-    +     '<div class="lbl">계약기간</div><div style="grid-column:span 3">' + period + '</div>'
-    +   '</div>'
-    +   paidBlockHtml
-    +   unpaidTableHtml
-    +   settleNoticeHtml
-    +   '<div class="declaration">' + declarationHtml + '</div>'
+  ;
+}
+function _rcptSignHtml(todayStr, sealHtml){
+  return ''
     +   '<div class="sign-area">'
     +     '<div class="sign-date">' + todayStr + '</div>'
     +     '<div style="display:inline-block;text-align:right;vertical-align:middle">'
@@ -16375,13 +16408,206 @@ async function generateIncomeReceipt(contractNo){
     +     '</div>'
     +     '<span class="sign-stamp-wrap">' + sealHtml + '</span>'
     +   '</div>'
-    + '</div></body></html>';
+  ;
+}
 
-  closeIncomeReceiptModal();
-  var win = window.open('', '_blank', 'width=900,height=1000,scrollbars=yes');
-  if (!win) { alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.'); return; }
-  win.document.write(html);
-  win.document.close();
+// ==================== [v644] 완납증명서 — 별도 버튼 · 전용 모달 ====================
+/* 은행 거래내역 줄 인식 — 하나(2026-09-16 11:43:56 ⇥ 최재성 ⇥ ⇥ (주)비바리퍼블리카 ⇥ 718670) · 신한(2026.09.16 09:16:07 ⇥ 타행IB ⇥ 605,000 ⇥ 0 ⇥ 김준성) 등.
+   규칙: 날짜 토큰 필수 · 금액 = 날짜 뒤 첫 번째 0보다 큰 숫자(콤마 허용) · 입금자 = 은행 코드(타행IB/CD/ATM 등)를 제외한 첫 문자 토큰 · 나머지 문자 토큰은 비고 */
+function _fpParseBankLines(text){
+  var out=[], SKIP=/^(타행|당행|IB|CD|ATM|인터넷|모바일|전자|자동|입금|출금|이체|폰뱅킹|오픈뱅킹|CMS|FB|펌뱅킹|텔레뱅킹|무통장|계좌)/i;
+  String(text||'').split(/\r?\n/).forEach(function(line){
+    var raw=line.trim(); if(!raw) return;
+    var toks=raw.split(/\t+| {2,}/).map(function(t){ return t.trim(); }).filter(function(t){ return t!==''; });
+    if(toks.length<2) toks=raw.split(/\s+/);
+    var di=-1, dm=null;
+    for(var i=0;i<toks.length;i++){ var m=toks[i].match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); if(m){ di=i; dm=m; break; } }
+    if(!dm) return;
+    var date=dm[1]+'-'+String(+dm[2]).padStart(2,'0')+'-'+String(+dm[3]).padStart(2,'0');
+    var amt=0, ai=-1;
+    for(var j=di+1;j<toks.length;j++){ var t=toks[j].replace(/[₩원]/g,''); if(!/^\d{1,3}(,\d{3})+$|^\d+$/.test(t)) continue; var n=parseInt(t.replace(/,/g,''),10); if(n>0){ amt=n; ai=j; break; } }
+    if(!(amt>0)) return;
+    var names=[]; toks.forEach(function(t,k){ if(k===di||k===ai) return; if(/^[\d,₩원.]+$/.test(t)) return; if(/^\d{1,2}:\d{2}/.test(t)) return; if(SKIP.test(t)) return; names.push(t); });
+    out.push({date:date, who:names.length?names[0]:'', amt:amt, memo:names.slice(1).join(' ')});
+  });
+  return out;
+}
+/* 연체 채무 후보 — 연체중·분납중·연체납부 (납기일 기간) · 금액 = 최종 청구금액(없으면 미납) */
+function _fpCollectDebtRows(contractNo, fromVal, toVal){
+  var pd=function(x){ var m=String(x||'').match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); return m?new Date(+m[1],+m[2]-1,+m[3]).getTime():null; };
+  var fromTs=fromVal?new Date(fromVal+'T00:00:00').getTime():null, toTs=toVal?new Date(toVal+'T23:59:59').getTime():null, out=[];
+  (paymentRawData||[]).forEach(function(p){
+    if(String(p['계약번호']||'').trim()!==String(contractNo).trim()) return;
+    var st=String(p['납부상태']||'').trim(); if(st!=='연체중'&&st!=='분납중'&&st!=='연체납부') return;
+    var due=pd(p['납기일']); if(fromTs&&due&&due<fromTs) return; if(toTs&&due&&due>toTs) return;
+    var gen=parseSafeMoney(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']), un=parseSafeMoney(p['미납(연체)금액(원)']);
+    out.push({name:String(p['청구서명']||p['납부종류']||'-'), type:String(p['납부종류']||''), due:String(p['납기일']||''), pay:String(p['납부일']||''), st:st, amt:gen>0?gen:un, unpaid:un});
+  });
+  out.sort(function(a,b){ return (pd(a.due)||0)-(pd(b.due)||0); });
+  return out;
+}
+function openFullPayModal(contractNo){
+  if(!contractNo){ alert('계약을 먼저 검색해주세요.'); return; }
+  var contract=(contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim()===String(contractNo); });
+  if(!contract){ alert('계약 데이터 없음'); return; }
+  closeFullPayModal();
+  var _safe=function(v){ if(v==null) return ''; var x=String(v).trim(); return (!x||x==='NaN'||x==='undefined'||x==='null'||x==='-')?'':x; };
+  var fmtD=function(x){ var m=String(x||'').match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); return m?(m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0')):''; };
+  var tenant=_safe(contract['임차인명'])||_safe(contract['임차인'])||'-', sub=[_safe(contract['건물명']),_safe(contract['호수'])].filter(Boolean).join(' ');
+  var t=new Date(), todayV=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+  var vr=(window.vacancyRawData||vacancyRawData||[]).find(function(v){ return String(v.no||'').trim()===String(contractNo).trim(); });
+  var startV=fmtD((vr&&vr.startDate)||contract['시작일']);
+  var pen=(typeof _dlqPenalty==='function')?(_dlqPenalty(contractNo)||0):0;
+  window._fpState={contractNo:String(contractNo), debt:[], deposits:[]};
+  var ov=document.createElement('div'); ov.id='crFullPayModal';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML=''
+    +'<div style="background:#fff;border-radius:10px;width:100%;max-width:760px;max-height:92vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.15)">'
+    +  '<div style="padding:14px 18px;background:#0F766E;color:#fff;display:flex;align-items:center;gap:10px"><div style="font-size:16px;font-weight:700;flex:1">✅ 완납증명서 발행</div><button onclick="closeFullPayModal()" style="background:transparent;border:none;width:26px;height:26px;color:#fff;font-size:18px;cursor:pointer;opacity:.7">✕</button></div>'
+    +  '<div style="padding:16px 20px">'
+    +    '<div style="margin-bottom:10px;padding:8px 11px;background:#F0FDFA;border-left:3px solid #0F766E;border-radius:4px;font-size:12px;color:#134E4A"><b>'+tenant+'</b> · 계약 #'+contractNo+(sub?' · '+sub:'')+' · 시작일 '+(startV||'-')+'</div>'
+    +    '<div style="font-size:11.5px;color:#475569;line-height:1.55;margin-bottom:12px">채무자가 납부한 금액을 증명하는 서류 — 연체 채무(① 연체금액 + ② 위약금)와 ④ 입금 내역을 대조해 <b>채무 소멸(완납)</b>을 확인합니다. 잔액이 0원일 때 발행할 수 있습니다.</div>'
+    +    '<div style="margin-bottom:12px;padding:11px 12px;background:#FEF2F2;border:1px solid #FECACA;border-radius:6px">'
+    +      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap"><b style="font-size:12px;color:#991B1B">① 연체금액 내역</b><span style="font-size:10.5px;color:#9CA3AF">납기일 기준</span>'
+    +        '<input type="date" id="fpFrom" value="'+startV+'" onchange="fpReloadDebt()" style="padding:4px 6px;border:1px solid #FCA5A5;border-radius:4px;font-size:11.5px"><span style="color:#94A3B8">~</span><input type="date" id="fpTo" value="'+todayV+'" onchange="fpReloadDebt()" style="padding:4px 6px;border:1px solid #FCA5A5;border-radius:4px;font-size:11.5px">'
+    +        '<span style="margin-left:auto;font-size:10.5px"><a href="javascript:void(0)" onclick="fpCheckAll(true)" style="color:#991B1B">전체 선택</a> · <a href="javascript:void(0)" onclick="fpCheckAll(false)" style="color:#991B1B">해제</a></span></div>'
+    +      '<div id="fpDebtList" style="border:1px solid #FECACA;border-radius:5px;background:#fff;max-height:190px;overflow-y:auto"></div>'
+    +      '<div style="font-size:10.5px;color:#9CA3AF;margin-top:5px">연체중·분납중·연체납부 항목 표시 · 금액 = 최종 청구금액(수정 가능) · 연체중/분납중은 기본 선택, 연체납부는 납부일이 최근 60일 이내인 항목만 기본 선택</div>'
+    +    '</div>'
+    +    '<div style="margin-bottom:12px;padding:11px 12px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9A3412;font-weight:700;cursor:pointer"><input type="checkbox" id="fpPenOn" '+(pen>0?'checked':'')+' onchange="fpRecalc()" style="accent-color:#B45309"> ② 위약금 <span style="font-weight:500;font-size:10.5px">(개런티즈 제13조 · 임대료×4개월)</span></label>'
+    +      '<input type="number" id="fpPenAmt" value="'+(pen>0?Math.round(pen):0)+'" oninput="fpRecalc()" style="width:130px;padding:5px 8px;border:1px solid #FDBA74;border-radius:4px;font-size:12px;text-align:right">'
+    +      '<span style="font-size:10.5px;color:#C2845A">'+(pen>0?'자동 산정 — 시작일 2025-06-01 이후 (gid=1953907648 AK열 임대료 × 4)':'대상 아님 — 시작일 2025-06-01 미만 (필요 시 금액 직접 입력 후 체크)')+'</span>'
+    +    '</div>'
+    +    '<div style="margin-bottom:12px;padding:11px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +      '<b style="font-size:12px;color:#334155">③ 협의 조정(감면) 금액</b><input type="number" id="fpAdjAmt" value="0" oninput="fpRecalc()" style="width:130px;padding:5px 8px;border:1px solid #CBD5E1;border-radius:4px;font-size:12px;text-align:right">'
+    +      '<input type="text" id="fpAdjNote" placeholder="사유 (예: 위약금 일부 감면 합의)" style="flex:1;min-width:180px;padding:5px 8px;border:1px solid #CBD5E1;border-radius:4px;font-size:11.5px">'
+    +      '<span style="width:100%;font-size:10.5px;color:#94A3B8">협의로 채무 일부를 감면한 경우에만 입력 (0이면 증명서에 표시되지 않음)</span>'
+    +    '</div>'
+    +    '<div style="margin-bottom:12px;padding:11px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px">'
+    +      '<b style="font-size:12px;color:#1E3A8A;display:block;margin-bottom:6px">④ 입금금액 내역 <span style="font-weight:500;font-size:10.5px;color:#60A5FA">— 은행 거래내역 줄을 붙여넣으면 자동 인식 (하나·신한 형식)</span></b>'
+    +      '<textarea id="fpPaste" rows="3" placeholder="예) 2026-09-16 11:43:56&#9;최재성&#9;&#9;(주)비바리퍼블리카&#9;718670&#10;예) 2026.09.16 09:16:07&#9;타행IB&#9;605,000&#9;0&#9;김준성" style="width:100%;padding:7px 9px;border:1px solid #BFDBFE;border-radius:5px;font-size:11.5px;font-family:inherit;box-sizing:border-box;resize:vertical"></textarea>'
+    +      '<div style="display:flex;gap:6px;margin:6px 0 8px;flex-wrap:wrap"><button type="button" onclick="fpParsePaste()" style="background:#1D4ED8;color:#fff;border:none;padding:6px 12px;border-radius:5px;font-size:11.5px;font-weight:700;cursor:pointer">📥 붙여넣기 인식 → 표에 추가</button><button type="button" onclick="fpAddDeposit()" style="background:#fff;border:1px solid #BFDBFE;color:#1E40AF;padding:6px 12px;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer">➕ 행 직접 추가</button><button type="button" onclick="fpClearDeposits()" style="background:#fff;border:1px solid #E5E7EB;color:#6B7280;padding:6px 10px;border-radius:5px;font-size:11px;cursor:pointer">초기화</button></div>'
+    +      '<div id="fpDepList" style="border:1px solid #BFDBFE;border-radius:5px;background:#fff;max-height:170px;overflow-y:auto"></div>'
+    +    '</div>'
+    +    '<div id="fpSummary" style="margin-bottom:12px"></div>'
+    +    '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:5px">📝 추가 기재 사항 <span style="color:#9CA3AF;font-weight:500;font-size:10.5px">(선택 — 증명서 본문에 삽입)</span></label>'
+    +    '<textarea id="fpExtra" rows="2" style="width:100%;padding:8px 10px;border:1px solid #CBD5E1;border-radius:5px;font-size:12px;font-family:inherit;box-sizing:border-box;resize:vertical"></textarea>'
+    +  '</div>'
+    +  '<div style="padding:11px 18px;background:#F8FAFC;border-top:1px solid #E2E8F0;display:flex;gap:6px"><button onclick="closeFullPayModal()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:8px 14px;border-radius:5px;font-size:12.5px;font-weight:600;cursor:pointer;margin-left:auto">취소</button><button id="fpGenBtn" onclick="generateFullPayCert()" style="background:#0F766E;color:#fff;border:none;padding:8px 16px;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer">✅ 완납증명서 생성</button></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  fpReloadDebt(); fpRenderDeposits();
+}
+function closeFullPayModal(){ var m=document.getElementById('crFullPayModal'); if(m) m.remove(); }
+function fpReloadDebt(){
+  var S=window._fpState, box=document.getElementById('fpDebtList'); if(!S||!box) return;
+  var rows=_fpCollectDebtRows(S.contractNo, (document.getElementById('fpFrom')||{}).value, (document.getElementById('fpTo')||{}).value); S.debt=rows;
+  if(!rows.length){ box.innerHTML='<div style="padding:10px;font-size:11px;color:#94A3B8;text-align:center">기간 내 연체 항목이 없습니다</div>'; fpRecalc(); return; }
+  var now=Date.now(), pd=function(x){ var m=String(x||'').match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); return m?new Date(+m[1],+m[2]-1,+m[3]).getTime():null; };
+  var esc=function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  box.innerHTML=rows.map(function(r,i){
+    var on=(r.st!=='연체납부')||(pd(r.pay)&&(now-pd(r.pay))<=60*86400000);
+    var sc={'연체중':'#DC2626','분납중':'#4F46E5','연체납부':'#F59E0B'}[r.st]||'#64748B';
+    return '<div style="display:grid;grid-template-columns:22px 1fr 82px 118px 110px;gap:6px;align-items:center;padding:5px 8px;border-bottom:1px solid #FEE2E2;font-size:11px">'
+      +'<input type="checkbox" class="fp-debt-on" data-i="'+i+'" '+(on?'checked':'')+' onchange="fpRecalc()" style="accent-color:#DC2626">'
+      +'<span title="'+esc(r.name)+'" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.name)+'<span style="color:#94A3B8;font-size:10px"> · '+esc(r.type)+'</span></span>'
+      +'<span style="color:#64748B;white-space:nowrap">'+esc(r.due||'-')+'</span>'
+      +'<span style="color:'+sc+';font-weight:700;white-space:nowrap">'+r.st+(r.st==='연체납부'&&r.pay?'<span style="color:#94A3B8;font-weight:500;font-size:9.5px"> '+esc(String(r.pay).slice(0,10))+'</span>':'')+'</span>'
+      +'<input type="number" class="fp-debt-amt" data-i="'+i+'" value="'+Math.round(r.amt)+'" oninput="fpRecalc()" style="width:100%;padding:3px 6px;border:1px solid #FECACA;border-radius:4px;font-size:11px;text-align:right;box-sizing:border-box">'
+      +'</div>';
+  }).join('');
+  fpRecalc();
+}
+function fpCheckAll(on){ document.querySelectorAll('.fp-debt-on').forEach(function(c){ c.checked=!!on; }); fpRecalc(); }
+function fpRenderDeposits(){
+  var S=window._fpState, box=document.getElementById('fpDepList'); if(!S||!box) return;
+  if(!S.deposits.length){ box.innerHTML='<div style="padding:10px;font-size:11px;color:#94A3B8;text-align:center">입금 내역이 없습니다 — 위에 붙여넣거나 행을 추가하세요</div>'; fpRecalc(); return; }
+  var esc=function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  box.innerHTML=S.deposits.map(function(d,i){
+    return '<div style="display:grid;grid-template-columns:120px 1fr 110px 1fr 24px;gap:6px;align-items:center;padding:5px 8px;border-bottom:1px solid #DBEAFE">'
+      +'<input type="date" value="'+esc(d.date||'')+'" onchange="fpDepEdit('+i+',\'date\',this.value)" style="padding:3px 5px;border:1px solid #BFDBFE;border-radius:4px;font-size:11px">'
+      +'<input type="text" value="'+esc(d.who||'')+'" placeholder="입금자" oninput="fpDepEdit('+i+',\'who\',this.value)" style="padding:3px 6px;border:1px solid #BFDBFE;border-radius:4px;font-size:11px">'
+      +'<input type="number" value="'+Math.round(d.amt||0)+'" oninput="fpDepEdit('+i+',\'amt\',this.value)" style="padding:3px 6px;border:1px solid #BFDBFE;border-radius:4px;font-size:11px;text-align:right">'
+      +'<input type="text" value="'+esc(d.memo||'')+'" placeholder="비고 (은행/내용)" oninput="fpDepEdit('+i+',\'memo\',this.value)" style="padding:3px 6px;border:1px solid #BFDBFE;border-radius:4px;font-size:11px">'
+      +'<button type="button" onclick="fpDepDel('+i+')" title="삭제" style="background:none;border:none;color:#94A3B8;cursor:pointer;font-size:13px">✕</button>'
+      +'</div>';
+  }).join('');
+  fpRecalc();
+}
+function fpDepEdit(i,k,v){ var S=window._fpState; if(!S||!S.deposits[i]) return; S.deposits[i][k]=(k==='amt')?parseSafeMoney(v):v; fpRecalc(); }
+function fpDepDel(i){ var S=window._fpState; if(!S) return; S.deposits.splice(i,1); fpRenderDeposits(); }
+function fpAddDeposit(){ var S=window._fpState; if(!S) return; var t=new Date(); S.deposits.push({date:t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'), who:'', amt:0, memo:''}); fpRenderDeposits(); }
+function fpClearDeposits(){ var S=window._fpState; if(!S) return; S.deposits=[]; fpRenderDeposits(); }
+function fpParsePaste(){ var S=window._fpState, ta=document.getElementById('fpPaste'); if(!S||!ta) return; var rows=_fpParseBankLines(ta.value); if(!rows.length){ alert('인식된 입금 줄이 없습니다. 날짜와 금액이 포함된 줄을 붙여넣어 주세요.'); return; } S.deposits=S.deposits.concat(rows); ta.value=''; fpRenderDeposits(); }
+function _fpTotals(){
+  var S=window._fpState||{debt:[],deposits:[]}, items=[];
+  document.querySelectorAll('.fp-debt-on').forEach(function(c){ if(!c.checked) return; var i=+c.getAttribute('data-i'), r=(S.debt||[])[i]; if(!r) return; var ai=document.querySelector('.fp-debt-amt[data-i="'+i+'"]'); items.push({name:r.name,type:r.type,due:r.due,pay:r.pay,st:r.st,amt:ai?parseSafeMoney(ai.value):r.amt}); });
+  var debt=items.reduce(function(a,x){ return a+x.amt; },0);
+  var penOn=!!(document.getElementById('fpPenOn')||{}).checked, pen=penOn?parseSafeMoney((document.getElementById('fpPenAmt')||{}).value):0;
+  var adj=parseSafeMoney((document.getElementById('fpAdjAmt')||{}).value), adjNote=(document.getElementById('fpAdjNote')||{}).value||'';
+  var deps=(S.deposits||[]).filter(function(d){ return d.amt>0; }), dep=deps.reduce(function(a,d){ return a+d.amt; },0);
+  var total=debt+pen, fixed=total-adj, bal=fixed-dep;
+  return {items:items, debt:debt, pen:pen, penOn:penOn, adj:adj, adjNote:adjNote, deps:deps, dep:dep, total:total, fixed:fixed, bal:bal};
+}
+function fpRecalc(){
+  var T=_fpTotals(), el=document.getElementById('fpSummary'); if(!el) return;
+  var W=function(n){ return '₩'+Math.round(n).toLocaleString('ko-KR'); };
+  var ok=(T.fixed>0 && T.bal<=0 && T.deps.length>0);
+  var st=T.fixed<=0?['#94A3B8','① 채무 항목을 선택하세요']:(!T.deps.length?['#94A3B8','④ 입금 내역을 입력하세요 (은행 거래내역 붙여넣기 또는 행 추가)']:(T.bal>0?['#DC2626','⚠ 잔액 '+W(T.bal)+' — 입금이 부족합니다 (③ 협의 조정 금액을 입력하거나 ④ 입금 내역을 확인하세요)']:(T.bal<0?['#B45309','✅ 완납 · 과납 '+W(-T.bal)+' (초과 입금분은 증명서에 별도 표기)']:['#15803D','✅ 완납 — 잔액 ₩0'])));
+  el.innerHTML='<div style="padding:11px 14px;border-radius:6px;border:1.5px solid '+st[0]+';background:#fff">'
+    +'<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:#334155"><span>① 연체금액 <b>'+W(T.debt)+'</b> ('+T.items.length+'건)</span><span>+ ② 위약금 <b>'+W(T.pen)+'</b></span>'+(T.adj>0?'<span>− ③ 협의 조정 <b>'+W(T.adj)+'</b></span>':'')+'<span>= 확정 채무 <b style="color:#991B1B">'+W(T.fixed)+'</b></span><span style="margin-left:auto">④ 입금 합계 <b style="color:#1D4ED8">'+W(T.dep)+'</b> ('+T.deps.length+'건)</span></div>'
+    +'<div style="margin-top:6px;font-size:12.5px;font-weight:800;color:'+st[0]+'">'+st[1]+'</div></div>';
+  var btn=document.getElementById('fpGenBtn'); if(btn){ btn.disabled=!ok; btn.style.opacity=ok?'1':'.45'; }
+}
+function generateFullPayCert(){
+  var S=window._fpState; if(!S) return; var contractNo=S.contractNo, T=_fpTotals();
+  if(T.fixed<=0){ alert('채무 항목을 한 건 이상 선택해주세요.'); return; }
+  if(!T.deps.length){ alert('입금 내역을 한 건 이상 입력해주세요.'); return; }
+  if(T.bal>0){ alert('입금 합계가 확정 채무보다 '+Math.round(T.bal).toLocaleString('ko-KR')+'원 부족합니다. 완납증명서는 잔액이 0원일 때 발행할 수 있습니다.'); return; }
+  var contract=(contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim()===String(contractNo); }); if(!contract){ alert('계약 데이터 없음'); return; }
+  var vac=(window.vacancyRawData||vacancyRawData||[]).find(function(v){ return String(v.no||'').trim()===String(contractNo); });
+  var fmtKr=function(x){ if(!x) return '-'; var m=String(x).match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); return m?(m[1]+'.'+String(+m[2]).padStart(2,'0')+'.'+String(+m[3]).padStart(2,'0')):x; };
+  var W=function(n){ return '₩'+Math.round(n).toLocaleString('ko-KR'); };
+  var esc=function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var refNo=(function(){var t=new Date(); return t.getFullYear()+String(t.getMonth()+1).padStart(2,'0')+String(t.getDate()).padStart(2,'0')+'-'+String(contractNo).padStart(5,'0');})();
+  var todayStr=(function(){var t=new Date(); return t.getFullYear()+'년 '+(t.getMonth()+1)+'월 '+t.getDate()+'일';})();
+  var contractInfo=vac?[vac.propAddr,vac.propBuilding,vac.propRoom].filter(Boolean).join(' '):((contract['건물명']||'')+' '+(contract['호수']||''));
+  var contractStatusStr=(vac&&String(vac.contractKind||'').trim())||contract['계약상태']||'-';
+  var period=(contract['시작일']||'')+' ~ '+(contract['종료일']||''), landlord=contract['임대인명']||'-', tenant=contract['임차인명']||contract['임차인']||'-';
+  var lastDep=T.deps.map(function(d){ return d.date; }).filter(Boolean).sort().pop()||'';
+  var hasPen=(T.penOn&&T.pen>0), over=T.bal<0?-T.bal:0;
+  var css=_rcptBaseCss()+'.fp-tbl{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:12px}.fp-tbl th{padding:7px 6px;font-weight:700;border:1px solid #D1D5DB}.fp-tbl td{padding:6px 6px;border:1px solid #D1D5DB}.fp-h{font-size:13px;font-weight:700;margin:0 0 7px}@media print{.fp-tbl{font-size:10px;margin-bottom:8px}.fp-tbl th,.fp-tbl td{padding:4px}.fp-h{font-size:11px}}';
+  var debtRows=T.items.map(function(x,i){ return '<tr><td style="text-align:center">'+(i+1)+'</td><td>'+esc(x.name)+'</td><td style="text-align:center">'+fmtKr(x.due)+'</td><td style="text-align:center">'+esc(x.st)+(x.st==='연체납부'&&x.pay?' <span style="color:#6B7280;font-size:10.5px">('+fmtKr(x.pay)+')</span>':'')+'</td><td style="text-align:right;font-weight:700;color:#991B1B">'+W(x.amt)+'</td></tr>'; }).join('');
+  if(hasPen) debtRows+='<tr><td style="text-align:center">'+(T.items.length+1)+'</td><td>위약금 <span style="color:#6B7280;font-size:10.5px">(개런티즈 계약서 제13조 · 임대료 4개월분 상당)</span></td><td style="text-align:center">-</td><td style="text-align:center">위약금</td><td style="text-align:right;font-weight:700;color:#991B1B">'+W(T.pen)+'</td></tr>';
+  var debtTbl='<div class="fp-h" style="color:#991B1B">① 연체 채무 내역 <span style="font-weight:500;font-size:11px;color:#6B7280">— 연체금액'+(hasPen?' + 위약금':'')+'</span></div>'
+    +'<table class="fp-tbl"><thead><tr style="background:#FEE2E2;color:#991B1B"><th style="width:36px">No</th><th style="text-align:left">청구서명</th><th style="width:84px">납기일</th><th style="width:150px">납부상태</th><th style="width:120px;text-align:right">금액</th></tr></thead><tbody>'+debtRows
+    +'<tr style="background:#FEF2F2"><td colspan="4" style="text-align:right;font-weight:700">채무 합계</td><td style="text-align:right;font-weight:900;color:#991B1B">'+W(T.total)+'</td></tr>'
+    +(T.adj>0?'<tr><td colspan="4" style="text-align:right">협의 조정(감면)'+(T.adjNote?' <span style="color:#6B7280;font-size:10.5px">— '+esc(T.adjNote)+'</span>':'')+'</td><td style="text-align:right;font-weight:700;color:#B45309">− '+W(T.adj)+'</td></tr><tr style="background:#FEF2F2"><td colspan="4" style="text-align:right;font-weight:700">확정 채무</td><td style="text-align:right;font-weight:900;color:#991B1B">'+W(T.fixed)+'</td></tr>':'')
+    +'</tbody></table>';
+  var depRows=T.deps.map(function(d,i){ return '<tr><td style="text-align:center">'+(i+1)+'</td><td style="text-align:center">'+fmtKr(d.date)+'</td><td>'+esc(d.who||'-')+'</td><td style="color:#6B7280">'+esc(d.memo||'')+'</td><td style="text-align:right;font-weight:700;color:#1D4ED8">'+W(d.amt)+'</td></tr>'; }).join('');
+  var depTbl='<div class="fp-h" style="color:#1E3A8A">② 입금 내역</div><table class="fp-tbl"><thead><tr style="background:#DBEAFE;color:#1E3A8A"><th style="width:36px">No</th><th style="width:90px">입금일</th><th style="text-align:left">입금자</th><th style="text-align:left">비고</th><th style="width:120px;text-align:right">입금액</th></tr></thead><tbody>'+depRows
+    +'<tr style="background:#EFF6FF"><td colspan="4" style="text-align:right;font-weight:700">입금 합계</td><td style="text-align:right;font-weight:900;color:#1D4ED8">'+W(T.dep)+'</td></tr></tbody></table>';
+  var totalBox='<div class="total-box"><div><div class="lbl">완납 확인 — 확정 채무 '+W(T.fixed)+' · 입금 '+W(T.dep)+(over>0?' <span style="font-weight:500">(초과 입금 '+W(over)+')</span>':'')+'</div><div class="kr">일금 '+_krWonText(T.fixed)+'원정 완납</div></div><div class="amt">잔액 ₩0</div></div>';
+  var extra=(document.getElementById('fpExtra')||{}).value||'';
+  var extraHtml=extra.trim()?'<div style="margin:10px 0 0;padding:9px 12px;background:#FFFBEB;border-left:4px solid #F59E0B;border-radius:0 5px 5px 0;font-size:12px;color:#78350F;line-height:1.7"><b style="color:#92400E;margin-right:5px">📝</b>'+esc(extra).replace(/\n/g,'<br>')+'</div>':'';
+  var decl='본 증명서는 위 계약(<b>#'+contractNo+'</b>)과 관련하여 임(전)차인 <b>'+esc(tenant)+'</b>이(가) 부담하던 연체 채무(연체금액'+(hasPen?' 및 위약금':'')+') 합계 <b>'+W(T.total)+'</b>'+(T.adj>0?'에서 협의 조정 <b>'+W(T.adj)+'</b>을(를) 감한 확정 채무 <b>'+W(T.fixed)+'</b>':'')+'을(를) 위 「입금 내역」과 같이 <b>'+W(T.dep)+'</b> 납부'+(lastDep?' (최종 입금일 '+fmtKr(lastDep)+')':'')+'하여 <b>전액 완납</b>하였음을 증명합니다.<br>'
+    +'이로써 <b>임(전)차인 '+esc(tenant)+'</b>과(와) <b>임대인 '+esc(landlord)+'</b> 및 대리인 <b>케이알지그룹주식회사</b> 사이의 본 계약과 관련한 위 채무는 <b>소멸</b>하였으며, 본 증명서 발행일 이후 위 채무와 관련한 추가 납부 의무는 존재하지 않음을 확인합니다.<br>'
+    +'이에 본 계약과 관련한 <b>채무 완납 증명서</b>를 발행합니다.'+extraHtml;
+  var fname='완납증명서_'+contractNo+'_'+refNo;
+  var html=_rcptHead(fname, css)
+    + _rcptPrintScaffold(fname)
+    + '<div class="page"><div class="title">완 납 증 명 서</div>'
+    + '<div class="refrow"><span>발행번호: '+refNo+'</span><span>발행일: '+todayStr+'</span></div>'
+    + '<div class="info-box"><div class="lbl">계약번호</div><div>'+contractNo+'</div><div class="lbl">계약상태</div><div>'+esc(contractStatusStr)+'</div><div class="lbl">임(전)차인</div><div>'+esc(tenant)+'</div><div class="lbl">임대인</div><div>'+esc(landlord)+'</div><div class="lbl">계약물건</div><div style="grid-column:span 3">'+esc(contractInfo)+'</div><div class="lbl">계약기간</div><div style="grid-column:span 3">'+esc(period)+'</div></div>'
+    + '<div class="period-info" style="background:#F0FDFA;border-left-color:#0F766E;color:#134E4A">📅 발행일: <b>'+todayStr+'</b> · 채무 항목 <b>'+T.items.length+'건</b>'+(hasPen?' + 위약금':'')+' · 입금 <b>'+T.deps.length+'건</b></div>'
+    + debtTbl + depTbl + totalBox
+    + '<div class="declaration">'+decl+'</div>'
+    + _rcptSignHtml(todayStr, _rcptSealHtml())
+    + '</div></body></html>';
+  closeFullPayModal();
+  var win=window.open('','_blank','width=900,height=1000,scrollbars=yes'); if(!win){ alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.'); return; }
+  win.document.write(html); win.document.close();
 }
 
 // ==================== [v149] 수수료&일할계산 모달 ====================
