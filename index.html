@@ -16414,6 +16414,44 @@ function _rcptSignHtml(todayStr, sealHtml){
 // ==================== [v644] 완납증명서 — 별도 버튼 · 전용 모달 ====================
 /* 은행 거래내역 줄 인식 — 하나(2026-09-16 11:43:56 ⇥ 최재성 ⇥ ⇥ (주)비바리퍼블리카 ⇥ 718670) · 신한(2026.09.16 09:16:07 ⇥ 타행IB ⇥ 605,000 ⇥ 0 ⇥ 김준성) 등.
    규칙: 날짜 토큰 필수 · 금액 = 날짜 뒤 첫 번째 0보다 큰 숫자(콤마 허용) · 입금자 = 은행 코드(타행IB/CD/ATM 등)를 제외한 첫 문자 토큰 · 나머지 문자 토큰은 비고 */
+/* [v645] 필수/선택 배지 */
+function _fpBadge(req){ return req?'<span class="fp-badge-req" style="display:inline-block;font-size:9.5px;font-weight:800;color:#fff;background:#DC2626;border-radius:3px;padding:1px 5px;line-height:1.5;vertical-align:1px;margin:0 4px">필수</span>':'<span class="fp-badge-opt" style="display:inline-block;font-size:9.5px;font-weight:700;color:#475569;background:#E2E8F0;border-radius:3px;padding:1px 5px;line-height:1.5;vertical-align:1px;margin:0 4px">선택</span>'; }
+/* [v645] 발행 요건 판정 — 단일 소스 (fpRecalc 상태·체크리스트 / generateFullPayCert 차단)
+   필수: ① 연체 항목 1건 이상(위약금만 남은 경우 ② 체크로 대체) · ④ 입금 1건 이상(행마다 날짜·입금자·금액) · 잔액 ₩0
+   조건부 필수: ② 체크 시 금액 · ③ 금액 입력 시 사유 · ③ 금액 < 채무 합계 */
+function _fpValidate(T){
+  var W=function(n){ return '₩'+Math.round(n).toLocaleString('ko-KR'); };
+  var errs=[], checks=[], E=function(msg,todo){ errs.push({msg:msg,todo:!!todo}); };
+  var penOk=T.penOn&&T.pen>0;
+  if(T.items.length>0){ if(T.badDebt>0){ checks.push(['bad','① 선택 항목 '+T.badDebt+'건 금액 0원']); E('① 선택한 항목 중 '+T.badDebt+'건의 금액이 0원입니다 — 금액을 입력하거나 체크를 해제하세요'); } else checks.push(['ok','① 연체 항목 '+T.items.length+'건 선택']); }
+  else if(penOk) checks.push(['warn','① 연체 항목 없음 — ② 위약금만으로 발행']);
+  else { checks.push(['todo','① 연체 항목 1건 이상 선택']); E('① 연체 항목을 1건 이상 선택하세요',true); }
+  if(T.penOn&&!(T.pen>0)){ checks.push(['bad','② 위약금 금액 입력']); E('② 위약금을 체크했으면 금액을 입력하세요 (또는 체크 해제)'); }
+  if(T.adj>0){
+    if(!String(T.adjNote||'').trim()){ checks.push(['bad','③ 조정 사유 입력']); E('③ 협의 조정 금액을 입력했으면 사유를 적어주세요'); }
+    if(T.total>0&&T.adj>=T.total){ checks.push(['bad','③ 조정 금액이 채무 합계 이상']); E('③ 조정 금액('+W(T.adj)+')이 채무 합계('+W(T.total)+') 이상입니다 — 확정 채무가 0원 이하가 됩니다'); }
+  }
+  if(!T.nDeps){ checks.push(['todo','④ 입금 내역 1건 이상 입력']); E('④ 입금 내역을 1건 이상 입력하세요 (은행 거래내역 붙여넣기 또는 행 추가)',true); }
+  else if(T.badDep>0){ checks.push(['bad','④ 입금 '+T.badDep+'행 미완성 (날짜·입금자·금액)']); E('④ 입금 행 '+T.badDep+'건에 날짜·입금자·금액을 모두 채우거나 ✕로 삭제하세요'); }
+  else checks.push(['ok','④ 입금 '+T.nDeps+'건 입력']);
+  if(errs.length) checks.push(['todo','잔액 ₩0 (확정 채무 = 입금 합계)']);
+  else if(T.fixed<=0){ checks.push(['bad','확정 채무 0원']); E('확정 채무가 0원입니다 — 채무 항목·조정 금액을 확인하세요'); }
+  else if(T.bal>0){ checks.push(['bad','잔액 '+W(T.bal)+' 부족']); E('⚠ 잔액 '+W(T.bal)+' — 입금이 부족합니다 (③ 협의 조정 금액을 입력하거나 ④ 입금 내역을 확인하세요)'); }
+  else if(T.bal<0) checks.push(['warn','완납 · 과납 '+W(-T.bal)]);
+  else checks.push(['ok','잔액 ₩0 — 완납']);
+  return {ok:!errs.length, errs:errs, checks:checks};
+}
+/* [v645] 입금 행 필수 필드(날짜·입금자·금액) 미완성 강조 */
+function _fpMarkDeposits(){
+  var S=window._fpState; if(!S) return;
+  document.querySelectorAll('.fp-dep-row').forEach(function(row){
+    var d=S.deposits[+row.getAttribute('data-i')]; if(!d) return;
+    var set=function(cls,bad){ var el=row.querySelector('.'+cls); if(!el) return; el.style.borderColor=bad?'#DC2626':'#BFDBFE'; el.style.background=bad?'#FEF2F2':'#fff'; };
+    set('fp-dep-date', !/^\d{4}-\d{2}-\d{2}$/.test(String(d.date||'')));
+    set('fp-dep-who', !String(d.who||'').trim());
+    set('fp-dep-amt', !(d.amt>0));
+  });
+}
 function _fpParseBankLines(text){
   var out=[], SKIP=/^(타행|당행|IB|CD|ATM|인터넷|모바일|전자|자동|입금|출금|이체|폰뱅킹|오픈뱅킹|CMS|FB|펌뱅킹|텔레뱅킹|무통장|계좌)/i;
   String(text||'').split(/\r?\n/).forEach(function(line){
@@ -16466,32 +16504,35 @@ function openFullPayModal(contractNo){
     +  '<div style="padding:14px 18px;background:#0F766E;color:#fff;display:flex;align-items:center;gap:10px"><div style="font-size:16px;font-weight:700;flex:1">✅ 완납증명서 발행</div><button onclick="closeFullPayModal()" style="background:transparent;border:none;width:26px;height:26px;color:#fff;font-size:18px;cursor:pointer;opacity:.7">✕</button></div>'
     +  '<div style="padding:16px 20px">'
     +    '<div style="margin-bottom:10px;padding:8px 11px;background:#F0FDFA;border-left:3px solid #0F766E;border-radius:4px;font-size:12px;color:#134E4A"><b>'+tenant+'</b> · 계약 #'+contractNo+(sub?' · '+sub:'')+' · 시작일 '+(startV||'-')+'</div>'
-    +    '<div style="font-size:11.5px;color:#475569;line-height:1.55;margin-bottom:12px">채무자가 납부한 금액을 증명하는 서류 — 연체 채무(① 연체금액 + ② 위약금)와 ④ 입금 내역을 대조해 <b>채무 소멸(완납)</b>을 확인합니다. 잔액이 0원일 때 발행할 수 있습니다.</div>'
+    +    '<div id="fpLegend" style="margin-bottom:12px;padding:9px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;font-size:11.5px;color:#334155;line-height:1.6">'
+    +      '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center"><span>'+_fpBadge(1)+'① 연체금액 <b>1건 이상 선택</b></span><span>'+_fpBadge(1)+'④ 입금 내역 <b>1건 이상</b> <span style="color:#64748B">(행마다 날짜·입금자·금액)</span></span><span>'+_fpBadge(0)+'② 위약금 · ③ 협의 조정 · 📝 추가 기재</span></div>'
+    +      '<div style="margin-top:3px;font-size:11px;color:#64748B">발행 조건: 확정 채무(① + ② − ③) = ④ 입금 합계 → <b style="color:#15803D">잔액 ₩0</b>일 때만 생성 버튼이 열립니다. 채무자가 납부한 금액을 증명해 <b>채무 소멸(완납)</b>을 확인하는 서류입니다.</div>'
+    +    '</div>'
     +    '<div style="margin-bottom:12px;padding:11px 12px;background:#FEF2F2;border:1px solid #FECACA;border-radius:6px">'
-    +      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap"><b style="font-size:12px;color:#991B1B">① 연체금액 내역</b><span style="font-size:10.5px;color:#9CA3AF">납기일 기준</span>'
+    +      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap"><b style="font-size:12px;color:#991B1B">① 연체금액 내역</b>'+_fpBadge(1)+'<span style="font-size:10.5px;color:#9CA3AF">1건 이상 선택 · 후보 기간(납기일)</span>'
     +        '<input type="date" id="fpFrom" value="'+startV+'" onchange="fpReloadDebt()" style="padding:4px 6px;border:1px solid #FCA5A5;border-radius:4px;font-size:11.5px"><span style="color:#94A3B8">~</span><input type="date" id="fpTo" value="'+todayV+'" onchange="fpReloadDebt()" style="padding:4px 6px;border:1px solid #FCA5A5;border-radius:4px;font-size:11.5px">'
     +        '<span style="margin-left:auto;font-size:10.5px"><a href="javascript:void(0)" onclick="fpCheckAll(true)" style="color:#991B1B">전체 선택</a> · <a href="javascript:void(0)" onclick="fpCheckAll(false)" style="color:#991B1B">해제</a></span></div>'
     +      '<div id="fpDebtList" style="border:1px solid #FECACA;border-radius:5px;background:#fff;max-height:190px;overflow-y:auto"></div>'
-    +      '<div style="font-size:10.5px;color:#9CA3AF;margin-top:5px">연체중·분납중·연체납부 항목 표시 · 금액 = 최종 청구금액(수정 가능) · 연체중/분납중은 기본 선택, 연체납부는 납부일이 최근 60일 이내인 항목만 기본 선택</div>'
+    +      '<div style="font-size:10.5px;color:#9CA3AF;margin-top:5px">연체중·분납중·연체납부 항목 표시 · 금액 = 최종 청구금액(수정 가능) · 연체중/분납중은 기본 선택, 연체납부는 납부일이 최근 60일 이내인 항목만 기본 선택 · 연체 항목 없이 위약금만 남은 경우는 ② 체크만으로 발행 가능</div>'
     +    '</div>'
     +    '<div style="margin-bottom:12px;padding:11px 12px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-    +      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9A3412;font-weight:700;cursor:pointer"><input type="checkbox" id="fpPenOn" '+(pen>0?'checked':'')+' onchange="fpRecalc()" style="accent-color:#B45309"> ② 위약금 <span style="font-weight:500;font-size:10.5px">(개런티즈 제13조 · 임대료×4개월)</span></label>'
+    +      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9A3412;font-weight:700;cursor:pointer"><input type="checkbox" id="fpPenOn" '+(pen>0?'checked':'')+' onchange="fpRecalc()" style="accent-color:#B45309"> ② 위약금 '+_fpBadge(0)+'<span style="font-weight:500;font-size:10.5px">(개런티즈 제13조 · 임대료×4개월 · 체크 시 금액 필수)</span></label>'
     +      '<input type="number" id="fpPenAmt" value="'+(pen>0?Math.round(pen):0)+'" oninput="fpRecalc()" style="width:130px;padding:5px 8px;border:1px solid #FDBA74;border-radius:4px;font-size:12px;text-align:right">'
     +      '<span style="font-size:10.5px;color:#C2845A">'+(pen>0?'자동 산정 — 시작일 2025-06-01 이후 (gid=1953907648 AK열 임대료 × 4)':'대상 아님 — 시작일 2025-06-01 미만 (필요 시 금액 직접 입력 후 체크)')+'</span>'
     +    '</div>'
     +    '<div style="margin-bottom:12px;padding:11px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-    +      '<b style="font-size:12px;color:#334155">③ 협의 조정(감면) 금액</b><input type="number" id="fpAdjAmt" value="0" oninput="fpRecalc()" style="width:130px;padding:5px 8px;border:1px solid #CBD5E1;border-radius:4px;font-size:12px;text-align:right">'
-    +      '<input type="text" id="fpAdjNote" placeholder="사유 (예: 위약금 일부 감면 합의)" style="flex:1;min-width:180px;padding:5px 8px;border:1px solid #CBD5E1;border-radius:4px;font-size:11.5px">'
-    +      '<span style="width:100%;font-size:10.5px;color:#94A3B8">협의로 채무 일부를 감면한 경우에만 입력 (0이면 증명서에 표시되지 않음)</span>'
+    +      '<b style="font-size:12px;color:#334155">③ 협의 조정(감면) 금액</b>'+_fpBadge(0)+'<input type="number" id="fpAdjAmt" value="0" oninput="fpRecalc()" style="width:130px;padding:5px 8px;border:1px solid #CBD5E1;border-radius:4px;font-size:12px;text-align:right">'
+    +      '<input type="text" id="fpAdjNote" placeholder="사유 — 금액 입력 시 필수 (예: 위약금 일부 감면 합의)" oninput="fpRecalc()" style="flex:1;min-width:180px;padding:5px 8px;border:1px solid #CBD5E1;border-radius:4px;font-size:11.5px">'
+    +      '<span style="width:100%;font-size:10.5px;color:#94A3B8">협의로 채무 일부를 감면한 경우에만 입력 (0이면 증명서에 표시되지 않음) · 금액을 입력하면 사유가 필수</span>'
     +    '</div>'
     +    '<div style="margin-bottom:12px;padding:11px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px">'
-    +      '<b style="font-size:12px;color:#1E3A8A;display:block;margin-bottom:6px">④ 입금금액 내역 <span style="font-weight:500;font-size:10.5px;color:#60A5FA">— 은행 거래내역 줄을 붙여넣으면 자동 인식 (하나·신한 형식)</span></b>'
+    +      '<b style="font-size:12px;color:#1E3A8A;display:block;margin-bottom:6px">④ 입금금액 내역 '+_fpBadge(1)+'<span style="font-weight:500;font-size:10.5px;color:#60A5FA">1건 이상 · 행마다 날짜·입금자·금액 필수, 비고 선택 — 은행 거래내역 줄을 붙여넣으면 자동 인식 (하나·신한 형식)</span></b>'
     +      '<textarea id="fpPaste" rows="3" placeholder="예) 2026-09-16 11:43:56&#9;최재성&#9;&#9;(주)비바리퍼블리카&#9;718670&#10;예) 2026.09.16 09:16:07&#9;타행IB&#9;605,000&#9;0&#9;김준성" style="width:100%;padding:7px 9px;border:1px solid #BFDBFE;border-radius:5px;font-size:11.5px;font-family:inherit;box-sizing:border-box;resize:vertical"></textarea>'
     +      '<div style="display:flex;gap:6px;margin:6px 0 8px;flex-wrap:wrap"><button type="button" onclick="fpParsePaste()" style="background:#1D4ED8;color:#fff;border:none;padding:6px 12px;border-radius:5px;font-size:11.5px;font-weight:700;cursor:pointer">📥 붙여넣기 인식 → 표에 추가</button><button type="button" onclick="fpAddDeposit()" style="background:#fff;border:1px solid #BFDBFE;color:#1E40AF;padding:6px 12px;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer">➕ 행 직접 추가</button><button type="button" onclick="fpClearDeposits()" style="background:#fff;border:1px solid #E5E7EB;color:#6B7280;padding:6px 10px;border-radius:5px;font-size:11px;cursor:pointer">초기화</button></div>'
     +      '<div id="fpDepList" style="border:1px solid #BFDBFE;border-radius:5px;background:#fff;max-height:170px;overflow-y:auto"></div>'
     +    '</div>'
     +    '<div id="fpSummary" style="margin-bottom:12px"></div>'
-    +    '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:5px">📝 추가 기재 사항 <span style="color:#9CA3AF;font-weight:500;font-size:10.5px">(선택 — 증명서 본문에 삽입)</span></label>'
+    +    '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:5px">📝 추가 기재 사항 '+_fpBadge(0)+'<span style="color:#9CA3AF;font-weight:500;font-size:10.5px">증명서 본문에 삽입</span></label>'
     +    '<textarea id="fpExtra" rows="2" style="width:100%;padding:8px 10px;border:1px solid #CBD5E1;border-radius:5px;font-size:12px;font-family:inherit;box-sizing:border-box;resize:vertical"></textarea>'
     +  '</div>'
     +  '<div style="padding:11px 18px;background:#F8FAFC;border-top:1px solid #E2E8F0;display:flex;gap:6px"><button onclick="closeFullPayModal()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:8px 14px;border-radius:5px;font-size:12.5px;font-weight:600;cursor:pointer;margin-left:auto">취소</button><button id="fpGenBtn" onclick="generateFullPayCert()" style="background:#0F766E;color:#fff;border:none;padding:8px 16px;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer">✅ 완납증명서 생성</button></div>'
@@ -16524,12 +16565,14 @@ function fpRenderDeposits(){
   var S=window._fpState, box=document.getElementById('fpDepList'); if(!S||!box) return;
   if(!S.deposits.length){ box.innerHTML='<div style="padding:10px;font-size:11px;color:#94A3B8;text-align:center">입금 내역이 없습니다 — 위에 붙여넣거나 행을 추가하세요</div>'; fpRecalc(); return; }
   var esc=function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
-  box.innerHTML=S.deposits.map(function(d,i){
-    return '<div style="display:grid;grid-template-columns:120px 1fr 110px 1fr 24px;gap:6px;align-items:center;padding:5px 8px;border-bottom:1px solid #DBEAFE">'
-      +'<input type="date" value="'+esc(d.date||'')+'" onchange="fpDepEdit('+i+',\'date\',this.value)" style="padding:3px 5px;border:1px solid #BFDBFE;border-radius:4px;font-size:11px">'
-      +'<input type="text" value="'+esc(d.who||'')+'" placeholder="입금자" oninput="fpDepEdit('+i+',\'who\',this.value)" style="padding:3px 6px;border:1px solid #BFDBFE;border-radius:4px;font-size:11px">'
-      +'<input type="number" value="'+Math.round(d.amt||0)+'" oninput="fpDepEdit('+i+',\'amt\',this.value)" style="padding:3px 6px;border:1px solid #BFDBFE;border-radius:4px;font-size:11px;text-align:right">'
-      +'<input type="text" value="'+esc(d.memo||'')+'" placeholder="비고 (은행/내용)" oninput="fpDepEdit('+i+',\'memo\',this.value)" style="padding:3px 6px;border:1px solid #BFDBFE;border-radius:4px;font-size:11px">'
+  var _req='<span style="color:#DC2626">*</span>';   /* [v645] 필수 열 표시 */
+  box.innerHTML='<div style="display:grid;grid-template-columns:120px 1fr 110px 1fr 24px;gap:6px;padding:4px 8px;border-bottom:1px solid #BFDBFE;background:#F8FAFF;font-size:10px;font-weight:700;color:#1E40AF"><span>입금일 '+_req+'</span><span>입금자 '+_req+'</span><span style="text-align:right">금액 '+_req+'</span><span>비고 <span style="color:#94A3B8;font-weight:500">(선택)</span></span><span></span></div>'
+   +S.deposits.map(function(d,i){
+    return '<div class="fp-dep-row" data-i="'+i+'" style="display:grid;grid-template-columns:120px 1fr 110px 1fr 24px;gap:6px;align-items:center;padding:5px 8px;border-bottom:1px solid #DBEAFE">'
+      +'<input type="date" class="fp-dep-date" value="'+esc(d.date||'')+'" onchange="fpDepEdit('+i+',\'date\',this.value)" style="padding:3px 5px;border:1px solid #BFDBFE;border-radius:4px;font-size:11px">'
+      +'<input type="text" class="fp-dep-who" value="'+esc(d.who||'')+'" placeholder="입금자 (필수)" oninput="fpDepEdit('+i+',\'who\',this.value)" style="padding:3px 6px;border:1px solid #BFDBFE;border-radius:4px;font-size:11px">'
+      +'<input type="number" class="fp-dep-amt" value="'+Math.round(d.amt||0)+'" oninput="fpDepEdit('+i+',\'amt\',this.value)" style="padding:3px 6px;border:1px solid #BFDBFE;border-radius:4px;font-size:11px;text-align:right">'
+      +'<input type="text" class="fp-dep-memo" value="'+esc(d.memo||'')+'" placeholder="비고 (선택 · 은행/내용)" oninput="fpDepEdit('+i+',\'memo\',this.value)" style="padding:3px 6px;border:1px solid #BFDBFE;border-radius:4px;font-size:11px">'
       +'<button type="button" onclick="fpDepDel('+i+')" title="삭제" style="background:none;border:none;color:#94A3B8;cursor:pointer;font-size:13px">✕</button>'
       +'</div>';
   }).join('');
@@ -16543,28 +16586,35 @@ function fpParsePaste(){ var S=window._fpState, ta=document.getElementById('fpPa
 function _fpTotals(){
   var S=window._fpState||{debt:[],deposits:[]}, items=[];
   document.querySelectorAll('.fp-debt-on').forEach(function(c){ if(!c.checked) return; var i=+c.getAttribute('data-i'), r=(S.debt||[])[i]; if(!r) return; var ai=document.querySelector('.fp-debt-amt[data-i="'+i+'"]'); items.push({name:r.name,type:r.type,due:r.due,pay:r.pay,st:r.st,amt:ai?parseSafeMoney(ai.value):r.amt}); });
-  var debt=items.reduce(function(a,x){ return a+x.amt; },0);
+  var debt=items.reduce(function(a,x){ return a+x.amt; },0), badDebt=items.filter(function(x){ return !(x.amt>0); }).length;   /* [v645] */
   var penOn=!!(document.getElementById('fpPenOn')||{}).checked, pen=penOn?parseSafeMoney((document.getElementById('fpPenAmt')||{}).value):0;
   var adj=parseSafeMoney((document.getElementById('fpAdjAmt')||{}).value), adjNote=(document.getElementById('fpAdjNote')||{}).value||'';
-  var deps=(S.deposits||[]).filter(function(d){ return d.amt>0; }), dep=deps.reduce(function(a,d){ return a+d.amt; },0);
+  var allDeps=(S.deposits||[]), deps=allDeps.filter(function(d){ return d.amt>0; }), dep=deps.reduce(function(a,d){ return a+d.amt; },0);
+  var badDep=allDeps.filter(function(d){ return !(d.amt>0)||!String(d.who||'').trim()||!/^\d{4}-\d{2}-\d{2}$/.test(String(d.date||'')); }).length;   /* [v645] 날짜·입금자·금액 필수 */
   var total=debt+pen, fixed=total-adj, bal=fixed-dep;
-  return {items:items, debt:debt, pen:pen, penOn:penOn, adj:adj, adjNote:adjNote, deps:deps, dep:dep, total:total, fixed:fixed, bal:bal};
+  return {items:items, debt:debt, pen:pen, penOn:penOn, adj:adj, adjNote:adjNote, deps:deps, dep:dep, total:total, fixed:fixed, bal:bal, badDebt:badDebt, badDep:badDep, nDeps:allDeps.length};
 }
 function fpRecalc(){
   var T=_fpTotals(), el=document.getElementById('fpSummary'); if(!el) return;
   var W=function(n){ return '₩'+Math.round(n).toLocaleString('ko-KR'); };
-  var ok=(T.fixed>0 && T.bal<=0 && T.deps.length>0);
-  var st=T.fixed<=0?['#94A3B8','① 채무 항목을 선택하세요']:(!T.deps.length?['#94A3B8','④ 입금 내역을 입력하세요 (은행 거래내역 붙여넣기 또는 행 추가)']:(T.bal>0?['#DC2626','⚠ 잔액 '+W(T.bal)+' — 입금이 부족합니다 (③ 협의 조정 금액을 입력하거나 ④ 입금 내역을 확인하세요)']:(T.bal<0?['#B45309','✅ 완납 · 과납 '+W(-T.bal)+' (초과 입금분은 증명서에 별도 표기)']:['#15803D','✅ 완납 — 잔액 ₩0'])));
+  var V=_fpValidate(T), ok=V.ok;   /* [v645] 요건 판정 단일 소스 */
+  var st=ok?(T.bal<0?['#B45309','✅ 완납 · 과납 '+W(-T.bal)+' (초과 입금분은 증명서에 별도 표기)']:['#15803D','✅ 완납 — 잔액 ₩0']):[V.errs[0].todo?'#94A3B8':'#DC2626', V.errs[0].msg];
+  var ic={ok:['#15803D','✓'],todo:['#94A3B8','○'],bad:['#DC2626','✗'],warn:['#B45309','△']};
+  var ck=V.checks.map(function(c){ var m=ic[c[0]]; return '<span class="fp-chk fp-chk-'+c[0]+'" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:'+m[0]+';font-weight:'+(c[0]==='todo'?'500':'700')+'"><span style="width:14px;height:14px;border-radius:50%;border:1.5px solid '+m[0]+';display:inline-flex;align-items:center;justify-content:center;font-size:9px;line-height:1;flex-shrink:0">'+m[1]+'</span>'+c[1]+'</span>'; }).join('');
   el.innerHTML='<div style="padding:11px 14px;border-radius:6px;border:1.5px solid '+st[0]+';background:#fff">'
+    +'<div id="fpChecklist" style="display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;margin-bottom:7px;padding-bottom:7px;border-bottom:1px dashed #E2E8F0"><span style="font-size:10.5px;color:#64748B;font-weight:700">발행 요건</span>'+ck+'</div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:#334155"><span>① 연체금액 <b>'+W(T.debt)+'</b> ('+T.items.length+'건)</span><span>+ ② 위약금 <b>'+W(T.pen)+'</b></span>'+(T.adj>0?'<span>− ③ 협의 조정 <b>'+W(T.adj)+'</b></span>':'')+'<span>= 확정 채무 <b style="color:#991B1B">'+W(T.fixed)+'</b></span><span style="margin-left:auto">④ 입금 합계 <b style="color:#1D4ED8">'+W(T.dep)+'</b> ('+T.deps.length+'건)</span></div>'
     +'<div style="margin-top:6px;font-size:12.5px;font-weight:800;color:'+st[0]+'">'+st[1]+'</div></div>';
   var btn=document.getElementById('fpGenBtn'); if(btn){ btn.disabled=!ok; btn.style.opacity=ok?'1':'.45'; }
+  /* [v645] 조건부 필수 필드 강조 */
+  var mark=function(id,bad){ var e=document.getElementById(id); if(!e) return; e.style.borderColor=bad?'#DC2626':''; e.style.background=bad?'#FEF2F2':''; };
+  mark('fpPenAmt', T.penOn&&!(T.pen>0)); mark('fpAdjNote', T.adj>0&&!String(T.adjNote||'').trim()); mark('fpAdjAmt', T.adj>0&&T.total>0&&T.adj>=T.total);
+  document.querySelectorAll('.fp-debt-on').forEach(function(c){ var ai=document.querySelector('.fp-debt-amt[data-i="'+c.getAttribute('data-i')+'"]'); if(!ai) return; var bad=c.checked&&!(parseSafeMoney(ai.value)>0); ai.style.borderColor=bad?'#DC2626':'#FECACA'; ai.style.background=bad?'#FEF2F2':'#fff'; });
+  _fpMarkDeposits();
 }
 function generateFullPayCert(){
   var S=window._fpState; if(!S) return; var contractNo=S.contractNo, T=_fpTotals();
-  if(T.fixed<=0){ alert('채무 항목을 한 건 이상 선택해주세요.'); return; }
-  if(!T.deps.length){ alert('입금 내역을 한 건 이상 입력해주세요.'); return; }
-  if(T.bal>0){ alert('입금 합계가 확정 채무보다 '+Math.round(T.bal).toLocaleString('ko-KR')+'원 부족합니다. 완납증명서는 잔액이 0원일 때 발행할 수 있습니다.'); return; }
+  var V=_fpValidate(T); if(!V.ok){ alert('완납증명서를 생성할 수 없습니다 — 필수 요건 미충족\n\n'+V.errs.map(function(e){ return '• '+e.msg; }).join('\n')+'\n\n완납증명서는 잔액이 0원일 때 발행할 수 있습니다.'); return; }   /* [v645] */
   var contract=(contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim()===String(contractNo); }); if(!contract){ alert('계약 데이터 없음'); return; }
   var vac=(window.vacancyRawData||vacancyRawData||[]).find(function(v){ return String(v.no||'').trim()===String(contractNo); });
   var fmtKr=function(x){ if(!x) return '-'; var m=String(x).match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); return m?(m[1]+'.'+String(+m[2]).padStart(2,'0')+'.'+String(+m[3]).padStart(2,'0')):x; };
