@@ -5730,6 +5730,8 @@ async function cG_loadSettleSheet(){
 // 연체 롤포워드 = 발생월 고정 코호트 (발생액 불변 · 회수는 현재까지 누적 · 손실처리 기준 미정 → 0).
 /* [v641] 법비용 청구서명 키워드 — 단일 소스 (법비용 카드·코호트·상세 모달 공용) */
 var _LAW_RE=/법비용|내용증명|지급명령|소송|송달|가처분|압류|추심|주소보정|진술최고|채권최고|인지대|집행|공탁|명도|고발|변호사|법무/;
+/* [v647] 위약 청구서명 키워드 — 단일 소스 (🚪 중도퇴실 위약 카드 · 연체 발생·회수 상세 모달 납부종류 '위약금' 칩 공용) */
+var _PEN_RE=/위약/;
 async function renderSettlementView(){
   var el = document.getElementById('stlBody');
   if (!el) return;
@@ -5962,7 +5964,7 @@ async function renderSettlementView(){
     /* [v646] 🚪 중도퇴실 위약 — 입금내역 청구서명(S열)에 '위약' 포함 행 (퇴실 정산금(위약금)·중도퇴실 위약벌·합의 위약금 등, 납부종류는 변동관리비로 내려옴)
        청구 = 최종청구금액 · 납부 = 청구 − 미납 · 미납 = 미납 잔액(연체중/분납중) · 삭제·철회·취소 제외 · 납부예정 별도 · 기간 = 납기일 월이 검색기간에 걸친 건 */
     var _pnScope=(window._stlPenScope==='all')?'all':'range';   /* 기본 = 기간 */
-    var _PEN_RE=/위약/;
+    /* [v647] _PEN_RE = 전역 단일 소스 (_LAW_RE 아래) — 상세 모달 '위약금' 칩과 동일 키워드 */
     var _pnKind=function(b){ return /위약벌/.test(b)?'위약벌':(/합의/.test(b)?'합의 위약금':'위약금'); };
     var _pnAgg=function(rangeOnly){
       var A={gen:0,genN:0,cs:{},paid:0,paidN:0,out:0,outN:0,outCs:{},outA:0,outE:0,cxl:0,cxlN:0,sch:0,schN:0,kinds:{}};
@@ -6464,8 +6466,8 @@ function stl_cohModal(key, keepSort, keepDay){
       return '기타'; };
     var _nAll0=rowsAll.length;
     var tyF=window.__stlCohTy||'all';
-    var TYS=['임대료','변동관리비','기타계약금','법비용'];   /* [v641] 법비용 = 청구서명 키워드 기준 — 원본 납부종류(변동관리비/기타계약금)에서 떼어내 배타 분류 (합계 = 전체, 중복 없음) */
-    var _tyOf=function(r){ if(String(r.ty||'')==='법비용') return '법비용'; var t9=String(r.rty||r.ty||''); for(var i9=0;i9<3;i9++){ if(t9.indexOf(TYS[i9])>=0) return TYS[i9]; } return ''; };
+    var TYS=['임대료','변동관리비','기타계약금','법비용','위약금'];   /* [v641] 법비용 = 청구서명 키워드 기준 — 원본 납부종류(변동관리비/기타계약금)에서 떼어내 배타 분류 (합계 = 전체, 중복 없음) · [v647] 위약금 = 청구서명에 '위약' 포함 (_PEN_RE, 🚪 중도퇴실 위약 카드와 동일 기준 — 퇴실 정산금(위약금)·중도퇴실 위약벌·합의 위약금 등) — 법비용 다음 우선순위로 배타 분류 */
+    var _tyOf=function(r){ if(String(r.ty||'')==='법비용') return '법비용'; if(_PEN_RE.test(String(r.bill||''))) return '위약금'; var t9=String(r.rty||r.ty||''); for(var i9=0;i9<3;i9++){ if(t9.indexOf(TYS[i9])>=0) return TYS[i9]; } return ''; };   /* [v647] 위약금 */
     var tyCnt={}; TYS.forEach(function(t9){tyCnt[t9]=0;});
     rowsAll.forEach(function(r){ var k9=_tyOf(r); if(k9) tyCnt[k9]++; });
     if(tyF!=='all') rowsAll=rowsAll.filter(function(r){ return _tyOf(r)===tyF; });
@@ -6521,7 +6523,7 @@ function stl_cohModal(key, keepSort, keepDay){
         +'<td style="padding:6px 9px;white-space:nowrap">'+r.nm+'</td>'
         +'<td style="padding:6px 9px"><span style="display:inline-block;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;'+(r.ck==='종료'?'background:#FEF3C7;color:#B45309':'background:#EFF6FF;color:#1D4ED8')+'">'+r.ck+'</span></td>'
         +'<td style="padding:6px 9px;font-size:11px;color:'+(r.sd?'#0E7490':'#CBD5E1')+';white-space:nowrap;font-weight:'+(r.sd?'700':'400')+'">'+(r.sd||'-')+'</td>'   /* [v572] 계약시작일 */
-        +'<td style="padding:6px 9px;font-size:11px;color:#475569;white-space:nowrap">'+(r.ty==='법비용'?'<b style="color:#6D28D9">법비용</b> <span style="color:#94A3B8;font-size:10px">'+(r.rty||'')+'</span>':(r.rty||r.ty))+'</td>'   /* [v641] */
+        +'<td style="padding:6px 9px;font-size:11px;color:#475569;white-space:nowrap">'+(r.ty==='법비용'?'<b style="color:#6D28D9">법비용</b> <span style="color:#94A3B8;font-size:10px">'+(r.rty||'')+'</span>':(_tyOf(r)==='위약금'?'<b style="color:#C2410C">위약금</b> <span style="color:#94A3B8;font-size:10px">'+(r.rty||'')+'</span>':(r.rty||r.ty)))+'</td>'   /* [v641] · [v647] 위약금 — 원본 납부종류는 회색 첨자 */
         +'<td style="padding:6px 9px;font-size:11px;color:#475569"><span title="'+String(r.bill||'').replace(/"/g,'&quot;')+'" style="display:inline-block;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">'+(r.bill||'-')+'</span></td>'   /* [v555.1] 청구서명 */
         +'<td style="padding:6px 9px;font-size:11px;color:#64748B;white-space:nowrap">'+(r.due||'-')+'</td>'
         +'<td style="padding:6px 9px;text-align:right;font-weight:700;color:#DC2626;white-space:nowrap">'+W(r.gen)+'</td>'
