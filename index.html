@@ -5000,13 +5000,14 @@ function downloadDlqExcel() {
     '연체금액':r.amt||0,
     '위약금':_dlqPenalty(r.cno)||0,
     '대응일':r.actionDateStr||'-',
+    '종료/퇴실일':(function(){ var x=_dlqEndExit(r.cno, r.contractStatus); return x?(x.kind+(x.fallback?'?':'')+' '+x.str):'-'; })(),   /* [v648] 계약중=만기(계약종료일) · 종료=퇴실일 */
     '입금예정일':r.dateStr||'-',
     '점수':_dlqScore(r.cno)||'',
     '법적진행':_legalStr(r.cno),
     '최근 대응 내용':r.content||'-'
   }));
   const ws = XLSX.utils.json_to_sheet(data);
-  ws['!cols'] = [{wch:10},{wch:8},{wch:9},{wch:8},{wch:16},{wch:8},{wch:8},{wch:12},{wch:12},{wch:12},{wch:13},{wch:12},{wch:12},{wch:11},{wch:11},{wch:6},{wch:14},{wch:40}];
+  ws['!cols'] = [{wch:10},{wch:8},{wch:9},{wch:8},{wch:16},{wch:8},{wch:8},{wch:12},{wch:12},{wch:12},{wch:13},{wch:12},{wch:12},{wch:11},{wch:15},{wch:11},{wch:6},{wch:14},{wch:40}];   /* [v648] 종료/퇴실일 열 추가 */
   const wb = XLSX.utils.book_new();
   const today = (()=>{const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');})();
   XLSX.utils.book_append_sheet(wb, ws, '연체자현황');
@@ -10131,7 +10132,7 @@ function dlqRenderTableRows() {
         <th>계약번호</th><th>그룹</th><th>계약정보</th>
         <th>연체일수</th><th>납부구분</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th>
         <th title="입금내역(gid=131074722) 임대료 청구 중 연체(연체납부·연체중·분납중) 발생 비율">연체율</th>
-        <th>연체금액</th><th title="시작일 25.6.1 이후 계약자: 임대료 × 4개월 (gid=1953907648 W열 ≥ 2025-06-01, AK열 × 4)">위약금</th><th>대응일</th><th>입금예정일</th><th title="gid=554798125 F열='법적조치 검토' 행의 H열 점수 (숫자)">점수</th><th title="gid=554798125 F열 기재 유무 (내용증명/지급명령/기타집행)">법적진행</th><th>최근 대응 내용</th>
+        <th>연체금액</th><th title="시작일 25.6.1 이후 계약자: 임대료 × 4개월 (gid=1953907648 W열 ≥ 2025-06-01, AK열 × 4)">위약금</th><th>대응일</th><th title="계약중 = 계약종료일(만기일, gid=1953907648 X열) · 종료 = 퇴실일(Z열 계약해지일자/퇴실일, 없으면 BP열 실제퇴실일)">종료/퇴실일</th><th>입금예정일</th><th title="gid=554798125 F열='법적조치 검토' 행의 H열 점수 (숫자)">점수</th><th title="gid=554798125 F열 기재 유무 (내용증명/지급명령/기타집행)">법적진행</th><th>최근 대응 내용</th>
       </tr></thead>
       <tbody>
         ${rows.map((r, _ri) => {
@@ -10190,6 +10191,7 @@ function dlqRenderTableRows() {
             <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
             <td style="white-space:nowrap;font-size:11px">${penaltyCell}</td>
             <td style="white-space:nowrap;font-size:11px;color:#374151">${r.actionDateStr&&r.actionDateStr!=='-'?r.actionDateStr:'—'}</td>
+            <td style="white-space:nowrap;font-size:11px">${_dlqEndExitCell(r.cno, r.contractStatus)}</td>   ${''/* [v648] 계약중=만기(계약종료일) · 종료=퇴실일 */}
             <td>${r.dateStr==='긴급대응필요'
               ? `<span class="dlq-urgent-badge" title="대응 기록은 있으나 입금예정일이 비어 있습니다 — 즉시 입금 약속 확정 필요">⚠ 긴급대응필요</span>`
               : (r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>${(function(){
@@ -10815,6 +10817,37 @@ function _dlqPenalty(cno){
     var rent=parseFloat(String(vr.rent||'0').replace(/[^0-9.\-]/g,''))||0;
     return rent>0?rent*4:null;
   }catch(_){return null;}
+}
+/* [v648] 연체표 '종료/퇴실일' 컬럼 — 계약중(정상) = 계약종료일(gid=1953907648 X열 종료일/만기일) · 종료 = 퇴실일(Z열 계약해지일자/퇴실일 → 없으면 BP열 실제퇴실일 → 그것도 없으면 X열 만기일을 '만기?'로 표시)
+   반환 {kind:'만기'|'퇴실', str:'YYYY.MM.DD', d:Date, dday:오늘 기준 잔여일, fallback:종료인데 퇴실일 미기재} · 없으면 null */
+function _dlqEndExit(cno, cs){
+  try{
+    if(!Array.isArray(vacancyRawData)) return null;
+    var vr=vacancyRawData.find(function(v){return String(v.no||'').trim()===String(cno||'').trim();});
+    if(!vr) return null;
+    var pd=function(s){ s=String(s==null?'':s).trim(); if(!s) return null;
+      var g=s.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})/); if(g) return new Date(+g[1],+g[2],+g[3]);   /* gviz 원시값 (월 0-based) */
+      var m=s.match(/(\d{4})[\s.\-\/년]+(\d{1,2})[\s.\-\/월]+(\d{1,2})/); if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+      var t=new Date(s); return isNaN(t)?null:t; };
+    var ended=String(cs||'계약중').indexOf('종료')===0, d=null, kind='', fb=false;
+    if(ended){ d=pd(vr.terminateDate)||pd(vr.actualExitDate)||pd(vr.exitDate); kind='퇴실'; if(!d){ d=pd(vr.endDate); if(d){ kind='만기'; fb=true; } } }
+    else { d=pd(vr.endDate); kind='만기'; }
+    if(!d||isNaN(d)) return null;
+    d.setHours(0,0,0,0); var t0=new Date(); t0.setHours(0,0,0,0);
+    return { kind:kind, d:d, fallback:fb, dday:Math.round((d-t0)/86400000),
+      str:d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0') };
+  }catch(_){return null;}
+}
+/* [v648] 셀 표기 — 계약중: '만기 YYYY.MM.DD' + D-일수(90일 이내, 30일 이내 주황 · 경과 시 '경과') · 종료: '퇴실 YYYY.MM.DD' (퇴실일 미기재 시 '만기?' 회색) */
+function _dlqEndExitCell(cno, cs){
+  var x=_dlqEndExit(cno, cs);
+  if(!x) return '<span style="color:#D1D5DB">—</span>';
+  if(x.kind==='퇴실') return '<span style="font-size:9.5px;font-weight:700;color:#B45309;margin-right:3px">퇴실</span><span style="color:#92400E;font-weight:600">'+x.str+'</span>';
+  if(x.fallback) return '<span title="퇴실일 미기재 (Z열 계약해지일자·BP열 실제퇴실일 비어 있음) — 만기일 표시" style="font-size:9.5px;font-weight:700;color:#94A3B8;margin-right:3px;cursor:help">만기?</span><span style="color:#9CA3AF;font-weight:600">'+x.str+'</span>';
+  var col = x.dday<0 ? '#9CA3AF' : (x.dday<=30 ? '#D97706' : '#374151');
+  var tail = x.dday<0 ? ' <span style="font-size:9.5px;color:#9CA3AF" title="만기일 경과 — 갱신·재계약 여부 확인">경과</span>'
+           : (x.dday<=90 ? ' <span style="font-size:9.5px;font-weight:700;color:'+(x.dday<=30?'#D97706':'#94A3B8')+'">D-'+x.dday+'</span>' : '');
+  return '<span style="font-size:9.5px;font-weight:700;color:#64748B;margin-right:3px">만기</span><span style="color:'+col+';font-weight:600">'+x.str+'</span>'+tail;
 }
 function dlqRenderLegalTableRows(rows, container){
   window._dlqLegalExportRows = rows;
