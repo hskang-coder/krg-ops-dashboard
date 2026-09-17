@@ -25067,7 +25067,10 @@ function okpi_importantBox(range, filter){
   } catch(e){ console.warn('[v411] okpi_importantBox:', e); return ''; }
 }
 /* ═══ [v652] 📋 임대차신고 기한 알람 — 일 단위 관리 ═══
-   소스 = 계약관리 시트 미러(gid=1953907648): BL 계약체결일(signDate) · CQ KRG임대차 결과등록(imdaeShingo) · K 계약상태(contractKind) · W 시작일(startDate)
+   [v654] 1차 소스 = 임대차신고관리 시트 미러(gid=748608384, 공개 시트 탭 '임대차신고(Raw DATA)' = IMPORTRANGE 원본!B:S — 임대인 개인정보 열 제외)
+          계약번호 · 계약체결일 · 요청일자 · 신고일자 · 완료일자 · 소요일자 · 접수번호 · 결과등록 · 사유 · 수정요청일 · 요청사항 · 회신사항 · 체크사항 · 해제신고 · 전차인명 · 물건지주소 · 건물명 · 호실
+          계약상태(K)·시작일(W)·임대인명(AO)은 계약관리 미러(gid=1953907648)에서 계약번호로 보강 · 미러 로드 실패 시 아래 CQ 방식으로 폴백
+   폴백 소스 = 계약관리 시트 미러(gid=1953907648): BL 계약체결일(signDate) · CQ KRG임대차 결과등록(imdaeShingo) · K 계약상태(contractKind) · W 시작일(startDate)
    규칙(슬랙 09:00 「임대차신고 기한 알람」과 동일) — 신고기한 = 계약체결일 + 30일 · CQ 공란·신고대기 = 미신고 · 접수완료·수정요청 = 후속조치
      · 완료·신고제외·삭제·신고철회·해제신청(불허)·'-' 등은 제외 · 계약상태 삭제·계약 철회·가계약 제외 · 체결일 없으면 ⚠ 체결일 미기재(시작일 참고)
      · 대상 = 체결일(없으면 시작일)이 IMDAE_ALARM_FROM 이후인 계약 + 날짜 무관 신고대기·접수완료·수정요청 (추적 시작 전 옛 계약의 공란은 제외) */
@@ -25076,48 +25079,100 @@ var IMDAE_SEG = [
   { k:'over',   icon:'🔴', label:'기한초과',    title:'기한초과 — 과태료 발생 구간, 즉시 확인',            col:'#DC2626', bg:'#FEF2F2', bd:'#FECACA', open:true  },
   { k:'d3',     icon:'🟠', label:'D-3이내',     title:'D-3 이내 — 이번 주 내 신고',                       col:'#EA580C', bg:'#FFF7ED', bd:'#FED7AA', open:true  },
   { k:'d7',     icon:'🟡', label:'D-7이내',     title:'D-7 이내',                                          col:'#CA8A04', bg:'#FEFCE8', bd:'#FDE68A', open:true  },
-  { k:'nodate', icon:'⚠️', label:'체결일미기재', title:'체결일 미기재 — 계약관리 시트 계약체결일(BL열) 입력 필요', col:'#B45309', bg:'#FFFBEB', bd:'#FDE68A', open:true  },
+  { k:'nodate', icon:'⚠️', label:'체결일미기재', title:'체결일 미기재 — 임대차신고관리 시트 계약체결일 입력 필요 (계약관리 BL열도 공란)', col:'#B45309', bg:'#FFFBEB', bd:'#FDE68A', open:true  },
   { k:'ok',     icon:'⚪', label:'여유',        title:'여유 (D-8 이상)',                                   col:'#64748B', bg:'#F8FAFC', bd:'#E2E8F0', open:false },
   { k:'follow', icon:'🔵', label:'후속조치',    title:'후속조치 — 접수완료(승인대기) / 수정요청',           col:'#2563EB', bg:'#EFF6FF', bd:'#BFDBFE', open:true  },
-  { k:'err',    icon:'🟣', label:'상태오류',    title:'상태 확인 필요 — 계약관리 시트 KRG임대차(CQ열) 셀이 오류(#REF!·#N/A 등)라 결과등록을 읽지 못함 · 원본 임대차신고관리 시트에서 확인', col:'#7C3AED', bg:'#F5F3FF', bd:'#DDD6FE', open:true  }   /* [v653] */
+  { k:'err',    icon:'🟣', label:'상태오류',    title:'상태 확인 필요 — 계약관리 시트 KRG임대차(CQ열) 셀이 오류(#REF!·#N/A 등)라 결과등록을 읽지 못함 · 원본 임대차신고관리 시트에서 확인', col:'#7C3AED', bg:'#F5F3FF', bd:'#DDD6FE', open:true  }   /* [v653] 폴백(CQ) 모드에서만 발생 */
 ];
+/* [v654] 임대차신고관리 미러 — 공개 시트 탭 '임대차신고(Raw DATA)' (=IMPORTRANGE 원본 임대차신고관리!B:S) */
+var IMDAE_MIRROR_GID = '748608384';
+var imdaeMirrorData = [];   /* 계약번호 있는 행만 · okpi_ensureData 에서 로드 · 비어 있으면 계약관리 CQ열 폴백 */
+function okpi_parseImdaeMirror(resp){
+  try{
+    if(!resp||!resp.table) return [];
+    var cols=resp.table.cols||[], rows=resp.table.rows||[];
+    var labels=cols.map(function(c){ return String(c.label||c.id||'').trim(); });
+    if(labels.indexOf('계약번호')<0 || labels.indexOf('결과등록')<0) return [];   /* IMPORTRANGE 깨짐(#REF!)·헤더 변경 → 폴백 */
+    var fi=function(keys,fb){ for(var k=0;k<keys.length;k++){ var i=labels.indexOf(keys[k]); if(i>=0) return i; } return fb; };
+    var I={ cno:fi(['계약번호'],0), sign:fi(['계약체결일','체결일'],1), req:fi(['요청일자'],2), filed:fi(['신고일자'],3), done:fi(['완료일자'],4), rcpt:fi(['접수번호'],6), st:fi(['결과등록'],7),
+            reason:fi(['사유(기록 바랍니다)','사유'],8), fixDate:fi(['수정요청일'],9), fixReq:fi(['요청사항'],10), reply:fi(['회신사항'],11), chk:fi(['체크사항'],12), cancel:fi(['해제신고'],13),
+            nm:fi(['전차인명','임차인명'],14), addr:fi(['물건지주소'],15), bld:fi(['건물명'],16), room:fi(['호실','호수'],17) };
+    var out=[];
+    rows.forEach(function(r){
+      var c=r.c||[];
+      var g=function(i){ var x=(i>=0)?c[i]:null; return x?String(x.f!=null?x.f:(x.v!=null?x.v:'')).trim():''; };
+      var cno=g(I.cno).replace(/,/g,''); if(!cno || /^#/.test(cno)) return;
+      out.push({ cno:cno, sign:g(I.sign), req:g(I.req), filed:g(I.filed), done:g(I.done), rcpt:g(I.rcpt), st:g(I.st), reason:g(I.reason), fixDate:g(I.fixDate), fixReq:g(I.fixReq), reply:g(I.reply), chk:g(I.chk), cancel:g(I.cancel), nm:g(I.nm), addr:g(I.addr), bld:g(I.bld), room:g(I.room) });
+    });
+    return out;
+  }catch(e){ console.warn('[v654] parseImdaeMirror:', e); return []; }
+}
 function okpi_imdaeCalc(){
   var pd=function(x){ var m=String(x||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; };
   var ymd=function(d){ return d?(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')):''; };
   var today=new Date(); today.setHours(0,0,0,0);
   var from=pd(IMDAE_ALARM_FROM)||new Date(2000,0,1);
-  var out={over:[],d3:[],d7:[],nodate:[],ok:[],follow:[],err:[]}, total=0, excluded=0;   /* [v653] err = CQ 오류값 */
-  ((typeof vacancyRawData!=='undefined'&&Array.isArray(vacancyRawData))?vacancyRawData:(window.vacancyRawData||[])).forEach(function(v){   /* let 선언 전역 → window에 없음 */
-    var cno=String(v.no||'').trim(); if(!cno) return;
-    var ck=String(v.contractKind||'').trim(); if(/삭제|철회|가계약/.test(ck)) return;
-    var st=String(v.imdaeShingo||'').trim(), isErr=/^#/.test(st);   /* [v653] #REF!·#N/A 등 = 조회 수식 오류 → 미신고로 세지 않음 */
-    var follow=(st==='접수완료'||st==='수정요청'), pending=(st===''||st==='신고대기');
-    if(!isErr && !follow && !pending){ excluded++; return; }
-    var sd=pd(v.signDate), wd=pd(v.startDate), base=sd||wd;
-    if(isErr && (!base || base<from)) return;                 /* 옛 계약의 오류 셀은 대상 아님 */
-    if(pending && st==='' && (!base || base<from)) return;   /* 추적 시작 전 옛 계약의 공란은 대상 아님 */
-    var row={ cno:cno, nm:String(v.tenant1Name||v.tenantName||'-').trim()||'-', bld:[String(v.propBuilding||'').trim(),String(v.propRoom||'').trim()].filter(Boolean).join(' '), addr:String(v.propAddr||'').trim(),
-              sign:ymd(sd), start:ymd(wd), st:(isErr?st:(st||'미신고')), ck:ck, landlord:String(v.landlordName||'').trim(), due:'', dd:null };
+  var out={over:[],d3:[],d7:[],nodate:[],ok:[],follow:[],err:[]}, total=0, excluded=0;   /* [v653] err = CQ 오류값 (폴백 모드에서만) */
+  var VAC=((typeof vacancyRawData!=='undefined'&&Array.isArray(vacancyRawData))?vacancyRawData:(window.vacancyRawData||[]));   /* let 선언 전역 → window에 없음 */
+  var MIR=(typeof imdaeMirrorData!=='undefined'&&Array.isArray(imdaeMirrorData))?imdaeMirrorData:[];
+  var useMirror=MIR.length>0;   /* [v654] 임대차신고관리 미러가 로드됐으면 결과등록을 직접 읽고, 아니면 계약관리 CQ열 폴백 */
+  var mkRow=function(cno,nm,bld,addr,sd,wd,st,ck,landlord){
+    var row={ cno:cno, nm:(nm||'-'), bld:bld, addr:addr, sign:ymd(sd), start:ymd(wd), st:st, ck:ck, landlord:landlord, due:'', dd:null };
     if(sd){ var due=new Date(sd.getTime()+30*86400000); row.due=ymd(due); row.dd=Math.round((due-today)/86400000); }
+    return row;
+  };
+  var place=function(row,sd,follow){
     total++;
-    if(isErr){ out.err.push(row); return; }
     if(follow){ out.follow.push(row); return; }
     if(!sd){ out.nodate.push(row); return; }
     (row.dd<0?out.over:(row.dd<=3?out.d3:(row.dd<=7?out.d7:out.ok))).push(row);
-  });
+  };
+  if(useMirror){
+    var vmap={}; VAC.forEach(function(v){ var k=String(v.no||'').trim(); if(k) vmap[k]=v; });
+    var last={}, order=[]; MIR.forEach(function(m){ if(!(m.cno in last)) order.push(m.cno); last[m.cno]=m; });   /* 같은 계약번호가 여러 행이면 마지막 행 기준 */
+    order.forEach(function(cno){
+      var m=last[cno], v=vmap[cno]||{};
+      var ck=String(v.contractKind||'').trim(); if(/삭제|철회|가계약/.test(ck)) return;
+      var st=String(m.st||'').trim();
+      var follow=(st==='접수완료'||st==='수정요청'), pending=(st===''||st==='신고대기');
+      if(!follow && !pending){ excluded++; return; }
+      var sd=pd(m.sign)||pd(v.signDate), wd=pd(v.startDate), base=sd||wd;
+      if(pending && st==='' && (!base || base<from)) return;   /* 추적 시작 전 옛 계약의 공란은 대상 아님 */
+      var row=mkRow(cno, m.nm||String(v.tenant1Name||v.tenantName||'').trim(),
+                    ([m.bld,m.room].filter(Boolean).join(' ')||[String(v.propBuilding||'').trim(),String(v.propRoom||'').trim()].filter(Boolean).join(' ')),
+                    (m.addr||String(v.propAddr||'').trim()), sd, wd, (st||'미신고'), ck, String(v.landlordName||'').trim());
+      row.req=m.req; row.filed=m.filed; row.rcpt=m.rcpt; row.chk=m.chk; row.fixDate=m.fixDate; row.fixReq=m.fixReq; row.reply=m.reply; row.reason=m.reason;
+      row.signSrc=(!pd(m.sign)&&sd)?'계약관리':'';   /* 신고관리 시트에 체결일이 없어 계약관리 BL열을 쓴 경우 표시 */
+      place(row, sd, follow);
+    });
+  } else {
+    VAC.forEach(function(v){
+      var cno=String(v.no||'').trim(); if(!cno) return;
+      var ck=String(v.contractKind||'').trim(); if(/삭제|철회|가계약/.test(ck)) return;
+      var st=String(v.imdaeShingo||'').trim(), isErr=/^#/.test(st);   /* [v653] #REF!·#N/A 등 = 조회 수식 오류 → 미신고로 세지 않음 */
+      var follow=(st==='접수완료'||st==='수정요청'), pending=(st===''||st==='신고대기');
+      if(!isErr && !follow && !pending){ excluded++; return; }
+      var sd=pd(v.signDate), wd=pd(v.startDate), base=sd||wd;
+      if(isErr && (!base || base<from)) return;                 /* 옛 계약의 오류 셀은 대상 아님 */
+      if(pending && st==='' && (!base || base<from)) return;   /* 추적 시작 전 옛 계약의 공란은 대상 아님 */
+      var row=mkRow(cno, String(v.tenant1Name||v.tenantName||'').trim(), [String(v.propBuilding||'').trim(),String(v.propRoom||'').trim()].filter(Boolean).join(' '), String(v.propAddr||'').trim(), sd, wd, (isErr?st:(st||'미신고')), ck, String(v.landlordName||'').trim());
+      if(isErr){ total++; out.err.push(row); return; }
+      place(row, sd, follow);
+    });
+  }
   var byDd=function(a,b){ return (a.dd==null?1e9:a.dd)-(b.dd==null?1e9:b.dd) || String(a.cno).localeCompare(String(b.cno)); };
   ['over','d3','d7','ok','follow','err'].forEach(function(k){ out[k].sort(byDd); });
   out.nodate.sort(function(a,b){ return String(a.start).localeCompare(String(b.start)) || String(a.cno).localeCompare(String(b.cno)); });
   var n={}; Object.keys(out).forEach(function(k){ n[k]=out[k].length; });
   n.pending=n.over+n.d3+n.d7+n.ok+n.nodate;
-  return { b:out, n:n, today:ymd(today), total:total, excluded:excluded };
+  return { b:out, n:n, today:ymd(today), total:total, excluded:excluded, src:(useMirror?'mirror':'cq'), mirRows:MIR.length };   /* [v654] src */
 }
 function okpi_imdaeOpen(k){ var st=(window._okpi&&window._okpi.imdaeOpen)||{}; if(k in st) return !!st[k]; var seg=IMDAE_SEG.filter(function(s){ return s.k===k; })[0]; return seg?!!seg.open:true; }
 function okpi_imdaeToggle(k){ window._okpi=window._okpi||{}; window._okpi.imdaeOpen=window._okpi.imdaeOpen||{}; window._okpi.imdaeOpen[k]=!okpi_imdaeOpen(k); var sec=document.getElementById('okpiImdaeSection'); if(sec) sec.outerHTML=okpi_imdaeSection(); }
 function okpi_imdaeExcel(){
   try{
     var R=window._imdaeLast||okpi_imdaeCalc(); var rows=[];
-    IMDAE_SEG.forEach(function(s){ R.b[s.k].forEach(function(r){ rows.push({'구간':s.label,'계약번호':r.cno,'전차인':r.nm,'건물·호수':r.bld,'물건지주소':r.addr,'임대인':r.landlord,'계약체결일':r.sign,'시작일':r.start,'신고기한':r.due,'D-day':(r.dd==null?'':r.dd),'결과등록(CQ)':r.st,'계약상태':r.ck}); }); });
+    IMDAE_SEG.forEach(function(s){ R.b[s.k].forEach(function(r){ rows.push({'구간':s.label,'계약번호':r.cno,'전차인':r.nm,'건물·호수':r.bld,'물건지주소':r.addr,'임대인':r.landlord,'계약체결일':r.sign,'시작일':r.start,'신고기한':r.due,'D-day':(r.dd==null?'':r.dd),'결과등록':r.st,'계약상태':r.ck,'요청일자':(r.req||''),'신고일자':(r.filed||''),'접수번호':(r.rcpt||''),'수정요청':[r.fixDate,r.fixReq].filter(Boolean).join(' '),'체크사항':(r.chk||''),'소스':(R.src==='mirror'?'임대차신고관리 미러':'계약관리 CQ')}); }); });
     if(!rows.length||typeof XLSX==='undefined'){ alert('다운로드할 데이터가 없습니다.'); return; }
     var ws=XLSX.utils.json_to_sheet(rows); var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'임대차신고알람');
     XLSX.writeFile(wb,'임대차신고_기한알람_'+R.today+'.xlsx');
@@ -25128,8 +25183,13 @@ function okpi_imdaeSection(){
     var R=okpi_imdaeCalc(); window._imdaeLast=R;
     var esc=function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
     var ddTxt=function(dd){ return dd==null?'':(dd<0?'D+'+(-dd):(dd===0?'D-DAY':'D-'+dd)); };
+    var fmtD=function(x){ var m=String(x||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0')):String(x||''); };   /* [v654] '2026. 9. 2' → 2026-09-02 (날짜 아니면 원문) */
     var stPill=function(st){ var m={'미신고':['#FEE2E2','#B91C1C'],'신고대기':['#FEF3C7','#B45309'],'접수완료':['#DBEAFE','#1D4ED8'],'수정요청':['#EDE9FE','#6D28D9']}[st]||(/^#/.test(st)?['#EDE9FE','#7C3AED']:['#F1F5F9','#64748B']); return '<span style="display:inline-block;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;background:'+m[0]+';color:'+m[1]+'">'+esc(st)+'</span>'; };
-    var head='<div class="okpi-section-title" style="margin-top:18px">📋 임대차신고 기한 알람 <span class="pill">오늘 기준 · 일 단위 관리 · 계약체결일+30일</span><span style="margin-left:auto;font-size:11px;color:#9CA3AF;font-weight:600">'+R.today+'</span></div>';
+    var head='<div class="okpi-section-title" style="margin-top:18px">📋 임대차신고 기한 알람 <span class="pill">오늘 기준 · 일 단위 관리 · 계약체결일+30일</span>'
+      +(R.src==='mirror'
+        ?'<span class="pill" style="background:#ECFDF5;color:#047857" title="임대차신고관리 시트 미러(IMPORTRANGE)에서 결과등록·체결일·요청/신고일자·접수번호를 직접 읽음 · 로드 '+R.mirRows+'행">소스 · 임대차신고관리 미러</span>'
+        :'<span class="pill" style="background:#FFFBEB;color:#B45309" title="임대차신고관리 미러를 읽지 못해 계약관리 시트 KRG임대차(CQ열) 기준으로 표시">⚠ 소스 · 계약관리 CQ열(폴백)</span>')
+      +'<span style="margin-left:auto;font-size:11px;color:#9CA3AF;font-weight:600">'+R.today+'</span></div>';
     var chips=IMDAE_SEG.filter(function(sg){ return sg.k!=='err'||R.n.err>0; }).map(function(sg){ var on=okpi_imdaeOpen(sg.k);   /* [v653] 오류 0건이면 숨김 */
       return '<span class="imdae-chip" data-k="'+sg.k+'" onclick="okpi_imdaeToggle(\''+sg.k+'\')" title="'+esc(sg.title)+' — 클릭하면 목록 펼치기/접기" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;border-radius:14px;padding:3px 10px;font-size:11px;font-weight:800;border:1.5px solid '+(on?sg.col:'#E5E7EB')+';background:'+(on?sg.bg:'#fff')+';color:'+sg.col+'">'+sg.icon+' '+sg.label+' <b>'+R.n[sg.k]+'</b></span>'; }).join('');
     var summary='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
@@ -25144,6 +25204,10 @@ function okpi_imdaeSection(){
         +'<span style="color:#6B7280">· 체결 <b style="color:'+(r.sign?'#374151':'#B45309')+'">'+(r.sign||'미기재')+'</b>'+(r.due?' · 기한 <b style="color:#374151">'+r.due+'</b>':'')+'</span>'
         +(r.dd!=null?'<b style="color:'+sg.col+'">('+ddTxt(r.dd)+')</b>':'')
         +stPill(r.st)
+        +((r.req||r.filed||r.rcpt)?'<span style="color:#6B7280;font-size:11px">'+(r.req?'· 요청 '+esc(fmtD(r.req)):'')+(r.filed?' · 신고 '+esc(fmtD(r.filed)):'')+(r.rcpt?' · 접수번호 '+esc(r.rcpt):'')+'</span>':'')   /* [v654] 신고관리 시트 상세 */
+        +((r.fixDate||r.fixReq)?'<span style="color:#6D28D9;font-size:11px">· 수정요청 '+esc([fmtD(r.fixDate),r.fixReq].filter(Boolean).join(' '))+'</span>':'')
+        +(r.chk?'<span style="color:#B45309;font-size:11px" title="체크사항">· ✓ '+esc(r.chk)+'</span>':'')
+        +(r.signSrc?'<span style="color:#9CA3AF;font-size:10.5px" title="임대차신고관리 시트에 체결일이 없어 계약관리(BL열) 체결일 사용">(체결일: 계약관리)</span>':'')
         +(r.start?'<span style="color:#9CA3AF;font-size:11px">· 시작 '+r.start+'</span>':'')
         +(r.ck==='종료'?'<span style="display:inline-block;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;background:#F3F4F6;color:#6B7280">종료</span>':'')
         +'</div>';
@@ -25153,7 +25217,11 @@ function okpi_imdaeSection(){
         +'<div onclick="okpi_imdaeToggle(\''+sg.k+'\')" style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:7px 11px;font-size:12px;font-weight:800;color:'+sg.col+'">'+sg.icon+' '+esc(sg.title)+' <span style="font-weight:600;color:#6B7280">('+rows.length+'건)</span><span style="margin-left:auto;font-size:11px;color:#9CA3AF;font-weight:600">'+(on?'▲ 접기':'▼ 펼치기')+'</span></div>'
         +(on?'<div style="padding:0 11px 8px;background:#fff;border-radius:0 0 8px 8px">'+(rows.length?rows.map(function(r){ return line(r,sg); }).join(''):'<div style="padding:6px 0;font-size:11.5px;color:#9CA3AF">(없음)</div>')+'</div>':'')
         +'</div>'; }).join('');
-    var foot='<div style="font-size:10.5px;color:#9CA3AF;margin-top:10px;line-height:1.55">기준 — 신고기한 = 계약체결일(BL열) + 30일 · KRG임대차(CQ열) 공란·신고대기 = 미신고 · 접수완료·수정요청 = 후속조치 · 완료·신고제외·삭제·신고철회·해제·"-" 제외 · 계약상태 삭제·철회·가계약 제외 · 대상 = 체결일(없으면 시작일) '+IMDAE_ALARM_FROM+' 이후 계약 + 날짜 무관 신고대기·접수완료·수정요청 · 시트에서 완료로 바꾸면 다음 로딩부터 빠짐 · CQ 셀이 #REF! 등 오류면 🟣 상태오류로 분리(미신고 아님) · 슬랙 09:00 알람과 같은 규칙(후속조치 건수는 원본 시트 행 기준과 차이 가능) · <a href="https://docs.google.com/spreadsheets/d/1Z3w9ZhKwiLfL4JJhs-gfcU27QLKgZAWycyGFCK4iiMc/edit?gid=1023474870" target="_blank" rel="noopener" style="color:#4F46E5;font-weight:600">임대차신고관리 시트 ↗</a></div>';
+    var foot='<div style="font-size:10.5px;color:#9CA3AF;margin-top:10px;line-height:1.55">기준 — 신고기한 = 계약체결일 + 30일 · 결과등록 공란·신고대기 = 미신고 · 접수완료·수정요청 = 후속조치 · 완료·신고제외·삭제·신고철회·해제·"-" 제외 · 계약상태(계약관리) 삭제·철회·가계약 제외 · 대상 = 체결일(없으면 시작일) '+IMDAE_ALARM_FROM+' 이후 계약 + 날짜 무관 신고대기·접수완료·수정요청 · 시트에서 완료로 바꾸면 다음 로딩부터 빠짐 · '
+      +(R.src==='mirror'
+        ?'소스 = 임대차신고관리 시트 미러(IMPORTRANGE · 실시간 · 같은 계약번호 여러 행이면 마지막 행 기준): 체결일·결과등록·요청/신고일자·접수번호·수정요청·체크사항 = 신고관리 시트, 계약상태·시작일·임대인 = 계약관리 시트'
+        :'⚠ 소스 = 계약관리 시트 KRG임대차(CQ열) 폴백 — 임대차신고관리 미러를 읽지 못함 · CQ 셀이 #REF! 등 오류면 🟣 상태오류로 분리(미신고 아님)')
+      +' · 슬랙 09:00 알람과 같은 규칙 · <a href="https://docs.google.com/spreadsheets/d/1Z3w9ZhKwiLfL4JJhs-gfcU27QLKgZAWycyGFCK4iiMc/edit?gid=1023474870" target="_blank" rel="noopener" style="color:#4F46E5;font-weight:600">임대차신고관리 시트 ↗</a> · <a href="https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/edit?gid='+IMDAE_MIRROR_GID+'" target="_blank" rel="noopener" style="color:#4F46E5;font-weight:600">미러 탭 ↗</a></div>';
     return '<div id="okpiImdaeSection">'+head+'<div class="okpi-period-card" style="grid-column:1/-1;border-color:#C7D2FE;background:#FAFAFF">'+summary+groups+foot+'</div></div>';
   }catch(e){ console.warn('[v652] imdae:', e); return ''; }
 }
@@ -25495,6 +25563,25 @@ async function okpi_ensureData(){
       }
     }
   } catch(e) { console.warn('[okpi] daeung ensure warn:', e); }
+  /* [v654] 임대차신고관리 미러 — 항상 새로 fetch · 실패/빈 응답이면 기존 데이터 유지(처음부터 없으면 계약관리 CQ열 폴백) */
+  try {
+    for (var a3 = 1; a3 <= 2; a3++) {
+      try {
+        var im = await okpi_fetchRaw(IMDAE_MIRROR_GID);
+        var newIm = okpi_parseImdaeMirror(im);
+        if (Array.isArray(newIm) && newIm.length) {
+          imdaeMirrorData = _keepBig(imdaeMirrorData, newIm);
+          console.log('[okpi] 임대차신고 미러 로드:', newIm.length, '건 (시도' + a3 + ')');
+          break;
+        } else if (a3 === 2) {
+          console.warn('[okpi] 임대차신고 미러 2회 시도 모두 빈 응답 → 계약관리 CQ열 폴백');
+        }
+      } catch(e3) {
+        console.warn('[okpi] 임대차신고 미러 fetch 시도' + a3 + ' 실패:', e3);
+        if (a3 === 1) await new Promise(function(r){ setTimeout(r, 500); });
+      }
+    }
+  } catch(e) { console.warn('[okpi] imdae mirror ensure warn:', e); }
 }
 
 // [옵션 A] 업무 진척 미니 섹션 — 기존 PEOPLE/TASKS/ckLoad 재사용 (수정 X)
