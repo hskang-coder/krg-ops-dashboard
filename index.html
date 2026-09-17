@@ -28214,9 +28214,15 @@ function renderExitMgmtView(){
     var rows=[].slice.call(table.querySelectorAll('tr.dlq-tbl-row'));
     function txt(tr){var c=tr.children[col]; return c?c.textContent.trim():'';}
     function pnum(t){ if(!/[0-9]/.test(t))return null; var n=t.replace(/[^0-9.-]/g,''); if(n===''||n==='-')return null; var f=parseFloat(n); return isNaN(f)?null:f; }
+    /* [v650] 날짜 컬럼 정렬 — 셀 텍스트의 첫 YYYY.MM.DD(-,/ 구분 포함)를 YYYYMMDD(+HHMM) 정수로 비교. 기존 pnum은 '2026.09.15'를 parseFloat→2026.09로 잘라 '일'이 무시되고
+       '퇴실2026.09.15 2일 전'·'2026.10.15 16:00'처럼 뒤에 숫자가 붙으면 값이 뒤섞여 종료/퇴실일·대응일·입금예정일 정렬이 일자와 안 맞던 문제 수정. 날짜 없는 셀(—)은 방향 무관 맨 뒤 */
+    function pdate(t){ var m=t.match(/(\d{4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})(?:[^0-9]{0,4}(\d{1,2}):(\d{2}))?/); if(!m)return null; return (+m[1])*1e8+(+m[2])*1e6+(+m[3])*1e4+(m[4]?(+m[4])*100+(+m[5]):0); }
     var ne=rows.map(txt).filter(function(t){return t!=='';});
-    var numeric=ne.length>0 && ne.filter(function(t){return pnum(t)!=null;}).length/ne.length>=0.6;
-    rows.sort(function(a,b){var ta=txt(a),tb=txt(b); if(numeric){var na=pnum(ta),nb=pnum(tb);na=na==null?-Infinity:na;nb=nb==null?-Infinity:nb;return (na-nb)*dir;} return ta.localeCompare(tb,'ko')*dir;});
+    var dateCol=ne.length>0 && ne.filter(function(t){return pdate(t)!=null;}).length/ne.length>=0.6;
+    var numeric=!dateCol && ne.length>0 && ne.filter(function(t){return pnum(t)!=null;}).length/ne.length>=0.6;
+    rows.sort(function(a,b){var ta=txt(a),tb=txt(b);
+      if(dateCol){var da=pdate(ta),db=pdate(tb); if(da==null&&db==null)return 0; if(da==null)return 1; if(db==null)return -1; return (da-db)*dir;}
+      if(numeric){var na=pnum(ta),nb=pnum(tb);na=na==null?-Infinity:na;nb=nb==null?-Infinity:nb;return (na-nb)*dir;} return ta.localeCompare(tb,'ko')*dir;});
     rows.forEach(function(tr){tbody.appendChild(tr);});
     var hr=table.querySelector('thead tr')||table.querySelector('tr');
     [].forEach.call(hr.children,function(h){var e=h.querySelector('.dp-sind'); if(e)e.remove();});
