@@ -5968,27 +5968,33 @@ async function renderSettlementView(){
     /* [v647] _PEN_RE = 전역 단일 소스 (_LAW_RE 아래) — 상세 모달 '위약금' 칩과 동일 키워드 */
     var _pnKind=function(b){ return /위약벌/.test(b)?'위약벌':(/합의/.test(b)?'합의 위약금':'위약금'); };
     var _pnAgg=function(rangeOnly){
-      var A={gen:0,genN:0,cs:{},paid:0,paidN:0,out:0,outN:0,outCs:{},outA:0,outE:0,cxl:0,cxlN:0,sch:0,schN:0,kinds:{}};
+      var A={gen:0,genN:0,cs:{},paid:0,paidN:0,out:0,outN:0,outCs:{},outA:0,outE:0,cxl:0,cxlN:0,sch:0,schN:0,kinds:{},rows:[]};   /* [v651] rows = 상세 모달용 행 보존 */
       P.forEach(function(p){
         var b=String(p['청구서명']||''); if(!_PEN_RE.test(b)) return;
         if(rangeOnly && !monthsInR[billMonth(p)]) return;
         var st=String(p['납부상태']||'').trim(), cno=String(p['계약번호']||'').trim();
         var out=num(p['미납(연체)금액(원)']);
         var gen=num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']); if(gen<=0) gen=out;
-        if(!alive(p) || st.indexOf('취소')>=0){ A.cxl+=gen; A.cxlN++; return; }
+        /* [v651] 상세 행 — 취소·납부예정도 cat 으로 구분해 보존 (카드 집계 규칙과 동일) */
+        var _ended=String(p['계약상태']||'').trim()==='종료', _nm=_nmMap[cno]||{};
+        var _row={ cno:cno, nm:_nm.nm||String(p['계약자명']||'-'), tel:_nm.tel||'-', ck:(_ended?'종료':'계약중'), sd:_sdStr(cno), bm:billMonth(p),
+          kind:_pnKind(b), bill:b.trim(), rty:String(p['납부종류']||'').trim(), due:String(p['납기일']||'').trim(), pay:String(p['납부일']||'').trim(), st:st,
+          days:parseInt(String(p['연체일수']==null?'':p['연체일수']).replace(/[^0-9\-]/g,''),10)||0, gen:gen, paid:0, out:0, cat:'' };
+        if(!alive(p) || st.indexOf('취소')>=0){ A.cxl+=gen; A.cxlN++; _row.cat='취소'; _row.st=(alive(p)?st:String(p['계약상태']||'').trim()); A.rows.push(_row); return; }
         if(gen<=0) return;
         A.gen+=gen; A.genN++; A.cs[cno]=1;
         var kd=_pnKind(b); A.kinds[kd]=(A.kinds[kd]||0)+1;
-        if(st==='납부예정'){ A.sch+=(out||gen); A.schN++; return; }
+        if(st==='납부예정'){ A.sch+=(out||gen); A.schN++; _row.cat='납부예정'; _row.out=(out||gen); A.rows.push(_row); return; }
         var paid=Math.max(0,gen-out);
         if(paid>0){ A.paid+=paid; A.paidN++; }
         if(out>0){ A.out+=out; A.outN++; A.outCs[cno]=1; if(String(p['계약상태']||'').trim()==='종료') A.outE+=out; else A.outA+=out; }
+        _row.paid=paid; _row.out=out; _row.cat=(out<=0?'납부완료':(paid>0?'일부납부':'미납')); A.rows.push(_row);
       });
       A.rate = A.gen>0 ? Math.round(A.paid/A.gen*1000)/10 : 0;
       return A;
     };
     var PN_R=_pnAgg(true), PN_A=_pnAgg(false), PN=(_pnScope==='range'?PN_R:PN_A), PN_O=(_pnScope==='range'?PN_A:PN_R);
-    window._stlPenLast = {scope:_pnScope, range:PN_R, all:PN_A};
+    window._stlPenLast = {scope:_pnScope, range:PN_R, all:PN_A, lbl:cmLbl, rlbl:_ymd(rs)+(_ymd(rs)!==_ymd(re2)?' ~ '+_ymd(re2):'')};   /* [v651] lbl = 발생월 라벨 · rlbl = 검색기간 (모달 헤더용 — rlbl 변수는 아래에서 선언되므로 직접 계산) */
 
     // ── [v513/v515] 기간 KPI — 청구 / 납부 / 대위변제 / 정산예정 (상단 통합 기간검색 기준) ──
     // [v537] 주거용/상업용/TOTAL 구분 필터 (계약관리 N열 계약형태 기준, 디폴트 TOTAL)
@@ -6204,7 +6210,7 @@ async function renderSettlementView(){
     var _pc0=function(a,b){ return b>0?Math.round(a/b*100):0; };
     var _pcF=function(a,b){ return b>0?Math.round(a/b*1000)/10:0; };
     var _fcTile=function(o){
-      return '<div style="flex:1;min-width:0;background:#fff;border-radius:8px;padding:7px 8px" title="'+String(o.tip||o.label).replace(/<[^>]+>/g,'')+'">'   /* [v646] 타일 좌우 패딩 10→8 */
+      return '<div '+(o.onclick?'onclick="'+o.onclick+'" ':'')+'style="flex:1;min-width:0;background:#fff;border-radius:8px;padding:7px 8px'+(o.onclick?';cursor:pointer':'')+'" title="'+String(o.tip||o.label).replace(/<[^>]+>/g,'')+(o.onclick?' — 클릭하면 목록':'')+'">'   /* [v646] 타일 좌우 패딩 10→8 · [v651] onclick 지원 */
         +'<div style="font-size:10px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:14px;line-height:14px">'+o.label+'</div>'
         +'<div style="font-size:15px;font-weight:800;color:'+o.col+';white-space:nowrap;height:20px;line-height:20px">'+o.val+(o.cnt!=null&&o.cnt!==''?'<span style="font-size:10px;color:#94A3B8;font-weight:600"> '+o.cnt+'</span>':'')+'</div>'
         +'<div style="font-size:9px;color:#94A3B8;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:12px;line-height:12px">'+(o.sub||'&nbsp;')+'</div>'   /* [v640] 3줄 고정 → 흰 박스 높이 동일 */
@@ -6225,7 +6231,7 @@ async function renderSettlementView(){
         +  (o.sub?'<span style="font-weight:400;font-size:10px;opacity:.85;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+(o.subTip||String(o.sub).replace(/<[^>]+>/g,''))+'">— '+o.sub+'</span>':'')   /* [v640] 1줄 고정 · [v646] 칩 카드는 부제 생략 */
         +  (o.chips||'')
         +'</div>'
-        +'<div style="font-size:24px;font-weight:800;line-height:1.2;white-space:nowrap"'+(o.headTip?' title="'+o.headTip+'"':'')+'>'+o.head+(o.headCnt?'<span style="font-size:11px;font-weight:700;opacity:.65"> '+o.headCnt+'</span>':'')+'</div>'
+        +'<div style="font-size:24px;font-weight:800;line-height:1.2;white-space:nowrap'+(o.headClick?';cursor:pointer':'')+'"'+(o.headTip?' title="'+o.headTip+(o.headClick?' — 클릭하면 목록':'')+'"':'')+(o.headClick?' onclick="'+o.headClick+'"':'')+'>'+o.head+(o.headCnt?'<span style="font-size:11px;font-weight:700;opacity:.65"> '+o.headCnt+'</span>':'')+'</div>'   /* [v651] headClick 지원 */
         +(o.bar||'<div style="height:7px;margin-top:6px"></div>')
         +'<div style="font-size:9.5px;opacity:.75;margin-top:3px;line-height:1.4;min-height:26.6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" title="'+String(o.ctx||'').replace(/<[^>]+>/g,'').replace(/"/g,'')+'">'+(o.ctx||'&nbsp;')+'</div>'   /* [v640] 2줄 예약 → 타일 행 상단 정렬 */
         +(o.tiles&&o.tiles.length?'<div style="display:flex;gap:8px;margin-top:8px">'+o.tiles.join('')+'</div>':'')
@@ -6281,14 +6287,15 @@ async function renderSettlementView(){
     var _pnOther=(_pnScope==='range'?'전체 누적 '+mil(PN_O.gen):cmLbl+'월 발생분 '+mil(PN_O.gen));
     var cardPen=_fcCard({ id:'stlPenCard', flex:1.08, minw:260, bg:'#FFF7ED', bd:'#FDBA74', fg:'#7C2D12', icon:'🚪', title:'중도퇴실 위약', sub:'',
       subTip:'청구 → 납부 · 미납 — 입금내역(gid=131074722) 청구서명(S열)에 \'위약\'이 포함된 청구 — 퇴실 정산금(위약금)·중도퇴실 위약벌·합의 위약금 등 (납부종류는 변동관리비로 내려옴) · 납부 = 청구 − 미납 · 삭제·철회·취소 제외 · 납부예정은 별도',
-      chips:_fcChips(_pnScope,'stl_setPenScope','#C2410C','#FDBA74',[['range','기간','검색기간이 걸친 달(납기일)의 위약 청구분만 (기본)'],['all','전체 누적','지금까지 위약 청구 전부']]),
-      head:mil(PN.gen), headTip:'청구 합계 '+won(PN.gen), headCnt:'청구 · '+PN.genN+'건 · '+_pnCs+'명',
+      chips:_fcChips(_pnScope,'stl_setPenScope','#C2410C','#FDBA74',[['range','기간','검색기간이 걸친 달(납기일)의 위약 청구분만 (기본)'],['all','전체 누적','지금까지 위약 청구 전부']])
+           +'<span onclick="stl_penModal(\'all\')" title="위약 청구 목록 — 건별 상세 (계약번호·청구서명·납기일·청구/납부/미납)" style="cursor:pointer;font-size:9.5px;font-weight:800;border-radius:10px;padding:2px 8px;border:1px solid #C2410C;background:#C2410C;color:#fff;margin-left:4px;white-space:nowrap">📋 목록</span>',   /* [v651] 상세 모달 (인자 있음 = 필터 초기화 후 열기) */
+      head:mil(PN.gen), headTip:'청구 합계 '+won(PN.gen), headCnt:'청구 · '+PN.genN+'건 · '+_pnCs+'명', headClick:'stl_penModal(\'all\')',   /* [v651] */
       bar:_fcBar([{pct:_pnBase>0?PN.paid/_pnBase*100:0,col:'#16A34A'},{pct:_pnBase>0?PN.out/_pnBase*100:0,col:'#DC2626'},{pct:_pnBase>0?PN.sch/_pnBase*100:0,col:'#FDBA74'}], '#FFEDD5',
            '납부 '+_pc0(PN.paid,_pnBase)+'% · 미납 '+_pc0(PN.out,_pnBase)+'%'+(PN.sch>0?' · 납부예정 '+_pc0(PN.sch,_pnBase)+'%':'')+' (청구 대비)'),
       ctx:(_pnBase<=0 ? ((_pnScope==='range'?'<b>'+cmLbl+'</b>월 발생분 없음':'위약 청구 없음')+' <span style="opacity:.85">· '+_pnOther+'</span>')
            : ((_pnScope==='range'?'<b>'+cmLbl+'</b>월 발생분':'전체 누적')+' · 납부율 <b>'+PN.rate+'%</b>'+(PN.schN>0?' · 납부예정 '+PN.schN+'건 '+mil(PN.sch):'')+' <span style="opacity:.85">· '+_pnOther+'</span>')),
-      tiles:[ _fcTile({label:'납부', val:mil(PN.paid), cnt:PN.paidN+'건', col:'#15803D', tip:'납부 '+won(PN.paid)+' — 청구 − 미납 (정상납부·연체납부·분납 납부분)'}),
-              _fcTile({label:'미납', val:mil(PN.out), cnt:PN.outN+'건', col:'#B91C1C', tip:'미납 '+won(PN.out)+' — '+PN.outN+'건 · '+Object.keys(PN.outCs).length+'명 · 미납 잔액 (연체중·분납중)'}) ],
+      tiles:[ _fcTile({label:'납부', val:mil(PN.paid), cnt:PN.paidN+'건', col:'#15803D', tip:'납부 '+won(PN.paid)+' — 청구 − 미납 (정상납부·연체납부·분납 납부분)', onclick:'stl_penModal(\'paid\')'}),   /* [v651] 클릭 → 납부 있는 건 목록 */
+              _fcTile({label:'미납', val:mil(PN.out), cnt:PN.outN+'건', col:'#B91C1C', tip:'미납 '+won(PN.out)+' — '+PN.outN+'건 · '+Object.keys(PN.outCs).length+'명 · 미납 잔액 (연체중·분납중)', onclick:'stl_penModal(\'out\')'}) ],   /* [v651] 클릭 → 미납 잔존 건 목록 */
       foot:'미납 — 계약중 <b>'+mil(PN.outA)+'</b> · 종료 <b>'+mil(PN.outE)+'</b>'
            +(function(){ var ks=Object.keys(PN.kinds).sort(function(a,b){ return PN.kinds[b]-PN.kinds[a]; }); if(!ks.length) return ''; return ' <span style="opacity:.85">· 항목 '+ks.map(function(k){ return k+' '+PN.kinds[k]; }).join(', ')+'</span>'; })()
            +' <span style="opacity:.8">· 퇴실 정산금(위약금)은 연체채권 퇴실정산에도 포함</span>' });
@@ -6647,6 +6654,130 @@ function stl_setDebtScope(k){ window._stlDebtScope=(k==='all'?'all':'range'); re
 /* [v637] 법비용 카드 집계 범위 — all(전체 누적, 기본) / range(검색기간 발생분) */
 function stl_setLawScope(k){ window._stlLawScope=(k==='range'?'range':'all'); renderSettlementView(); }
 function stl_setPenScope(k){ window._stlPenScope=(k==='range'?'range':'all'); renderSettlementView(); }   /* [v646] */
+/* ═══ [v651] 🚪 중도퇴실 위약 — 건별 상세 모달 ═══
+   데이터 = renderSettlementView 의 _pnAgg 가 보존한 window._stlPenLast.{range|all}.rows (카드 집계와 동일 규칙 · 취소·납부예정도 cat 으로 보존)
+   필터: 범위(기간/전체 누적) · 상태(전체/납부/미납/납부예정/취소) · 계약상태(전체/계약중/종료) · 종류(위약벌/위약금/합의 위약금) · 정렬(헤더 클릭) · 엑셀 */
+window.__stlPen = window.__stlPen || { scope:null, st:'all', ck:'T', kind:'all', sort:{key:'due',dir:'desc'} };
+function stl_penModal(initSt){
+  try{
+    var L=window._stlPenLast; if(!L){ alert('정산관리 탭의 위약 집계가 아직 없습니다. 정산관리 탭을 먼저 열어 주세요.'); return; }
+    var S=window.__stlPen;
+    if(initSt!==undefined){ S.st=(initSt==null||initSt==='')?'all':initSt; S.ck='T'; S.kind='all'; S.scope=L.scope; }   /* 카드에서 새로 열 때 초기화 (칩 재렌더는 initSt 미전달) */
+    if(!S.scope) S.scope=L.scope;
+    var A=(S.scope==='all')?L.all:L.range; var rowsAll=(A&&A.rows)?A.rows.slice():[];
+    var W=function(n){ return '₩'+Math.round(n||0).toLocaleString(); };
+    var mil=function(n){ return '₩'+(Math.round((n||0)/100000)/10).toLocaleString()+'M'; };
+    /* 상태 분류 — 카드 타일과 동일: paid = 납부액 있는 건 · out = 미납 잔존 건 · sched = 납부예정 · cxl = 취소 · all = 청구 집계 대상(취소 제외) */
+    var _isCat=function(r,f){ if(f==='all') return r.cat!=='취소'; if(f==='paid') return r.cat!=='취소'&&r.cat!=='납부예정'&&r.paid>0; if(f==='out') return r.cat!=='취소'&&r.cat!=='납부예정'&&r.out>0; if(f==='sched') return r.cat==='납부예정'; if(f==='cxl') return r.cat==='취소'; return true; };
+    var cnt=function(f){ return rowsAll.filter(function(r){ return _isCat(r,f); }).length; };
+    var base=rowsAll.filter(function(r){ return _isCat(r,S.st); });
+    var ckCnt={T:base.length, A:base.filter(function(r){return r.ck==='계약중';}).length, E:base.filter(function(r){return r.ck==='종료';}).length};
+    if(S.ck==='A') base=base.filter(function(r){return r.ck==='계약중';}); else if(S.ck==='E') base=base.filter(function(r){return r.ck==='종료';});
+    var kinds={}; base.forEach(function(r){ kinds[r.kind]=(kinds[r.kind]||0)+1; });
+    var kindKeys=['위약벌','위약금','합의 위약금'].filter(function(k){ return kinds[k]; }).concat(Object.keys(kinds).filter(function(k){ return ['위약벌','위약금','합의 위약금'].indexOf(k)<0; }));
+    var _nK=base.length;
+    var rows=(S.kind==='all')?base:base.filter(function(r){ return r.kind===S.kind; });
+    /* 정렬 */
+    var so=S.sort||{key:'due',dir:'desc'};
+    var dv=function(o){ var v=o[so.key]; if(so.key==='due'||so.key==='pay'||so.key==='sd'){ var m=String(v||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m?(+m[1])*10000+(+m[2])*100+(+m[3]):0; } return (typeof v==='number')?v:String(v==null?'':v); };
+    rows.sort(function(a,b){ var x=dv(a),y=dv(b),r; if(typeof x==='number'&&typeof y==='number') r=x-y; else r=String(x).localeCompare(String(y),'ko'); if(r===0) r=String(a.cno).localeCompare(String(b.cno)); return so.dir==='desc'?-r:r; });
+    window.__stlPenFlat=rows;
+    var T={gen:0,paid:0,out:0,sch:0}, cs={};
+    rows.forEach(function(r){ cs[r.cno]=1; if(r.cat==='취소') return; T.gen+=r.gen; if(r.cat==='납부예정'){ T.sch+=r.out; return; } T.paid+=r.paid; T.out+=r.out; });
+    var rate=T.gen>0?Math.round(T.paid/T.gen*1000)/10:0;
+    var scopeLbl=(S.scope==='all')?'전체 누적':('<b>'+L.lbl+'</b>월 발생분 <span style="opacity:.75">(검색기간 '+L.rlbl+')</span>');
+    var prev=document.getElementById('stlPenModal'); if(prev) prev.remove();
+    var ov=document.createElement('div'); ov.id='stlPenModal';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    var chip=function(on,fn,lb,col){ return '<span onclick="'+fn+'" style="cursor:pointer;border-radius:7px;padding:3px 10px;font-size:10.5px;font-weight:800;border:1.5px solid '+(on?col:'#E2E8F0')+';background:'+(on?col:'#fff')+';color:'+(on?'#fff':'#475569')+'">'+lb+'</span>'; };
+    var sth=function(h,k,al){ var on=(so.key===k); return '<th onclick="stl_penSort(\''+k+'\')" style="padding:6px 9px;text-align:'+(al||'left')+';white-space:nowrap;cursor:pointer;user-select:none">'+h+(on?(so.dir==='asc'?' ▲':' ▼'):' <span style="opacity:.3">⇅</span>')+'</th>'; };
+    var catPill=function(c){ var m={'납부완료':['#DCFCE7','#15803D'],'일부납부':['#FEF3C7','#B45309'],'미납':['#FEE2E2','#B91C1C'],'납부예정':['#F1F5F9','#64748B'],'취소':['#F3F4F6','#9CA3AF']}[c]||['#F1F5F9','#64748B']; return '<span style="display:inline-block;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;background:'+m[0]+';color:'+m[1]+'">'+c+'</span>'; };
+    var kindCol=function(k){ return k==='위약벌'?'#C2410C':(k==='합의 위약금'?'#7C3AED':'#B45309'); };
+    var body=rows.map(function(r,i){
+      var sc={'정상납부':'#16A34A','연체납부':'#F59E0B','연체중':'#DC2626','분납중':'#4F46E5','납부예정':'#94A3B8'}[r.st]||'#64748B';
+      return '<tr style="border-top:1px solid #F1F5F9'+(r.out>0&&r.cat!=='납부예정'?';background:#FFFBFB':'')+(r.cat==='취소'?';opacity:.55':'')+'">'
+        +'<td style="padding:6px 9px;color:#94A3B8;font-size:11px">'+(i+1)+'</td>'
+        +'<td style="padding:6px 9px"><b style="color:#0E7490;cursor:pointer" onclick="document.getElementById(\'stlPenModal\').remove();crNavFromView(\''+r.cno+'\',\'delinquency\')">'+r.cno+'</b></td>'
+        +'<td style="padding:6px 9px;white-space:nowrap">'+r.nm+'</td>'
+        +'<td style="padding:6px 9px"><span style="display:inline-block;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;'+(r.ck==='종료'?'background:#FEF3C7;color:#B45309':'background:#EFF6FF;color:#1D4ED8')+'">'+r.ck+'</span></td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:'+(r.sd?'#0E7490':'#CBD5E1')+';white-space:nowrap">'+(r.sd||'-')+'</td>'
+        +'<td style="padding:6px 9px;white-space:nowrap"><b style="color:'+kindCol(r.kind)+';font-size:11px">'+r.kind+'</b></td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:#475569"><span title="'+String(r.bill||'').replace(/"/g,'&quot;')+'" style="display:inline-block;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">'+(r.bill||'-')+'</span> <span style="color:#94A3B8;font-size:10px">'+(r.rty||'')+'</span></td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:#64748B;white-space:nowrap">'+(r.due||'-')+'</td>'
+        +'<td style="padding:6px 9px;text-align:right;font-weight:700;color:#7C2D12;white-space:nowrap">'+W(r.gen)+'</td>'
+        +'<td style="padding:6px 9px;text-align:right;font-weight:700;color:'+(r.paid>0?'#15803D':'#94A3B8')+';white-space:nowrap">'+(r.paid>0?W(r.paid):'—')+'</td>'
+        +'<td style="padding:6px 9px;text-align:right;font-weight:800;white-space:nowrap;color:'+(r.out>0?(r.cat==='납부예정'?'#64748B':'#B91C1C'):'#94A3B8')+'">'+(r.out>0?W(r.out):'—')+'</td>'
+        +'<td style="padding:6px 9px;white-space:nowrap">'+catPill(r.cat)+'</td>'
+        +'<td style="padding:6px 9px;white-space:nowrap"><span style="display:inline-block;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;background:'+sc+'1a;color:'+sc+'">'+(r.st||'-')+'</span></td>'
+        +'<td style="padding:6px 9px;text-align:center;font-weight:700;color:'+(r.days>0?'#DC2626':'#94A3B8')+'">'+(r.days||0)+'</td>'
+        +'<td style="padding:6px 9px;font-size:11px;color:#64748B;white-space:nowrap">'+(r.pay||'—')+'</td></tr>';
+    }).join('')||'<tr><td colspan="15" style="padding:22px;text-align:center;color:#94A3B8">해당 건이 없습니다.</td></tr>';
+    var sum=function(lb,val,col,sub){ return '<div style="flex:1;min-width:120px;background:#fff;border:1px solid #F1F5F9;border-radius:8px;padding:6px 10px"><div style="font-size:10px;color:#64748B">'+lb+'</div><div style="font-size:15px;font-weight:800;color:'+col+'">'+val+'</div>'+(sub?'<div style="font-size:9.5px;color:#94A3B8">'+sub+'</div>':'')+'</div>'; };
+    ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:1240px;width:100%;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
+      +'<div style="display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid #EEF2F7">'
+      +  '<span style="width:11px;height:11px;border-radius:3px;background:#C2410C"></span>'
+      +  '<b style="font-size:14px;color:#7C2D12">🚪 중도퇴실 위약 상세</b>'
+      +  '<span title="입금내역(gid=131074722) 청구서명에 \'위약\'이 포함된 청구 — 퇴실 정산금(위약금)·중도퇴실 위약벌·합의 위약금 등 · 납부 = 청구 − 미납 · 취소 = 삭제·계약 철회·납부상태 취소" style="font-size:9.5px;font-weight:800;color:#C2410C;background:#FFF7ED;border:1px solid #FDBA74;border-radius:9px;padding:2px 7px;cursor:help">청구서명 \'위약\'</span>'
+      +  '<span style="font-size:11.5px;color:#8A97A8">'+scopeLbl+' · '+Object.keys(cs).length+'명 · '+rows.length+'건</span>'
+      +  '<span style="margin-left:auto;display:flex;gap:6px">'
+      +    '<button onclick="stl_penExcel()" style="background:#C2410C;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">⬇️ 엑셀</button>'
+      +    '<button onclick="document.getElementById(\'stlPenModal\').remove()" style="background:#fff;color:#64748B;border:1px solid #CBD5E1;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer">닫기</button>'
+      +  '</span></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #F1F5F9;background:#fff">'
+      +  '<span style="font-size:10.5px;color:#64748B;font-weight:800;margin-right:2px">범위</span>'
+      +  chip(S.scope!=='all','stl_penScopeM(\'range\')','기간 '+((L.range&&L.range.rows)?L.range.rows.filter(function(r){return r.cat!=='취소';}).length:0),'#C2410C')
+      +  chip(S.scope==='all','stl_penScopeM(\'all\')','전체 누적 '+((L.all&&L.all.rows)?L.all.rows.filter(function(r){return r.cat!=='취소';}).length:0),'#C2410C')
+      +  '<span style="width:1px;height:15px;background:#E2E8F0;margin:0 5px"></span>'
+      +  '<span style="font-size:10.5px;color:#64748B;font-weight:800;margin-right:2px">상태</span>'
+      +  chip(S.st==='all','stl_penSt(\'all\')','전체 '+cnt('all'),'#1B3976')
+      +  chip(S.st==='paid','stl_penSt(\'paid\')','납부 '+cnt('paid'),'#15803D')
+      +  chip(S.st==='out','stl_penSt(\'out\')','미납 '+cnt('out'),'#B91C1C')
+      +  chip(S.st==='sched','stl_penSt(\'sched\')','납부예정 '+cnt('sched'),'#64748B')
+      +  chip(S.st==='cxl','stl_penSt(\'cxl\')','취소 '+cnt('cxl'),'#9CA3AF')
+      +  '<span style="width:1px;height:15px;background:#E2E8F0;margin:0 5px"></span>'
+      +  '<span style="font-size:10.5px;color:#64748B;font-weight:800;margin-right:2px">계약 상태</span>'
+      +  chip(S.ck==='T','stl_penCk(\'T\')','전체 '+ckCnt.T,'#1B3976')+chip(S.ck==='A','stl_penCk(\'A\')','계약중 '+ckCnt.A,'#15803D')+chip(S.ck==='E','stl_penCk(\'E\')','종료 '+ckCnt.E,'#64748B')
+      +  '<span style="width:1px;height:15px;background:#E2E8F0;margin:0 5px"></span>'
+      +  '<span style="font-size:10.5px;color:#64748B;font-weight:800;margin-right:2px">종류</span>'
+      +  chip(S.kind==='all','stl_penKind(\'all\')','전체 '+_nK,'#1B3976')
+      +  kindKeys.map(function(k){ return chip(S.kind===k,'stl_penKind(\''+k.replace(/'/g,'')+'\')',k+' '+kinds[k],kindCol(k)); }).join('')
+      +'</div>'
+      +'<div style="display:flex;gap:8px;padding:8px 16px;border-bottom:1px solid #F1F5F9;background:#FCFDFF">'
+      +  sum('청구 합계',W(T.gen),'#7C2D12',rows.filter(function(r){return r.cat!=='취소';}).length+'건 · '+Object.keys(cs).length+'명')
+      +  sum('납부',W(T.paid),'#15803D','청구 − 미납')
+      +  sum('미납 잔액',W(T.out),'#B91C1C','연체중·분납중')
+      +  sum('납부율',rate+'%',rate>=60?'#15803D':(rate>=30?'#B45309':'#B91C1C'),'납부 ÷ 청구')
+      +  (T.sch>0?sum('납부예정',W(T.sch),'#64748B','납기 미도래'):'')
+      +'</div>'
+      +'<div style="overflow:auto;flex:1"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+      +  '<thead style="position:sticky;top:0;background:#F8FAFC;color:#475569;font-size:11px;z-index:1"><tr>'
+      +    '<th style="padding:6px 9px;text-align:left">No</th>'+sth('계약번호','cno')+sth('임(전)차인','nm')+sth('계약상태','ck')+sth('계약시작일','sd')+sth('종류','kind')+'<th style="padding:6px 9px;text-align:left">청구서명 <span style="color:#94A3B8;font-weight:400">· 납부종류</span></th>'+sth('납기일','due')
+      +    sth('청구액','gen','right')+sth('납부액','paid','right')+sth('미납','out','right')+sth('구분','cat')+sth('납부상태','st')+sth('연체일','days','center')+sth('납부일','pay')
+      +  '</tr></thead><tbody>'+body+'</tbody></table></div>'
+      +'<div style="padding:8px 16px;border-top:1px solid #EEF2F7;font-size:10.5px;color:#8A97A8">계약번호 클릭 → 연체관리 계약 상세 · 헤더 클릭 정렬 · 납부율 = 납부 ÷ 청구 (취소·납부예정 제외) · 퇴실 정산금(위약금)은 연체채권 카드의 퇴실정산에도 포함되어 있습니다</div>'
+      +'</div>';
+    document.body.appendChild(ov);
+  }catch(e){ console.warn('[v651] stl_penModal 실패:', e); alert('위약 상세를 열 수 없습니다: '+e.message); }
+}
+function stl_penScopeM(s){ window.__stlPen.scope=(s==='all'?'all':'range'); stl_penModal(); }
+function stl_penSt(f){ window.__stlPen.st=(window.__stlPen.st===f&&f!=='all')?'all':f; stl_penModal(); }
+function stl_penCk(k){ window.__stlPen.ck=k; stl_penModal(); }
+function stl_penKind(k){ window.__stlPen.kind=(window.__stlPen.kind===k&&k!=='all')?'all':k; stl_penModal(); }
+function stl_penSort(k){ var s=window.__stlPen.sort||{key:'due',dir:'desc'}; window.__stlPen.sort=(s.key===k)?{key:k,dir:(s.dir==='desc'?'asc':'desc')}:{key:k,dir:(k==='gen'||k==='paid'||k==='out'||k==='days'||k==='due'||k==='pay'?'desc':'asc')}; stl_penModal(); }
+function stl_penExcel(){
+  try{
+    var rows=window.__stlPenFlat||[];
+    if(!rows.length||typeof XLSX==='undefined'){ alert('다운로드할 데이터가 없습니다.'); return; }
+    var ws=XLSX.utils.json_to_sheet(rows.map(function(r,i){ return {'No':i+1,'계약번호':r.cno,'임(전)차인':r.nm,'연락처':r.tel,'계약상태':r.ck,'계약시작일':r.sd||'','발생월':r.bm||'',
+      '종류':r.kind,'청구서명':r.bill||'','납부종류':r.rty||'','납기일':r.due,'납부일':r.pay||'','납부상태':r.st,'구분':r.cat,'연체일수':r.days,
+      '청구액':r.gen,'납부액':r.paid,'미납':r.out}; }));
+    ws['!cols']=[{wch:5},{wch:10},{wch:12},{wch:14},{wch:8},{wch:11},{wch:9},{wch:10},{wch:30},{wch:10},{wch:12},{wch:12},{wch:9},{wch:9},{wch:8},{wch:12},{wch:12},{wch:12}];
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'중도퇴실위약');
+    var S=window.__stlPen||{}; var d=new Date(); var ymd=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+    XLSX.writeFile(wb,'중도퇴실위약_'+(S.scope==='all'?'전체누적':'기간')+'_'+ymd+'.xlsx');
+  }catch(e){ alert('엑셀 생성 실패'); }
+}
 /* [v572] ③ 월별 연체 코호트 집계 기준 — bill(청구 발행월) / start(계약 시작일이 검색기간 내) */
 function stl_setCohBase(k){ window._stlCohBase=(k==='start'?'start':'bill'); renderSettlementView(); }
 function stl_clearRange(){ window._stlP = window._stlP || {period:'day'}; window._stlP.r1=null; window._stlP.r2=null; window._stlP.period='day'; renderSettlementView(); }
