@@ -5207,8 +5207,23 @@ function renderPaymentTargets() {
       .filter(p => String(p['청구서명']||p['납부종류']||'').includes('임대료') && isPrevMonth(p))
       .some(p => ['연체납부','연체중','분납중'].some(v => String(p['납부상태']||'').trim().includes(v)));
     // 임대료 청구서만 필터 후 2회차 = 첫납부 대상
-    const rentBills = payments.filter(p => String(p['청구서명']||p['납부종류']||'').includes('임대료'));
-    const isFirst   = parseInt(String(vacancy.billCount||'').replace(/[^0-9]/g,'')) === 2;
+    // [v655] 청구수(BT열)=2 규칙 폐기 — 입주 시 다음 달 청구서까지 선발행되어 첫 정기납부 시점엔 청구수가 이미 3 → 항상 0건이던 버그.
+    //        이 납기일의 임대료 청구서보다 앞선(납기일이 빠른) 임대료 청구가 정확히 1건(=입주분)이면 2회차 = 첫납부. 위약벌·수수료·정산 명목은 제외.
+    //        폴백: 앞선 청구가 0건이어도 납기일이 계약관리 시작일(W열) +20~40일이면 첫납부(입주분 청구가 시트에 없는 경우). 납기일 파싱 불가 시 종전 규칙.
+    //        안전장치: 계약관리 청구수(BT)가 숫자면 4 이하일 때만(입주분+2회차+선발행 1건(+분할 1건)) — 입금내역에 과거 청구가 빠진 장기 계약 오판 방지.
+    const rentBills = payments.filter(p => String(p['청구서명']||p['납부종류']||'').includes('임대료') && !/위약|수수료|정산|청소/.test(String(p['청구서명']||'')));
+    const _tDue = parseKorDate(String(r.dueDate||''));
+    const _bcN  = parseInt(String(vacancy.billCount||'').replace(/[^0-9]/g,''));
+    let isFirst;
+    if (_tDue) {
+      const _seen = {}; let _earlier = 0;
+      rentBills.forEach(p => { const d = parseKorDate(String(p['납기일']||'')); if (!d) return; const k = d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate(); if (_seen[k]) return; _seen[k] = 1; if (d < _tDue) _earlier++; });
+      const _sd  = parseKorDate(String(vacancy.startDate||''));
+      const _gap = _sd ? Math.round((_tDue - _sd) / 86400000) : null;
+      isFirst = (isNaN(_bcN) || _bcN <= 4) && ((_earlier === 1) || (_earlier === 0 && _gap !== null && _gap >= 20 && _gap <= 40));
+    } else {
+      isFirst = _bcN === 2;
+    }
     const isActive  = !String(contract['계약상태']||'').match(/종료|해지/);
     // 우선순위: 전월연체 > 첫납부 > 계약중
     const cat = hasDelinq ? '전월연체' : isFirst ? '첫납부' : isActive ? '계약중' : '기타';
@@ -5256,12 +5271,12 @@ function renderPaymentTargets() {
     { key:'전체',      cls:'pt-chip-total',  label:`전체 ${counts['전체']}건` },
     { key:'수납관리대상', cls:'pt-chip-mgmt',  label:`🎯 수납관리대상 ${counts['수납관리대상']}건` },
     { key:'전월연체',  cls:'pt-chip-delinq', label:`전월연체 ${counts['전월연체']}건` },
-    { key:'첫납부',   cls:'pt-chip-first',  label:`첫납부 ${counts['첫납부']}건` },
+    { key:'첫납부',   cls:'pt-chip-first',  label:`첫납부 ${counts['첫납부']}건`, tip:'임대료 2회차 청구(입주분 다음 첫 정기 납부)' },   /* [v655] */
     { key:'계약중',   cls:'pt-chip-active', label:`계약중 ${counts['계약중']}건` },
     { key:'심사확대', cls:'pt-chip-revx',   label:`🔍 심사확대 ${counts['심사확대']}건` }, // [v598]
   ];
   const chips = chipDefs.map(c =>
-    `<span class="pt-summary-chip ${c.cls}${ptFilter.category===c.key?' active':''}"
+    `<span class="pt-summary-chip ${c.cls}${ptFilter.category===c.key?' active':''}"${c.tip?' title="'+c.tip+'"':''}
       onclick="setPtCategory('${c.key}')">${c.label}</span>`
   ).join('');
 
@@ -5379,7 +5394,7 @@ function renderPaymentTargets() {
         <!-- 첫납부 바 차트 -->
         <div>
           <div style="display:flex;align-items:center;margin-bottom:7px">
-            <span style="font-size:12px;font-weight:800;color:#16A34A;margin-right:6px">첫납부 대상</span>
+            <span style="font-size:12px;font-weight:800;color:#16A34A;margin-right:6px" title="이 납기일의 임대료 청구서가 계약의 2회차(입주분 다음 첫 정기 납부)인 계약 · 다음 달 청구서가 미리 발행돼도 영향 없음 [v655]">첫납부 대상</span>
             <span style="font-size:13px;font-weight:900;color:#16A34A">${counts['첫납부']}건</span>
           </div>
           <div style="display:flex;gap:10px;align-items:center;margin-bottom:5px">
