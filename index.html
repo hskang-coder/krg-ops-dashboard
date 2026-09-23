@@ -7066,7 +7066,7 @@ function renderContractRecord(c, payments, responses = []) {
           ${_statusBadge(c['계약상태'])}
           ${String(c['잔여기간']||'').trim()?`<span class="crx-chip">잔여 ${fmt(c['잔여기간'])}</span>`:''}
         </div>
-        <div style="font-size:12px;color:#64748B;margin-top:4px;font-weight:600">${fmt(c['임차인명'])} · ${fmt(c['건물명'])} ${fmt(c['호수'])}</div>
+        <div style="font-size:12px;color:#64748B;margin-top:4px;font-weight:600">${(function(){ /* [v657] 부제 임차인명 — 계약관리 시트 공란이면 공실현황(tenant1Name→tenantName) 폴백 (본문 이름줄과 동일 규칙) */ let n=String(fmt(c['임차인명'])||'').trim(); if(!n||n==='—'||n==='-') n=String(__vacRow.tenant1Name||__vacRow.tenantName||'—').trim()||'—'; return n; })()} · ${fmt(c['건물명'])} ${fmt(c['호수'])}</div>
       </div>
       <div class="crx-stats" title="임대료 청구 기준 (수수료·관리비 제외) — [v538.2] 청구횟수와 동일 기준으로 통일">
         <div class="crx-stat"><div class="l">청구횟수 <span style="font-weight:400;color:#B4BDCB">(임대료)</span></div><div class="v">${stripU(c['청구수'])}회</div></div>
