@@ -10789,7 +10789,7 @@ function _drNoCell(t, no, total, forPrint){
   var c = _drPrioColor(t);
   var tip = '우선순위 ' + t.rank + '/' + total + ' — 긴급도 ' + t.urg + ' + 중요도 ' + t.imp + ' = ' + t.prio + (no !== t.rank ? ' (전체 ' + t.rank + '위)' : '');
   return '<td style="padding:6px 6px;text-align:center;white-space:nowrap;vertical-align:middle" title="'+_drEsc(tip)+'">'
-    + '<div style="display:inline-block;min-width:26px;background:'+c+';color:#fff;border-radius:6px;padding:2px 6px;font-size:12.5px;font-weight:800;line-height:1.3">'+no+'</div>'
+    + '<div style="display:inline-block;min-width:'+(forPrint?'22px':'26px')+';background:'+c+';color:#fff;border-radius:6px;padding:2px '+(forPrint?'4px':'6px')+';font-size:12.5px;font-weight:800;line-height:1.3">'+no+'</div>'
     + (forPrint ? '<div style="font-size:8.5px;color:#475569;margin-top:1px">긴 '+t.urg+' · 중 '+t.imp+(no !== t.rank ? '<br>전체 '+t.rank+'위' : '')+'</div>' : '<div style="font-size:9px;color:#94a3b8;margin-top:1px">긴급 '+t.urg+' · 중요 '+t.imp+'</div>')
     + '</td>';
 }
@@ -10864,7 +10864,7 @@ function _drPersonRowHtml(t, pl, cfg, forPrint){
   var r = t.r, no = pl._no(t), acts = pl._acts(t), legal = t.legal || _drLegal(r.cno);
   var pad = forPrint ? 'padding:5px 7px' : 'padding:7px 8px';
   var cnoCell = forPrint
-    ? '<td style="'+pad+';white-space:nowrap;font-weight:800">'+r.cno+'</td>'
+    ? '<td style="'+pad+';font-weight:800">'+r.cno+'</td>'
     : '<td style="'+pad+';white-space:nowrap"><span style="color:#2563eb;font-weight:700;cursor:pointer" onclick="dlqCloseDailyReport();dlqGoToContract(\''+r.cno+'\')">'+r.cno+'</span></td>';
   var aMin = Math.min.apply(null, acts.map(function(a){ return a.p; }));
   // [v660] 단계·상태 = 2줄 고정폭(1줄: 단계·D+n·미수신 / 2줄: 법무·약속) · 등급 배지 제거(등급은 No 중요도에만 반영) · 금액은 상태 앞 · 최근 대응 내용이 가장 넓은 열
@@ -10874,11 +10874,11 @@ function _drPersonRowHtml(t, pl, cfg, forPrint){
     + (forPrint ? '<td style="'+pad+';text-align:center;font-size:16px">☐</td>' : '')
     + _drNoCell(t, no, pl._total, forPrint)
     + cnoCell
-    + '<td style="'+pad+';white-space:nowrap"><b>'+_drEsc(r.nm)+'</b><br><span style="color:#64748b;font-size:10.5px">'+_drEsc(r.tel)+'</span></td>'
+    + '<td style="'+pad+(forPrint?'':';white-space:nowrap')+'"><b>'+_drEsc(r.nm)+'</b><br><span style="color:#64748b;font-size:10.5px">'+_drEsc(r.tel)+'</span></td>'
     + _drScoreCell(t)
-    + '<td style="'+pad+';text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums">'+_drWon(r.amt)+(t.pen?'<br><span style="color:#dc2626;font-size:11px">'+_drWon(t.pen)+'</span>':'')+'</td>'
-    + '<td style="'+pad+';white-space:nowrap;line-height:2">'+st1+(st2?'<br>'+st2:'')+'</td>'
-    + '<td style="'+pad+';min-width:'+(forPrint?'260px':'280px')+'"><div style="color:#475569;font-size:'+(forPrint?'10.5px':'11.5px')+';line-height:1.5;word-break:break-all">'+_drEsc(r.content||'—')+'</div></td>'
+    + '<td style="'+pad+';text-align:right;'+(forPrint?'word-break:break-all':'white-space:nowrap')+';font-variant-numeric:tabular-nums">'+_drWon(r.amt)+(t.pen?'<br><span style="color:#dc2626;font-size:11px">'+_drWon(t.pen)+'</span>':'')+'</td>'
+    + '<td style="'+pad+';'+(forPrint?'white-space:normal':'white-space:nowrap')+';line-height:2">'+st1+(st2?(forPrint?' ':'<br>')+st2:'')+'</td>'
+    + '<td style="'+pad+(forPrint?'':';min-width:280px')+'"><div style="color:#475569;font-size:'+(forPrint?'10.5px':'11.5px')+';line-height:1.5;word-break:break-all">'+_drEsc(r.content||'—')+'</div></td>'
     + '<td style="'+pad+';border-left:2px solid '+acts[0].c+';background:'+(acts.some(function(a){return a.warn;})?'#fff7ed':'#fcfdfe')+'">'+_drActRowsHtml(acts, forPrint)+'</td>'
     + (forPrint ? '<td style="'+pad+'"></td>' : '')
     + '</tr>';
@@ -10886,12 +10886,14 @@ function _drPersonRowHtml(t, pl, cfg, forPrint){
 function _drPersonTableHtml(who, pl, cfg, forPrint){
   if (!pl.length) return '<div style="padding:14px;color:#94a3b8;font-size:12px;background:#fff">오늘 배정 건이 없습니다.</div>';
   var th = function(s, extra){ return '<th style="padding:5px 8px;text-align:left;white-space:nowrap;'+(extra||'')+'">'+s+'</th>'; };
+  // [v661] 인쇄는 고정 레이아웃(colgroup 비율) — 용지(A3/A4)·내용 길이와 무관하게 열 비율 유지, 최근 대응 내용이 최대폭
+  var cols = '<colgroup><col style="width:2.6%"><col style="width:4.4%"><col style="width:5.2%"><col style="width:8.2%"><col style="width:3.6%"><col style="width:7%"><col style="width:13%"><col style="width:28%"><col style="width:22%"><col style="width:6%"></colgroup>';
   var head = forPrint
-    ? '<tr>' + th('완료','text-align:center;width:28px;padding:4px 3px') + th('No','text-align:center;width:52px') + th('계약번호','width:62px') + th('임(전)차인','width:104px') + th('점수','text-align:center;width:40px') + th('연체금액/위약금','text-align:right;width:92px') + th('단계 · 상태','width:1%') + th('최근 대응 내용') + th('▶ 대응 지시 (연체 Process 근거 · SOP-04-연체 v1.2)','width:30%;white-space:normal') + th('결과 · 메모','width:130px') + '</tr>'
+    ? cols + '<tr>' + th('완료','text-align:center;padding:4px 3px') + th('No','text-align:center') + th('계약번호') + th('임(전)차인') + th('점수','text-align:center') + th('연체금액/위약금','text-align:right;white-space:normal') + th('단계 · 상태') + th('최근 대응 내용') + th('▶ 대응 지시 (연체 Process 근거 · SOP-04-연체 v1.2)','white-space:normal') + th('결과 · 메모','white-space:normal') + '</tr>'
     : '<tr style="background:#f8fafc;color:#64748b;font-size:10.5px">' + _drTh('no','No','center') + _drTh('cno','계약번호') + _drTh('nm','임(전)차인') + _drTh('score','점수','center') + _drTh('amt','연체금액/위약금','right') + _drTh('stage','단계 · 상태','left','width:1%')
       + '<th style="padding:6px 8px;text-align:left">최근 대응 내용 <span onclick="dlqDrSort(\'nc\')" title="미수신 횟수로 정렬" style="cursor:pointer;user-select:none;opacity:.7">📵'+(cfg.sortKey==='nc'?(cfg.sortDir==='asc'?'▲':'▼'):'↕')+'</span></th>'
       + '<th style="padding:6px 8px;text-align:left;width:30%">▶ 대응 지시 (연체 Process 근거 · SOP-04-연체 v1.2)</th></tr>';
-  return '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff"><thead>' + head + '</thead><tbody>'
+  return '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff'+(forPrint?';table-layout:fixed':'')+'"><thead>' + head + '</thead><tbody>'
     + pl.map(function(t){ return _drPersonRowHtml(t, pl, cfg, forPrint); }).join('') + '</tbody></table></div>';
 }
 function _drRoleText(who, cfg){
@@ -11013,7 +11015,7 @@ function _drFooterHtml(cfg){
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual-yeonche-sop.html" target="_blank" style="color:#c0392b;font-weight:700">🗓️ 연체 Process — SOP-04-연체 v1.2↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">운영매뉴얼 SOP04↗</a>'
     + ' · 미수신 '+cfg.ncCount+'회 확정 즉시 법무 · 납부약속 상한 D+'+cfg.promiseMax+' · 지급명령 마감 D+20 · 명도 주거 D+'+cfg.evictRes+' / 상업 D+'+cfg.evictCom
-    + ' · 단계 = 납기일(D+0) 기준 연체일수 · <b>No = 우선순위</b>(긴급도: 액션 P·분기·연체일 + 중요도: 연체금액·위약금·등급·KCB) · Daily Report 생성일 '+_drDateStr()+' · build v660</div>';
+    + ' · 단계 = 납기일(D+0) 기준 연체일수 · <b>No = 우선순위</b>(긴급도: 액션 P·분기·연체일 + 중요도: 연체금액·위약금·등급·KCB) · Daily Report 생성일 '+_drDateStr()+' · build v661</div>';
 }
 function _drBuildHtml(){
   var cfg = window._dlqDrCfg;
@@ -11062,7 +11064,7 @@ var _DR_PRINT_CSS = '@page{size:A3 landscape;margin:10mm}'
   + '.dr-hd{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:2px solid #0f172a;padding-bottom:7px;margin-bottom:10px}'
   + '.dr-hd h1{font-size:20px;margin:0}.dr-hd .sub{font-size:12px;color:#334155}.dr-hd .cnt{margin-left:auto;font-size:14px;font-weight:800}'
   + '.dr-sheet table{width:100%;border-collapse:collapse;font-size:11.5px;background:#fff}'
-  + '.dr-sheet th,.dr-sheet td{border:1px solid #cbd5e1;vertical-align:top}'
+  + '.dr-sheet th,.dr-sheet td{border:1px solid #cbd5e1;vertical-align:top;overflow-wrap:anywhere}'
   + '.dr-sheet th{background:#f1f5f9;font-weight:800;font-size:11px;padding:5px 7px;text-align:left}'
   + '.dr-sheet tr{page-break-inside:avoid;break-inside:avoid}.dr-sheet thead{display:table-header-group}'
   + '.dr-ft{font-size:10px;color:#475569;margin-top:10px;border-top:1px solid #cbd5e1;padding-top:5px}'
@@ -11077,7 +11079,7 @@ function _drPrintSheet(who, cfg){
   return '<div class="dr-sheet">'
     + '<div class="dr-hd"><h1 style="color:'+color+'">📋 연체대응 Daily Report — '+who+'</h1>'
     + '<div class="sub">'+_drDateStr()+' · '+_drEsc(_drRoleText(who, cfg))+(flt ? ' · 필터: '+_drEsc(flt) : '')+'</div>'
-    + '<div class="cnt">배정 '+pl.length+'명 · '+nActs+'건</div></div>'
+    + '<div class="cnt">배정 '+pl.length+'명 · '+nActs+'건 <span style="font-size:10px;font-weight:600;color:#64748b;margin-left:8px">용지 A3 · 가로 방향</span></div></div>'
     + _drPersonTableHtml(who, pl, cfg, true)
     + '<div class="dr-ft">No = '+who+' 담당 내 우선순위 = 긴급도 + 중요도 (전체 순위가 다르면 함께 표기) · 긴급도: 액션 P·분기(약속/분납 불이행 · 미수신 확정 · 5-2 · 명도 · 마감)·연체일 / 중요도: 연체금액·위약금·등급·KCB·강제퇴실'
     + ' · 기준 연체 Process SOP-04-연체 v1.2 — 미수신 '+cfg.ncCount+'회 확정 즉시 법무 · 납부약속 상한 D+'+cfg.promiseMax+' · 지급명령 마감 D+20 · 명도 주거 D+'+cfg.evictRes+' / 상업 D+'+cfg.evictCom+' · 완료 시 ☐ 체크 후 Daily Report 시트에 결과 기록</div>'
@@ -11196,7 +11198,7 @@ function dlqDrSlackCopy(who){
   if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(done).catch(function(){ prompt('복사(Ctrl+C):', t); }); }
   else { prompt('복사(Ctrl+C):', t); }
 }
-// ═══════════ [v660] Daily Report 끝 ═══════════
+// ═══════════ [v661] Daily Report 끝 ═══════════
 /* [v610] 소송취하 컷오프 — 계약별 최근 '소송취하' 기록(일자·행순번). 취하 이전 법적 기록은 리셋 취급 */
 function _dlqLegalCut(cno){
   var Prow=(typeof daeungRawData!=='undefined'&&Array.isArray(daeungRawData))?daeungRawData:[];
