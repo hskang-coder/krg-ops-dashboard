@@ -2824,6 +2824,39 @@ function _auditSheetFp(resp, idxs){
     return { h:h, n:rows.length };
   }catch(_){ return null; }
 }
+/* [v662] 행수 급감 자동 재확인 — 90초 후 해당 시트를 다시 읽어 회복(기준의 95% 이상)이면 배너 항목 제거, 아니면 '재확인에서도 동일' 표기 */
+var _AUDIT_GIDS = { '계약':'1953907648', '연체자':'418937767', '입금내역':'131074722' };
+function _auditScheduleRecheck(nm, baseN, seenN){
+  try{
+    window._auditRecheckState = window._auditRecheckState || {};
+    if (window._auditRecheckState[nm]) return;
+    window._auditRecheckState[nm] = { base:baseN, seen:seenN, at:Date.now() };
+    setTimeout(function(){ _auditRecheck(nm, baseN, seenN); }, 90000);
+  }catch(_){}
+}
+async function _auditRecheck(nm, baseN, seenN){
+  var gid = _AUDIT_GIDS[nm]; if (!gid) return;
+  try{
+    var url = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:json&gid='+gid+'&range=A:ZZ&tq='+encodeURIComponent('SELECT *')+'&headers=1&_t='+Date.now();
+    var txt = await (await fetch(url, { cache:'no-store' })).text();
+    var body = txt.replace(/^[\s\S]*?setResponse\(/, '').replace(/\);?\s*$/, '');
+    var j = JSON.parse(body); var n = ((j.table||{}).rows||[]).length;
+    var key = nm+' 시트 행수 급감';
+    var lst = window._sheetIssues||[]; var i = lst.findIndex(function(x){ return x.indexOf(key) >= 0; });
+    if (n >= baseN*0.95) {
+      if (i >= 0) lst.splice(i, 1);
+      window._sheetIssues = lst;
+      var el = document.getElementById('sheetHealthBanner');
+      if (!lst.length && el) el.remove(); else if (el) _renderSheetBanner();
+      console.info('[dataAudit] '+nm+' 시트 행수 재확인: '+seenN.toLocaleString()+' → '+n.toLocaleString()+'행 (기준 '+baseN.toLocaleString()+') — 동기화 중 일시 상태였음, 알림 해제');
+      window._auditRecheckState[nm].result = 'recovered:'+n;
+    } else {
+      if (i >= 0) { lst[i] = lst[i].replace(/ <span[^>]*>\(미러 동기화 중[^<]*<\/span>/, '') + ' <span style="font-weight:800">— 90초 후 재확인에서도 '+n.toLocaleString()+'행, 실제 감소로 보임 (마스터 시트 확인 필요)</span>'; _renderSheetBanner(); }
+      console.warn('[dataAudit] '+nm+' 시트 행수 재확인: 여전히 '+n.toLocaleString()+'행 (기준 '+baseN.toLocaleString()+')');
+      window._auditRecheckState[nm].result = 'still:'+n;
+    }
+  }catch(e){ console.warn('[dataAudit] recheck', e); }
+}
 function _dlqDataAudit(r1, r2, r4, flagSet, daysMap){
   try{
     var issues=[], today=new Date(); today.setHours(0,0,0,0); var tISO=_auditISO(today);
@@ -2870,7 +2903,12 @@ function _dlqDataAudit(r1, r2, r4, flagSet, daysMap){
       } else {
         next[nm]={h:cur.h,n:cur.n,dlq:cur.dlq,first:tISO};
         if(p && p.n>0){
-          if(cur.n < p.n*0.95) issues.push('🔴 '+nm+' 시트 행수 급감 '+p.n.toLocaleString()+' → '+cur.n.toLocaleString()+'행 ('+Math.round((cur.n/p.n-1)*100)+'%) — 데이터 소실/잘못된 복사 의심');
+          if(cur.n < p.n*0.95){
+            /* [v662] 급감은 미러 시트(Apps Script 값 동기화) 재작성 중 부분 상태를 읽은 오탐일 수 있음 → 기준 지문은 이전 값 유지 + 90초 후 자동 재확인 */
+            next[nm]={h:p.h,n:p.n,dlq:p.dlq,first:p.first||tISO};
+            issues.push('🔴 '+nm+' 시트 행수 급감 '+p.n.toLocaleString()+' → '+cur.n.toLocaleString()+'행 ('+Math.round((cur.n/p.n-1)*100)+'%) — 데이터 소실/잘못된 복사 의심 <span style="font-weight:400;opacity:.85">(미러 동기화 중 일시 상태일 수 있음 · 90초 후 자동 재확인)</span>');
+            _auditScheduleRecheck(nm, p.n, cur.n);
+          }
           if(nm==='입금내역' && p.dlq>=20 && Math.abs(cur.dlq-p.dlq)/p.dlq>0.5) issues.push('⚠ 입금내역 연체중·분납중 행 급변 '+p.dlq+' → '+cur.dlq+'건 — 납부상태 일괄 변경/복사 여부 확인');
         }
       }
