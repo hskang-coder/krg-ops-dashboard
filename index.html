@@ -28910,6 +28910,9 @@ function renderExitMgmtView(){
     rows.forEach(function(tr){tbody.appendChild(tr);});
     var hr=table.querySelector('thead tr')||table.querySelector('tr');
     [].forEach.call(hr.children,function(h){var e=h.querySelector('.dp-sind'); if(e)e.remove();});
+    /* [v666] No 열은 표시 순번 — 어떤 열로 정렬해도 위에서부터 1,2,3… 다시 매김 */
+    try{ var noIdx=-1; [].some.call(hr.children,function(h,i){ if(h.getAttribute('title')==='표시 순번'||/^No$/i.test(h.textContent.replace(/[▲▼↕]/g,'').trim())){noIdx=i;return true;} return false; });
+      if(noIdx>=0) rows.forEach(function(tr,i){ var c=tr.children[noIdx]; if(c && !c.querySelector('input')) c.textContent=String(i+1); }); }catch(_n){}
     if(th){var s=document.createElement('span');s.className='dp-sind';s.textContent=dir>0?' ▲':' ▼';s.style.fontSize='9px';th.appendChild(s);}
   };
   window._dpInject=function(){
@@ -28926,7 +28929,9 @@ function renderExitMgmtView(){
       base.insertAdjacentElement('afterend', mk('대응패턴'));
       base.insertAdjacentElement('afterend', mk('리포트'));
     }
-    if(headRow){ for(var hi=0;hi<headRow.children.length;hi++){ (function(th,col){ if(th.__dpSB)return; th.__dpSB=true; th.style.cursor='pointer'; th.style.userSelect='none'; th.addEventListener('click',function(){ window._dpSortBy(col,th); }); })(headRow.children[hi],hi); } }
+    if(headRow){ for(var hi=0;hi<headRow.children.length;hi++){ (function(th,col){ if(th.__dpSB)return; th.__dpSB=true;
+        if(th.getAttribute('title')==='표시 순번'||/^No$/i.test(th.textContent.trim())){ th.style.cursor='default'; return; }   /* [v666] No(표시 순번)는 정렬 대상 아님 */
+        th.style.cursor='pointer'; th.style.userSelect='none'; th.addEventListener('click',function(){ window._dpSortBy(col,th); }); })(headRow.children[hi],hi); } }
     if(__legal)return;  // [v389] 법무 뷰: 리포트·대응패턴 셀은 주입 안 함 (정렬만 적용)
     var rows=table.querySelectorAll('tr.dlq-tbl-row');
     for(var k=0;k<rows.length;k++){ var tr=rows[k];
