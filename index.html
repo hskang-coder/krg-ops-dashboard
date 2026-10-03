@@ -1177,11 +1177,11 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-tbl-amt { font-weight:500; color:#374151; white-space:nowrap; font-size:11px; }
 .dlq-tbl-tel { color:#6b7280; font-size:10.5px; white-space:nowrap; }
 .dlq-tbl td.dlq-tbl-content { width:100%; min-width:200px; max-width:none; color:#374151; white-space:normal !important; word-break:keep-all; overflow-wrap:anywhere; line-height:1.5; font-size:10.5px; }   /* [v631] 잔여 폭 전부 흡수 · [v663] 최소폭 340→200, 긴 토큰 강제 줄바꿈 → 표가 컨테이너 폭을 넘지 않음 */
-/* [v663] 보조 열 줄바꿈 허용 — 종료/퇴실일·입금예정일·법적진행이 폭을 덜 차지해 잔여 폭이 최근 대응 내용으로 간다 */
+/* [v663] 보조 열 줄바꿈 허용 — 종료/퇴실일·입금예정일이 폭을 덜 차지해 잔여 폭이 최근 대응 내용으로 간다 ([v665] 법적진행은 1줄 유지) */
 .dlq-tbl td.dlq-td-wrap { white-space:normal; line-height:1.35; }
 .dlq-tbl td.dlq-td-exit { min-width:84px; font-size:11px; }
 .dlq-tbl td.dlq-td-pay { min-width:80px; }
-.dlq-tbl td.dlq-td-legal { min-width:106px; text-align:center; line-height:1.25; }
+.dlq-tbl td.dlq-td-legal { white-space:nowrap; text-align:center; }   /* [v665] 법적진행 5개 배지 1줄 */
 .dlq-days-badge { display:inline-block; padding:2px 7px; border-radius:10px; font-size:11px; font-weight:600; }
 .dlq-days-low  { background:#dcfce7; color:#166534; }
 .dlq-days-mid  { background:#fef9c3; color:#854d0e; }
@@ -10418,8 +10418,8 @@ function dlqRenderTableRows() {
                 return '<span style="color:#D1D5DB">-</span>';
               } catch(_) { return '<span style="color:#D1D5DB">-</span>'; }
             })()}</td>
-            <td class="dlq-td-wrap dlq-td-legal">${(function(){
-              // [v366] 법적진행 — F열에 내용증명/지급명령/기타집행 포함된 행 있으면 점등 · [v663] 좁은 폭에서 2줄(3+2)로 접힘
+            <td class="dlq-td-legal">${(function(){
+              // [v366] 법적진행 — F열에 내용증명/지급명령/기타집행 포함된 행 있으면 점등 · [v665] 1줄 유지
               try {
                 if (!Array.isArray(daeungRawData)) return '<span style="color:#D1D5DB">-</span>';
                 var cno = String(r.cno||'').trim();
