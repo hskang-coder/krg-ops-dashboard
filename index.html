@@ -14606,14 +14606,18 @@ function fetchContractForPdf(contractNo) {
         // [v232] 컬럼 +1 시프트 보정 — 시트에 AT/AU 사이 컬럼 추가됨 (사용자 확인: AY=긴급연락처, AZ=관계이름)
         tenantPhone:  gNth(['임차인휴대폰','임차인 휴대폰','휴대폰','연락처'], 0, 47),  // AV
         tenantIdNo:   gNth(['주민번호','주민등록번호'], 0, 48),                          // AW
-        tenantAddr:   gNth(['주소'], 0, 49),                                              // AX
+        tenantAddr:   gNth(['주소임차인','주소 임차인','임차인주소','임차인 주소','주소임(전)차인','주소'], 0, 49),   // AX — [v664] 헤더 '주소임차인' 우선 (정확히 '주소'인 열은 공동계약자 BD라 빈값이 나오던 문제)
         emergPhone:   gNth(['긴급연락처'], 0, 50),                                        // AY
         emergInfo:    gNth(['관계,이름','관계, 이름','관계/이름','관계'], 0, 51),        // AZ
         // [v232] 공동계약인도 +1 시프트
         coName:       g(['공동계약인 이름','공동계약인이름','공동계약인'], 52),          // BA
         coPhone:      gNth(['연락처','휴대폰'], 1, 53),                                    // BB
         coIdNo:       gNth(['주민번호','주민등록번호'], 1, 54),                            // BC
-        coAddr:       gNth(['주소'], 1, 55),                                                // BD
+        coAddr:       (function(){   // BD — [v664] '공동계약자이름' 열 뒤에 오는 첫 '주소' 열 (임차인 주소 헤더명과 무관하게 고정)
+                        var ci = findColIdxNth(['공동계약자이름','공동계약자 이름','공동계약인 이름','공동계약인이름','공동계약자','공동계약인'], 0, 52);
+                        for (var i2 = ci + 1; i2 < labels.length; i2++) { var lb2 = (labels[i2]||'').replace(/\s/g,''); if (lb2 === '주소' || lb2 === '공동계약자주소' || lb2 === '공동계약인주소' || lb2 === '주소공동계약자') return gi(i2); }
+                        return gNth(['주소'], 1, 55);
+                      })(),
         coEmergPhone: gNth(['긴급연락처'], 1, 56),                                          // BE
         coEmergInfo:  gNth(['관계,이름','관계, 이름','관계/이름','관계'], 1, 57),         // BF
         contractDate: g(['계약체결일','체결일'], 62),
@@ -14948,7 +14952,7 @@ function mgmtCtrPrefillFromContract(no){
   // 임대인 주소
   setIn('Addr', c['임대인주소']||c['주소']||'');
   // 주택 소재지 — 계약 주소 사용
-  setIn('PropAddr', c['주소']||c['임대주택주소']||c['건물주소']||'');
+  setIn('PropAddr', c['계약지주소']||c['임대주택주소']||c['건물주소']||c['주소']||'');   /* [v664] 소재지 = 계약지주소 ('주소' 헤더는 공동계약자 주소) */
   // 시작일/종료일
   var fmtDate = function(d){
     if (!d) return '';
