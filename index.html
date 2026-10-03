@@ -1164,7 +1164,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-filter-btn:hover { border-color:#3b82f6; color:#3b82f6; }
 .dlq-filter-btn.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
 /* [v34] 모든 td nowrap + 최근대응 약간만 확장 */
-.dlq-tbl { width:100%; border-collapse:collapse; font-size:10px; min-width:900px; table-layout:auto; }
+.dlq-tbl { width:100%; border-collapse:collapse; font-size:10px; min-width:0; table-layout:auto; }   /* [v663] 컨테이너 폭에 맞춤 — 최근 대응 내용이 가로 스크롤 없이 줄바꿈 표시 */
 .dlq-tbl thead tr { background:#f1f5f9; }
 .dlq-tbl th { padding:5px 2px; text-align:left; font-weight:600; color:#475569; font-size:9.5px; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
 .dlq-tbl-row { border-bottom:1px solid #f1f5f9; transition:background .12s; }
@@ -1176,13 +1176,18 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-tbl-info { font-size:10.5px; color:#6b7280; white-space:nowrap; }
 .dlq-tbl-amt { font-weight:500; color:#374151; white-space:nowrap; font-size:11px; }
 .dlq-tbl-tel { color:#6b7280; font-size:10.5px; white-space:nowrap; }
-.dlq-tbl td.dlq-tbl-content { width:100%; min-width:340px; max-width:none; color:#374151; white-space:normal !important; word-break:keep-all; line-height:1.5; font-size:10.5px; }   /* [v631] 잔여 폭 전부 흡수 */
+.dlq-tbl td.dlq-tbl-content { width:100%; min-width:200px; max-width:none; color:#374151; white-space:normal !important; word-break:keep-all; overflow-wrap:anywhere; line-height:1.5; font-size:10.5px; }   /* [v631] 잔여 폭 전부 흡수 · [v663] 최소폭 340→200, 긴 토큰 강제 줄바꿈 → 표가 컨테이너 폭을 넘지 않음 */
+/* [v663] 보조 열 줄바꿈 허용 — 종료/퇴실일·입금예정일·법적진행이 폭을 덜 차지해 잔여 폭이 최근 대응 내용으로 간다 */
+.dlq-tbl td.dlq-td-wrap { white-space:normal; line-height:1.35; }
+.dlq-tbl td.dlq-td-exit { min-width:84px; font-size:11px; }
+.dlq-tbl td.dlq-td-pay { min-width:80px; }
+.dlq-tbl td.dlq-td-legal { min-width:106px; text-align:center; line-height:1.25; }
 .dlq-days-badge { display:inline-block; padding:2px 7px; border-radius:10px; font-size:11px; font-weight:600; }
 .dlq-days-low  { background:#dcfce7; color:#166534; }
 .dlq-days-mid  { background:#fef9c3; color:#854d0e; }
 .dlq-days-high { background:#ffedd5; color:#9a3412; }
 .dlq-days-crit { background:#fee2e2; color:#991b1b; }
-.dlq-pay-date-badge { font-size:11px; font-weight:600; }
+.dlq-pay-date-badge { font-size:11px; font-weight:600; white-space:nowrap; }   /* [v663] 날짜·시각은 한 줄 유지(경과 배지만 다음 줄로) */
 /* [v633] 입금예정일 경과일수 — -1일 ~ -3일 표기 */
 .dlq-past-days { display:inline-block; margin-left:3px; background:#FEF2F2; color:#B91C1C; border:1px solid #FCA5A5; font-size:9.5px; font-weight:800; border-radius:4px; padding:1px 5px; white-space:nowrap; vertical-align:1px; }
 /* [v632] 긴급대응필요 — 솔리드 빨강 배지 (대응 기록은 있으나 입금예정일 미등록) */
@@ -8162,9 +8167,12 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
     // 연체일수 최대값 (t열=연체중/분납중 기준)
     if ((t19 === '연체중' || t19 === '분납중') && n13 !== '삭제' && n13 !== '계약 철회') delinqDaysMap[cno] = Math.max(delinqDaysMap[cno] || 0, ad29);
     // contractDetails: f=임대료 기준, t열=연체중/분납중 행 중 ad열 최대값
-    if (f5 === '임대료' && n13 === '계약중' && (t19 === '연체중' || t19 === '분납중')) {
-      if (!contractDetails[cno] || ad29 > contractDetails[cno].days) {
-        contractDetails[cno] = { group: tipo, 연체구분: t19, days: ad29 };
+    //   [v663] 종료 계약도 기록(연체자 현황 표 납부구분·그룹 표시용) — 삭제·계약 철회 제외.
+    //          계약중 행이 하나라도 있으면 계약중 행만 반영(KPI 버킷·기존 동작 불변), 없을 때만 종료 행 사용
+    if (f5 === '임대료' && (t19 === '연체중' || t19 === '분납중') && n13 !== '삭제' && n13 !== '계약 철회') {
+      const _cur = contractDetails[cno], _act = (n13 === '계약중');
+      if (!_cur || (_act && !_cur.active) || (_act === !!_cur.active && ad29 > _cur.days)) {
+        contractDetails[cno] = { group: tipo, 연체구분: t19, days: ad29, active: _act };
       }
     }
     if (n13 === '계약중') allActiveSet.add(cno);
@@ -10375,8 +10383,8 @@ function dlqRenderTableRows() {
             <td class="dlq-tbl-amt">${r.amt>0?'₩'+r.amt.toLocaleString():'-'}</td>
             <td style="white-space:nowrap;font-size:11px">${penaltyCell}</td>
             <td style="white-space:nowrap;font-size:11px;color:#374151">${r.actionDateStr&&r.actionDateStr!=='-'?r.actionDateStr:'—'}</td>
-            <td style="white-space:nowrap;font-size:11px">${_dlqEndExitCell(r.cno, r.contractStatus)}</td>   ${''/* [v648] 계약중=만기(계약종료일) · 종료=퇴실일 */}
-            <td>${r.dateStr==='긴급대응필요'
+            <td class="dlq-td-wrap dlq-td-exit">${_dlqEndExitCell(r.cno, r.contractStatus)}</td>   ${''/* [v648] 계약중=만기(계약종료일) · 종료=퇴실일 · [v663] 줄바꿈 허용 */}
+            <td class="dlq-td-wrap dlq-td-pay">${r.dateStr==='긴급대응필요'
               ? `<span class="dlq-urgent-badge" title="대응 기록은 있으나 입금예정일이 비어 있습니다 — 즉시 입금 약속 확정 필요">⚠ 긴급대응필요</span>`
               : (r.dateStr!=='-'?`<span class="dlq-pay-date-badge" style="color:${payColor}">${r.dateStr}</span>${(function(){
                   /* [v633] 입금예정일 경과 — 1~3일만 '-N일' 표기 (4일 이상은 생략) */
@@ -10410,8 +10418,8 @@ function dlqRenderTableRows() {
                 return '<span style="color:#D1D5DB">-</span>';
               } catch(_) { return '<span style="color:#D1D5DB">-</span>'; }
             })()}</td>
-            <td style="white-space:nowrap;text-align:center">${(function(){
-              // [v366] 법적진행 — F열에 내용증명/지급명령/기타집행 포함된 행 있으면 점등
+            <td class="dlq-td-wrap dlq-td-legal">${(function(){
+              // [v366] 법적진행 — F열에 내용증명/지급명령/기타집행 포함된 행 있으면 점등 · [v663] 좁은 폭에서 2줄(3+2)로 접힘
               try {
                 if (!Array.isArray(daeungRawData)) return '<span style="color:#D1D5DB">-</span>';
                 var cno = String(r.cno||'').trim();
@@ -11344,14 +11352,15 @@ function _dlqEndExitCell(cno, cs){
   var x=_dlqEndExit(cno, cs);
   if(!x) return '<span style="color:#D1D5DB">—</span>';
   if(x.kind==='퇴실'){
-    if(x.recent) return '<span title="퇴실 3개월 이내 ('+x.ago+') — 최근 종료, 집중 회수 구간" style="display:inline-block;background:#FEF3C7;border:1px solid #FDE68A;border-radius:5px;padding:1px 6px;white-space:nowrap"><span style="font-size:9.5px;font-weight:800;color:#B45309;margin-right:3px">퇴실</span><span style="color:#92400E;font-weight:700">'+x.str+'</span> <span style="font-size:9.5px;font-weight:700;color:#D97706">'+x.ago+'</span></span>';
-    return '<span title="퇴실 3개월 초과 ('+x.ago+') — 장기 종료채권" style="white-space:nowrap"><span style="font-size:9.5px;font-weight:700;color:#9CA3AF;margin-right:3px">퇴실</span><span style="color:#6B7280;font-weight:600">'+x.str+'</span> <span style="font-size:9.5px;color:#9CA3AF">'+x.ago+'</span></span>';
+    /* [v663] '퇴실 날짜'는 한 덩어리(nowrap), '○개월 전'만 폭이 좁으면 다음 줄로 */
+    if(x.recent) return '<span title="퇴실 3개월 이내 ('+x.ago+') — 최근 종료, 집중 회수 구간" style="display:inline-block;background:#FEF3C7;border:1px solid #FDE68A;border-radius:5px;padding:1px 6px;white-space:normal;line-height:1.35"><span style="white-space:nowrap"><span style="font-size:9.5px;font-weight:800;color:#B45309;margin-right:3px">퇴실</span><span style="color:#92400E;font-weight:700">'+x.str+'</span></span> <span style="font-size:9.5px;font-weight:700;color:#D97706;white-space:nowrap">'+x.ago+'</span></span>';
+    return '<span title="퇴실 3개월 초과 ('+x.ago+') — 장기 종료채권" style="white-space:normal"><span style="white-space:nowrap"><span style="font-size:9.5px;font-weight:700;color:#9CA3AF;margin-right:3px">퇴실</span><span style="color:#6B7280;font-weight:600">'+x.str+'</span></span> <span style="font-size:9.5px;color:#9CA3AF;white-space:nowrap">'+x.ago+'</span></span>';
   }
-  if(x.fallback) return '<span title="퇴실일 미기재 (Z열 계약해지일자·BP열 실제퇴실일 비어 있음) — 만기일 표시" style="font-size:9.5px;font-weight:700;color:#94A3B8;margin-right:3px;cursor:help">만기?</span><span style="color:#9CA3AF;font-weight:600">'+x.str+'</span>';
+  if(x.fallback) return '<span style="white-space:nowrap"><span title="퇴실일 미기재 (Z열 계약해지일자·BP열 실제퇴실일 비어 있음) — 만기일 표시" style="font-size:9.5px;font-weight:700;color:#94A3B8;margin-right:3px;cursor:help">만기?</span><span style="color:#9CA3AF;font-weight:600">'+x.str+'</span></span>';
   var col = x.dday<0 ? '#9CA3AF' : (x.dday<=30 ? '#D97706' : '#374151');
   var tail = x.dday<0 ? ' <span style="font-size:9.5px;color:#9CA3AF" title="만기일 경과 — 갱신·재계약 여부 확인">경과</span>'
            : (x.dday<=90 ? ' <span style="font-size:9.5px;font-weight:700;color:'+(x.dday<=30?'#D97706':'#94A3B8')+'">D-'+x.dday+'</span>' : '');
-  return '<span style="font-size:9.5px;font-weight:700;color:#64748B;margin-right:3px">만기</span><span style="color:'+col+';font-weight:600">'+x.str+'</span>'+tail;
+  return '<span style="white-space:nowrap"><span style="font-size:9.5px;font-weight:700;color:#64748B;margin-right:3px">만기</span><span style="color:'+col+';font-weight:600">'+x.str+'</span></span>'+tail;   /* [v663] D-xx·경과만 줄바꿈 */
 }
 function dlqRenderLegalTableRows(rows, container){
   window._dlqLegalExportRows = rows;
