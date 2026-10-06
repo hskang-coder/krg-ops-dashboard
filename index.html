@@ -1172,7 +1172,10 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-tbl td { padding:4px 2px; color:#374151; vertical-align:middle; white-space:nowrap; }
 .dlq-tbl-cno { color:#3b82f6; font-weight:600; white-space:nowrap; }
 .dlq-tbl-group { font-size:10px; color:#6b7280; background:#f3f4f6; padding:1px 5px; border-radius:4px; white-space:nowrap; }
-.dlq-tbl-nm { font-weight:500; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dlq-tbl-nm { font-weight:500; max-width:108px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }   /* [v668] 거절 칩 공간 +18px */
+/* [v668] 계약심사 거절 칩 — 계약관리 R열(계약심사)에 '거절' 포함 시 이름 옆 표기 (9px, 약 22px 폭) */
+.dlq-revx { display:inline-block; margin-left:3px; padding:0 3px; border-radius:3px; font-size:9px; font-weight:800; line-height:1.5; vertical-align:1px; letter-spacing:-.3px; cursor:help; }
+.dlq-revx-deny { background:#FEF2F2; color:#B91C1C; border:1px solid #FCA5A5; }
 .dlq-tbl-info { font-size:10.5px; color:#6b7280; white-space:nowrap; }
 .dlq-tbl-amt { font-weight:500; color:#374151; white-space:nowrap; font-size:11px; }
 .dlq-tbl-tel { color:#6b7280; font-size:10.5px; white-space:nowrap; }
@@ -3771,6 +3774,28 @@ function buildStrategyCards() {
 window._dlqSelectedCnos = new Set();
 
 /* [v627] 공실상태 표시 축약 — '중도퇴실(자진)-사유'는 접두어까지만, 전체 값은 title로 */
+/* [v668] 계약심사 거절 표기 — 계약관리(gid=1953907648) R열 '계약심사'에 '거절' 포함(예: 거절(일시납)·승인+거절(실거주대체))이면 이름 옆 '거절' 칩, 툴팁에 원문 */
+function _dlqRevXTag(cno){
+  try{
+    var V = Array.isArray(vacancyRawData) ? vacancyRawData : [];
+    if (!window._dlqRevXMap || window._dlqRevXMapN !== V.length) {
+      var m = {};
+      V.forEach(function(v){ var k = String(v.no||'').trim(); if (k && !m[k]) m[k] = v; });
+      window._dlqRevXMap = m; window._dlqRevXMapN = V.length;
+    }
+    var v = window._dlqRevXMap[String(cno||'').trim()];
+    var x = (v && typeof ptRevX === 'function') ? ptRevX(v) : null;
+    if (!x || x.kind !== '거절') return '';
+    return '<span class="dlq-revx dlq-revx-deny" title="계약심사: ' + String(x.raw).replace(/"/g,'&quot;') + '">거절</span>';
+  }catch(_){ return ''; }
+}
+/* [v668] 이름 셀 — 거절 칩이 있으면 이름만 말줄임(…)하고 칩은 항상 보이도록 flex 래핑 */
+function _dlqNmCell(nm, cno){
+  var name = String(nm == null || nm === '' ? '-' : nm);
+  var tag = _dlqRevXTag(cno);
+  if (!tag) return name;
+  return '<span style="display:flex;align-items:center;gap:3px;max-width:108px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">' + name + '</span>' + tag.replace('class="dlq-revx', 'style="flex:none;margin-left:0" class="dlq-revx') + '</span>';
+}
 function _dlqVacDisp(v){
   var t = String(v == null ? '' : v).trim() || '-';
   if (t.indexOf('중도퇴실(자진)') === 0 && t !== '중도퇴실(자진)') {
@@ -10381,7 +10406,7 @@ function dlqRenderTableRows() {
             }">${(r.연체구분==='연체중'||r.연체구분==='분납중')?r.연체구분:'-'}</span></td>
             <td><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:${(r.contractStatus||'계약중')==='계약중'?'#dbeafe':(r.contractStatus==='종료(3개월이내)'?'#fef3c7':'#f3f4f6')};color:${(r.contractStatus||'계약중')==='계약중'?'#1d4ed8':(r.contractStatus==='종료(3개월이내)'?'#d97706':'#6b7280')}">${r.contractStatus||'계약중'}</span></td>
             <td>${_dlqVacDisp(r.vacancyStatus)}</td>
-            <td class="dlq-tbl-nm">${r.nm||'-'}</td>
+            <td class="dlq-tbl-nm" title="${String(r.nm||'').replace(/"/g,'&quot;')}">${_dlqNmCell(r.nm, r.cno)}</td>   ${''/* [v668] 계약심사 거절 칩 */}
             <td style="white-space:nowrap;text-align:center;font-size:11.5px">${(function(){
               var m=_dlqRateOf(r.cno);
               if(!m||!m.bill) return '<span style="color:#D1D5DB">-</span>';
@@ -11402,7 +11427,7 @@ function dlqRenderLegalTableRows(rows, container){
       +'<td><span class="dlq-days-badge dlq-days-'+(r.days<=3?'low':r.days<=15?'mid':r.days<=30?'high':'crit')+'">'+(r.days||0)+'일</span></td>'
       +'<td><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:'+csBg+';color:'+csFg+'">'+cs+'</span></td>'
       +'<td>'+_dlqVacDisp(r.vacancyStatus)+'</td>'
-      +'<td class="dlq-tbl-nm">'+(r.nm||'-')+'</td>'
+      +'<td class="dlq-tbl-nm" title="'+String(r.nm||'').replace(/"/g,'&quot;')+'">'+_dlqNmCell(r.nm, r.cno)+'</td>'   /* [v668] */
       +'<td class="dlq-tbl-tel">'+(r.tel||'-')+'</td>'
       +'<td class="dlq-tbl-amt">'+(r.amt>0?'₩'+r.amt.toLocaleString():'-')+'</td>'
       +'<td style="white-space:nowrap;font-size:11px">'+(pen?'<span style="color:#B91C1C;font-weight:700">₩'+pen.toLocaleString()+'</span>':'<span style="color:#D1D5DB">-</span>')+'</td>'
