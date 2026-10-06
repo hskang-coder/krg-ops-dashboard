@@ -1177,7 +1177,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-revx { display:inline-block; margin-left:3px; padding:0 3px; border-radius:3px; font-size:9px; font-weight:800; line-height:1.5; vertical-align:1px; letter-spacing:-.3px; cursor:help; }
 .dlq-revx-deny { background:#FEF2F2; color:#B91C1C; border:1px solid #FCA5A5; }
 .dlq-revx-ok   { background:#ECFDF5; color:#047857; border:1px solid #6EE7B7; }   /* [v669] 승인 */
-.dlq-revx-skip { background:#FFFBEB; color:#B45309; border:1px solid #FCD34D; }   /* [v669] 무심사 */
+.dlq-revx-skip { background:#FEFCE8; color:#854D0E; border:1px solid #FDE047; }   /* [v669] 무심사 · [v670] 노란색 */
+.dlq-revx-co   { background:#EFF6FF; color:#1D4ED8; border:1px solid #93C5FD; }   /* [v670] 승인+거절 계열(공동계약 일부 거절) — 파란색 */
 .dlq-revx-etc  { background:#F3F4F6; color:#4B5563; border:1px solid #D1D5DB; }   /* [v669] 기타 */
 .dlq-revx-legend { display:inline-flex; gap:5px; align-items:center; margin-right:auto; font-size:10.5px; color:#9CA3AF; }
 .dlq-revx-legend .dlq-revx { margin-left:0; cursor:default; }
@@ -3782,17 +3783,35 @@ window._dlqSelectedCnos = new Set();
 /* [v668/v669] 계약심사 칩 — 계약관리(gid=1953907648) R열 '계약심사' 전 유형을 짧게 구분
    · 글자 = 괄호 안 조건 약어: 일시납 / 분할 / 일시+분할 / 대체(실거주대체) / 추가(실거주추가) / 보강(임대료보강) / 초과(금액초과), 그 외는 조건 앞 3자
    · 색 = 심사 종류: 빨강 거절 포함 · 초록 승인 · 주황 무심사 · 회색 기타 / '[3인]' 공동계약은 '3인·' 접두 / 툴팁에 원문 */
-window._DLQ_REVX_SHORT = [['일시납+분할','일시+분할'],['일시납','일시납'],['분할','분할'],['실거주대체','대체'],['실거주추가','추가'],['임대료보강','보강'],['금액초과','초과']];
+/* [v670] 표기 규칙(요청 반영)
+     거절(일시납)→🟥일시납 · 거절(분할)→🟥분할 · 거절(일시납+분할)→🟥일시+분할
+     승인(금액초과)→🟩금액초과 · 승인+승인(임대료보강)→🟩금액보강 · 승인+무심사(실거주추가)→🟨승인
+     승인+거절(실거주대체)→🟦실거주·대체 · [3인]승인+거절+거절(실거주대체)→🟦3인·대체 · [3인]승인+승인+거절(임대료보강)→🟦3인·보강
+   색: 🟥 본인 거절(조건부 계약) · 🟦 승인+거절 계열(공동계약 일부 거절) · 🟩 승인 · 🟨 무심사 승인 · ⬜ 기타 */
+window._DLQ_REVX_SHORT3 = [['일시납+분할','일시+분할'],['일시납','일시납'],['분할','분할'],['실거주대체','대체'],['실거주추가','추가'],['임대료보강','보강'],['금액초과','초과']];
 function _dlqRevXInfo(raw){
   raw = String(raw == null ? '' : raw).trim();
   if (!raw || raw === '-' || raw === '—') return null;
-  var kind = raw.indexOf('거절') >= 0 ? 'deny' : (raw.indexOf('무심사') >= 0 ? 'skip' : (raw.indexOf('승인') >= 0 ? 'ok' : 'etc'));
-  var cond = (raw.match(/\(([^)]*)\)/) || [])[1] || '';
+  var has3 = /\[\s*3인\s*\]/.test(raw);
+  var body = raw.replace(/\[[^\]]*\]/g, '').trim();
+  var hasDeny = body.indexOf('거절') >= 0, hasSkip = body.indexOf('무심사') >= 0, hasOk = body.indexOf('승인') >= 0;
+  var cond = (body.match(/\(([^)]*)\)/) || [])[1] || '';
+  cond = cond.replace(/\s/g, '');
+  var kind = (hasDeny && body.indexOf('거절') === 0) ? 'deny' : (hasDeny ? 'co' : (hasSkip ? 'skip' : (hasOk ? 'ok' : 'etc')));
   var txt = '';
-  for (var i = 0; i < window._DLQ_REVX_SHORT.length; i++) { if (cond.indexOf(window._DLQ_REVX_SHORT[i][0]) >= 0) { txt = window._DLQ_REVX_SHORT[i][1]; break; } }
-  if (!txt) txt = cond ? cond.replace(/\s/g,'').slice(0, 3) : (kind === 'deny' ? '거절' : kind === 'skip' ? '무심사' : kind === 'ok' ? '승인' : raw.slice(0, 3));
-  if (/\[3인\]/.test(raw)) txt = '3인·' + txt;
-  var kindNm = kind === 'deny' ? '거절' : (kind === 'skip' ? '무심사' : (kind === 'ok' ? '승인' : '기타'));
+  if (has3) {
+    for (var i = 0; i < window._DLQ_REVX_SHORT3.length; i++) { if (cond.indexOf(window._DLQ_REVX_SHORT3[i][0]) >= 0) { txt = window._DLQ_REVX_SHORT3[i][1]; break; } }
+    txt = '3인·' + (txt || (cond ? cond.slice(0, 2) : (kind === 'deny' || kind === 'co' ? '거절' : '승인')));
+  } else if (cond.indexOf('일시납+분할') >= 0) txt = '일시+분할';
+  else if (cond.indexOf('일시납') >= 0) txt = '일시납';
+  else if (cond.indexOf('분할') >= 0) txt = '분할';
+  else if (cond.indexOf('금액초과') >= 0) txt = '금액초과';
+  else if (cond.indexOf('임대료보강') >= 0) txt = (kind === 'co' || kind === 'deny') ? '보강' : '금액보강';
+  else if (cond.indexOf('실거주대체') >= 0) txt = '실거주·대체';
+  else if (cond.indexOf('실거주추가') >= 0) txt = (kind === 'skip') ? '승인' : '실거주·추가';
+  else if (cond) txt = cond.slice(0, 3);
+  else txt = kind === 'deny' ? '거절' : (kind === 'co' ? '승인+거절' : (kind === 'skip' ? '승인' : (kind === 'ok' ? '승인' : body.slice(0, 3))));
+  var kindNm = ({ deny:'거절', co:'승인+거절(공동계약 일부 거절)', skip:'무심사 승인', ok:'승인', etc:'기타' })[kind];
   return { kind: kind, cls: 'dlq-revx-' + kind, txt: txt, kindNm: kindNm, raw: raw };
 }
 function _dlqRevXTag(cno){
@@ -3814,7 +3833,7 @@ function _dlqRevXLegend(rows){
   try{
     if (!(rows||[]).some(function(r){ return !!_dlqRevXTag(r.cno); })) return '';
     var c = function(cls, t){ return '<span class="dlq-revx ' + cls + '">' + t + '</span>'; };
-    return '<span class="dlq-revx-legend" title="계약관리 R열 계약심사 — 글자: 괄호 안 조건(일시납·분할·대체=실거주대체·추가=실거주추가·보강=임대료보강·초과=금액초과), 색: 심사 종류 · 칩에 마우스를 올리면 원문">심사 ' + c('dlq-revx-deny','거절') + c('dlq-revx-ok','승인') + c('dlq-revx-skip','무심사') + '<span>· 일시납 · 분할 · 대체=실거주대체 · 추가=실거주추가 · 보강=임대료보강</span></span>';
+    return '<span class="dlq-revx-legend" title="계약관리 R열 계약심사 — 빨강: 거절(일시납·분할 조건부) · 파랑: 승인+거절 계열(실거주대체·3인 공동계약 일부 거절) · 초록: 승인(금액초과·임대료보강) · 노랑: 무심사 승인(실거주추가) · 칩에 마우스를 올리면 원문">심사 ' + c('dlq-revx-deny','거절') + c('dlq-revx-co','승인+거절') + c('dlq-revx-ok','승인') + c('dlq-revx-skip','무심사') + '</span>';
   }catch(_){ return ''; }
 }
 /* [v668] 이름 셀 — 거절 칩이 있으면 이름만 말줄임(…)하고 칩은 항상 보이도록 flex 래핑 */
