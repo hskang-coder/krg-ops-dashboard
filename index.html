@@ -1176,6 +1176,11 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 /* [v668] 계약심사 거절 칩 — 계약관리 R열(계약심사)에 '거절' 포함 시 이름 옆 표기 (9px, 약 22px 폭) */
 .dlq-revx { display:inline-block; margin-left:3px; padding:0 3px; border-radius:3px; font-size:9px; font-weight:800; line-height:1.5; vertical-align:1px; letter-spacing:-.3px; cursor:help; }
 .dlq-revx-deny { background:#FEF2F2; color:#B91C1C; border:1px solid #FCA5A5; }
+.dlq-revx-ok   { background:#ECFDF5; color:#047857; border:1px solid #6EE7B7; }   /* [v669] 승인 */
+.dlq-revx-skip { background:#FFFBEB; color:#B45309; border:1px solid #FCD34D; }   /* [v669] 무심사 */
+.dlq-revx-etc  { background:#F3F4F6; color:#4B5563; border:1px solid #D1D5DB; }   /* [v669] 기타 */
+.dlq-revx-legend { display:inline-flex; gap:5px; align-items:center; margin-right:auto; font-size:10.5px; color:#9CA3AF; }
+.dlq-revx-legend .dlq-revx { margin-left:0; cursor:default; }
 .dlq-tbl-info { font-size:10.5px; color:#6b7280; white-space:nowrap; }
 .dlq-tbl-amt { font-weight:500; color:#374151; white-space:nowrap; font-size:11px; }
 .dlq-tbl-tel { color:#6b7280; font-size:10.5px; white-space:nowrap; }
@@ -3774,7 +3779,22 @@ function buildStrategyCards() {
 window._dlqSelectedCnos = new Set();
 
 /* [v627] 공실상태 표시 축약 — '중도퇴실(자진)-사유'는 접두어까지만, 전체 값은 title로 */
-/* [v668] 계약심사 거절 표기 — 계약관리(gid=1953907648) R열 '계약심사'에 '거절' 포함(예: 거절(일시납)·승인+거절(실거주대체))이면 이름 옆 '거절' 칩, 툴팁에 원문 */
+/* [v668/v669] 계약심사 칩 — 계약관리(gid=1953907648) R열 '계약심사' 전 유형을 짧게 구분
+   · 글자 = 괄호 안 조건 약어: 일시납 / 분할 / 일시+분할 / 대체(실거주대체) / 추가(실거주추가) / 보강(임대료보강) / 초과(금액초과), 그 외는 조건 앞 3자
+   · 색 = 심사 종류: 빨강 거절 포함 · 초록 승인 · 주황 무심사 · 회색 기타 / '[3인]' 공동계약은 '3인·' 접두 / 툴팁에 원문 */
+window._DLQ_REVX_SHORT = [['일시납+분할','일시+분할'],['일시납','일시납'],['분할','분할'],['실거주대체','대체'],['실거주추가','추가'],['임대료보강','보강'],['금액초과','초과']];
+function _dlqRevXInfo(raw){
+  raw = String(raw == null ? '' : raw).trim();
+  if (!raw || raw === '-' || raw === '—') return null;
+  var kind = raw.indexOf('거절') >= 0 ? 'deny' : (raw.indexOf('무심사') >= 0 ? 'skip' : (raw.indexOf('승인') >= 0 ? 'ok' : 'etc'));
+  var cond = (raw.match(/\(([^)]*)\)/) || [])[1] || '';
+  var txt = '';
+  for (var i = 0; i < window._DLQ_REVX_SHORT.length; i++) { if (cond.indexOf(window._DLQ_REVX_SHORT[i][0]) >= 0) { txt = window._DLQ_REVX_SHORT[i][1]; break; } }
+  if (!txt) txt = cond ? cond.replace(/\s/g,'').slice(0, 3) : (kind === 'deny' ? '거절' : kind === 'skip' ? '무심사' : kind === 'ok' ? '승인' : raw.slice(0, 3));
+  if (/\[3인\]/.test(raw)) txt = '3인·' + txt;
+  var kindNm = kind === 'deny' ? '거절' : (kind === 'skip' ? '무심사' : (kind === 'ok' ? '승인' : '기타'));
+  return { kind: kind, cls: 'dlq-revx-' + kind, txt: txt, kindNm: kindNm, raw: raw };
+}
 function _dlqRevXTag(cno){
   try{
     var V = Array.isArray(vacancyRawData) ? vacancyRawData : [];
@@ -3784,9 +3804,17 @@ function _dlqRevXTag(cno){
       window._dlqRevXMap = m; window._dlqRevXMapN = V.length;
     }
     var v = window._dlqRevXMap[String(cno||'').trim()];
-    var x = (v && typeof ptRevX === 'function') ? ptRevX(v) : null;
-    if (!x || x.kind !== '거절') return '';
-    return '<span class="dlq-revx dlq-revx-deny" title="계약심사: ' + String(x.raw).replace(/"/g,'&quot;') + '">거절</span>';
+    var x = v ? _dlqRevXInfo(v.reviewResult) : null;
+    if (!x) return '';
+    return '<span class="dlq-revx ' + x.cls + '" title="계약심사(' + x.kindNm + '): ' + x.raw.replace(/"/g,'&quot;') + '">' + x.txt + '</span>';
+  }catch(_){ return ''; }
+}
+/* [v669] 표 하단 범례 — 칩이 하나라도 있을 때만 */
+function _dlqRevXLegend(rows){
+  try{
+    if (!(rows||[]).some(function(r){ return !!_dlqRevXTag(r.cno); })) return '';
+    var c = function(cls, t){ return '<span class="dlq-revx ' + cls + '">' + t + '</span>'; };
+    return '<span class="dlq-revx-legend" title="계약관리 R열 계약심사 — 글자: 괄호 안 조건(일시납·분할·대체=실거주대체·추가=실거주추가·보강=임대료보강·초과=금액초과), 색: 심사 종류 · 칩에 마우스를 올리면 원문">심사 ' + c('dlq-revx-deny','거절') + c('dlq-revx-ok','승인') + c('dlq-revx-skip','무심사') + '<span>· 일시납 · 분할 · 대체=실거주대체 · 추가=실거주추가 · 보강=임대료보강</span></span>';
   }catch(_){ return ''; }
 }
 /* [v668] 이름 셀 — 거절 칩이 있으면 이름만 말줄임(…)하고 칩은 항상 보이도록 flex 래핑 */
@@ -10476,7 +10504,7 @@ function dlqRenderTableRows() {
       </tbody>
     </table>
   </div>
-  <div class="dlq-tbl-count">${rows.length}건 / 전체 ${window._dlqTableRows.length}건</div>
+  <div class="dlq-tbl-count" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">${_dlqRevXLegend(rows)}<span>${rows.length}건 / 전체 ${window._dlqTableRows.length}건</span></div>   ${''/* [v669] 심사 칩 범례 */}
   `;
 }
 
