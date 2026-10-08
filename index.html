@@ -18700,8 +18700,8 @@ function rnwBuildSheetMap(){
 // === 갱신관리 jobType의 최근 대응 내용 ===
 function rnwLatestRenewalContent(cno){
   if (typeof daeungRawData === 'undefined' || !daeungRawData) return '';
-  var matches = daeungRawData.filter(function(r){
-    return (r.jobType||'').trim() === '갱신관리' && String(r.no||'').replace(/\.0$/,'').trim() === cno;
+  var matches = (_rnwDaeungByCno()[cno] || []).filter(function(r){   /* [v671] 인덱스 */
+    return (r.jobType||'').trim() === '갱신관리';
   });
   if (!matches.length) return '';
   matches.sort(function(a,b){ return (rnwParseDate(b.date)||0) - (rnwParseDate(a.date)||0); });
@@ -18971,14 +18971,23 @@ function _rnwSettleRef(cno, bd){
   return new Date(bd.getTime()+6*86400000);
 }
 // [v539] 약속 이행율 — 연체관리(Daily Report) 입금예정일(D열) 최근 1년 3건 이상 & 약속일 ±1일 내 납부 80% 이상
+/* [v671] 성능 — Daily Report(대응내역) 계약번호별 행 인덱스 (배열·길이 바뀌면 재생성, 행 순서 유지) */
+function _rnwDaeungByCno(){
+  var D = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
+  var cur = window._rnwDaeIdx;
+  if (cur && cur.arr === D && cur.n === D.length) return cur.m;
+  var m = Object.create(null);
+  for (var i = 0; i < D.length; i++) { var d = D[i]; var k = String(d.no||'').replace(/\.0$/,'').trim(); (m[k] || (m[k] = [])).push(d); }
+  window._rnwDaeIdx = { arr: D, n: D.length, m: m };
+  return m;
+}
 function _rnwPromiseOk(cno, payTimes){
   try{
     if(!Array.isArray(daeungRawData)||!daeungRawData.length) return false;
     var key=String(cno).replace(/\.0$/,'').trim();
     var yearAgo=new Date(); yearAgo.setFullYear(yearAgo.getFullYear()-1);
     var DAY=86400000, ps=[];
-    daeungRawData.forEach(function(d){
-      if(String(d.no||'').replace(/\.0$/,'').trim()!==key) return;
+    (_rnwDaeungByCno()[key] || []).forEach(function(d){   /* [v671] 인덱스 */
       var pdt=null; try{ pdt=rnwParseDate(d.payDate); }catch(_e){}
       if(!pdt||pdt<yearAgo) return;
       ps.push(pdt.getTime());
@@ -19024,19 +19033,35 @@ function rnwCalcLateMetricsFromObjects(cno, P){
   }
   return _rnwFinishMetrics(cno, matches);
 }
+/* [v671] 성능 — 입금내역(gviz) 계약번호별 행 인덱스를 응답 객체당 1회만 생성
+   (종전: 계약마다 45,000행 전체 재탐색 → 갱신관리 83명 0.7초 · '계약자 전체' 1,384명 9초 — 느린 PC에서 수 배)
+   행 순서·매칭 규칙(_normCno(행) === 계약번호)은 종전과 동일 */
+function _rnwIncomeIndex(incomeResp){
+  var rows = incomeResp.table.rows || [];
+  var cur = incomeResp.__rnwIdx;
+  if (cur && cur.rows === rows && cur.n === rows.length) return cur;
+  var _ilb = (incomeResp.table.cols || []).map(function(col){return (col.label||col.id||'').trim();});  // [v381] 라벨 기반(현재 인덱스 fallback)
+  var ix = { cno:findColIdx(_ilb,['계약번호'],4), cs:findColIdx(_ilb,['계약상태'],13), ty:findColIdx(_ilb,['납부종류'],5), days:findColIdx(_ilb,['연체일수'],29), due:findColIdx(_ilb,['납기일'],28),
+             pay:findColIdx(_ilb,['납부일'],30), unp:findColIdx(_ilb,['미납(연체)금액(원)','미납(연체)금액'],27) };   // [v539]
+  var map = Object.create(null);
+  for (var i = 0; i < rows.length; i++) {
+    var c0 = rows[i].c || [];
+    var k = c0[ix.cno] ? _normCno(c0[ix.cno].v ?? c0[ix.cno].f ?? '') : '';   // [v494]
+    (map[k] || (map[k] = [])).push(rows[i]);
+  }
+  var idx = { rows: rows, n: rows.length, ix: ix, map: map };
+  try { Object.defineProperty(incomeResp, '__rnwIdx', { value: idx, enumerable: false, configurable: true, writable: true }); } catch(_e) { incomeResp.__rnwIdx = idx; }
+  return idx;
+}
 function rnwCalcLateMetrics(cno, incomeResp){
   // [v502] gviz resp가 아니라 객체 배열(paymentRawData)이 넘어오면 폴백 사용
   if (Array.isArray(incomeResp)) return rnwCalcLateMetricsFromObjects(cno, incomeResp);
   if (!incomeResp || !incomeResp.table) return { count:0, sumDays:0, rate:0, total:0, regular:false, recent3:false, promiseOk:false };
-  var rows = incomeResp.table.rows || [];
-  var _ilb = (incomeResp.table.cols || []).map(function(col){return (col.label||col.id||'').trim();});  // [v381] 라벨 기반(현재 인덱스 fallback)
-  var _iCno2=findColIdx(_ilb,['계약번호'],4), _iCStat2=findColIdx(_ilb,['계약상태'],13), _iType2=findColIdx(_ilb,['납부종류'],5), _iDays2=findColIdx(_ilb,['연체일수'],29), _iDue2=findColIdx(_ilb,['납기일'],28);
-  var _iPay2=findColIdx(_ilb,['납부일'],30), _iUnp2=findColIdx(_ilb,['미납(연체)금액(원)','미납(연체)금액'],27);   // [v539]
+  var _IX = _rnwIncomeIndex(incomeResp);   /* [v671] */
+  var _iCStat2=_IX.ix.cs, _iType2=_IX.ix.ty, _iDays2=_IX.ix.days, _iDue2=_IX.ix.due, _iPay2=_IX.ix.pay, _iUnp2=_IX.ix.unp;
   var matches = [];
-  rows.forEach(function(row){
+  (_IX.map[String(cno).replace(/\.0$/,'').trim()] || []).forEach(function(row){
     var c = row.c || [];
-    var rowCno = c[_iCno2] ? _normCno(c[_iCno2].v ?? c[_iCno2].f ?? '') : '';   // [v494]
-    if (rowCno !== String(cno).replace(/\.0$/,'').trim()) return;
     var n13 = c[_iCStat2] ? String(c[_iCStat2].v ?? '') : '';
     var f5  = c[_iType2]  ? String(c[_iType2].v  ?? '') : '';
     if (n13 === '삭제' || n13 === '계약 철회') return;
@@ -19228,10 +19253,11 @@ function rnwBuildCohorts(){
 }
 
 // === enriched (심사 결과 + 진행상태 결합) ===
-function rnwBuildEnriched(startMonth, endMonth, mode){
+function rnwBuildEnriched(startMonth, endMonth, mode, onlyCnos){
   var targets = rnwBuildTargets(startMonth, endMonth, mode);
+  if (onlyCnos) targets = targets.filter(function(t){ return onlyCnos.has(String(t.cno)); });   /* [v671] 체크한 계약만 산출 (계약상태 필터 무시) */
   // [v45] 계약상태 필터 적용
-  var cf = window._rnwContractFilter || 'all';
+  var cf = onlyCnos ? 'all' : (window._rnwContractFilter || 'all');
   if (cf !== 'all') {
     targets = targets.filter(function(t){
       var s = (t.contractStatus||'').trim();
@@ -19350,6 +19376,7 @@ function renderRenewalView(){
   }
 
   window._rnwLastRendered = filtered;  // [v382] 엑셀 내보내기가 화면과 동일한 필터 결과(날짜·계약상태·심사결과·검색)를 쓰도록 저장
+  window._rnwLastEnriched = enriched;  // [v671] 문자 생성이 화면과 같은 모집단(기간·모드·계약자 전체)에서 체크 계약을 찾도록 저장
   var kpi = rnwCountKPI(enriched);
   var cohorts = rnwBuildCohorts();
   // [v163] 모드별 effective range
@@ -19416,6 +19443,7 @@ function renderRenewalView(){
     +   '</div>'
     // ── 우측: 액션 버튼 — 갱신 심사 | 만기퇴실 | 조건부승인 | 갱신불가 | 엑셀 ──
     +   '<div style="display:flex;align-items:center;gap:6px">'
+    +     '<span id="rnwSelInfo" style="font-size:11px;font-weight:700;color:#4F46E5;white-space:nowrap;margin-right:2px">' + rnwSelInfoHtml() + '</span>'   /* [v671] 선택 카운터 */
     +     btnAct('#4F46E5', '📊 갱신 심사', "rnwOpenSelectedReports()")
     +     '<span style="width:1px;height:20px;background:#D1D5DB;margin:0 2px"></span>'
     +     btnAct('#F59E0B', '📨 만기퇴실', "rnwGenerateMsg('expired')")
@@ -19439,7 +19467,7 @@ function renderRenewalView(){
       +   '<col style="width:5%"><col style="width:5%"><col style="width:16%">'                            /* 진행상태·대응일·최근대응내용 */
       + '</colgroup>'
       + '<thead><tr>'
-      + '<th style="width:32px;text-align:center"><input type="checkbox" class="dlq-cb" id="rnwChkAll" onchange="rnwSelectAll(this.checked)" title="전체 선택"></th>'
+      + '<th style="width:32px;text-align:center"><input type="checkbox" class="dlq-cb" id="rnwChkAll" onchange="rnwSelectAll(this.checked)" title="전체 선택"' + (filtered.length && filtered.every(function(x){ return window._rnwSelectedCnos.has(String(x.cno)); }) ? ' checked' : '') + '></th>'   /* [v671] 체크 상태 유지 */
       + '<th>No</th><th>계약번호</th><th>그룹</th><th>계약상태</th><th>공실상태</th>'
       + '<th>갱신심사결과</th><th>임(전)차인</th><th>연락처</th>'
       + '<th>갱신기한</th><th>만기일</th><th>D-Day</th><th>회차</th>'
@@ -19450,7 +19478,7 @@ function renderRenewalView(){
           var ddayCls = rnwDDayCls(e.dday);
           var rateCls = rnwRateCls(e.metrics.rate);
           return '<tr onclick="crNavFromView(\'' + e.cno + '\',\'renewal\')">'
-            + '<td onclick="event.stopPropagation()" style="text-align:center;padding:4px"><input type="checkbox" class="dlq-cb rnw-row-cb" value="' + e.cno + '" onchange="rnwToggleSelect(\'' + e.cno + '\',this.checked)"></td>'
+            + '<td onclick="event.stopPropagation()" style="text-align:center;padding:4px"><input type="checkbox" class="dlq-cb rnw-row-cb" value="' + e.cno + '" onchange="rnwToggleSelect(\'' + e.cno + '\',this.checked)"' + (window._rnwSelectedCnos.has(String(e.cno)) ? ' checked' : '') + '></td>'   /* [v671] 재렌더(필터·검색·데이터 갱신) 후에도 체크 표시 유지 */
             + '<td style="color:#94A3B8;font-size:11px">' + (idx+1) + '</td>'
             + '<td><b style="color:#0E7490">' + e.cno + '</b></td>'
             + '<td style="font-size:11px;color:#6B7280">' + (e.group||'—') + '</td>'
@@ -19590,6 +19618,7 @@ window._rnwSelectedCnos = window._rnwSelectedCnos || new Set();
 function rnwToggleSelect(cno, checked){
   if (checked) window._rnwSelectedCnos.add(String(cno));
   else window._rnwSelectedCnos.delete(String(cno));
+  rnwUpdateSelInfo();   /* [v671] */
 }
 function rnwSelectAll(checked){
   document.querySelectorAll('.rnw-row-cb').forEach(function(cb){
@@ -19598,6 +19627,49 @@ function rnwSelectAll(checked){
     if (checked) window._rnwSelectedCnos.add(String(cno));
     else window._rnwSelectedCnos.delete(String(cno));
   });
+  rnwUpdateSelInfo();   /* [v671] */
+}
+/* [v671] 선택 카운터 — 체크한 계약 수 + 지금 화면(기간·필터·검색) 밖에 숨어 있는 체크 수 · 해제 */
+function rnwSelInfoHtml(){
+  var sel = window._rnwSelectedCnos || new Set();
+  if (!sel.size) return '<span style="color:#94A3B8;font-weight:600">선택 0명</span>';
+  var vis = Object.create(null); (window._rnwLastRendered || []).forEach(function(e){ vis[String(e.cno)] = 1; });
+  var hidden = 0; sel.forEach(function(c){ if (!vis[String(c)]) hidden++; });
+  return '✔ 선택 ' + sel.size + '명'
+    + (hidden ? ' <span style="color:#B45309;cursor:help" title="기간·필터·검색 때문에 지금 표에는 보이지 않지만 체크되어 있는 계약입니다 — 문자·심사 리포트 생성에 포함됩니다">(화면 밖 ' + hidden + ')</span>' : '')
+    + ' <a href="javascript:void(0)" onclick="rnwClearSelection()" style="color:#64748B;font-weight:600;margin-left:2px;text-decoration:underline" title="체크 전체 해제">해제</a>';
+}
+function rnwUpdateSelInfo(){
+  var el = document.getElementById('rnwSelInfo'); if (el) el.innerHTML = rnwSelInfoHtml();
+  var all = document.getElementById('rnwChkAll');
+  if (all) { var cbs = document.querySelectorAll('.rnw-row-cb'); all.checked = cbs.length > 0 && Array.prototype.every.call(cbs, function(cb){ return cb.checked; }); }
+}
+function rnwClearSelection(){
+  if (window._rnwSelectedCnos) window._rnwSelectedCnos.clear(); else window._rnwSelectedCnos = new Set();
+  document.querySelectorAll('.rnw-row-cb').forEach(function(cb){ cb.checked = false; });
+  rnwUpdateSelInfo();
+}
+/* [v671] 체크한 계약 해석 — 화면 모집단(_rnwLastEnriched) 우선, 없으면(다른 기간·모드·계약상태·'계약자 전체'에서 체크) 그 계약만 추가 산출
+   순서 = 화면 표 순서 → 화면 밖 체크는 만기 임박 순 */
+function rnwResolveSelected(){
+  var sel = window._rnwSelectedCnos || new Set();
+  var pool = Object.create(null);
+  (window._rnwLastEnriched || []).forEach(function(e){ pool[String(e.cno)] = e; });
+  var need = new Set(); sel.forEach(function(c){ if (!pool[String(c)]) need.add(String(c)); });
+  if (need.size) {
+    try { rnwBuildEnriched('2000-01', '2099-12', 'endDate', need).forEach(function(e){ pool[String(e.cno)] = e; }); } catch(_e){ console.warn('[v671] rnwResolveSelected', _e); }
+  }
+  var order = Object.create(null); (window._rnwLastRendered || []).forEach(function(e, i){ order[String(e.cno)] = i; });
+  var list = [], missing = [], hidden = 0;
+  sel.forEach(function(c){ c = String(c); var e = pool[c]; if (!e) { missing.push(c); return; } list.push(e); if (order[c] == null) hidden++; });
+  list.sort(function(a, b){
+    var ia = order[String(a.cno)], ib = order[String(b.cno)];
+    if (ia != null && ib != null) return ia - ib;
+    if (ia != null) return -1;
+    if (ib != null) return 1;
+    return (a.dday == null ? 1e9 : a.dday) - (b.dday == null ? 1e9 : b.dday);
+  });
+  return { list: list, hidden: hidden, missing: missing };
 }
 
 // 메시지 템플릿 생성 (계약자별) — [v53] 가독성 개선 + 갱신불가 텍스트 변경
@@ -19668,13 +19740,19 @@ function rnwGenerateMsg(type){
     alert('대상자를 1명 이상 체크해 주세요.');
     return;
   }
-  var enriched = rnwBuildEnriched();
-  var selected = enriched.filter(function(e){ return window._rnwSelectedCnos.has(String(e.cno)); });
-  if (!selected.length) { alert('체크된 대상자를 찾을 수 없습니다. 화면을 새로고침해 주세요.'); return; }
   var typeLabels = { expired:'만기퇴실 문자', conditional:'조건부승인 발송 문자', denied:'갱신불가 발송 문자' };
   var typeColors = { expired:'#F59E0B', conditional:'#0EA5E9', denied:'#DC2626' };
   var label = typeLabels[type] || '문자';
   var color = typeColors[type] || '#1F2937';
+  // [v671] ① 팝업을 클릭 즉시 먼저 연다 — 대상 계산이 오래 걸려도(느린 PC·넓은 기간) 브라우저의 '클릭 직후에만 팝업 허용' 시간을 넘겨 차단되지 않도록
+  var w = window.open('', '_blank', 'width=720,height=820,scrollbars=yes');
+  if (!w) { alert('팝업 차단을 해제해 주세요.'); return; }
+  try { w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>' + label + ' 생성 중…</title></head><body style="font-family:sans-serif;padding:40px;color:#64748B;font-size:14px">⏳ ' + label + ' 생성 중… (' + window._rnwSelectedCnos.size + '명)</body></html>'); w.document.close(); } catch(_e){}
+  // [v671] ② 체크한 계약 = 출력 대상 — 화면의 기간·모드(심사 진행 기간/계약종료일)·'계약자 전체'·필터·검색과 무관하게 체크한 전원
+  //        (종전: 생성 시 기본 '심사 진행 기간' 모집단으로 다시 걸러 '계약자 전체'·'계약종료일' 화면에서 체크한 계약이 빠짐 — 예: 7명 체크 → 4명 출력)
+  var _R = rnwResolveSelected();
+  var selected = _R.list;
+  if (!selected.length) { try { w.close(); } catch(_e){} alert('체크된 대상자를 찾을 수 없습니다. 화면을 새로고침해 주세요.'); return; }
   var blocks = selected.map(function(e, idx){
     var msg = rnwBuildMsgFor(type, e);
     var safeId = 'msg_' + idx;
@@ -19688,14 +19766,16 @@ function rnwGenerateMsg(type){
       + '</div>';
   }).join('');
   var allMsgs = selected.map(function(e){ return '─── ' + (e.name||'') + ' (' + e.cno + ') ───\n' + rnwBuildMsgFor(type, e); }).join('\n\n');
-  var w = window.open('', '_blank', 'width=720,height=820,scrollbars=yes');
-  if (!w) { alert('팝업 차단을 해제해 주세요.'); return; }
+  var _note = (_R.hidden ? '<div style="background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:6px;padding:7px 12px;margin-bottom:12px;font-size:12px">※ 현재 화면(기간·필터·검색) 밖에서 체크된 ' + _R.hidden + '명 포함</div>' : '')
+            + (_R.missing.length ? '<div style="background:#FEF2F2;border:1px solid #FECACA;color:#B91C1C;border-radius:6px;padding:7px 12px;margin-bottom:12px;font-size:12px">⚠ 계약 정보를 찾지 못한 체크 ' + _R.missing.length + '건 제외: ' + _R.missing.join(', ') + '</div>' : '');   /* [v671] */
+  w.document.open();   /* [v671] '생성 중' 화면을 결과로 교체 */
   w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>' + label + ' (' + selected.length + '명)</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">'
     + '<style>body{font-family:\'Noto Sans KR\',sans-serif;background:#F9FAFB;margin:0;padding:20px;color:#1F2937}.hdr{background:' + color + ';color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}.hdr h2{margin:0;font-size:16px}.hdr button{background:#fff;color:' + color + ';border:none;padding:7px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:12.5px}</style></head><body>'
     + '<div class="hdr"><h2>📨 ' + label + ' (' + selected.length + '명)</h2>'
     + '<button onclick="navigator.clipboard.writeText(document.getElementById(\'allMsg\').innerText).then(function(){this.textContent=\'\u2705 \uC804\uCCB4 \uBCF5\uC0AC\uB428\';}.bind(this))">📋 전체 복사</button>'
     + '</div>'
+    + _note
     + blocks
     + '<div id="allMsg" style="display:none">' + allMsgs + '</div>'
     + '</body></html>');
