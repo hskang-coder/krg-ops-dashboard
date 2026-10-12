@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KRG 인수인계 · 운영관리팀장 OJT</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --bg:#FAFAF7; --panel:#FFFFFF; --ink:#1B1E24; --sub:#5A6070; --line:#E6E4DE; --soft:#F3F1EC;
+  --navy:#1F3864; --blue:#3B6FC9; --blue-soft:#EDF2FB; --blue-border:#C6D4EE;
+  --amber:#B7791F; --amber-soft:#FDF6E7; --amber-border:#EEDCB0;
+  --ok:#1E7B4D; --ok-soft:#E9F5EE;
+  --red:#B0383C; --red-soft:#FBEDED; --red-border:#EBC6C8;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Pretendard Variable',Pretendard,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  background:var(--bg);color:var(--ink);line-height:1.6;font-size:15px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+a{color:inherit}
+
+/* ---------- top ---------- */
+.top{position:sticky;top:0;z-index:50;background:rgba(250,250,247,.93);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:12px;min-height:56px;flex-wrap:wrap;padding-top:5px;padding-bottom:5px}
+.logo{font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+.logo em{font-style:italic;color:var(--blue)}
+.ver{font-family:var(--mono);font-size:11px;color:var(--sub);white-space:nowrap}
+.top nav{margin-left:auto;display:flex;gap:2px;flex-wrap:wrap}
+.top nav a{font-size:12.5px;color:var(--sub);text-decoration:none;padding:6px 8px;border-radius:8px;white-space:nowrap}
+.top nav a:hover{background:var(--soft);color:var(--ink)}
+.toppct{font-family:var(--mono);font-size:11.5px;font-weight:800;color:var(--navy);background:var(--blue-soft);
+  border:1px solid var(--blue-border);border-radius:99px;padding:4px 11px;white-space:nowrap}
+
+/* quick strip */
+.quick{border-bottom:1px solid var(--line);background:var(--panel)}
+.quick .wrap{display:flex;align-items:center;gap:8px;padding:9px 24px;flex-wrap:wrap}
+.quick .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--sub)}
+.quick a{font-size:12.5px;text-decoration:none;padding:4px 11px;border:1px solid var(--line);border-radius:99px;background:var(--bg)}
+.quick a:hover{border-color:var(--blue-border);background:var(--blue-soft);color:var(--navy)}
+.quick .stat{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.pill{font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:99px}
+.pill.ho{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-border)}
+.pill.who{background:var(--blue-soft);color:var(--navy);border:1px solid var(--blue-border)}
+
+/* ---------- hero ---------- */
+.hero{padding:58px 0 40px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--sub);margin-bottom:14px}
+h1{font-size:clamp(28px,4.4vw,42px);font-weight:800;letter-spacing:-.03em;line-height:1.28}
+h1 em{font-style:italic;color:var(--blue)}
+.hero p{margin-top:16px;max-width:680px;color:var(--sub)}
+.hero-meta{display:flex;gap:22px;margin-top:26px;flex-wrap:wrap;font-size:13px}
+.hero-meta div b{display:block;font-size:11px;font-family:var(--mono);letter-spacing:.1em;color:var(--sub);font-weight:600;margin-bottom:2px}
+
+/* overall progress */
+.ovr{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.ovr .row{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.ovr .t{font-weight:800;font-size:13.5px}
+.ovr .n{font-family:var(--mono);font-size:12px;color:var(--sub);margin-left:auto}
+.bar{height:8px;border-radius:99px;background:var(--soft);overflow:hidden;margin-top:9px}
+.bar i{display:block;height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,var(--blue),var(--navy));transition:width .25s}
+.bar.amber i{background:linear-gradient(90deg,var(--amber),#8a5a14)}
+.bar.ok i{background:linear-gradient(90deg,#2f9d68,var(--ok))}
+
+/* ---------- section ---------- */
+section{padding:42px 0}
+.sec-eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--sub)}
+h2{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:6px 0 8px}
+h2 .k{color:var(--blue)}
+.sec-desc{color:var(--sub);max-width:760px;margin-bottom:24px}
+h3{font-size:16.5px;font-weight:800;letter-spacing:-.01em;margin:4px 0 10px}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow-x:auto;border-radius:14px;border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;background:var(--panel);font-size:13.5px}
+th{background:var(--navy);color:#fff;font-weight:700;text-align:left;padding:11px 14px;font-size:12.5px;white-space:nowrap}
+td{padding:10px 14px;border-top:1px solid var(--line);vertical-align:top}
+tr:nth-child(even) td{background:#FBFAF7}
+.mtag,.rtag,.xtag{font-family:var(--mono);font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;margin-right:5px;white-space:nowrap}
+.mtag{background:var(--navy);color:#fff}
+.rtag{background:var(--blue-soft);color:var(--navy);border:1px solid var(--blue-border)}
+.xtag{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-border)}
+.arrow{color:var(--blue);font-weight:800;font-family:var(--mono)}
+.keep td{color:var(--sub)}
+.keep .nm{text-decoration:none}
+
+/* callout */
+.callout{border-radius:14px;padding:14px 16px;font-size:13.5px;margin-top:16px;line-height:1.7}
+.callout.amber{background:var(--amber-soft);border:1px solid var(--amber-border)}
+.callout.red{background:var(--red-soft);border:1px solid var(--red-border)}
+.callout.blue{background:var(--blue-soft);border:1px solid var(--blue-border)}
+.callout b.h{display:block;font-size:12px;font-family:var(--mono);letter-spacing:.08em;margin-bottom:4px}
+.callout.amber b.h{color:var(--amber)}
+.callout.red b.h{color:var(--red)}
+.callout.blue b.h{color:var(--navy)}
+
+/* ---------- checklist ---------- */
+.ckgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px}
+label.ck{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--line);border-radius:10px;
+  background:var(--panel);cursor:pointer;font-size:13.5px;transition:border-color .15s}
+label.ck:hover{border-color:var(--blue-border)}
+label.ck input{margin-top:3.5px;accent-color:var(--blue);width:15px;height:15px;flex:none;cursor:pointer}
+label.ck input:checked + span{color:var(--sub);text-decoration:line-through;text-decoration-color:rgba(90,96,112,.5);text-decoration-thickness:1px}
+label.ck .who{font-family:var(--mono);font-size:10px;color:var(--sub);margin-left:4px}
+
+/* ---------- week cards ---------- */
+.week{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:16px 0}
+.week-head{padding:16px 20px 13px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.week-head .wno{font-family:var(--mono);font-size:11px;font-weight:800;color:#fff;background:var(--navy);border-radius:6px;padding:3px 9px}
+.week-head .wdate{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--navy);background:var(--blue-soft);border:1px solid var(--blue-border);border-radius:6px;padding:3px 9px;white-space:nowrap}
+.week-head .wt{font-size:16.5px;font-weight:800;letter-spacing:-.01em}
+.week-head .wg{font-size:12.5px;color:var(--sub)}
+.week-head .wp{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--sub);white-space:nowrap}
+.week .bar{margin:0;border-radius:0;height:4px}
+.week-body{padding:6px 12px 12px}
+details.day{border:1px solid var(--line);border-radius:10px;margin:7px 0;background:#fff;overflow:hidden}
+details.day[open]{box-shadow:0 2px 10px rgba(20,20,20,.05)}
+summary{list-style:none;cursor:pointer;padding:11px 13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+summary::-webkit-details-marker{display:none}
+.dno{font-family:var(--mono);font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;background:var(--blue-soft);color:var(--navy);border:1px solid var(--blue-border);white-space:nowrap}
+.dtt{font-weight:700;font-size:13.5px}
+.dmeta{margin-left:auto;display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.b{font-family:var(--mono);font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.b.theory{background:var(--soft);color:var(--sub)}
+.b.shadow{background:var(--blue-soft);color:var(--navy);border:1px solid var(--blue-border)}
+.b.prac{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-border)}
+.b.solo{background:var(--ok-soft);color:var(--ok);border:1px solid #BFE2CD}
+.b.mentor{background:#fff;color:var(--sub);border:1px solid var(--line)}
+.dcnt{font-family:var(--mono);font-size:10.5px;color:var(--sub);white-space:nowrap}
+.day-body{padding:4px 14px 13px;border-top:1px dashed var(--line)}
+.day-body label.ck{border:none;padding:6px 2px;border-radius:0;background:transparent}
+.day-body label.ck:hover{background:var(--soft)}
+.day-body .ref{font-size:11.5px;color:var(--sub);margin-top:6px}
+.day-body .ref a{color:var(--blue);text-decoration:none}
+.day-body .ref a:hover{text-decoration:underline}
+
+/* ---------- detail blocks (업무별) ---------- */
+.area{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:16px 0}
+.area-head{padding:16px 20px 13px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.area-head .nm{font-size:17px;font-weight:800}
+.area-head .info{font-size:12.5px;color:var(--sub)}
+.area-head .wp{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--sub)}
+.area .bar{margin:0;border-radius:0;height:4px}
+.area-body{padding:6px 12px 12px}
+details.task{border:1px solid var(--line);border-radius:10px;margin:7px 0;background:#fff;overflow:hidden}
+details.task[open]{box-shadow:0 2px 10px rgba(20,20,20,.05)}
+.tw{font-family:var(--mono);font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;background:var(--blue-soft);color:var(--navy);border:1px solid var(--blue-border);white-space:nowrap}
+.tw.w{background:var(--amber-soft);color:var(--amber);border-color:var(--amber-border)}
+.tw.m{background:var(--ok-soft);color:var(--ok);border-color:#BFE2CD}
+.steps{margin:8px 0 2px;display:grid;gap:4px}
+.steps .st{display:flex;gap:9px;font-size:13px;padding:5px 2px;align-items:flex-start}
+.steps .st .no{font-family:var(--mono);font-size:10px;font-weight:800;color:var(--sub);background:var(--soft);border-radius:4px;padding:2px 6px;margin-top:2px;flex:none}
+.steps .st b{color:var(--navy)}
+
+/* sign */
+.sign-tbl td{padding:16px 14px}
+.sign-tbl .sig{min-width:140px;border-bottom:1px solid var(--ink);display:inline-block;height:22px;width:80%}
+.note{font-size:12.5px;color:var(--sub);margin-top:10px}
+
+/* reset btn */
+.rstbtn{font-size:12px;color:var(--sub);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+.rstbtn:hover{border-color:var(--red-border);color:var(--red);background:var(--red-soft)}
+
+footer{border-top:1px solid var(--line);padding:26px 0 40px;color:var(--sub);font-size:12.5px}
+footer a{color:var(--blue);text-decoration:none}
+
+@media(max-width:760px){
+  .ckgrid{grid-template-columns:1fr}
+  .top nav{display:none}
+  .hero{padding:40px 0 30px}
+}
+@media print{
+  .top,.quick,.rstbtn,.noprint{display:none!important}
+  body{background:#fff;font-size:11.5px}
+  section{padding:16px 0;page-break-inside:avoid}
+  .week,.area{page-break-inside:avoid}
+  details{border:1px solid #ccc!important}
+  .bar{display:none}
+  a{text-decoration:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ======================= TOP ======================= -->
+<header class="top">
+  <div class="wrap">
+    <div class="logo">KRG <em>Ops</em></div>
+    <div class="ver">[인수인계] 운영관리팀장 OJT · v1.6</div>
+    <nav>
+      <a href="#scope">인수범위</a>
+      <a href="#prep">사전준비</a>
+      <a href="#weeks">4주 일정</a>
+      <a href="#detail">업무 상세</a>
+      <a href="#force">강제퇴실</a>
+      <a href="#rules">연락·KPI</a>
+      <a href="#refs">참고자료</a>
+      <a href="#sign">확인</a>
+    </nav>
+    <span class="toppct" id="sync-chip" style="background:var(--soft);color:var(--sub);border-color:var(--line)" title="구글시트 연동 상태 — Operations Dashboard · OJT_체크리스트 탭에서 진척율 확인">○ 연동 확인 중</span>
+    <div class="toppct" id="top-pct">0%</div>
+  </div>
+</header>
+
+<div class="quick">
+  <div class="wrap">
+    <span class="lbl">QUICK</span>
+    <a href="krg-prep-leehyunbae.html" target="_blank" style="border-color:var(--amber-border);background:var(--amber-soft);color:var(--amber);font-weight:700">입사 전 준비 ↗</a>
+    <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html" target="_blank">운영 메뉴얼 ↗</a>
+    <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#l2" target="_blank">Role Card ↗</a>
+    <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank">SOP06 강제퇴실 ↗</a>
+    <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#tools" target="_blank">Tool 기준 ↗</a>
+    <a href="https://docs.google.com/spreadsheets/d/1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q/edit?gid=1426207978" target="_blank">Task_메뉴얼 시트 ↗</a>
+    <div class="stat">
+      <span class="pill ho">HANDOVER · 4주</span>
+      <span class="pill who">인수자 · 이현배</span>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= HERO ======================= -->
+<div class="hero">
+  <div class="wrap">
+    <div class="eyebrow">HANDOVER · OJT PROGRAM</div>
+    <h1>운영관리팀장 OJT<br><em>운영 업무 인수인계</em></h1>
+    <p>이지희 · 고송미가 담당하는 운영 업무 <b>전체</b>와 <b>강제퇴실 관리(전 단계 실무)</b>를
+      4주(20 영업일)에 걸쳐 인수합니다. 기준은 <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html" target="_blank" style="color:var(--blue)">KRG 운영 메뉴얼 v0.1</a>과
+      <a href="https://docs.google.com/spreadsheets/d/1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q/edit?gid=1426207978" target="_blank" style="color:var(--blue)">Task_메뉴얼 시트</a>(Operations Dashboard V1.0 · 구 Task관리_V2 대체)
+      두 문서이며, 시트 99개 Task 중 인수 범위 57건(주담당 47 + 시스템 백업 10)을 모두 아래 체크리스트에 반영한 <b>최종 버전</b>입니다. 10/12 신규 업무 5건(계약서 확인 · 임대차신고 · 퇴실청소)이 추가되어 있습니다.</p>
+    <div class="hero-meta">
+      <div><b>인수자</b>이현배</div>
+      <div><b>인계자</b>이지희 · 고송미</div>
+      <div><b>강제퇴실 인계</b>오진선 · 김영철</div>
+      <div><b>기간</b>2026.10.12(월) ~ 11.06(금) · 20 영업일</div>
+      <div><b>작성</b>2026.10.06 · v1.6 10.12</div>
+    </div>
+    <div class="ovr">
+      <div class="row"><span class="t">전체 진행률</span><span class="n" id="ovr-num">0 / 0 항목</span></div>
+      <div class="bar"><i id="ovr-bar"></i></div>
+      <div class="row" style="margin-top:12px;gap:18px;font-size:12px;color:var(--sub)">
+        <span>사전준비 <b id="p-prep" style="font-family:var(--mono)">0%</b></span>
+        <span>4주 일정 <b id="p-weeks" style="font-family:var(--mono)">0%</b></span>
+        <span>업무 상세 <b id="p-detail" style="font-family:var(--mono)">0%</b></span>
+        <button class="rstbtn noprint" id="reset-all" style="margin-left:auto">전체 초기화</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ======================= SCOPE ======================= -->
+<section id="scope">
+  <div class="wrap">
+    <div class="sec-eyebrow">— SCOPE</div>
+    <h2>인수 범위 맵 <span class="k">현재 담당 → 인수 후</span></h2>
+    <p class="sec-desc">운영 8개 영역 중 이지희·고송미가 매니저(M) 또는 실무(R)로 들어가 있는 모든 영역과,
+      강제퇴실 관리가 인수 대상입니다. 회색 행은 이번 인수인계에서 <b>제외(현행 유지)</b>되는 영역입니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:190px">영역 · 업무</th><th>현재 담당</th><th style="width:36px"></th><th>인수 후</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td><b>01 심사관리</b></td><td><span class="mtag">M</span>이지희 <span class="rtag">R</span>고송미</td><td class="arrow">→</td><td><b>이현배</b></td><td>26.4.1부터 자동 처리 전환 — 예외 건 수동 개입 + 가계약 등록이 핵심</td></tr>
+          <tr><td><b>02 계약관리</b> <span class="xtag">PILOT</span></td><td><span class="mtag">M</span>이지희 <span class="rtag">R</span>고송미</td><td class="arrow">→</td><td><b>이현배</b></td><td>일일 업무량 최다 — 입주전 관리 5단계 · 계약등록 8단계</td></tr>
+          <tr><td><b>03 입주관리</b></td><td><span class="mtag">M</span>이지희 <span class="rtag">R</span>고송미·김영철</td><td class="arrow">→</td><td><b>이현배</b></td><td>김영철의 수납·연체문의 응대(①②③)는 현행 유지</td></tr>
+          <tr><td><b>05 갱신관리</b></td><td><span class="mtag">M</span><span class="rtag">R</span>이지희 (단독)</td><td class="arrow">→</td><td><b>이현배</b></td><td>월간 사이클 전체 — 대상 선정부터 홈버튼 등록까지</td></tr>
+          <tr><td><b>06 중도퇴실 · 단순변심</b></td><td><span class="rtag">R</span>이지희·고송미</td><td class="arrow">→</td><td><b>이현배</b></td><td>5종 책임 사항 안내 · 정산 · 종결</td></tr>
+          <tr><td><b>06 중도퇴실 · 강제퇴실</b> <span class="xtag">추가</span></td><td><span class="mtag">M</span>오진선 · 현장 김영철</td><td class="arrow">→</td><td><b>이현배</b></td><td><b>전 6단계 실무 포함</b> — 현장 1차 대응부터 계약해지 확정까지</td></tr>
+          <tr><td><b>07 퇴실관리 · 만기퇴실</b></td><td><span class="rtag">R</span>이지희</td><td class="arrow">→</td><td><b>이현배</b></td><td>일정 조율 · 정산 이슈 대응</td></tr>
+          <tr><td><b>08 정산관리 · 위탁계약서 원본</b></td><td><span class="rtag">R</span>이지희</td><td class="arrow">→</td><td><b>이현배</b></td><td>파트너 인센티브 절차 중 원본 보관·약정 확인 단계만</td></tr>
+          <tr class="keep"><td>04 수납/연체관리</td><td><span class="mtag">M</span>오진선 <span class="rtag">R</span>오진선·김영철</td><td></td><td>현행 유지</td><td>강제퇴실 인입(연체 15~20일 경과자 선별)은 연체팀 협조 유지</td></tr>
+          <tr class="keep"><td>07 퇴실관리 · 연체퇴실 정산</td><td><span class="rtag">R</span>오진선</td><td></td><td>현행 유지</td><td></td></tr>
+          <tr class="keep"><td>08 정산관리 (임대인 정산·입금)</td><td><span class="mtag">M</span>김준영 <span class="rtag">R</span>강휘수·김준영 외</td><td></td><td>현행 유지</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout amber">
+      <b class="h">⚠ 강제퇴실 — 인수 기준</b>
+      현재 강제퇴실은 <b>연체팀 선별 → 김영철 현장 1차 대응 → 오진선 퇴실관리·해지</b>로 분담되어 있습니다.
+      본 OJT의 목표는 이현배가 <b>전 단계를 직접 수행</b>할 수 있는 수준입니다 (대상자 선별은 연체팀 협조 유지).
+      보고 라인(매니저·차장 → 김기성 본부장)과 임을빈 팀장 멘션 체계는 그대로 따릅니다.
+    </div>
+  </div>
+</section>
+
+<!-- ======================= PREP ======================= -->
+<section id="prep" style="background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-eyebrow">— STEP 0</div>
+    <h2>사전 준비 <span class="k">계정 · 권한 · 자료</span></h2>
+    <p class="sec-desc">OJT 1일차 전까지 완료. 권한이 하나라도 빠지면 해당 일차 실습이 공회전합니다.
+      발급 주체가 다른 항목(홈버튼·NAS·노션 등)은 미리 요청해 두세요.
+      입사 전 단계(장비 · 계정 생성 · 서류 · 사전 공유)는 <a href="krg-prep-leehyunbae.html" target="_blank" style="color:var(--blue);font-weight:700">입사 전 준비 체크리스트 ↗</a>에서 별도로 관리합니다 (같은 폴더에 두면 바로 열립니다).</p>
+
+    <div class="ckgrid" data-scope="prep">
+      <label class="ck"><input type="checkbox" data-k="prep01"><span>홈버튼 계정 발급 — 심사·계약·수납 조회 + <b>중도퇴실 확정 처리 · 청소비/출장비 등록 권한</b> 포함</span></label>
+      <label class="ck"><input type="checkbox" data-k="prep02"><span>계약관리 Sheet · 심사관리 Sheet 접근 권한 + 채번 시트 확인</span></label>
+      <label class="ck"><input type="checkbox" data-k="prep03"><span>NAS 접속 계정 — /계약/YYYY/MM 폴더 쓰기 권한, 채번 규칙(YYMMDD_계약자명_물건지) 숙지</span></label>
+      <label class="ck"><input type="checkbox" data-k="prep04"><span>Slack 초대 — #ops 채널 합류, 보고 라인(매니저·차장 / 김기성 본부장) · 임을빈 팀장 멘션 확인</span></label>
+      <label class="ck"><input type="checkbox" data-k="prep05"><span>노션 접근 — 현장관리 진척표 · 금액 청구/정산 DB · 강제퇴실 상세 매뉴얼</span></label>
+      <label class="ck"><input type="checkbox" data-k="prep06"><span>운영관리 웹 계정 (응대 이력 기록용)</span></label>
+      <label class="ck"><input type="checkbox" data-k="prep07"><span>494계좌 입금 내역 조회 권한 (가계약금·수수료·갱신 수수료 확인)</span></label>
+      <label class="ck"><input type="checkbox" data-k="prep08"><span>개런티즈 7.0 — 퇴실관리 SHEET 접근</span></label>
+      <label class="ck"><input type="checkbox" data-k="prep09"><span>KPI Sheet 접근 + Role Card KPI 직접 갱신 방법 확인</span></label>
+      <label class="ck"><input type="checkbox" data-k="prep10"><span>부동산 연락처 인계 — 삼일(조형섭 대표) · 태양(장희제 대표)</span></label>
+      <label class="ck"><input type="checkbox" data-k="prep11"><span>현장 연락처 인계 — 임을빈 팀장(현장관리) · 열쇠 출장 업체</span></label>
+      <label class="ck"><input type="checkbox" data-k="prep12"><span>운영 메뉴얼(krg-manual.html) 북마크 + 연체 Process(SOP-04-연체 v1.2) 열람 권한</span></label>
+    </div>
+  </div>
+</section>
+<!-- ======================= WEEKS ======================= -->
+<section id="weeks">
+  <div class="wrap">
+    <div class="sec-eyebrow">— SCHEDULE</div>
+    <h2>4주 커리큘럼 <span class="k">20 영업일</span></h2>
+    <p class="sec-desc">흐름은 <b>이론 → 동행 → 실습 → 단독</b> 순입니다. 1~2주차는 이지희·고송미의 일일 업무를,
+      3주차부터 퇴실 계열과 강제퇴실을 다루고, 4주차에 단독 운영을 검증합니다.
+      각 항목은 해당 일차에 완료하면 체크하고, 밀린 항목은 다음 날 이월해 그날 체크합니다.
+      일정은 <b>2026.10.12(월) 시작 ~ 11.06(금) 수료</b> 기준이며, 공휴일은 없습니다.</p>
+
+    <!-- ===== WEEK 1 ===== -->
+    <div class="week">
+      <div class="week-head">
+        <span class="wno">WEEK 1</span><span class="wdate">10/12 ~ 10/16</span>
+        <span class="wt">기반 다지기 — 심사 · 계약관리</span>
+        <span class="wg">고송미 업무 축 · 인계자 고송미</span>
+        <span class="wp" id="wp-w1">0 / 0</span>
+      </div>
+      <div class="bar"><i id="wb-w1"></i></div>
+      <div class="week-body" data-scope="weeks" data-week="w1">
+
+        <details class="day" open>
+          <summary><span class="dno">D1 · 10/12 월</span><span class="dtt">오리엔테이션 — 운영 구조와 도구</span>
+            <span class="dmeta"><span class="b theory">이론</span><span class="b mentor">강휘수</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w1d1a"><span>메뉴얼 3층 구조(L1 Master Map · L2 Role Card · L3 SOP) 정독 — 8개 영역 파이프라인 흐름 설명 가능</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d1b"><span>사전 준비(STEP 0) 체크리스트 전 항목 완료 확인 — 로그인 실제 테스트</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d1c"><span>Tool 사용 기준 숙지 — 즉시 대응은 Slack · 돈 얘기는 노션 · 응대 이력은 운영관리 웹</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d1d"><span>일일 타임테이블 암기 — 09:00 심사/입주전 → 10:00 가계약 체크 → 15:00 계약정보 확인 → 16:00 수납(참고)</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#l1" target="_blank">L1 Master Map ↗</a> · <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#tools" target="_blank">담당연락 &amp; Tool 기준 ↗</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D2 · 10/13 화</span><span class="dtt">심사관리 — 자동심사 체계와 가계약 등록</span>
+            <span class="dmeta"><span class="b shadow">동행</span><span class="b mentor">고송미</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w1d2a"><span>자동심사 4단계(신청 수신 → 심사 평가 → 결과 통보 → 시트 등록) 체계 이해 — 예외 건 수동 개입 기준 확인</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d2b"><span>09:00 심사결과 체크(승인/거절) 동행 — Slack 승인 알림 → 카카오톡 계약필수정보 입수 흐름 관찰</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d2c"><span>가계약 등록 3단계 — 가계약일 확정 · 계약조건 입력(홈버튼) · 계약관리 Sheet 등록(심사번호 &amp; 가계약번호 채번)</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop01" target="_blank">SOP01 심사관리 ↗</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D3 · 10/14 수</span><span class="dtt">입주전 관리 5단계 — NAS · 증빙 · 신분증</span>
+            <span class="dmeta"><span class="b shadow">동행</span><span class="b prac">실습</span><span class="b mentor">고송미</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w1d3a"><span>전자계약서 NAS 보관 실습 — 홈버튼 PDF 다운로드 → /계약/YYYY/MM 채번 규칙 저장 → 채번 시트 행 추가</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d3b"><span>가계약금(첫 임대료) 증빙 — 494계좌 입금 확인 → 입금자명·금액·일시 캡처 → '증빙' 하위 저장</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d3c"><span>신분증 3종 검증 — 유효기간 · 사진/계약자명 일치 · 주민번호 뒷자리 마스킹 + <b>30일 내 폐기 규정</b></span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d3d"><span>수수료 입금 확인 · 서명 3자(임차인/공동계약자/KRG 날인) 확인 — 불일치·누락 시 Slack #ops 1줄 공유</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop02" target="_blank">SOP02 계약관리 · 입주전 관리 ↗</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D4 · 10/15 목</span><span class="dtt">가계약 체크 · 계약정보 확인</span>
+            <span class="dmeta"><span class="b prac">실습</span><span class="b mentor">고송미</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w1d4a"><span>10:00 가계약 체크 — 삼일(조형섭 대표)·태양(장희제 대표) 전일 건 리스트업 → 정시 일괄 전달 → 14:00까지 응답 회수</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d4b"><span>15:00 계약정보 확인 — 입주일·계약기간 등 정보 입수</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d4c"><span>서비스 중요사항 설명 3건 — 서비스 수수료 · 중도퇴실 중요사항 · 퇴실청소비 (3건 모두 완료 기준)</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d4d"><span>납기일 -3D 정책 설명 후 동의 여부(YES/NO) 기록</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop02" target="_blank">SOP02 계약관리 ↗</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D5 · 10/16 금</span><span class="dtt">계약등록 8단계 · 부동산 계약안내 + 회고 ①</span>
+            <span class="dmeta"><span class="b prac">실습</span><span class="b mentor">고송미</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w1d5a"><span>계약등록 8단계 스위밍레인 1사이클 — 채번 → 등록 → 작성 → 정보 → 수수료 → 날인 → NAS → 첨부</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d5b"><span>주간(W) 항목 이해 — 정식 계약 등록 · 첨부파일(보증보험증서·위임장 등) 주간 일괄 입수</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d5c"><span>기존계약 부동산 계약안내(수요일 AM 마감 사이클) — 계약서·임전대차 계약서(이미지) 확인 흐름</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d5e"><span>계약 부대 업무 — 임대차계약신고(RTMS·30일 내), SGI보증보험 신청(D+14), 신규고객 KRG 등록(D+1) 흐름 확인</span></label>
+            <label class="ck"><input type="checkbox" data-k="w1d5d"><span>주간 회고 ① — 막힌 항목·질문 목록 정리, 다음 주 이월 항목 확정</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop02" target="_blank">SOP02 계약관리 ↗</a></div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <!-- ===== WEEK 2 ===== -->
+    <div class="week">
+      <div class="week-head">
+        <span class="wno">WEEK 2</span><span class="wdate">10/19 ~ 10/23</span>
+        <span class="wt">응대와 갱신 — 입주관리 · 갱신관리</span>
+        <span class="wg">이지희 업무 축 · 인계자 이지희</span>
+        <span class="wp" id="wp-w2">0 / 0</span>
+      </div>
+      <div class="bar"><i id="wb-w2"></i></div>
+      <div class="week-body" data-scope="weeks" data-week="w2">
+
+        <details class="day">
+          <summary><span class="dno">D6 · 10/19 월</span><span class="dtt">임대인 응대 — 유형 분류와 라우팅</span>
+            <span class="dmeta"><span class="b shadow">동행</span><span class="b mentor">이지희</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w2d6a"><span>문의 수신 → 유형 분류 5종(임대료 정산·퇴실 정산·갱신·중도퇴실·세금) → 1차 응답 D+1 이내</span></label>
+            <label class="ck"><input type="checkbox" data-k="w2d6b"><span>기록 기준 체득 — 정산·돈 관련은 노션 / 단순 응대는 운영관리 웹, 처리 후 종결 표시</span></label>
+            <label class="ck"><input type="checkbox" data-k="w2d6c"><span>담당 라우팅 — 정산은 김준영, 갱신은 본인(인수 후), 그 외 적절 담당 배정 연습</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop03" target="_blank">SOP03 입주관리 ↗</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D7 · 10/20 화</span><span class="dtt">임차인 응대 · 부동산 1차 응대</span>
+            <span class="dmeta"><span class="b shadow">동행</span><span class="b prac">실습</span><span class="b mentor">이지희</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w2d7a"><span>임차인 문의 6종 분류 — ①납기일 변경 ②임대료 수납 ③연체 → 김영철 / ④중도퇴실 ⑤퇴실 ⑥갱신 → 본인</span></label>
+            <label class="ck"><input type="checkbox" data-k="w2d7b"><span>Slack 호출로 담당 라우팅 → 단순 응대는 운영관리 웹, 금액 관련은 노션 기록</span></label>
+            <label class="ck"><input type="checkbox" data-k="w2d7c"><span>부동산 1차 응대 4종(심사·인센티브·임대인 정산·중도퇴실) — 즉답 처리 vs 영업담당 인계 판단</span></label>
+            <label class="ck"><input type="checkbox" data-k="w2d7d"><span>건별 응대 업무 — 임차인 증명서 대응 · 계약정보(전화번호) 변경 처리</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop03" target="_blank">SOP03 입주관리 ↗</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D8 · 10/21 수</span><span class="dtt">첫계약 부동산안내 — 4단계</span>
+            <span class="dmeta"><span class="b shadow">동행</span><span class="b mentor">이지희</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w2d8a"><span>계약서 사전 체크 → 특약내용 전달 → 서비스계약 중요사항 안내 → 영업담당 연락처 전달(일정·내용)</span></label>
+            <label class="ck"><input type="checkbox" data-k="w2d8b"><span>첫계약 vs 기존계약 안내 차이 구분 — 발생 시(D) vs 수요일 사이클(W)</span></label>
+            <label class="ck"><input type="checkbox" data-k="w2d8c"><span>08 정산관리 연계 — 업무위탁계약서 원본 보관 위치·버전 관리, 매월 약정 조건 확인 방법 인수</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop02" target="_blank">SOP02 계약관리 ↗</a> · <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop08" target="_blank">SOP08 정산관리 ↗</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D9 · 10/22 목</span><span class="dtt">갱신관리 ① — 대상 선정 · 심사 상신</span>
+            <span class="dmeta"><span class="b shadow">동행</span><span class="b prac">실습</span><span class="b mentor">이지희</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w2d9a"><span>만기 -1M 대상 추출(홈버튼) → 갱신 기준 적용(임대료·연체 이력·임대인 의사)</span></label>
+            <label class="ck"><input type="checkbox" data-k="w2d9b"><span>갱신심사 상신 — 5건 단위 묶음 → 결과 3종(승인/조건부/불가) 분류</span></label>
+            <label class="ck"><input type="checkbox" data-k="w2d9c"><span>갱신대상 관리 기준 문서 숙지 — 월간 사이클 달력에 본인 일정으로 등록</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop05" target="_blank">SOP05 갱신관리 ↗</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D10 · 10/23 금</span><span class="dtt">갱신관리 ② — 연락 · 청구 · 등록 + 회고 ②</span>
+            <span class="dmeta"><span class="b prac">실습</span><span class="b mentor">이지희</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w2d10a"><span>갱신불가·조건부 연락 — 계약자(1차 문자 → 미응답 시 통화) · 임대인 결과 통보</span></label>
+            <label class="ck"><input type="checkbox" data-k="w2d10b"><span>임대인 사전 임대료 변경 의사가 있던 건 — 계약자 사전 연락 처리</span></label>
+            <label class="ck"><input type="checkbox" data-k="w2d10c"><span>일시납 갱신수수료 청구서 발행 → 494계좌 입금 확인 → 홈버튼 등록(만기 -1M 전 · 묵시/조건부 구분)</span></label>
+            <label class="ck"><input type="checkbox" data-k="w2d10d"><span>주간 회고 ② — 응대 녹취/기록 리뷰, 라우팅 오판 사례 복기</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop05" target="_blank">SOP05 갱신관리 ↗</a></div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <!-- ===== WEEK 3 ===== -->
+    <div class="week">
+      <div class="week-head">
+        <span class="wno">WEEK 3</span><span class="wdate">10/26 ~ 10/30</span>
+        <span class="wt">퇴실 계열 — 중도 · 만기 · 강제퇴실 학습/동행</span>
+        <span class="wg">인계자 이지희 · 오진선 · 김영철</span>
+        <span class="wp" id="wp-w3">0 / 0</span>
+      </div>
+      <div class="bar"><i id="wb-w3"></i></div>
+      <div class="week-body" data-scope="weeks" data-week="w3">
+
+        <details class="day">
+          <summary><span class="dno">D11 · 10/26 월</span><span class="dtt">단순변심 중도퇴실 — 5종 책임 안내</span>
+            <span class="dmeta"><span class="b prac">실습</span><span class="b mentor">이지희·고송미</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w3d11a"><span>이유 문의(통화) → Slack #ops 한 줄 공유 → 5종 책임 서면 안내 → 정산(노션) → 종결(홈버튼)</span></label>
+            <label class="ck"><input type="checkbox" data-k="w3d11b"><span>5종 책임 암기 — 4개월 위약금 · 잔여 임대료 책임 · 중개보수료 · 원상복구 책임 + 이유 문의</span></label>
+            <label class="ck"><input type="checkbox" data-k="w3d11c"><span>M(오진선) 협의 포인트 확인 — 단순변심 vs 강제 분기 판단 기준</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank">SOP06 중도퇴실관리 ↗</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D12 · 10/27 화</span><span class="dtt">만기퇴실 풀 사이클 (D-60 → D+7) · 정산이슈</span>
+            <span class="dmeta"><span class="b shadow">동행</span><span class="b prac">실습</span><span class="b mentor">이지희</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w3d12a"><span>만기일 도래(홈버튼 알림) → 퇴실일·열쇠 반납·짐 정리 협의</span></label>
+            <label class="ck"><input type="checkbox" data-k="w3d12c"><span>풀 사이클 타임라인 체득 — 임대인 소통(D-60) → 정산금 등록 → 알림(D-30) → 퇴실확인(D-7) → 담보금 대응·송금(D+7) → 확정 입력(D+1)</span></label>
+            <label class="ck"><input type="checkbox" data-k="w3d12b"><span>퇴실정산 이슈 수집·대응 — 원상복구·관리비 정산, 분쟁 시 노션 상세 기록</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop07" target="_blank">SOP07 퇴실관리 ↗</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D13 · 10/28 수</span><span class="dtt">강제퇴실 이론 — 6단계 · 분기표 · 보고라인</span>
+            <span class="dmeta"><span class="b theory">이론</span><span class="b mentor">오진선</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w3d13a"><span>인입 조건(연체 15~20일 경과자 · 연체팀 선별)과 6단계 플로우 설명 가능 — 선별 → 현장 → 시트 → 청소 → 청소비 → 해지</span></label>
+            <label class="ck"><input type="checkbox" data-k="w3d13b"><span>분기 판단표 ①(비밀번호 입수/실패) · ②(후임 세입자/합의 해지) 암기 수준 숙지</span></label>
+            <label class="ck"><input type="checkbox" data-k="w3d13c"><span>보고 라인 — 현장 결과는 매니저·차장, 청소 지시·완료는 김기성 본부장, 합의 해지는 본부장 사전 확인</span></label>
+            <label class="ck"><input type="checkbox" data-k="w3d13d"><span>노션 강제퇴실 상세 매뉴얼 · 현장관리 진척표 구조 숙지</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank">SOP06 강제퇴실 처리 ↗</a> · 아래 <a href="#force">강제퇴실 상세</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D14 · 10/29 목</span><span class="dtt">강제퇴실 현장 동행 — 1차 대응</span>
+            <span class="dmeta"><span class="b shadow">동행</span><span class="b mentor">김영철</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w3d14a"><span>사전 현장 방문 동행 — 실거주 여부 확인 + 자진퇴실 회유 화법 관찰</span></label>
+            <label class="ck"><input type="checkbox" data-k="w3d14b"><span><b>현장 수칙 체득 — 확정 금액 현장 언급 금지.</b> "퇴실 전 임대료 + 공과금 + 퇴실정산이 있으며, 정확한 금액은 내부 산정 후 안내" 화법만 사용</span></label>
+            <label class="ck"><input type="checkbox" data-k="w3d14c"><span>분기① 실행 — 입수 성공: 진척표 계약정보 등록 → 매니저·차장 Slack 보고 / 실패: 매니저 보고 → 열쇠 출장 개문 → 비용 홈버튼 등록</span></label>
+            <div class="ref">현장 일정이 없는 주에는 직전 사례 리뷰로 대체하고, 발생 시 동행으로 보충</div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D15 · 10/30 금</span><span class="dtt">강제퇴실 백오피스 동행 + 회고 ③</span>
+            <span class="dmeta"><span class="b shadow">동행</span><span class="b mentor">오진선</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w3d15a"><span>퇴실관리 SHEET(개런티즈 7.0) 등록 — 계약번호 + 실제퇴실일</span></label>
+            <label class="ck"><input type="checkbox" data-k="w3d15b"><span>청소 등록·지시 — 최저 보증금 확인 → 옵션 사항 진척표 등록(임을빈 멘션) → 작업지시서 전달(임을빈 멘션) → 본부장 Slack 보고</span></label>
+            <label class="ck"><input type="checkbox" data-k="w3d15c"><span>주간 회고 ③ — 강제퇴실 체크리스트(아래 상세) 중 미경험 단계 식별</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank">SOP06 강제퇴실 처리 ↗</a></div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <!-- ===== WEEK 4 ===== -->
+    <div class="week">
+      <div class="week-head">
+        <span class="wno">WEEK 4</span><span class="wdate">11/2 ~ 11/6</span>
+        <span class="wt">단독 운영 검증 — 강제퇴실 실습 · 전체 사이클</span>
+        <span class="wg">인계자 배석 · 개입 최소화</span>
+        <span class="wp" id="wp-w4">0 / 0</span>
+      </div>
+      <div class="bar"><i id="wb-w4"></i></div>
+      <div class="week-body" data-scope="weeks" data-week="w4">
+
+        <details class="day">
+          <summary><span class="dno">D16 · 11/2 월</span><span class="dtt">강제퇴실 해지 실습 — 분기② · 확정 처리 4단계</span>
+            <span class="dmeta"><span class="b prac">실습</span><span class="b mentor">오진선</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w4d16a"><span>청소 완료 확인 후 청소비 홈버튼 등록</span></label>
+            <label class="ck"><input type="checkbox" data-k="w4d16b"><span>중도퇴실 확정 처리 4단계 — 퇴실일 확정 → 잔여 서비스수수료 등록(<b>기존 잔여 청구서 삭제 필수</b>) → 퇴실정산 4종 확인 → 임대인 정산금액 Slack 결제요청</span></label>
+            <label class="ck"><input type="checkbox" data-k="w4d16c"><span>합의 해지 경로 — 김기성 본부장 Slack 확인 후 진행 + 계약해지증명서 발행 추가</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop06" target="_blank">SOP06 강제퇴실 처리 ↗</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D17 · 11/3 화</span><span class="dtt">단독 운영 ① — 일일 사이클 전체</span>
+            <span class="dmeta"><span class="b solo">단독</span><span class="b mentor">배석: 고송미·이지희</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w4d17a"><span>09:00 심사결과 체크·가계약 등록 + 입주전 관리 5단계 — 개입 없이 완수</span></label>
+            <label class="ck"><input type="checkbox" data-k="w4d17b"><span>10:00 가계약 체크(삼일·태양) → 14:00 회수 / 15:00 계약정보 확인 3단계</span></label>
+            <label class="ck"><input type="checkbox" data-k="w4d17c"><span>당일 유입 응대(임대인·임차인·부동산) 전건 단독 처리 — 라우팅·기록 포함</span></label>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D18 · 11/4 수</span><span class="dtt">단독 운영 ② — 예외 케이스 시뮬레이션</span>
+            <span class="dmeta"><span class="b solo">단독</span><span class="b mentor">출제: 인계자</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w4d18a"><span>계약 계열 — 신분증 오류 · 입금 불일치 · 서명 누락 · 수수료 부족/초과 대응 (Slack 공유 포함)</span></label>
+            <label class="ck"><input type="checkbox" data-k="w4d18b"><span>갱신 계열 — 갱신불가 반발 · 임대인 임대료 변경 통보 케이스</span></label>
+            <label class="ck"><input type="checkbox" data-k="w4d18c"><span>강제퇴실 계열 — 분기①·② 전 경로 + 현장 금액 질문 대응 화법 롤플레이</span></label>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D19 · 11/5 목</span><span class="dtt">KPI · 리포트 · 미결 건 인수</span>
+            <span class="dmeta"><span class="b prac">실습</span><span class="b mentor">이지희·고송미</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w4d19a"><span>인수 KPI 기준·측정 방식 확인(아래 KPI 표) — Role Card에서 직접 갱신 1회 수행</span></label>
+            <label class="ck"><input type="checkbox" data-k="w4d19b"><span>개선제안루프(제안 → 검토 → SOP 반영 → 보상) · 수정이력관리 사용법 확인</span></label>
+            <label class="ck"><input type="checkbox" data-k="w4d19c"><span>진행 중 미결 건 목록 인계 — 건별 상태·다음 액션·기한을 노션/시트 기준으로 확인</span></label>
+            <label class="ck"><input type="checkbox" data-k="w4d19d"><span>시스템 자동 업무 백업 체계 확인 — 심사·계약서 생성·갱신/퇴실 추출 등 자동 10건의 예외 대응 지점 (Task_메뉴얼 시트 기준)</span></label>
+            <div class="ref">기준: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#kpi" target="_blank">KPI 대시보드 ↗</a> · <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#improve" target="_blank">개선제안루프 ↗</a></div>
+          </div>
+        </details>
+
+        <details class="day">
+          <summary><span class="dno">D20 · 11/6 금</span><span class="dtt">최종 점검 — 완료 확인 · 서명</span>
+            <span class="dmeta"><span class="b solo">검증</span><span class="b mentor">전원</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="w4d20a"><span>본 페이지 체크리스트 전 항목 완료 확인 — 미완 항목은 보완 계획(담당·기한) 수립</span></label>
+            <label class="ck"><input type="checkbox" data-k="w4d20b"><span>담당연락 기준 변경 전사 공지 — 계약·입주·강제퇴실 연락처를 이현배로 전환</span></label>
+            <label class="ck"><input type="checkbox" data-k="w4d20c"><span>인수인계 확인 서명(하단) + 종합 회고</span></label>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ======================= DETAIL ======================= -->
+<section id="detail" style="background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-eyebrow">— CHECKLIST</div>
+    <h2>업무별 상세 체크리스트 <span class="k">최종 버전 — 메뉴얼 + Task_메뉴얼 시트 병합</span></h2>
+    <p class="sec-desc">커리큘럼(위)은 "언제 배우는가", 이 목록은 "무엇이 넘어가야 끝나는가"입니다.
+      메뉴얼 SOP와 Task_메뉴얼 시트(Operations Dashboard V1.0)를 대조해 시트에만 있던 업무까지 전부 반영했습니다.
+      <span class="b theory" style="font-size:10px">자동</span> 는 시스템이 수행하는 업무로 <b>체계 이해 + 예외 대응(백업)만</b> 인수하고,
+      <span class="b prac" style="font-size:10px">자동화대상</span> 는 현재 수동이며 자동화 예정인 업무입니다.
+      시트의 '심사표 작성 · 등기부등본 입수' 2건은 폐지 검토 대상이라 체크리스트에서 제외했습니다.</p>
+    <div class="callout blue" style="margin:0 0 20px">
+      <b class="h">✓ 체크 기준 — 두 조건 모두 충족 시에만</b>
+      ① 매뉴얼을 보지 않고 절차를 설명할 수 있다 &nbsp;·&nbsp; ② 실제 건 기준 <b>단독 수행 1회 이상</b> 완료했다.
+      수행 기회가 없던 항목(발생형 업무)은 시뮬레이션 통과로 갈음하고 비고에 남깁니다.
+    </div>
+
+    <!-- ===== A. 고송미 ===== -->
+    <div class="area">
+      <div class="area-head">
+        <span class="nm">A. 고송미 인계 업무</span>
+        <span class="info">심사 · 계약 · 입주 실무 — Task시트 주담당 18건 + 시스템 백업 4건</span>
+        <span class="wp" id="wp-da">0 / 0</span>
+      </div>
+      <div class="bar"><i id="wb-da"></i></div>
+      <div class="area-body" data-scope="detail" data-area="da">
+
+        <details class="task">
+          <summary><span class="tw">D 09:00</span><span class="dtt">심사결과 체크 · 가계약 등록</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="a01"><span>심사결과 체크(승인/거절) — 자동심사 예외 건 수동 개입 포함</span></label>
+            <label class="ck"><input type="checkbox" data-k="a02"><span>가계약일 확정 — Slack 승인 알림 → 카카오톡으로 계약필수정보 입수</span></label>
+            <label class="ck"><input type="checkbox" data-k="a03"><span>계약조건 입력 — 자동심사 결과 재확인 후 심사관리 Sheet 등록</span></label>
+            <label class="ck"><input type="checkbox" data-k="a04"><span>계약관리 Sheet 등록 — 심사번호 &amp; 홈버튼 가계약번호 채번</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw">D 09:00</span><span class="dtt">입주전 관리 — 5단계 (입주 -1일 · 계약당 약 15분)</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="a05"><span>전자계약서 NAS 보관 — PDF 다운로드 → /계약/YYYY/MM · 채번 규칙(YYMMDD_계약자명_물건지) → 채번 시트 행 추가</span></label>
+            <label class="ck"><input type="checkbox" data-k="a06"><span>첫 임대료(가계약금) 증빙 — 494계좌 확인 → 입금자명·금액·일시 캡처 → '증빙' 하위 저장</span></label>
+            <label class="ck"><input type="checkbox" data-k="a07"><span>신분증 3종 확인 — 유효기간 · 사진/계약자명 일치 · 뒷자리 마스킹 + 사본 30일 내 폐기 폴더 이동</span></label>
+            <label class="ck"><input type="checkbox" data-k="a08"><span>수수료 입금 확인 — 금액 일치, 부족/초과 시 즉시 Slack #ops 공유</span></label>
+            <label class="ck"><input type="checkbox" data-k="a09"><span>서명 확인 — 임차인 · 공동계약자 · KRG 날인, 누락 시 홈버튼 알림 + 재요청</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw">D 10:00</span><span class="dtt">가계약 체크 — 삼일 · 태양</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="a10"><span>삼일(조형섭 대표) — 전일 가계약 건 리스트업 → 누락 확인 → 10:00 정시 일괄 전달</span></label>
+            <label class="ck"><input type="checkbox" data-k="a11"><span>태양(장희제 대표) — 동일 절차 · 양 부동산 응답 14:00까지 회수</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw">D 15:00</span><span class="dtt">계약정보 확인(전차인·공동계약자) — 3단계</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="a12"><span>계약정보 입수 — 입주일 · 계약기간 · 임대료 · 특약</span></label>
+            <label class="ck"><input type="checkbox" data-k="a13"><span>서비스 중요사항 설명 3건 — 수수료 · 중도퇴실 · 퇴실청소비 (모두 완료 기준)</span></label>
+            <label class="ck"><input type="checkbox" data-k="a14"><span>납기일 -3D 설명 — 동의 여부 YES/NO 기록</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw">D ALL</span><span class="dtt">계약등록 — 8단계 스위밍레인</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="a15"><span>[D] 홈버튼 가계약 번호채번 · [W] 홈버튼 계약정보 등록(주간 정식 등록)</span></label>
+            <label class="ck"><input type="checkbox" data-k="a16"><span>[D] 전자계약서 작성·발행 — 템플릿 호출 → 정보 입력 → 발행</span></label>
+            <label class="ck"><input type="checkbox" data-k="a17"><span>[D] 계약자/공동계약자 정보 등록 · 서비스수수료 설정(조건별 자동 계산 확인)</span></label>
+            <label class="ck"><input type="checkbox" data-k="a18"><span>[D] 전자계약서 날인 순서 관리 — 임차인 → 공동계약자 → KRG</span></label>
+            <label class="ck"><input type="checkbox" data-k="a19"><span>[D] 계약정보 NAS 등록 · [W] 첨부파일(보증보험증서·위임장 등) 주간 일괄 입수</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw w">W 수요일</span><span class="dtt">부동산 계약안내 — 기존계약 (수요일 AM 마감)</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="a20"><span>계약서 확인 · 임전대차 계약서(이미지) 확인</span></label>
+            <label class="ck"><input type="checkbox" data-k="a21"><span>월 오후 계약 부동산 대표 전달 → 수요일 오전까지 입수 완료</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw">건별</span><span class="dtt">계약 부대 업무 — Task시트 보강분</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="a22"><span>신규고객 KRG 등록 + 계약서류 입수·정리 (D+1) — 계약서 · 신분증 · 첫달 임대료 NAS(시놀로지) + 노션 등록</span></label>
+            <label class="ck"><input type="checkbox" data-k="a23"><span>계약서 오타 점검 (D-3) — 개런티즈 계약서 PDF 생성본 검수</span></label>
+            <label class="ck"><input type="checkbox" data-k="a24"><span>입주전 부동산 체크 (입주 전)</span></label>
+            <label class="ck"><input type="checkbox" data-k="a25"><span>계약정보(전화번호) 변경 처리 (요청 시)</span></label>
+            <label class="ck"><input type="checkbox" data-k="a26"><span>임대차계약신고 — 체결 후 30일 내, RTMS 자동화 스킬 운용 방법 포함</span></label>
+            <label class="ck"><input type="checkbox" data-k="a27"><span>SGI보증보험 신청서 작성(위수탁계약서·전대차계약서) · 신청 (D+14) <span class="b prac" style="font-size:9px">자동화대상</span></span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw m">시스템</span><span class="dtt">자동 업무 — 체계 이해 · 백업/예외 대응 인수</span><span class="dmeta"><span class="b theory">자동</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="a28"><span>심사 자동 체계 — 심사 실행 · 결과 통지 · 심사관리 Sheet 반영 (예외 건에서 수동 개입 지점 파악)</span></label>
+            <label class="ck"><input type="checkbox" data-k="a29"><span>개런티즈 계약서 자동 작성(PDF, D-3) · 계약정보 홈버튼 등록 · 입주전 체크(전자서명·수수료) 자동 흐름 확인</span></label>
+            <label class="ck"><input type="checkbox" data-k="a30"><span>자동화대상 현황 인지 — 임차인 계약정보 입수 · 수수료 입금 확인(홈버튼·신한 대조) · SGI 신청 (현재는 수동 수행)</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw w">W 이미지 입수</span><span class="dtt">임(전)대차 계약서 확인 · 임대차신고 · 퇴실청소비 — 10/12 추가 업무</span><span class="dmeta"><span class="b prac">실습</span><span class="b mentor">강휘수</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="a31"><span>임(전)대차 계약서 5점 확인 — ① 임대인 날인 ② 전(대)차인 날인 ③ 거래금액 30만원 초과 여부 ④ 계약정보(계약기간·계약금액) ⑤ 개런티즈계약 특약사항 (W · 계약서 이미지 주단위 입수 후)</span></label>
+            <label class="ck"><input type="checkbox" data-k="a32"><span>임대차신고 파일 등록 대응 — 계약완료 파일 구글드라이브 업로드 전달 → 개런티즈7.0 등록 업로드 (W · 이미지 입수 후)</span></label>
+            <label class="ck"><input type="checkbox" data-k="a33"><span>임대차신고 진척사항 체크 — 대상 건별 신고 상태 확인 · 미신고 건 follow-up (W · 이미지 입수 후)</span></label>
+            <label class="ck"><input type="checkbox" data-k="a34"><span>퇴실청소비 청구 3단계 — 입주 시 퇴실청소비 안내 → 계약서 청소비 약정 확인 → 홈버튼 청구서 생성</span></label>
+          </div>
+        </details>
+
+        <div class="callout blue" style="margin:10px 2px 4px">
+          <b class="h">📊 함께 넘어가는 KPI</b>
+          계약등록 누락 <b>0건/월</b> · NAS 보관 적시율 목표 <b>100%</b> · 마감시각 준수율 <b>95%↑</b>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== B. 이지희 ===== -->
+    <div class="area">
+      <div class="area-head">
+        <span class="nm">B. 이지희 인계 업무</span>
+        <span class="info">심사·계약·입주·갱신 매니저 + 응대·갱신·만기퇴실 실무 — Task시트 주담당 24건 + 시스템 백업 5건</span>
+        <span class="wp" id="wp-db">0 / 0</span>
+      </div>
+      <div class="bar"><i id="wb-db"></i></div>
+      <div class="area-body" data-scope="detail" data-area="db">
+
+        <details class="task">
+          <summary><span class="tw m">M 공통</span><span class="dtt">매니저 역할 — 4개 영역 (01 심사 · 02 계약 · 03 입주 · 05 갱신)</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="b01"><span>영역 KPI 관리 — 심사 처리 시간 · 계약등록 누락률 · 임차인 1차 응답(D+1) · 갱신율</span></label>
+            <label class="ck"><input type="checkbox" data-k="b02"><span>실무 백업 체계 — 고송미 업무 전체 백업 가능(cross-trained) 구조 유지, 부재 시 대응 순서</span></label>
+            <label class="ck"><input type="checkbox" data-k="b03"><span>Role Card 운영 — 체크 관리 · 개선 메모(주간 회고) 사이클</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw">D 발생 시</span><span class="dtt">첫계약 부동산안내 — 4단계</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="b04"><span>계약서 사전 체크 · 특약내용 전달</span></label>
+            <label class="ck"><input type="checkbox" data-k="b05"><span>서비스계약 진행 중요사항 안내</span></label>
+            <label class="ck"><input type="checkbox" data-k="b06"><span>영업담당 연락처 전달 — 일정 · 내용 포함</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw">D ALL</span><span class="dtt">임대인 응대 — 첫 응대자 (부재 시 고송미 → 인수 후 본인)</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="b07"><span>문의 수신 → 유형 분류 5종(임대료 정산 · 퇴실 정산 · 갱신 · 중도퇴실 · 세금)</span></label>
+            <label class="ck"><input type="checkbox" data-k="b08"><span>1차 응답 D+1 이내 — 정산·돈은 노션 / 단순 응대는 운영관리 웹</span></label>
+            <label class="ck"><input type="checkbox" data-k="b09"><span>담당 처리 라우팅(정산 → 김준영 등) → 결과 회신 → 종결 표시</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw">D ALL</span><span class="dtt">임차인 응대 ④⑤⑥ · 부동산 1차 응대</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="b10"><span>임차인 6종 분류 — ①납기일 ②수납 ③연체 → 김영철 / ④중도퇴실 ⑤퇴실 ⑥갱신 → 본인 · Slack 호출</span></label>
+            <label class="ck"><input type="checkbox" data-k="b11"><span>단순 응대는 운영관리 웹 · 금액 관련은 노션 기록</span></label>
+            <label class="ck"><input type="checkbox" data-k="b12"><span>부동산 1차 응대 — 심사·인센티브·임대인 정산·중도퇴실, 심층 건 영업담당 인계(Slack 일정·내용) <i style="color:var(--sub);font-style:normal;font-size:11.5px">· Task시트 주담당: 고송미</i></span></label>
+            <label class="ck"><input type="checkbox" data-k="b36"><span>임차인 증명서 대응 (요청 시) — 발급 절차와 자동 발급 흐름 확인</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw m">M 갱신</span><span class="dtt">갱신관리 — 전체 사이클 (단독 운영)</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="b13"><span>만기 -1M 대상 추출 → 갱신대상 관리 기준 적용(임대료 · 연체 이력 · 임대인 의사)</span></label>
+            <label class="ck"><input type="checkbox" data-k="b14"><span>갱신심사 상신(5건 단위) → 승인/조건부/불가 3종 분류</span></label>
+            <label class="ck"><input type="checkbox" data-k="b15"><span>갱신불가·조건부 연락 — 계약자(문자 → 통화) · 임대인 통보</span></label>
+            <label class="ck"><input type="checkbox" data-k="b16"><span>임대인 사전 임대료 변경 시 계약자 사전 연락</span></label>
+            <label class="ck"><input type="checkbox" data-k="b17"><span>일시납 갱신수수료 청구서 발행 → 494 입금 확인</span></label>
+            <label class="ck"><input type="checkbox" data-k="b18"><span>갱신대상 홈버튼 등록 — 만기 -1M 전 · 묵시적/조건부 구분</span></label>
+            <label class="ck"><input type="checkbox" data-k="b25"><span>임차인 갱신의사 파악 (D-70)</span></label>
+            <label class="ck"><input type="checkbox" data-k="b26"><span>임대인 확인 연락(갱신합의) · 확인 문자 (D-70)</span></label>
+            <label class="ck"><input type="checkbox" data-k="b27"><span>갱신계약서 작성 · 발송 (D-70) + 갱신대상자 홈버튼 의뢰(청구서 생성) <span class="b prac" style="font-size:9px">자동화대상</span></span></label>
+            <label class="ck"><input type="checkbox" data-k="b28"><span>갱신서류 입력 — 홈버튼 (D-60)</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw">D 발생 시</span><span class="dtt">단순변심 중도퇴실 — 5종 책임 (이지희·고송미 공동 실무)</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="b19"><span>이유 문의(통화 → 사유 청취) → Slack #ops 한 줄 공유</span></label>
+            <label class="ck"><input type="checkbox" data-k="b20"><span>5종 책임 서면 안내 — 4개월 위약금 · 잔여 임대료 · 중개보수료 · 원상복구</span></label>
+            <label class="ck"><input type="checkbox" data-k="b21"><span>정산 진행(노션) → 종결 처리(홈버튼)</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw">건별</span><span class="dtt">만기퇴실 풀 사이클 — D-60 → D+7 (Task시트 보강)</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="b29"><span>임대인 소통 확인 (D-60) — 퇴실정보 파악은 시스템 자동, 결과 확인부터 수동</span></label>
+            <label class="ck"><input type="checkbox" data-k="b30"><span>퇴실정산금 등록 (확정 시)</span></label>
+            <label class="ck"><input type="checkbox" data-k="b31"><span>퇴실정산 주의사항 알림 (D-30)</span></label>
+            <label class="ck"><input type="checkbox" data-k="b32"><span>퇴실확인 — 임차인 · 임대인 (D-7)</span></label>
+            <label class="ck"><input type="checkbox" data-k="b22"><span>만기일 도래 — 퇴실일 · 열쇠 반납 · 짐 정리 협의 (퇴실일)</span></label>
+            <label class="ck"><input type="checkbox" data-k="b33"><span>원상회복 담보금 요청 대응 (퇴실일) → 담보금 송금 (D+7 · 백업 강휘수)</span></label>
+            <label class="ck"><input type="checkbox" data-k="b34"><span>퇴실확정 정보 입력 (D+1)</span></label>
+            <label class="ck"><input type="checkbox" data-k="b39"><span>만기퇴실자 연락 후 퇴실 사유 확인 (W · 발생 시) <i style="color:var(--sub);font-style:normal;font-size:11.5px">· 10/8 시트 추가분</i></span></label>
+            <label class="ck"><input type="checkbox" data-k="b40"><span>퇴실청소 일정 확인 → 현장관리팀 캘린더 등록 (발생 시) <i style="color:var(--sub);font-style:normal;font-size:11.5px">· 10/8 시트 추가분</i></span></label>
+            <label class="ck"><input type="checkbox" data-k="b41"><span>만기퇴실 퇴실청소 진행(현장관리팀 연계) — 전차인: 퇴실일 확인·청소비 금액 청구 / 임대인: 청소진행 안내·후속 세입자 입주일정 체크 <i style="color:var(--sub);font-style:normal;font-size:11.5px">· 10/12 추가</i></span></label>
+            <label class="ck"><input type="checkbox" data-k="b23"><span>퇴실정산 이슈 수집·대응 — 원상복구 · 관리비, 분쟁 시 노션 상세 기록 (발생 시 · 백업 오진선)</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw m">M 파트너</span><span class="dtt">업무위탁계약서 원본 관리 (08 정산 연계)</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="b24"><span>원본 보관 위치·버전 인수 — 매월 약정 조건 확인, 갱신·변경 시 최신본 업데이트·구버전 분리 보관 <i style="color:var(--sub);font-style:normal;font-size:11.5px">· 작성·서류 입수는 강휘수 유지</i></span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw m">시스템</span><span class="dtt">자동 업무 — 체계 이해 · 백업/예외 대응 인수</span><span class="dmeta"><span class="b theory">자동</span><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="b37"><span>갱신 자동 체계 — 갱신대상 추출(만기 D-90) · 수수료 입금 확인(D-60) · 홈버튼 확인 · 부속합의서 작성 (예외 시 수동 개입 지점 파악)</span></label>
+            <label class="ck"><input type="checkbox" data-k="b38"><span>퇴실정보 파악 자동 추출(D-60) 확인 + 임차인 응대(주담당 김영철)의 백업 역할 인수</span></label>
+          </div>
+        </details>
+
+        <div class="callout blue" style="margin:10px 2px 4px">
+          <b class="h">📊 함께 넘어가는 KPI</b>
+          갱신율(만기 도래 계약 중 갱신 %) + 매니저 관리 KPI — 심사 처리 시간 · 계약등록 누락률 · 임차인 1차 응답 시간
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== C. 강제퇴실 ===== -->
+    <div class="area" id="force">
+      <div class="area-head">
+        <span class="nm">C. 강제퇴실 관리 <span class="xtag" style="font-size:10.5px;vertical-align:3px">전 단계 실무</span></span>
+        <span class="info">SOP06 — 현장 1차 대응부터 계약해지 확정까지</span>
+        <span class="wp" id="wp-dc">0 / 0</span>
+      </div>
+      <div class="bar amber"><i id="wb-dc"></i></div>
+      <div class="area-body" data-scope="detail" data-area="dc">
+
+        <div class="tbl-wrap" style="margin:10px 2px">
+          <table>
+            <tbody>
+              <tr><td style="width:150px"><b>인입 조건</b></td><td>연체 15~20일 경과자 — 연체팀 선별 (협조 유지)</td></tr>
+              <tr><td><b>현장 1차 대응</b></td><td>김영철 <span class="arrow">→</span> <b>이현배</b></td></tr>
+              <tr><td><b>퇴실관리 · 해지</b></td><td>오진선 <span class="arrow">→</span> <b>이현배</b></td></tr>
+              <tr><td><b>보고 라인</b></td><td>매니저 · 차장 → 김기성 본부장 (현행 유지)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout red" style="margin:6px 2px 12px">
+          <b class="h">⚠ 현장 수칙 — 가장 먼저 몸에 붙여야 할 한 가지</b>
+          정산금액 문의 시 <b>확정 금액을 현장에서 말하지 않는다.</b>
+          "퇴실 전 임대료 + 공과금 + 퇴실정산이 있으며, 정확한 금액은 내부 산정 후 안내드린다"로만 대응.
+          원상회복비 · 잔여 서비스수수료 · 위약금 등 세부 항목은 계약자에게 직접 언급 금지.
+        </div>
+
+        <details class="task" open>
+          <summary><span class="tw w">STEP 1-2</span><span class="dtt">대상자 선별 · 현장 1차 대응 (분기 ①)</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="f01"><span>연체팀으로부터 대상자 인수 — 선별 기준(연체 15~20일) 확인 후 일정 수립</span></label>
+            <label class="ck"><input type="checkbox" data-k="f02"><span>사전 현장 방문 — 실거주 여부 확인 + 자진퇴실 회유 (현장 수칙 준수)</span></label>
+            <label class="ck"><input type="checkbox" data-k="f03"><span>분기① 입수 성공 — 현장관리 진척표에 계약정보 등록 → 매니저·차장 Slack 보고</span></label>
+            <label class="ck"><input type="checkbox" data-k="f04"><span>분기① 입수 실패(실거주 없음 + 임대인 마스터키 포함 미확보) — 매니저 Slack 보고 → 열쇠 출장 개문 → 출장 비용 홈버튼 등록</span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw w">STEP 3-4</span><span class="dtt">퇴실관리 SHEET · 청소 등록·작업 지시</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="f05"><span>개런티즈 7.0 퇴실관리 SHEET 등록 — 계약번호 + 실제퇴실일 (2개 항목)</span></label>
+            <label class="ck"><input type="checkbox" data-k="f06"><span>최저 보증금 정보 확인 → 옵션 사항 진척표 등록 → <b>임을빈 팀장 멘션</b></span></label>
+            <label class="ck"><input type="checkbox" data-k="f07"><span>작업지시서 전달 → <b>임을빈 팀장 멘션</b> → <b>김기성 본부장</b> Slack 보고</span></label>
+            <label class="ck"><input type="checkbox" data-k="f17"><span>강제퇴실 영업팀 공유(부동산 공유) — 확정 건 재임대 연계를 위한 매물 공유 <i style="color:var(--sub);font-style:normal;font-size:11.5px">· 10/8 시트 추가분</i></span></label>
+          </div>
+        </details>
+
+        <details class="task">
+          <summary><span class="tw w">STEP 5-6</span><span class="dtt">청소비 등록 · 계약해지 확정 (분기 ②)</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="f08"><span>청소 완료 확인 후 청소비 홈버튼 등록</span></label>
+            <label class="ck"><input type="checkbox" data-k="f09"><span>확정 처리 ①② — 퇴실일 확정 등록 · 잔여 서비스수수료 등록 (<b>기존 잔여 청구서 삭제 필수</b>)</span></label>
+            <label class="ck"><input type="checkbox" data-k="f10"><span>확정 처리 ③ — 퇴실정산 4종 확인: 청소 · 도배 · 원상회복 · 부동산컨설팅(중개보수료)</span></label>
+            <label class="ck"><input type="checkbox" data-k="f11"><span>확정 처리 ④ — 임대인 정산금액 내부 Slack 결제요청</span></label>
+            <label class="ck"><input type="checkbox" data-k="f12"><span>분기② 합의 해지 경로 — <b>김기성 본부장 Slack 확인 후에만</b> 진행 + 계약해지증명서 발행 추가</span></label>
+          </div>
+        </details>
+
+        <h3 style="margin:18px 2px 8px">분기 판단표 — 지금 어느 상황인가?</h3>
+        <div class="tbl-wrap" style="margin:0 2px">
+          <table>
+            <thead><tr><th>분기</th><th>상황</th><th>다음 액션</th></tr></thead>
+            <tbody>
+              <tr><td>① 비밀번호</td><td>입수 성공</td><td>진척표 계약정보 등록 → 매니저·차장 Slack 보고</td></tr>
+              <tr><td>① 비밀번호</td><td>입수 실패 (마스터키 포함)</td><td>매니저 Slack 보고 → 열쇠 출장 개문 → 비용 홈버튼 등록</td></tr>
+              <tr><td>② 계약해지</td><td>후임 세입자 확정</td><td>홈버튼 중도퇴실 확정 처리 4단계</td></tr>
+              <tr><td>② 계약해지</td><td>합의 해지</td><td>본부장 Slack 확인 → 확정 처리 4단계 + 계약해지증명서 발행</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <details class="task" style="margin-top:14px">
+          <summary><span class="tw m">완료 조건</span><span class="dtt">건별 종결 기준 — 4가지 모두 충족</span><span class="dmeta"><span class="dcnt"></span></span></summary>
+          <div class="day-body">
+            <label class="ck"><input type="checkbox" data-k="f13"><span>현장관리 진척표 기록 완료 — 계약정보 · 옵션 사항 · 작업지시서까지</span></label>
+            <label class="ck"><input type="checkbox" data-k="f14"><span>퇴실관리 SHEET 등록 — 계약번호 + 실제퇴실일</span></label>
+            <label class="ck"><input type="checkbox" data-k="f15"><span>홈버튼 반영 완료 — 중도퇴실 확정 + 기존 잔여 청구서 삭제 + 퇴실정산 4종 확인</span></label>
+            <label class="ck"><input type="checkbox" data-k="f16"><span>Slack 보고 3건 — ① 현장 결과(매니저·차장) ② 청소 지시·완료(본부장) ③ 임대인 정산금액 결제요청</span></label>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ======================= RULES / KPI ======================= -->
+<section id="rules">
+  <div class="wrap">
+    <div class="sec-eyebrow">— HANDOFF RULES</div>
+    <h2>담당연락 기준 변경 <span class="k">&amp; KPI 인수</span></h2>
+    <p class="sec-desc">OJT 완료(서명) 시점에 아래와 같이 연락 기준이 바뀝니다. D20에 전사 공지 후 적용하며,
+      메뉴얼의 '담당연락 &amp; Tool 이용 기준' 섹션도 함께 갱신해야 합니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>문의 유형</th><th>기존 담당</th><th style="width:36px"></th><th>변경 후</th></tr></thead>
+        <tbody>
+          <tr><td>📄 계약 관련 — 기존 계약이력 부동산 · 심사완료 계약자 · 공동 계약자</td><td>고송미</td><td class="arrow">→</td><td><b>이현배</b></td></tr>
+          <tr><td>🏠 입주 이슈 — 계약자 클레임 · 중도퇴실 문의 · 임대인 정산 문의</td><td>이지희</td><td class="arrow">→</td><td><b>이현배</b></td></tr>
+          <tr><td>⚖️ 강제퇴실자 관련 — 임대인 · 강제퇴실 관련자 · 법적 대응 문의</td><td>오진선</td><td class="arrow">→</td><td><b>이현배</b> <span style="font-size:12px;color:var(--sub)">(법적 대응 문의는 오진선 유지)</span></td></tr>
+          <tr class="keep"><td>💰 임대료 납부 문의 — 입금일 연기 · 변경</td><td>김영철</td><td></td><td>현행 유지</td></tr>
+          <tr class="keep"><td>🏢 신규 부동산/임대인 — 상세 서비스 이용 희망</td><td>영업팀</td><td></td><td>현행 유지</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="margin-top:28px">인수 대상 KPI — 7종</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>KPI</th><th>측정 방식</th><th>현재 수준</th><th>출처</th></tr></thead>
+        <tbody>
+          <tr><td><b>심사 처리 시간</b></td><td>신청 → 결과 통보 평균 D</td><td>베이스라인 수집</td><td>01 심사 (M)</td></tr>
+          <tr><td><b>계약등록 누락률</b></td><td>가계약 → 정식 미등록 0건/월</td><td>0건 / 월</td><td>02 계약 (M)</td></tr>
+          <tr><td><b>NAS 보관 적시율</b></td><td>목표 100%</td><td>98%</td><td>고송미 Role Card</td></tr>
+          <tr><td><b>마감시각 준수율</b></td><td>목표 95%↑</td><td>95% 달성</td><td>고송미 Role Card</td></tr>
+          <tr><td><b>임차인 1차 응답 시간</b></td><td>문의 → 응답 D+1 이내 %</td><td>베이스라인 수집</td><td>03 입주 (M)</td></tr>
+          <tr><td><b>갱신율</b></td><td>만기 도래 계약 중 갱신 %</td><td>베이스라인 수집</td><td>05 갱신 (M)</td></tr>
+          <tr><td><b>위약금 회수율</b></td><td>청구액 대비 회수액 %</td><td>베이스라인 수집</td><td>06 중도퇴실 — 강제퇴실 인수에 따라 공동 관리 (오진선 협의)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">KPI 원칙(메뉴얼): 개인별 최소 1개 · 최대 3개 — 측정 가능 · 본인이 직접 영향 · 주 1회 이상 갱신.
+      인수 직후에는 <b>계약등록 누락률 · NAS 적시율 · 마감 준수율</b> 3종을 이현배의 핵심 KPI로 두고, 나머지는 Monitoring 지표로 관리하는 것을 권장.</p>
+  </div>
+</section>
+
+<!-- ======================= REFS ======================= -->
+<section id="refs" style="border-top:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-eyebrow">— ARCHIVE</div>
+    <h2>이전 OJT · 교육 자료 <span class="k">참고 아카이브</span></h2>
+    <p class="sec-desc">인계자 4인(이지희 · 고송미 · 김영철 · 오진선)이 거친 OJT·교육 기록입니다.
+      진행 방식(특히 <b>일지 작성</b>)을 이번 OJT에 그대로 적용하고, 수료 후 심화 교육은 세션별 교육 슬라이드와 연계합니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:250px">자료</th><th>내용 · 활용</th><th style="width:90px">위치</th></tr></thead>
+        <tbody>
+          <tr><td><a href="krg-ojt-archive.html" target="_blank"><b>과거 전체 OJT 자료 — FAQ·프로세스 ↗</b></a></td>
+              <td><b>이번 OJT 교재</b> — 6월 전체 OJT 진행 방식 · FAQ 42문 · 운영 프로세스/R&amp;R · 교육 문서 원본 링크 일괄 (같은 폴더에 저장 시 바로 열림)</td><td>파일</td></tr>
+          <tr><td><a href="https://app.notion.com/p/31aa64b0445180029d43d416e2796292" target="_blank"><b>신입사원 OJT (고송미) ↗</b></a></td>
+              <td>개인 OJT 기록 — 일정 · 목표 · <b>일일 일지</b> · 임대차신고 교육 (2026.03). 일지 양식을 이번 OJT 주간 회고에 그대로 사용 권장</td><td>노션</td></tr>
+          <tr><td><a href="https://app.notion.com/p/375a64b04451805ca54fd627a9c3f49b" target="_blank">2026.6월 그룹 OJT 일정 ↗</a></td>
+              <td>6/8~10 1·2·3차 OJT 진행 기록 · <a href="https://app.notion.com/p/364a64b044518001a9dad592dbc7dab8" target="_blank">주단위 업무점검 ↗</a> — 이지희·김영철·오진선 교육 이력</td><td>노션</td></tr>
+          <tr><td><a href="https://docs.google.com/presentation/d/1bLb5Ideq8dNjM4jW-__mGsJLndtQln7--QxcmO3vgkI" target="_blank"><b>운영팀 세션별 교육내용 ↗</b></a></td>
+              <td>4인 전원 대상 6개월 역량 향상 교육 24회 (2026.7.13~12.21) — OJT 수료 후 이현배 심화 교육으로 연계 권장</td><td>슬라이드</td></tr>
+          <tr><td>OJT 템플릿 — <a href="https://app.notion.com/p/2f4a64b0445180039136dcf94a9713c3" target="_blank">신입 ↗</a> · <a href="https://app.notion.com/p/2d2a64b04451805aacfedadad4369cf5" target="_blank">경력 ↗</a> · <a href="https://app.notion.com/p/1d2a64b0445180298130effe8ad6b09f" target="_blank">영업·수납 ↗</a></td>
+              <td>직군·연차별 OJT 구성 템플릿 (신입은 심사 고도화 트랙 포함)</td><td>노션</td></tr>
+          <tr><td><a href="https://docs.google.com/document/d/1SVfp7Cg7GtmTlGtqi_6lm08vk3d8zUsnhLC1dO2etMg" target="_blank">운영업무 면담 가이드 ↗</a></td>
+              <td>이지희 · 고송미 면담 기록 (2026.08) · <a href="https://docs.google.com/spreadsheets/d/1fkfh21gCpSu4TPjKLlcNJPpqVHKnj_voJjyjMCJfwbo" target="_blank">면담 후속관리 시트 ↗</a> — 주간 회고 면담 시 참고</td><td>문서</td></tr>
+          <tr><td><a href="https://drive.google.com/drive/folders/1cPxjDsTncKozTcLnbPTq07LKRM4Y6JhM" target="_blank">2024 신입사원 일반OJT ↗</a></td>
+              <td>레거시 — 신입사원 실무교육 OJT 계획서 등. 현행 프로세스와 차이가 있어 참고용</td><td>드라이브</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">금요일 회고(D5 · D10 · D15 · D20) 때 고송미 OJT 페이지의 일지 형식으로 기록을 남기면 다음 인수인계 때 그대로 자산이 됩니다. 노션 링크는 워크스페이스 권한 필요.</p>
+  </div>
+</section>
+
+<!-- ======================= SIGN ======================= -->
+<section id="sign" style="background:var(--panel);border-top:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-eyebrow">— SIGN-OFF</div>
+    <h2>인수인계 확인</h2>
+    <p class="sec-desc">아래 완료 조건이 모두 충족된 후 서명합니다. 서명 시점부터 담당연락 기준 변경이 적용됩니다.
+      (인쇄: 브라우저 인쇄 기능 사용 — 체크 상태가 함께 출력됩니다)</p>
+
+    <div class="callout blue" style="margin:0 0 18px">
+      <b class="h">완료 조건</b>
+      ① 사전 준비 · 4주 일정 · 업무 상세 체크리스트 100% &nbsp;
+      ② 단독 운영 D17~D18 통과 &nbsp;
+      ③ Role Card KPI 직접 갱신 1회 &nbsp;
+      ④ 담당연락 기준 변경 전사 공지 완료
+    </div>
+
+    <div class="tbl-wrap">
+      <table class="sign-tbl">
+        <thead><tr><th style="width:190px">구분</th><th style="width:140px">성명</th><th style="width:130px">일자</th><th>서명</th></tr></thead>
+        <tbody>
+          <tr><td><b>인수자</b></td><td>이현배</td><td></td><td><span class="sig"></span></td></tr>
+          <tr><td>인계자 — 심사·계약 실무</td><td>고송미</td><td></td><td><span class="sig"></span></td></tr>
+          <tr><td>인계자 — 입주·갱신·퇴실</td><td>이지희</td><td></td><td><span class="sig"></span></td></tr>
+          <tr><td>인계자 — 강제퇴실 (해지)</td><td>오진선</td><td></td><td><span class="sig"></span></td></tr>
+          <tr><td>인계자 — 강제퇴실 (현장)</td><td>김영철</td><td></td><td><span class="sig"></span></td></tr>
+          <tr><td>확인 — 운영총괄</td><td>강휘수</td><td></td><td><span class="sig"></span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    [인수인계] 운영관리팀장 OJT · v1.6 · 2026.10.12 (OJT 기간 10.12 ~ 11.06) —
+    기준 문서: <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html" target="_blank">KRG 운영 메뉴얼 v0.1 (Pilot)</a> ·
+    <a href="https://docs.google.com/spreadsheets/d/1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q/edit?gid=1426207978" target="_blank">Task_메뉴얼 — Operations Dashboard V1.0</a> ·
+    체크 상태는 구글시트(OJT_체크리스트 탭)와 자동 동기화됩니다 — 어느 기기에서 열어도 유지되며, 시트에서 진척율을 확인할 수 있습니다 (오프라인 시 이 브라우저에 임시 저장 후 재접속 시 업로드).
+  </div>
+</footer>
+
+<script>
+(function(){
+  var KEY='krg-ojt-lhb-v1';
+  var mem={};
+
+  // ── 구글시트 연동 (Operations Dashboard V1.0 · 체크리스트_상태 탭) ──
+  var CK_API='https://script.google.com/macros/s/AKfycby7414_o1bxespzyDZrWwwCo-dpAjxp-nOZWy86MWToIRuX9X2YjFd_KMFI_Y7RGqHVaQ/exec';
+  var DATE_KEY='ojt_관리팀매니저', PERSON='이현배';
+  function jsonp(params, cb, timeout){
+    try{
+      var name='_ojt'+Math.random().toString(36).slice(2);
+      var s=document.createElement('script');
+      window[name]=function(d){ try{ if(cb) cb(d); } finally { try{delete window[name];}catch(e){} if(s.parentNode) s.parentNode.removeChild(s); } };
+      s.onerror=function(){ try{delete window[name];}catch(e){} if(s.parentNode) s.parentNode.removeChild(s); if(cb) cb(null); };
+      var q=[]; for(var key in params){ q.push(encodeURIComponent(key)+'='+encodeURIComponent(params[key])); }
+      q.push('callback='+name); q.push('_='+Date.now());
+      s.src=CK_API+'?'+q.join('&');
+      document.head.appendChild(s);
+      setTimeout(function(){ if(window[name]){ try{delete window[name];}catch(e){} if(s.parentNode) s.parentNode.removeChild(s); if(cb) cb(null); } }, timeout||12000);
+    }catch(e){ if(cb) cb(null); }
+  }
+  function setChip(ok){
+    var c=document.getElementById('sync-chip'); if(!c) return;
+    if(ok){ c.textContent='● 시트 연동'; c.style.color='var(--ok)'; c.style.borderColor='#BFE2CD'; c.style.background='var(--ok-soft)'; }
+    else { c.textContent='○ 오프라인 · 로컬 저장'; c.style.color='var(--sub)'; c.style.borderColor='var(--line)'; c.style.background='var(--soft)'; }
+  }
+  function ckSet(k, done){
+    jsonp({action:'set', dateKey:DATE_KEY, person:PERSON, taskId:k, done:String(!!done)}, function(d){ setChip(!!d); });
+  }
+  function ckLoadServer(){
+    jsonp({}, function(data){
+      if(!data){ setChip(false); return; }
+      setChip(true);
+      var server=(data[DATE_KEY]||{})[PERSON]||{};
+      var changed=false;
+      Object.keys(server).forEach(function(k){
+        var v=!!server[k];
+        if(v && !mem[k]){ mem[k]=1; changed=true; }
+        if(!v && mem[k]){ delete mem[k]; changed=true; }
+      });
+      // 서버에 없는 로컬 체크는 서버로 업로드 (기존 진행분 이관)
+      var pushes=[];
+      boxes.forEach(function(b){ var k=b.getAttribute('data-k'); if(k && mem[k] && !(k in server)) pushes.push(k); });
+      pushes.forEach(function(k,i){ setTimeout(function(){ ckSet(k,true); }, 180*i); });
+      if(changed){
+        save();
+        boxes.forEach(function(b){ var k=b.getAttribute('data-k'); b.checked=!!mem[k]; });
+        update();
+      }
+    });
+  }
+  function load(){ try{var s=localStorage.getItem(KEY); if(s){mem=JSON.parse(s)||{};}}catch(e){} }
+  function save(){ try{localStorage.setItem(KEY,JSON.stringify(mem));}catch(e){} }
+
+  var boxes=Array.prototype.slice.call(document.querySelectorAll('label.ck input[type=checkbox]'));
+
+  function pct(c,t){ return t? Math.round(c/t*100):0; }
+  function setBar(id,c,t){ var b=document.getElementById(id); if(b){b.style.width=pct(c,t)+'%';} }
+  function setTxt(id,s){ var e=document.getElementById(id); if(e){e.textContent=s;} }
+
+  function countIn(sel){
+    var ins=document.querySelectorAll(sel+' label.ck input');
+    var c=0; for(var i=0;i<ins.length;i++){ if(ins[i].checked)c++; }
+    return [c,ins.length];
+  }
+
+  function update(){
+    // per-details counters
+    var dets=document.querySelectorAll('details');
+    for(var i=0;i<dets.length;i++){
+      var ins=dets[i].querySelectorAll('label.ck input');
+      if(!ins.length) continue;
+      var c=0; for(var j=0;j<ins.length;j++){ if(ins[j].checked)c++; }
+      var cnt=dets[i].querySelector('.dcnt');
+      if(cnt){ cnt.textContent=c+' / '+ins.length; cnt.style.color = (c===ins.length)?'var(--ok)':'var(--sub)'; cnt.style.fontWeight=(c===ins.length)?'800':'400'; }
+    }
+    // weeks
+    ['w1','w2','w3','w4'].forEach(function(w){
+      var r=countIn('[data-week="'+w+'"]');
+      setTxt('wp-'+w, r[0]+' / '+r[1]); setBar('wb-'+w, r[0], r[1]);
+    });
+    // detail areas
+    ['da','db','dc'].forEach(function(a){
+      var r=countIn('[data-area="'+a+'"]');
+      setTxt('wp-'+a, r[0]+' / '+r[1]); setBar('wb-'+a, r[0], r[1]);
+    });
+    // scopes
+    var p=countIn('[data-scope="prep"]'), wk=countIn('[data-scope="weeks"]'), dt=countIn('[data-scope="detail"]');
+    setTxt('p-prep', pct(p[0],p[1])+'%'); setTxt('p-weeks', pct(wk[0],wk[1])+'%'); setTxt('p-detail', pct(dt[0],dt[1])+'%');
+    // overall
+    var c=0; for(var k=0;k<boxes.length;k++){ if(boxes[k].checked)c++; }
+    setTxt('ovr-num', c+' / '+boxes.length+' 항목');
+    setBar('ovr-bar', c, boxes.length);
+    setTxt('top-pct', pct(c,boxes.length)+'%');
+  }
+
+  load();
+  boxes.forEach(function(b){
+    var k=b.getAttribute('data-k');
+    if(k && mem[k]) b.checked=true;
+    b.addEventListener('change',function(){
+      if(b.checked){ mem[k]=1; } else { delete mem[k]; }
+      save(); update();
+      if(k) ckSet(k, b.checked);
+    });
+  });
+
+  var rst=document.getElementById('reset-all');
+  if(rst) rst.addEventListener('click',function(){
+    if(!window.confirm('모든 체크를 초기화할까요? 구글시트의 체크 상태도 함께 해제됩니다.')) return;
+    var had=Object.keys(mem);
+    mem={}; save();
+    boxes.forEach(function(b){ b.checked=false; });
+    update();
+    had.forEach(function(k,i){ setTimeout(function(){ ckSet(k,false); }, 160*i); });
+  });
+
+  window.addEventListener('beforeprint',function(){
+    var dets=document.querySelectorAll('details');
+    for(var i=0;i<dets.length;i++){ dets[i].setAttribute('open',''); }
+  });
+
+  update();
+  ckLoadServer();
+})();
+</script>
+</body>
+</html>
