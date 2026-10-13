@@ -29739,6 +29739,9 @@ function renderExitMgmtView(){
       '.odt-tile.base{border-color:#C7D2FE;background:linear-gradient(180deg,#fff,#FBFBFF)}.odt-tile.base::after{content:"당일 기준값";position:absolute;right:10px;top:10px;font-size:10px;font-weight:800;color:#fff;background:#4F46E5;border-radius:999px;padding:2px 8px}',
       '.odt-tile.now{border:2px solid #6366F1}.odt-tile.now .t .tm{background:#4F46E5;color:#fff}.odt-tile.pending{border-style:dashed;background:#FAFAFA}.odt-tile.pending .n{color:#CBD5E1}',
       '.odt-strip-foot{margin-top:7px;font-size:10.5px;color:#94A3B8;font-weight:600}',
+      '.odt-pay{display:inline-flex;align-items:center;gap:6px;padding-left:12px;border-left:1px solid #E5E7EB;font-size:11px;color:#64748B;font-weight:700;white-space:nowrap}.odt-pay .k9{font-size:11px;color:#64748B;font-weight:700}',
+      '.odt-chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 9px;font-weight:800;font-size:11.5px}.odt-chip b{font-weight:900}.odt-chip.good{background:#ECFDF5;color:#15803D}.odt-chip.warn{background:#FFFBEB;color:#B45309}.odt-chip.click{cursor:pointer}.odt-chip.click:hover{box-shadow:0 0 0 2px #C7D2FE}',
+      '.odt-tile .c2{font-size:10.5px;color:#64748B;margin-top:3px;font-weight:700}.odt-tile .c2 b.g{color:#15803D}.odt-tile .c2 b.w{color:#B45309}.odt-tile .c2 b.p{color:#7C3AED}',
       '@media (max-width:900px){.odt-f.amt{margin-left:0}}'
     ].join('\n');
     document.head.appendChild(st);
@@ -29839,11 +29842,20 @@ function renderExitMgmtView(){
         + (r && isB ? '<span class="odt-basetag">당일 기준값' + (s !== '08:20' ? ' · ' + s + ' 대체' : '') + '</span>' : '');
     });
     var delta = di ? di.last.n['임대료'] - di.baseN : null;
+    /* [v676] 오늘 입금 — 완납 / 분납(일부 입금) 간략 표시 (숫자 클릭 → 명단) */
+    var TIP_PAID = '완납 = 기준 연체자 중 임대료 미납이 0원이 되고 그날 연체납부 기록이 있는 사람', TIP_PART = '분납(일부 입금) = 아직 연체지만 미납총액이 줄어든 사람';
+    var payChips = '';
+    if (di) {
+      var l9 = di.last, can9 = !!l9.hasList;
+      var chip9 = function(key, cls, lb, n, tip){ return '<span class="odt-chip ' + cls + (can9 && n > 0 ? ' click" onclick="odt_list(\'' + di.day + '\',\'' + key + '\')"' : '"') + ' title="' + tip + (can9 && n > 0 ? ' · 클릭하면 명단' : '') + '">' + lb + ' <b>' + n + '</b></span>'; };
+      payChips = '<span class="odt-pay"><span class="k9">오늘 입금</span>' + chip9('paid', 'good', '✅ 완납', l9.paid, TIP_PAID) + chip9('part', 'warn', '💧 분납', l9.part, TIP_PART)
+        + (l9.got > 0 ? '<span class="k9" title="기준 연체자의 임대료 미납 감소분 합">회수 ' + wonS(l9.got) + '</span>' : '') + '</span>';
+    }
     var right = (pv ? '<span title="' + esc(mdLb(pv.day)) + ' 기준 ' + pv.baseSlot + ' → ' + pv.last.slot + '">' + (di ? '전일' : '최근') + '(' + mdShort(pv.day) + ') ' + pv.baseN + ' → ' + pv.last.n['임대료'] + '</span>' : '')
       + '<span class="odt-link" onclick="odt_goOps()" title="운영관리 > 연체 대응 결과 > 연체 해소 흐름으로 이동">완납·입금 상세 → 운영관리</span>'
       + '<span class="odt-open" onclick="odt_toggle()">' + (open ? '▴ 접기' : '▾ 펼치기') + '</span>';
     var h = '<div class="odt-strip' + (open ? ' open' : '') + '"><div class="odt-strip-top"><span class="ft"><span class="dot"></span>⏱ 오늘 연체 인원</span>'
-      + (di ? '<span class="odt-seq">' + seq + (delta ? '<span class="dl ' + (delta < 0 ? 'dn' : 'up') + '">' + (delta < 0 ? '▼' + (-delta) : '▲' + delta) + '</span>' : '') + '</span>'
+      + (di ? '<span class="odt-seq">' + seq + (delta ? '<span class="dl ' + (delta < 0 ? 'dn' : 'up') + '">' + (delta < 0 ? '▼' + (-delta) : '▲' + delta) + '</span>' : '') + '</span>' + payChips
             : '<span class="odt-seq muted">' + noDataWhy(today) + '</span>')
       + '<span class="odt-strip-right">' + right + '</span></div>';
     if (open) {
@@ -29858,10 +29870,11 @@ function renderExitMgmtView(){
           h += '<div class="odt-tile' + (isB ? ' base' : '') + (isNow ? ' now' : '') + '"><div class="t"><span class="tm">' + slotLb(s) + '</span>' + (isB ? '' : '회차 집계') + '</div>'
             + '<div class="n">' + r.n['임대료'] + '<small>명</small></div>'
             + '<div class="c">' + (isB ? '구간 ' + r.b.join(' / ') + ' · 변동관리비 ' + r.n['변동관리비']
-                : '전 회차 ' + (dp < 0 ? '<span class="dn">▼' + (-dp) + '</span>' : dp > 0 ? '<span class="up">▲' + dp + '</span>' : '—') + ' · 기준 대비 ' + (db < 0 ? '<span class="dn">▼' + (-db) + '</span>' : db > 0 ? '<span class="up">▲' + db + '</span>' : '—')) + '</div></div>';
+                : '전 회차 ' + (dp < 0 ? '<span class="dn">▼' + (-dp) + '</span>' : dp > 0 ? '<span class="up">▲' + dp + '</span>' : '—') + ' · 기준 대비 ' + (db < 0 ? '<span class="dn">▼' + (-db) + '</span>' : db > 0 ? '<span class="up">▲' + db + '</span>' : '—')) + '</div>'
+            + (isB ? '' : '<div class="c2" title="기준 이후 이 회차까지 누적 · ' + TIP_PAID + ' · ' + TIP_PART + '">완납 <b class="g">' + r.paid + '</b> · 분납 <b class="w">' + r.part + '</b>' + (r.newd ? ' · 신규 <b class="p">+' + r.newd + '</b>' : '') + '</div>') + '</div>';
           prevR = r;
         });
-        h += '</div><div class="odt-strip-foot">계약중 · 임대료 기준 · 아침 08:20 첫 집계가 그날의 기준값(DashBoard 일자별 카드와 동일) · 완납/일부 입금/미입금 상세는 운영관리 &gt; 연체 대응 결과에서</div>';
+        h += '</div><div class="odt-strip-foot">계약중 · 임대료 기준 · 아침 08:20 첫 집계가 그날의 기준값(DashBoard 일자별 카드와 동일) · 완납 = 기준 연체자 중 임대료 미납 0원 + 그날 연체납부 기록 · 분납(일부 입금) = 아직 연체지만 미납총액 감소 · 회차별 숫자는 기준 이후 누적 · 숫자 클릭 → 명단, 미입금·신규 상세는 운영관리 &gt; 연체 대응 결과에서</div>';
       } else {
         h += '<div class="odt-strip-foot">' + noDataWhy(today) + (pv ? ' · 최근 집계 ' + mdLb(pv.day) + ' ' + pv.baseSlot + ' ' + pv.baseN + '명 → ' + pv.last.slot + ' ' + pv.last.n['임대료'] + '명' : '') + '</div>';
       }
