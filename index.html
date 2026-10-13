@@ -1225,6 +1225,8 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
           <span class="status-dot loading" id="statusDot"></span>
           <span id="statusText">로딩 중</span>
         </span>
+        <!-- [v677] 자동 갱신 상태 칩 — 클릭: 상세/설정 팝오버 -->
+        <span id="autoSyncChip" class="date-badge" style="display:none" onclick="window.__autoSyncToggleUi&&window.__autoSyncToggleUi(event)">⟳ 자동갱신</span>
         <button class="refresh-btn" id="refreshBtn" onclick="loadData()">🔄 새로고침</button>
         <!-- [v193] 계약정보 새로고침 — 기존 loadData() 보존, 계약/공실 강제 재로드 -->
         <button class="refresh-btn" id="refreshContractsBtn" onclick="refreshContractsOnly()" style="margin-left:6px;background:#4F46E5;min-width:140px;text-align:center" title="계약·공실 데이터만 다시 받습니다 (캐시 무력화)">📑 계약정보갱신</button>
@@ -1925,7 +1927,7 @@ window._sheetInflight = window._sheetInflight || {};
   function keyOf(u){
     try {
       var q = u.split('?');
-      var parts = (q[1] || '').split('&').filter(function(kv){ return kv.slice(0,3) !== '_t=' && kv.slice(0,2) !== '_='; });
+      var parts = (q[1] || '').split('&').filter(function(kv){ return kv.slice(0,3) !== '_t=' && kv.slice(0,2) !== '_=' && kv.slice(0,7) !== '_fresh='; });   /* [v677] _fresh 는 키에서 제외 */
       parts.sort();
       return q[0] + '?' + parts.join('&');
     } catch(_e){ return u; }
@@ -1934,6 +1936,7 @@ window._sheetInflight = window._sheetInflight || {};
     var n = Object.keys(mem).length;
     if (n) console.log('[v595] gviz 캐시 비움 (' + reason + ') — ' + n + '건');
     mem = {};
+    try { if (window.__gvizOnBust) window.__gvizOnBust(reason); } catch(_b){}   /* [v677] 자동 갱신: 쓰기 후 재확인 */
   }
   window._gvizBust = bust;
   window.fetch = function(input, init){
@@ -1949,7 +1952,8 @@ window._sheetInflight = window._sheetInflight || {};
     var ttl = (typeof window._gvizTTL === 'number') ? window._gvizTTL : 60000;
     var k = keyOf(url);
     var hit = mem[k];
-    if (hit && (Date.now() - hit.t) < ttl) {
+    var force = /[?&]_fresh=1(?:&|$)/.test(url);   /* [v677] 자동 갱신: TTL 무시하고 새로 받되 캐시에는 저장 */
+    if (hit && !force && (Date.now() - hit.t) < ttl) {
       return Promise.resolve(new Response(hit.text, { status: hit.status || 200, headers: { 'Content-Type': 'text/plain' } }));
     }
     if (inflight[k]) {
@@ -1959,7 +1963,10 @@ window._sheetInflight = window._sheetInflight || {};
     var pr = realFetch(input, init).then(function(res){
       return res.text().then(function(text){
         var rec = { t: Date.now(), text: text, status: res.status };
-        if (res.ok && text && text.length > 50) mem[k] = rec;
+        if (res.ok && text && text.length > 50) {
+          mem[k] = rec;
+          try { rec.sig = (text.slice(0, 400).match(/"sig":"([^"]+)"/) || [])[1] || ''; if (window.__gvizOnStore) window.__gvizOnStore(k, rec); } catch(_h){}   /* [v677] 시트별 데이터 해시 기록 */
+        }
         console.log('[v595] gviz ' + (Math.round(text.length/104858)/10) + 'MB · ' + ((Date.now()-t0)/1000).toFixed(1) + 's — ' + (k.match(/gid=\d+|sheet=[^&]+/) || ['?'])[0]);
         return rec;
       });
@@ -5874,7 +5881,7 @@ var _PEN_RE=/위약/;
 async function renderSettlementView(){
   var el = document.getElementById('stlBody');
   if (!el) return;
-  el.innerHTML = '<div class="cr-empty">💵 정산 데이터 로딩 중...</div>';
+  if (!window.__asQuiet) el.innerHTML = '<div class="cr-empty">💵 정산 데이터 로딩 중...</div>';   /* [v677] 자동 갱신 재렌더 시 깜빡임 방지 */
   try{
     // ── 데이터 확보 (기존 로드 재사용, 없으면 fetch) ──
     if (!Array.isArray(paymentRawData) || !paymentRawData.length) {
@@ -12522,7 +12529,11 @@ if (typeof loadLandlordAccounts === 'function') loadLandlordAccounts();
 setInterval(() => { updateDateBadge(); renderCkProgress(); }, 60000);
 // [v104/v116] 첫 화면을 K.R.G. Enterprize로 — 100ms 지연 + prefetch 제거 (중복 fetch 방지)
 if (typeof switchView === 'function') {
-  setTimeout(function(){ switchView('summary'); }, 100);
+  setTimeout(function(){
+    var rv = null;   /* [v677] 새 버전 자동 적용(재로드) 후 이전 탭 복원 */
+    try { rv = sessionStorage.getItem('krg_restore_view'); if (rv) sessionStorage.removeItem('krg_restore_view'); } catch(_){}
+    switchView((rv && document.getElementById(rv + 'View')) ? rv : 'summary');
+  }, 100);
 }
 // 5분마다 Sheets 데이터 자동 재로드
 setInterval(() => { loadData(); }, 5 * 60 * 1000);
@@ -27161,7 +27172,7 @@ async function okpi_render(){
     // [Phase 2c-fix] syncFromGlobal은 매 렌더가 아니라 탭 진입 시·글로벌 후크에서만 호출
     var host = document.querySelector('#opskpiView .okpi-inner');
     if (!host) return;
-    host.innerHTML = '<div class="okpi-empty">📡 KPI 데이터 로딩 중...</div>';
+    if (!window.__asQuiet) host.innerHTML = '<div class="okpi-empty">📡 KPI 데이터 로딩 중...</div>';   /* [v677] 자동 갱신 재렌더 시 깜빡임 방지 */
     await okpi_ensureData();
     var k = okpi_calcAll();
     var _callRows=[];
@@ -29276,7 +29287,7 @@ function renderExitMgmtView(){
   function mlabel(y,mo){ return String(y).slice(2)+'.'+('0'+mo).slice(-2); }
   var cache = {};
   var _curSig = null, _rerender = null, _lastRenderSig = null;
-  function dataSig(){ var p=0,c=0,o=''; try{ p=(paymentRawData||[]).length; }catch(e){} try{ c=(contractRawData||[]).length; }catch(e){} try{ o=(typeof window.odt_sig==='function')?window.odt_sig():''; }catch(e){} return p+'_'+c+'_'+o; }   /* [v673] 연체추이 집계 도착 시 캐시 무효화 */
+  function dataSig(){ var p=0,c=0,o=''; try{ p=(paymentRawData||[]).length; }catch(e){} try{ c=(contractRawData||[]).length; }catch(e){} try{ o=(typeof window.odt_sig==='function')?window.odt_sig():''; }catch(e){} return p+'_'+c+'_'+o+'_'+(window.__dataEpoch||0); }   /* [v673] 연체추이 집계 도착 시 캐시 무효화 · [v677] 자동 갱신 세대 */
   function compute(pt){
     var _sig = dataSig();
     if (_curSig !== _sig) { cache = {}; _curSig = _sig; }   // [v375] 데이터 변경 시 캐시 무효화 (덜 로드된 상태로 고정되는 버그 방지)
@@ -29979,6 +29990,486 @@ function renderExitMgmtView(){
   setInterval(function(){
     if (document.getElementById('odtOpsBox') || document.getElementById('odtStripBox') || document.getElementById('rnwDelqTrendCard')) load();
   }, TTL);
+})();
+</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════════
+   [v677] 자동 갱신 — 새로고침 없이 시트 변경을 감지해 현재 화면을 다시 그린다
+   · 주기(기본 3분 · 탭이 보일 때만)마다 "현재 화면이 쓰는 시트만" 다시 받아 gviz 응답의 sig(구글이 붙이는 데이터 해시)로 변경 판정
+       - 계약관리(Raw DATA)·대응내역·연체관리: 전체 수신(0.5~0.9MB) → sig 같으면 파싱 생략, 다르면 파싱·반영
+       - 입금내역(Raw DATA, 원문 41MB): 1KB 집계 프로브(계약상태·납부상태·납부종류별 건수·금액·날짜 합)가 바뀔 때만 전체 수신
+   · 반영 = 전역 배열(contractRawData·paymentRawData·vacancyRawData·daeungRawData·incomeRawData·_rnwIncomeRaw·_dlqRawCache …) 교체
+            + 길이 기반 파생 캐시 무효화(__dlqRateMap·__dpay*·__dlqCutMap·__dataEpoch) + 현재 화면 재렌더(스크롤 보존)
+   · 재렌더 보류(데이터는 먼저 반영, 화면은 조작이 끝난 뒤): 탭 숨김 · 입력 중(포커스+타이핑) · 수정 중인 폼(입력값≠기본값)
+       · 모달/오버레이 열림 · 최근 2.5초 내 조작 · 텍스트 선택 중 → 칩에 "새 데이터 · … 반영" 표시, 1.5초마다 재시도
+   · 탭이 다시 보이면(마지막 확인 45초 경과) 즉시 확인 · Apps Script 쓰기(JSONP action=… / fetch) 12초 뒤 확인 · 화면 전환 시 확인
+   · 새 버전 감지: index.html ETag 비교(HEAD) → 우하단 안내 + [지금 적용] · 탭이 10분 이상 숨겨져 있으면 자동 적용(현재 탭 복원)
+   · 끄기/간격: 헤더 '⟳ 자동갱신' 칩 클릭 → 팝오버 · localStorage krg_autosync_off / krg_autosync_ms · 콘솔 window.__autoSync
+   ═══════════════════════════════════════════════════════════════════════════════ */
+(function(){
+  if (window.__autoSyncInit) return; window.__autoSyncInit = true;
+  var TAG = '[v677 자동갱신]';
+  var SID = (typeof SHEET_ID !== 'undefined' && SHEET_ID) ? SHEET_ID : '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
+  var GID = { contract:'1953907648', income:'131074722', daily:'554798125', dlq:'418937767', partner:'1799140165', settle:'1253974103' };
+  var NAME2GID = { '계약관리(Raw DATA)':'1953907648', '입금내역(Raw DATA)':'131074722' };
+  var LABEL = { contract:'계약관리', income:'입금내역', daily:'대응내역', dlq:'연체관리', partner:'파트너', settle:'정산내역' };
+  var VIEW_SHEETS = {
+    summary:      ['contract','income','daily'],
+    opskpi:       ['contract','daily','income'],
+    settlement:   ['contract','income','daily','settle'],
+    contractMgmt: ['contract'],
+    partnerMgmt:  ['contract','income','partner'],
+    contract:     ['contract','income','daily'],
+    renewal:      ['contract','income','daily','settle'],
+    payment:      ['contract','income','daily'],
+    delinquency:  ['contract','income','daily','dlq'],
+    exitMgmt:     ['contract','daily','income'],
+    property:     ['contract','daily'],
+    dashboard: [], checklist: []
+  };
+  var VIEW_EL = { summary:'#summaryView', opskpi:'#opskpiView', settlement:'#settlementView', contractMgmt:'#contractMgmtView', partnerMgmt:'#partnerMgmtView', contract:'#contractView', renewal:'#renewalView', payment:'#paymentView', delinquency:'#delinquencyView', exitMgmt:'#exitMgmtView', property:'#propertyView', dashboard:'#dashboardView', checklist:'#checklistView' };
+  /* 입금내역 프로브 — 열: E 계약번호 · F 납부종류 · N 계약상태 · R 납부번호 · S 청구서명 · T 납부상태 · U 최종청구 · Z 연체료 · AA 납부금액 · AB 미납금액 · AC 납기일 · AD 연체일수 · AE 납부일 */
+  var PROBE_TQ = 'SELECT N, T, F, count(E), sum(AB), sum(AD), count(AE), max(AE), max(AC), max(R), sum(AA), sum(U), sum(Z), count(S) GROUP BY N, T, F';
+  var DEF_MS = 3 * 60 * 1000, MIN_MS = 60 * 1000;
+  var ST = window.__autoSync = {
+    on: true, ms: DEF_MS, lastCheck: 0, lastChange: 0, lastKeys: [], running: null, pending: null, holdWhy: '', nextAt: 0, err: '',
+    sig: {}, probe: {}, fetching: {}, ver: { etag: '', newer: false, since: 0, at: 0, later: 0 }, hiddenSince: 0, lastInput: 0, lastKeyIn: 0,
+    renderedAt: 0, log: [], n: { checks: 0, applied: 0, renders: 0 }, api: {}
+  };
+  ST.cfg = { VIEW_SHEETS: VIEW_SHEETS, GID: GID, LABEL: LABEL };   /* 콘솔 점검·테스트용 */
+  try {
+    if (localStorage.getItem('krg_autosync_off') === '1') ST.on = false;
+    var _ms = parseInt(localStorage.getItem('krg_autosync_ms') || '', 10);
+    if (_ms >= MIN_MS && _ms <= 60 * 60 * 1000) ST.ms = _ms;
+  } catch(_){ }
+  if (typeof window._autoSyncMs === 'number' && window._autoSyncMs >= MIN_MS) ST.ms = window._autoSyncMs;
+
+  function now(){ return Date.now(); }
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function hm(t){ var d = new Date(t); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+  function hms(t){ var d = new Date(t); return hm(t) + ':' + pad2(d.getSeconds()); }
+  function log(m){ ST.log.push(hms(now()) + ' ' + m); if (ST.log.length > 40) ST.log.shift(); try { console.log(TAG, m); } catch(_){ } }
+  function labels(keys){ return (keys || []).map(function(k){ return LABEL[k] || k; }).join('·'); }
+  function esc(s){ return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+  function sigOf(text){ var m = String(text || '').slice(0, 400).match(/"sig":"([^"]+)"/); return m ? m[1] : ''; }
+  function gidOfKey(k){
+    var m = String(k || '').match(/[?&]gid=(\d+)/); if (m) return m[1];
+    m = String(k || '').match(/[?&]sheet=([^&]+)/);
+    if (m) { var nm = m[1]; try { nm = decodeURIComponent(nm); } catch(_){ } return NAME2GID[nm] || ''; }
+    return '';
+  }
+  function sheetKeyOfGid(g){ for (var k in GID) if (GID[k] === g) return k; return null; }
+  function isStarQuery(k){ k = String(k || ''); if (!/[?&]tq=/.test(k)) return true; return /[?&]tq=SELECT(?:%20|\+| )(?:\*|%2A)(?:&|$)/i.test(k); }
+  function curView(){ return (typeof currentView !== 'undefined' && currentView) ? currentView : ''; }
+  function viewEl(v){ var s = VIEW_EL[v]; return s ? document.querySelector(s) : null; }
+
+  /* ── gviz 캐시(v595) 훅: 어떤 경로로 받았든 시트별 최신 sig 기억 · 쓰기 감지 ───────────── */
+  window.__gvizOnStore = function(k, rec){
+    try {
+      if (!rec || !rec.text || !isStarQuery(k)) return;
+      var sk = sheetKeyOfGid(gidOfKey(k)); if (!sk) return;
+      var s = rec.sig || sigOf(rec.text); if (!s) return;
+      ST.sig[sk] = s;
+      if (sk === 'income' && !ST.fetching.income) { clearTimeout(ST._pbT); ST._pbT = setTimeout(function(){ probeBaseline(); }, 400); }   /* 다른 경로로 입금내역을 새로 받음 → 프로브 기준도 그 시점으로 */
+    } catch(_){ }
+  };
+  window.__gvizOnBust = function(reason){ try { if (/쓰기/.test(String(reason || ''))) scheduleAfterWrite('fetch 쓰기'); } catch(_){ } };
+
+  /* ── fetch 헬퍼 ───────────────────────────────────────────────────────────── */
+  function urlFull(gid){ return 'https://docs.google.com/spreadsheets/d/' + SID + '/gviz/tq?tqx=out:json&gid=' + gid + '&range=A:ZZ&tq=' + encodeURIComponent('SELECT *') + '&headers=1&_fresh=1&_t=' + now(); }
+  function urlProbe(){ return 'https://docs.google.com/spreadsheets/d/' + SID + '/gviz/tq?tqx=out:json&gid=' + GID.income + '&range=A:ZZ&headers=1&tq=' + encodeURIComponent(PROBE_TQ) + '&_fresh=1&_t=' + now(); }
+  function fetchText(url, timeoutMs){
+    var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+    var tm = setTimeout(function(){ try { if (ctrl) ctrl.abort(); } catch(_){ } }, timeoutMs || 60000);
+    var opt = { cache: 'no-store' }; if (ctrl) opt.signal = ctrl.signal;
+    return fetch(url, opt).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function(t){ clearTimeout(tm); return t; }, function(e){ clearTimeout(tm); throw e; });
+  }
+  function parseGviz(text){
+    var i = text.indexOf('setResponse('), j = text.lastIndexOf(')');
+    if (i < 0 || j <= i) throw new Error('gviz 파싱 실패');
+    var g = JSON.parse(text.slice(i + 12, j).replace(/;\s*$/, ''));
+    if (!g || !g.table) throw new Error('gviz table 없음 (' + (g && g.status) + ')');
+    return g;
+  }
+  function normProbe(t){ var i = t.indexOf('setResponse('); return i >= 0 ? t.slice(i) : t; }
+  function probeBaseline(){
+    if (ST.probing) return ST.probing;
+    ST.probing = fetchText(urlProbe(), 45000).then(function(t){
+      if (/"status":"ok"/.test(t.slice(0, 200))) ST.probe.income = normProbe(t);
+      ST.probing = null; return t;
+    }).catch(function(e){ ST.probing = null; log('입금내역 프로브 기준 설정 실패: ' + (e && e.message || e)); });
+    return ST.probing;
+  }
+
+  /* ── 시트별 변경 확인 ───────────────────────────────────────────────────────── */
+  function checkFull(sk){
+    var prev = ST.sig[sk]; ST.fetching[sk] = true;
+    return fetchText(urlFull(GID[sk]), 120000).then(function(text){
+      ST.fetching[sk] = false;
+      var s = sigOf(text); if (!s) throw new Error('응답에 sig 없음');
+      ST.sig[sk] = s;
+      if (prev !== undefined && s === prev) return { sk: sk, changed: false };
+      return { sk: sk, changed: true, g: parseGviz(text), first: prev === undefined };
+    }, function(e){ ST.fetching[sk] = false; throw e; });
+  }
+  function checkIncome(){
+    if (ST.sig.income === undefined) return checkFull('income').then(function(r){ probeBaseline(); return r; });   /* 세션 내 전체 수신 기록 없음(IDB 캐시 경로) → 1회 전체 수신 */
+    return fetchText(urlProbe(), 45000).then(function(t){
+      var ok = /"status":"ok"/.test(t.slice(0, 200));
+      if (!ok) { log('입금내역 프로브 오류 → 전체 수신으로 대체'); return checkFull('income'); }
+      var np = normProbe(t);
+      if (ST.probe.income === undefined) { ST.probe.income = np; return { sk: 'income', changed: false, baseline: true }; }
+      if (np === ST.probe.income) return { sk: 'income', changed: false };
+      return checkFull('income').then(function(r){ ST.probe.income = np; return r; });
+    });
+  }
+
+  /* ── 반영: 각 화면의 로더가 하는 일을 그대로 (gvizToObjects·parse*·_keepBig) ───── */
+  function nul(keys){ keys.forEach(function(k){ try { window[k] = null; } catch(_){ } }); }
+  function setCrLoaded(){ try { if (Array.isArray(contractRawData) && contractRawData.length && Array.isArray(paymentRawData) && paymentRawData.length) crLoaded = true; } catch(_){ } }
+  var APPLY = {
+    contract: function(g){
+      var objs = gvizToObjects(g).filter(function(r){ return _krNo(r); });
+      contractRawData = _keepBig(contractRawData, objs);
+      try { vacancyRawData = _keepBig(vacancyRawData, parseVacancySheet(g)); } catch(e){ log('parseVacancySheet 실패: ' + (e.message || e)); }
+      if (window._dlqRawCache) { window._dlqRawCache.r1 = g; window._dlqRawCache.ts = now(); }
+      try { if (window._sumSheetCacheSet) { window._sumSheetCacheSet('name', CONTRACT_SHEET, g); window._sumSheetCacheSet('gid', VACANCY_GID, g); } } catch(_){ }
+      try { if (typeof prp_invalidateCache === 'function') prp_invalidateCache(); } catch(_){ }
+      nul(['__dpayCs']);
+      setCrLoaded();
+    },
+    income: function(g){
+      var objs = gvizToObjects(g).filter(function(r){ return _krNo(r); });
+      paymentRawData = _keepBig(paymentRawData, objs);
+      try { _normPaymentRows(paymentRawData); } catch(_){ }
+      window._rnwIncomeRaw = g;
+      try { if (ptLoaded || (Array.isArray(incomeRawData) && incomeRawData.length)) incomeRawData = parseIncomeSheet(g); } catch(e){ log('parseIncomeSheet 실패: ' + (e.message || e)); }
+      if (window._dlqRawCache) { window._dlqRawCache.r2 = g; window._dlqRawCache.ts = now(); }
+      try { if (window._sumSheetCacheSet) window._sumSheetCacheSet('name', INCOME_SHEET, g); } catch(_){ }
+      nul(['__dlqRateMap', '__dpayAmt', '__dpayDue', '__dpayCs', '__dpayDlqD', '__dpayScore', '__dpayRes']);
+      setCrLoaded();
+    },
+    daily: function(g){
+      daeungRawData = _keepBig(daeungRawData, parseDailyReport(g));
+      try { if (window._ptDailyMap) window._ptDailyMap = parseDailyForPt(g); } catch(e){ log('parseDailyForPt 실패: ' + (e.message || e)); }
+      if (window._dlqRawCache) { window._dlqRawCache.r3 = g; window._dlqRawCache.ts = now(); }
+      nul(['__dlqCutMap', '__dpayScore', '__dpayRes']);
+    },
+    dlq: function(g){ if (window._dlqRawCache) { window._dlqRawCache.r4 = g; window._dlqRawCache.ts = now(); } },
+    partner: function(g){ partnerRawData = parsePartnerSheet(g); partnerLoaded = true; },
+    settle: function(g){ return cG_loadSettleSheet(); }   /* 60초 gviz 캐시에 방금 받은 응답이 있어 재다운로드 없음 */
+  };
+
+  /* ── 재렌더 보류 판정 ───────────────────────────────────────────────────────── */
+  function isEditable(el){
+    if (!el || el === document.body) return false;
+    var t = (el.tagName || '').toUpperCase();
+    if (t === 'TEXTAREA') return true;
+    if (t === 'INPUT') { var ty = (el.type || 'text').toLowerCase(); return !/^(checkbox|radio|button|submit|reset|hidden|range|file|color|image)$/.test(ty); }
+    return !!el.isContentEditable;
+  }
+  function isSearchBox(el){ return /search|검색|filter|필터/i.test([el.id, el.className, el.placeholder, el.name].join(' ')); }
+  function isDirty(el){
+    try {
+      var t = (el.tagName || '').toUpperCase();
+      if (el.disabled || el.readOnly) return false;
+      if (t === 'SELECT') { var di = -1; for (var i = 0; i < el.options.length; i++) if (el.options[i].defaultSelected) { di = i; break; } if (di < 0) di = 0; return el.selectedIndex !== di; }
+      if (t === 'TEXTAREA') return (el.value || '').trim() !== (el.defaultValue || '').trim();
+      if (t === 'INPUT') { var ty = (el.type || 'text').toLowerCase(); if (/^(checkbox|radio|button|submit|reset|hidden|range|file|color|image)$/.test(ty)) return false; return el.value !== el.defaultValue && (el.value || '').trim() !== ''; }
+    } catch(_){ }
+    return false;
+  }
+  function hasDirty(root){
+    if (!root) return false;
+    var els = root.querySelectorAll('input, textarea, select');
+    for (var i = 0; i < els.length; i++) { var el = els[i]; if (el.__asDirty && !isSearchBox(el) && isDirty(el)) return true; }
+    return false;
+  }
+  function bigFixed(el, minFrac){
+    var cs; try { cs = getComputedStyle(el); } catch(_){ return false; }
+    if (cs.display === 'none' || cs.visibility === 'hidden' || (cs.position !== 'fixed' && cs.position !== 'absolute')) return false;
+    var r = el.getBoundingClientRect(); return (r.width * r.height) >= (innerWidth * innerHeight * minFrac);
+  }
+  function overlayOpen(root){
+    var kids = document.body.children;
+    for (var i = 0; i < kids.length; i++) {
+      var el = kids[i]; if (el.nodeType !== 1) continue;
+      if (/^(SCRIPT|STYLE|LINK)$/.test(el.tagName) || el.id === 'autoSyncPop' || el.id === 'autoSyncVerBar' || el.classList.contains('header')) continue;
+      var cs; try { cs = getComputedStyle(el); } catch(_){ continue; }
+      if (cs.position === 'fixed' && bigFixed(el, 0.5)) return true;
+    }
+    if (root) { var cand = root.querySelectorAll('[class*="modal"],[class*="overlay"],[class*="popup"],[class*="-ov"],[id*="modal"],[id*="Modal"],[id*="Overlay"]'); for (var j = 0; j < cand.length; j++) if (bigFixed(cand[j], 0.4)) return true; }
+    return false;
+  }
+  function blockReason(view){
+    if (document.hidden) return '탭이 보이면';
+    var ae = document.activeElement;
+    if (ae && isEditable(ae) && (now() - ST.lastKeyIn < 20000 || (ae.__asDirty && isDirty(ae)))) return '입력 끝나면';
+    if (now() - ST.lastInput < 2500) return '잠시 후';
+    var root = viewEl(view);
+    if (hasDirty(root)) return '입력 끝나면';
+    if (overlayOpen(root)) return '창 닫으면';
+    try { var sel = window.getSelection && window.getSelection(); if (sel && sel.rangeCount && !sel.isCollapsed && String(sel).trim().length > 0) return '선택 해제 후'; } catch(_){ }
+    return '';
+  }
+  function dirtyAnywhere(){ try { var els = document.querySelectorAll('input, textarea, select'); for (var i = 0; i < els.length; i++) if (els[i].__asDirty && isDirty(els[i])) return true; } catch(_){ } return false; }
+
+  /* ── 스크롤 보존 ────────────────────────────────────────────────────────────── */
+  function pathOf(el, root){ var p = [], n = el; while (n && n !== root && n.parentElement) { var idx = 0, s = n; while ((s = s.previousElementSibling)) idx++; p.unshift(n.tagName + ':' + idx); n = n.parentElement; } return n === root ? p.join('/') : ''; }
+  function byPath(root, path){ if (!root || !path) return null; var n = root, parts = path.split('/'); for (var i = 0; i < parts.length; i++) { var pr = parts[i].split(':'); var c = n.children[+pr[1]]; if (!c || c.tagName !== pr[0]) return null; n = c; } return n; }
+  function snapScroll(root){
+    var out = { x: window.scrollX || window.pageXOffset || 0, y: window.scrollY || window.pageYOffset || 0, inner: [] };
+    if (!root) return out;
+    try { var all = root.querySelectorAll('*'); for (var i = 0; i < all.length; i++) { var e = all[i]; if (e.scrollTop > 0 || e.scrollLeft > 0) { var p = pathOf(e, root); if (p) out.inner.push({ p: p, x: e.scrollLeft, y: e.scrollTop }); } } } catch(_){ }
+    return out;
+  }
+  function restoreScroll(root, snap){
+    if (!snap || ST.lastInput > ST.renderedAt) return;   /* 그 사이 사용자가 움직였으면 건드리지 않음 */
+    try { if (Math.abs((window.scrollY || 0) - snap.y) > 2 || Math.abs((window.scrollX || 0) - snap.x) > 2) window.scrollTo(snap.x, snap.y); } catch(_){ }
+    snap.inner.forEach(function(s){ var e = byPath(root, s.p); if (e) { if (e.scrollTop !== s.y) e.scrollTop = s.y; if (e.scrollLeft !== s.x) e.scrollLeft = s.x; } });
+  }
+
+  /* ── 현재 화면 재렌더 (각 탭 진입 시 호출되는 함수 그대로) ──────────────────── */
+  function rerenderRecord(){
+    if (!window._crCurrentNo || !document.querySelector('.cr-contract-no')) return;
+    var no = String(window._crCurrentNo).trim();
+    var c = (contractRawData || []).find(function(r){ return String(r['계약번호'] || '').trim() === no; }); if (!c) return;
+    var p = (paymentRawData || []).filter(function(x){ return _krNo(x) === no; });
+    var r = (daeungRawData || []).filter(function(x){ return String(x.no).trim() === no; }).sort(cG_sortResponsesNewest);
+    renderContractRecord(c, p, r);
+  }
+  var RENDER = {
+    summary:      function(){ renderSummaryDashboard(); },
+    opskpi:       function(){ try { if (typeof okpi_syncFromGlobal === 'function') okpi_syncFromGlobal(); } catch(_){ } return okpi_render(); },
+    settlement:   function(){ return renderSettlementView(); },
+    contractMgmt: function(){ renderContractMgmtView(); },
+    partnerMgmt:  function(){ renderPartnerMgmtView(); },
+    contract:     function(){ rerenderRecord(); },
+    renewal:      function(){ renderRenewalView(); },
+    payment:      function(){ if (ptLoaded) renderPaymentTargets(); },
+    delinquency:  function(){ return renderDelinquency(); },
+    exitMgmt:     function(){ renderExitMgmtView(); },
+    property:     function(){ if (typeof renderPropertyView === 'function') renderPropertyView(); }
+  };
+  function doRender(view, keys){
+    var fn = RENDER[view]; if (!fn) return;
+    var root = viewEl(view), snap = snapScroll(root);
+    ST.renderedAt = now(); ST.n.renders++;
+    window.__asQuiet = true;   /* okpi_render · renderSettlementView 의 '로딩 중' 문구 생략 (깜빡임 방지) */
+    try { var pr = fn(); if (pr && typeof pr.catch === 'function') pr.catch(function(e){ log('재렌더 오류(' + view + '): ' + (e && e.message || e)); }); }
+    catch(e){ log('재렌더 오류(' + view + '): ' + (e && e.message || e)); }
+    finally { window.__asQuiet = false; }
+    [0, 150, 800, 2000].forEach(function(ms){ setTimeout(function(){ restoreScroll(root, snap); }, ms); });
+    log('화면 반영 ' + view + ' ← ' + labels(keys));
+  }
+  function requestRender(view, keys){
+    if (ST.pending && ST.pending.view === view) { ST.pending.keys = ST.pending.keys.concat(keys.filter(function(k){ return ST.pending.keys.indexOf(k) < 0; })); }
+    else ST.pending = { view: view, keys: keys.slice(), since: now() };
+    tryRender();
+  }
+  function tryRender(){
+    clearTimeout(ST.retryT);
+    var p = ST.pending; if (!p) return;
+    var view = curView();
+    if (view !== p.view) { ST.pending = null; ST.holdWhy = ''; setChip(); return; }   /* 화면이 바뀌면 전환 시 최신 데이터로 그려짐 */
+    var why = blockReason(view);
+    if (why) { ST.holdWhy = why; setChip(); ST.retryT = setTimeout(tryRender, 1500); return; }
+    ST.pending = null; ST.holdWhy = '';
+    doRender(view, p.keys); setChip();
+  }
+
+  /* ── 한 바퀴 ────────────────────────────────────────────────────────────────── */
+  function tick(reason){
+    if (!ST.on) return Promise.resolve();
+    if (document.hidden) { ST.skippedHidden = true; return Promise.resolve(); }
+    if (ST.running) return ST.running;
+    var view = curView();
+    var keys = (VIEW_SHEETS[view] || []).slice();
+    if (view === 'delinquency' && !window._dlqRawCache) keys = keys.filter(function(k){ return k !== 'dlq'; });   /* 첫 렌더 진행 중 */
+    if (view === 'contract' && !document.querySelector('.cr-contract-no')) keys = [];                               /* 열린 계약 기록이 없으면 그릴 것이 없음 */
+    if (keys.indexOf('partner') >= 0 && !partnerLoaded) keys = keys.filter(function(k){ return k !== 'partner'; });
+    if (keys.indexOf('settle') >= 0 && !(window.__settleMapAll || window.__rnwSettleMap)) keys = keys.filter(function(k){ return k !== 'settle'; });
+    ST.nextAt = now() + ST.ms;
+    versionCheck();
+    if (!keys.length) { ST.lastCheck = now(); setChip(); return Promise.resolve(); }
+    setChip('checking');
+    var t0 = now();
+    var ps = keys.map(function(k){
+      var p = (k === 'income') ? checkIncome() : checkFull(k);
+      return p.then(function(r){ return r; }, function(e){ return { sk: k, error: (e && e.message) || String(e) }; });
+    });
+    ST.running = Promise.all(ps).then(function(res){
+      var changed = [], errs = [], applies = [];
+      res.forEach(function(r){
+        if (r.error) { errs.push(LABEL[r.sk] + ': ' + r.error); return; }
+        if (!r.changed) return;
+        applies.push(Promise.resolve().then(function(){ return APPLY[r.sk](r.g); }).then(function(){ changed.push(r.sk); }, function(e){ errs.push(LABEL[r.sk] + ' 반영 실패: ' + (e && e.message || e)); }));
+      });
+      return Promise.all(applies).then(function(){
+        ST.lastCheck = now(); ST.n.checks++;
+        ST.err = errs.length ? errs.join(' · ') : '';
+        if (view === 'delinquency' && window._dlqRawCache && !errs.length) window._dlqRawCache.ts = now();   /* 전부 확인됨 → 10분 캐시 만료로 인한 6MB 재다운로드 방지 */
+        if (changed.length) {
+          ST.lastChange = now(); ST.lastKeys = changed.slice(); ST.n.applied++;
+          window.__dataEpoch = (window.__dataEpoch || 0) + 1;
+          log('변경 반영: ' + labels(changed) + ' (' + reason + ', ' + (now() - t0) + 'ms)' + (errs.length ? ' ⚠ ' + ST.err : ''));
+          if (view === curView()) requestRender(view, changed);
+        } else {
+          log('변경 없음: ' + labels(keys) + ' (' + reason + ', ' + (now() - t0) + 'ms)' + (errs.length ? ' ⚠ ' + ST.err : ''));
+        }
+        try { if (typeof window.odt_load === 'function' && /^(delinquency|opskpi|summary)$/.test(view)) window.odt_load(true); } catch(_){ }
+        ST.running = null; setChip();
+      });
+    }).catch(function(e){ ST.running = null; ST.lastCheck = now(); ST.err = (e && e.message) || String(e); log('확인 실패: ' + ST.err); setChip(); });
+    return ST.running;
+  }
+  function scheduleAfterWrite(src){ clearTimeout(ST.wT); ST.wT = setTimeout(function(){ tick('쓰기 후 ' + (src || '')); }, 12000); }
+
+  /* ── 새 버전 감지 ───────────────────────────────────────────────────────────── */
+  function etagOf(r){ var e = (r.headers.get('etag') || '').replace(/^W\//i, '').replace(/"/g, '').trim(); return e + '|' + (r.headers.get('last-modified') || '').trim(); }   /* gzip 응답은 W/"…" 약한 ETag → 정규화 */
+  function versionBaseline(){
+    if (!/^https?:$/.test(location.protocol)) return;
+    fetch(location.href.split('#')[0], { cache: 'force-cache' }).then(function(r){ var e = etagOf(r); if (e !== '|') { ST.ver.etag = e; ST.ver.at = now(); } }).catch(function(){ });
+  }
+  function versionCheck(force){
+    if (!/^https?:$/.test(location.protocol) || ST.verChecking) return;
+    if (!force && now() - ST.ver.at < 120000) return;
+    if (!ST.ver.etag) { versionBaseline(); return; }
+    ST.verChecking = true;
+    fetch(location.pathname + '?_vc=' + now(), { method: 'HEAD', cache: 'no-store' }).then(function(r){
+      ST.verChecking = false; ST.ver.at = now();
+      if (!r.ok) return;
+      var e = etagOf(r); if (e === '|') return;
+      if (e !== ST.ver.etag && !ST.ver.newer) { ST.ver.newer = true; ST.ver.since = now(); log('새 버전 감지 (' + e.split('|')[0] + ')'); showVerBar(); setChip(); }
+    }).catch(function(){ ST.verChecking = false; });
+  }
+  function applyVersion(){
+    try { sessionStorage.setItem('krg_restore_view', curView() || 'summary'); } catch(_){ }
+    location.replace(location.pathname + '?v=' + now());   /* 새 쿼리 → 엣지 캐시 우회, 최신 index.html 보장 */
+  }
+  function showVerBar(){
+    if (document.getElementById('autoSyncVerBar') || (ST.ver.later && now() - ST.ver.later < 30 * 60000)) return;
+    var b = document.createElement('div'); b.id = 'autoSyncVerBar';
+    b.innerHTML = '<span style="font-size:18px">🆕</span><div style="flex:1;min-width:0"><div style="font-weight:800">대시보드 새 버전이 배포되었습니다</div><div style="font-size:11px;color:#CBD5E1;margin-top:2px">지금 적용하면 현재 탭을 유지한 채 다시 불러옵니다 · 탭을 10분 이상 벗어나 있으면 자동 적용</div></div>'
+      + '<button class="as-btn as-btn-pri" onclick="window.__autoSync.api.applyVersion()">지금 적용</button><button class="as-btn" onclick="window.__autoSync.api.laterVersion()">나중에</button>';
+    document.body.appendChild(b);
+  }
+  function laterVersion(){ ST.ver.later = now(); var b = document.getElementById('autoSyncVerBar'); if (b) b.remove(); setChip(); }
+
+  /* ── 헤더 칩 · 팝오버 ───────────────────────────────────────────────────────── */
+  function setChip(mode){
+    var el = document.getElementById('autoSyncChip'); if (!el) return;
+    el.style.display = '';
+    var txt;
+    if (!ST.on) txt = '⏸ 자동갱신 꺼짐';
+    else if (mode === 'checking') txt = '⟳ 확인 중…';
+    else if (ST.pending) txt = '⟳ 새 데이터 · ' + (ST.holdWhy || '잠시 후') + ' 반영';
+    else if (ST.err) txt = '⚠ 자동갱신 오류 · 재시도';
+    else if (ST.lastChange && now() - ST.lastChange < 10 * 60000) txt = '⟳ ' + hm(ST.lastChange) + ' 반영 · ' + labels(ST.lastKeys);
+    else if (ST.lastCheck) txt = '⟳ 자동갱신 · ' + hm(ST.lastCheck) + ' 확인';
+    else txt = '⟳ 자동갱신';
+    if (ST.ver.newer) txt = '🆕 ' + txt;
+    el.textContent = txt;
+    el.classList.toggle('as-busy', mode === 'checking');
+    el.classList.toggle('as-new', !!ST.ver.newer);
+    el.classList.toggle('as-off', !ST.on);
+    el.title = ST.on ? ('자동 갱신 켜짐 · ' + Math.round(ST.ms / 60000) + '분마다 현재 화면의 시트 변경 확인' + (ST.lastCheck ? ' · 마지막 확인 ' + hms(ST.lastCheck) : '') + (ST.lastChange ? ' · 마지막 반영 ' + hms(ST.lastChange) + ' (' + labels(ST.lastKeys) + ')' : '') + ' · 클릭: 상세/설정') : '자동 갱신 꺼짐 · 클릭: 켜기';
+    var pop = document.getElementById('autoSyncPop'); if (pop) pop.innerHTML = popHtml();
+  }
+  function popHtml(){
+    var next = ST.on ? (ST.running ? '확인 중…' : (ST.nextAt ? hm(ST.nextAt) : '-')) : '-';
+    var mins = Math.round(ST.ms / 60000);
+    var h = '<div class="as-pop-head"><b>⟳ 자동 갱신</b><span class="as-pill ' + (ST.on ? 'on' : 'off') + '">' + (ST.on ? '켜짐 · ' + mins + '분마다' : '꺼짐') + '</span><span class="as-x" onclick="window.__autoSync.api.closePop()">✕</span></div>'
+      + '<div class="as-row">마지막 확인 <b>' + (ST.lastCheck ? hms(ST.lastCheck) : '-') + '</b> · 다음 <b>' + next + '</b></div>'
+      + '<div class="as-row">마지막 반영 <b>' + (ST.lastChange ? hms(ST.lastChange) + '</b> — ' + labels(ST.lastKeys) : '없음</b>') + '</div>'
+      + (ST.pending ? '<div class="as-row as-warn">새 데이터 수신 — ' + esc(ST.holdWhy || '잠시 후') + ' 화면에 반영됩니다</div>' : '')
+      + (ST.err ? '<div class="as-row as-err">⚠ ' + esc(ST.err) + '</div>' : '')
+      + '<div class="as-row">새 버전: ' + (ST.ver.newer ? '<b style="color:#B45309">🆕 새 버전 있음</b> <button class="as-btn as-btn-pri as-sm" onclick="window.__autoSync.api.applyVersion()">지금 적용</button>' : '<b>최신</b>') + '</div>'
+      + '<div class="as-actions"><button class="as-btn as-btn-pri" onclick="window.__autoSync.api.syncNow()">지금 갱신</button><button class="as-btn" onclick="window.__autoSync.api.toggle()">' + (ST.on ? '끄기' : '켜기') + '</button>'
+      + '<span class="as-gap">간격</span>' + [1, 3, 5, 10].map(function(m){ return '<button class="as-btn as-sm' + (mins === m ? ' as-cur' : '') + '" onclick="window.__autoSync.api.setMinutes(' + m + ')">' + m + '분</button>'; }).join('') + '</div>'
+      + '<div class="as-note">현재 화면이 쓰는 시트만 확인하고, 바뀐 시트만 받아 반영합니다. 입력 중이거나 창이 열려 있을 때는 데이터만 받아두고 조작이 끝난 뒤 화면을 다시 그립니다. 스크롤·필터·선택은 유지됩니다.</div>'
+      + '<div class="as-log">' + ST.log.slice(-6).reverse().map(function(l){ return '<div>' + esc(l) + '</div>'; }).join('') + '</div>';
+    return h;
+  }
+  function openPop(ev){
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var pop = document.getElementById('autoSyncPop');
+    if (pop) { pop.remove(); return; }
+    pop = document.createElement('div'); pop.id = 'autoSyncPop'; pop.innerHTML = popHtml();
+    pop.addEventListener('click', function(e){ e.stopPropagation(); });
+    document.body.appendChild(pop);
+    var chip = document.getElementById('autoSyncChip'); var r = chip ? chip.getBoundingClientRect() : { bottom: 60, left: innerWidth - 340 };
+    pop.style.top = (r.bottom + 8) + 'px'; pop.style.left = Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 12)) + 'px';
+    setTimeout(function(){ document.addEventListener('click', closePop, { once: true }); }, 0);
+  }
+  function closePop(){ var p = document.getElementById('autoSyncPop'); if (p) p.remove(); }
+  window.__autoSyncToggleUi = openPop;
+  ST.api = {
+    tick: tick, openPop: openPop, closePop: closePop, applyVersion: applyVersion, laterVersion: laterVersion, versionCheck: function(){ versionCheck(true); },
+    syncNow: function(){ closePop(); ST.probe.income = undefined; probeBaseline().then(function(){ tick('수동'); }); },
+    toggle: function(){ ST.on = !ST.on; try { localStorage.setItem('krg_autosync_off', ST.on ? '0' : '1'); } catch(_){ } if (ST.on) ST.nextAt = now() + ST.ms; else { ST.pending = null; ST.holdWhy = ''; } log('자동 갱신 ' + (ST.on ? '켜짐' : '꺼짐')); setChip(); },
+    setMinutes: function(m){ var ms = Math.max(MIN_MS, Math.round(m * 60000)); ST.ms = ms; try { localStorage.setItem('krg_autosync_ms', String(ms)); } catch(_){ } ST.nextAt = Math.min(ST.nextAt || 0, now() + ms) || (now() + ms); log('간격 ' + Math.round(ms / 60000) + '분'); setChip(); },
+    state: function(){ return ST; }
+  };
+
+  /* ── 이벤트 ─────────────────────────────────────────────────────────────────── */
+  ['pointerdown', 'mousedown', 'keydown', 'wheel', 'touchstart'].forEach(function(ev){
+    document.addEventListener(ev, function(e){ ST.lastInput = now(); if (ev === 'keydown' && e.target && isEditable(e.target)) ST.lastKeyIn = now(); }, { capture: true, passive: true });
+  });
+  document.addEventListener('input', function(e){ try { if (e.target) { e.target.__asDirty = now(); ST.lastKeyIn = now(); } } catch(_){ } }, true);
+  document.addEventListener('change', function(e){ try { if (e.target) e.target.__asDirty = now(); } catch(_){ } }, true);
+  document.addEventListener('visibilitychange', function(){
+    if (document.hidden) { ST.hiddenSince = now(); return; }
+    var hid = ST.hiddenSince ? now() - ST.hiddenSince : 0; ST.hiddenSince = 0;
+    if (ST.ver.newer && hid >= 10 * 60000 && !dirtyAnywhere() && !overlayOpen(viewEl(curView()))) { log('10분 이상 비활성 후 복귀 → 새 버전 적용'); applyVersion(); return; }
+    if (ST.pending) setTimeout(tryRender, 300);
+    if (ST.on && now() - ST.lastCheck > 45000) setTimeout(function(){ tick('탭 복귀'); }, 800);
+  });
+  /* 화면 전환 → 그 화면의 시트가 45초 이상 확인되지 않았으면 곧 확인 */
+  try {
+    var _sv = window.switchView;
+    if (typeof _sv === 'function' && !_sv.__asWrapped) {
+      var w = function(view){ var r = _sv.apply(this, arguments); try { ST.pending = null; ST.holdWhy = ''; setChip(); if (ST.on && now() - ST.lastCheck > 45000) { clearTimeout(ST.svT); ST.svT = setTimeout(function(){ tick('화면 전환'); }, 1500); } } catch(_){ } return r; };
+      w.__asWrapped = true; window.switchView = w;
+    }
+  } catch(_){ }
+  /* Apps Script JSONP 쓰기(action=…) 감지 → 12초 뒤 확인 */
+  try {
+    var mo = new MutationObserver(function(muts){
+      for (var i = 0; i < muts.length; i++) { var a = muts[i].addedNodes; for (var j = 0; j < a.length; j++) { var n = a[j]; if (n && n.tagName === 'SCRIPT' && /script\.google\.com/.test(n.src || '') && /[?&]action=/.test(n.src)) { scheduleAfterWrite('JSONP'); return; } } }
+    });
+    mo.observe(document.head, { childList: true }); mo.observe(document.body, { childList: true });
+  } catch(_){ }
+  /* 타이머 — 숨겨진 탭에서는 쉬고, 보이면 주기대로 · 숨김 10분+새 버전 → 자동 적용 */
+  setInterval(function(){
+    try {
+      if (document.hidden) { if (ST.ver.newer && ST.hiddenSince && now() - ST.hiddenSince >= 10 * 60000 && !dirtyAnywhere() && !overlayOpen(viewEl(curView()))) { log('10분 이상 숨김 → 새 버전 자동 적용'); applyVersion(); } return; }
+      if (ST.on && now() >= ST.nextAt) tick('주기');
+      else setChip();
+    } catch(_){ }
+  }, 15000);
+
+  /* ── 스타일 · 시작 ──────────────────────────────────────────────────────────── */
+  (function(){ var st = document.createElement('style'); st.id = 'as-css'; st.textContent = ''
+    + '#autoSyncChip{cursor:pointer;user-select:none;transition:background .2s,color .2s}#autoSyncChip:hover{background:rgba(255,255,255,.22);color:#fff}'
+    + '#autoSyncChip.as-busy{animation:blink 1.2s infinite}#autoSyncChip.as-new{background:rgba(250,204,21,.22);color:#FDE68A}#autoSyncChip.as-off{color:#94A3B8}'
+    + '#autoSyncPop{position:fixed;z-index:100010;width:360px;max-width:calc(100vw - 16px);background:#fff;border:1px solid #E2E8F0;border-radius:12px;box-shadow:0 14px 40px rgba(15,23,42,.2);padding:12px 14px;font-size:12px;color:#334155;line-height:1.55}'
+    + '.as-pop-head{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:6px}.as-pop-head b{color:#0F172A}.as-x{margin-left:auto;cursor:pointer;color:#94A3B8;font-size:13px;padding:0 4px}.as-x:hover{color:#0F172A}'
+    + '.as-pill{font-size:10.5px;font-weight:800;border-radius:10px;padding:1px 8px}.as-pill.on{background:#DCFCE7;color:#166534}.as-pill.off{background:#F1F5F9;color:#64748B}'
+    + '.as-row{margin:2px 0}.as-row.as-warn{color:#B45309;background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:4px 8px;margin:6px 0}.as-row.as-err{color:#B91C1C;background:#FEF2F2;border:1px solid #FECACA;border-radius:6px;padding:4px 8px;margin:6px 0;word-break:break-all}'
+    + '.as-actions{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:8px 0 6px}.as-gap{margin-left:6px;color:#64748B;font-size:11px}'
+    + '.as-btn{border:1px solid #CBD5E1;background:#fff;color:#334155;border-radius:7px;padding:4px 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}.as-btn:hover{background:#F1F5F9}.as-btn.as-sm{padding:2px 7px;font-size:11px}.as-btn.as-cur{background:#EEF2FF;border-color:#A5B4FC;color:#4338CA}.as-btn.as-btn-pri{background:#4F46E5;border-color:#4F46E5;color:#fff}.as-btn.as-btn-pri:hover{background:#4338CA}'
+    + '.as-note{font-size:10.5px;color:#64748B;border-top:1px dashed #E2E8F0;padding-top:6px;margin-top:4px}.as-log{font-size:10px;color:#94A3B8;margin-top:6px;max-height:84px;overflow:auto;font-family:ui-monospace,Menlo,monospace;white-space:nowrap}'
+    + '#autoSyncVerBar{position:fixed;right:16px;bottom:16px;z-index:100009;background:#0F172A;color:#fff;border-radius:12px;padding:12px 14px;box-shadow:0 12px 36px rgba(15,23,42,.35);font-size:12.5px;display:flex;gap:10px;align-items:center;max-width:460px}'
+    + '#autoSyncVerBar .as-btn{border-color:#334155;background:#1E293B;color:#E2E8F0}#autoSyncVerBar .as-btn.as-btn-pri{background:#F59E0B;border-color:#F59E0B;color:#0F172A}#autoSyncVerBar .as-btn.as-btn-pri:hover{background:#FBBF24}'
+    + '@media(max-width:900px){#autoSyncVerBar{left:12px;right:12px;max-width:none}}';
+    document.head.appendChild(st); })();
+  ST.nextAt = now() + ST.ms;
+  setChip();
+  setTimeout(function(){ try { versionBaseline(); } catch(_){ } }, 2500);
+  setTimeout(function(){ try { if (ST.on && ST.probe.income === undefined) probeBaseline(); } catch(_){ } }, 5000);
+  log('시작 — ' + (ST.on ? Math.round(ST.ms / 60000) + '분마다 확인' : '꺼짐'));
 })();
 </script>
 </body>
