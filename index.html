@@ -8606,9 +8606,9 @@ function dpay_renderCard(){
     return '<div class="dpay-card">' + head + kpi0
       + '<div style="padding:14px;text-align:center;color:#94A3B8;font-size:12px">'
       + (list.doneToday ? '오늘 입금 약속 <b style="color:#047857">' + list.doneToday + '건이 모두 완납·종료 처리</b>되었습니다. 남은 대응 건이 없습니다.'
-                        : (_n0.length ? '오늘 대응이 필요한 입금 약속이 없습니다. (받을 미납이 없는 ' + _n0.length + '건은 아래에 있습니다)'
+                        : (_n0.length ? '오늘 대응이 필요한 입금 약속이 없습니다. (받을 미납이 없는 ' + _n0.length + '건 제외)'
                                       : '오늘 잡힌 입금 약속이 없습니다.'))
-      + '</div>' + dpay_noDueBlock(list, CTX) + dpay_doneBlock(list, CTX) + '</div>';   /* [v596] 어제 실적은 운영관리 > 연체 대응 결과로 이동 */
+      + '</div></div>';   /* [v672] 접이식 행 제거 */
   }
   /* [v584] 약속자 / 분납자 / 완납자 — 오늘 약속한 사람을 결과별로 나눈 요약 */
   var _dl = list.doneList || [], _nd = list.noDueList || [];
@@ -8627,7 +8627,7 @@ function dpay_renderCard(){
     + '<span class="sep">·</span>' + kv('💧 분납자', kSplit, '#5B21B6', '진척사항이 분납으로 기록된 건 — 일부만 받았고 잔액이 남아 있음')
     + '<span class="sep">·</span>' + kv('✅ 완납자', kPaid, '#047857', '진척사항이 완납으로 기록된 건')
     + (kEnd ? '<span class="sep">·</span>' + kv('📗 종료', kEnd, '#475569', '진척사항이 종료로 기록된 건') : '')
-    + (kNoDue ? '<span class="sep">·</span>' + kv('🧾 미납 없음', kNoDue, '#1D4ED8', '입금내역에 받을 미납이 없어 대응 목록에서 내린 건 — 아래 접이식에서 확인할 수 있습니다') : '')
+    + (kNoDue ? '<span class="sep">·</span>' + kv('🧾 미납 없음', kNoDue, '#1D4ED8', '입금내역에 받을 미납이 없어 대응 목록에서 내린 건') : '')
     + (kRest ? '<span class="sep">·</span>' + kv('⏳ 진행', kRest, '#B45309', '아직 완납·분납 결과가 기록되지 않은 건 — 오늘 대응이 필요합니다') : '')
     + '</div>';
   var nDone = 0, nSoon = 0, nWait = 0, nNone = 0;
@@ -8737,8 +8737,7 @@ function dpay_renderCard(){
       + '<span class="dpay-mini-right"><span class="dpay-mini-open">▲ 목록 열기</span></span></div>';
   }
   return '<div class="dpay-card">' + head + kpi + sum + '<div class="dpay-list">' + body + '</div>'
-    + dpay_noDueBlock(list, CTX)
-    + dpay_doneBlock(list, CTX)   /* [v596] 어제 완납·종료 접이식 제거 — 운영관리 > 연체 대응 결과(기준일=어제)에서 확인 */
+    /* [v672] '미납 없음'·'오늘 완납·종료' 접이식 행 제거 (요청) — 건수는 위 요약 칩에서만 표시 */
     + '<div style="font-size:10px;color:#94A3B8;margin-top:8px;padding-top:7px;border-top:1px solid #F1F5F9">계약별 <b>가장 최근에 잡힌 입금 약속</b>이 오늘이고 <b>아직 완납·종료되지 않은</b> 건만 올라옵니다 (약속이 다른 날로 바뀐 건, 진척사항이 완납·종료인 건, <b>입금내역에 받을 미납이 없는 건</b>은 제외) · 빠른 메모의 <b>입금시간</b>에 시간을 넣으면 시간순으로 섭니다 · 1분마다 자동 갱신 · 알림은 약속 10분 전과 정각에 1회씩</div></div>'
     + mini;
 }
