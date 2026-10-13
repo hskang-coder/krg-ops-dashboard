@@ -9256,7 +9256,7 @@ function dpay_resBlock(){
     +   (who ? '<span style="font-size:10px;color:#94A3B8;font-weight:800"> · ' + (who==='a'?'계약자':'종료자') + '만</span>' : '')
     +   (psel ? '<span style="font-size:10px;color:#0F766E;font-weight:800"> · ' + psel + ' 대응만</span>' : '')
     + '</span>'
-    + '<span class="dres-sub">' + O.day + ' · 대응일 기준'
+    + '<span class="dres-sub">' + O.day + ' · 대응일 · 담당자 대응 기록(진척사항) 기준'
     +   (isRange ? ' · ' + O.days + '일 합산' + (O.exclToday ? ' (회수·미회수는 오늘 제외)' : '') : '')
     +   (isY && O.got ? ' · 회수 ₩' + O.got.toLocaleString() : '')
     + '</span></div>'
@@ -10022,6 +10022,9 @@ function buildDlqUI(d1, d2, d3, d4) {
     <!-- [v576] 오늘 입금예정 타임라인 (1분마다 자동 갱신) -->
     <div id="dpayTodayBox"></div>
 
+    <!-- [v673] 오늘 연체 인원 한 줄(접이식) — 연체추이 Raw DATA · 08:20 당일 기준값 -->
+    <div id="odtStripBox"></div>
+
     <!-- 연체율 섹션 -->
     <div class="dlq-rate-section">
       <div class="dlq-rate-left">
@@ -10276,6 +10279,7 @@ function buildDlqUI(d1, d2, d3, d4) {
   window._dlqTableRows = [...activeRows, ...terminatedRows];
   /* [v576] 오늘 입금예정 타임라인 · [v577] 계약정보(_dlqTableRows) 확정 후에 그려야 이름·금액·연락처가 붙는다 */
   try { dpay_refresh(); dpay_checkAlarms(); } catch(_v576){}
+  try { if (typeof odt_fillAll === 'function') odt_fillAll(); } catch(_v673){}   /* [v673] 오늘 연체 인원 한 줄 */
   // 납부예정일 카드 인원 기본 필터(계약중) 기준으로 업데이트
   setTimeout(dlqUpdatePayCards, 50);
   window._dlqFilterState = { days:'all', pay:'all', search:'', delinqType:'all', contractStatus:'계약중', strategyFilter:'all' };
@@ -27186,6 +27190,7 @@ async function okpi_render(){
     host.innerHTML = '<div class="okpi-wrap">'
       + okpi_renderTopBar(k)
       + '<div class="okpi-section-title">📋 연체 대응 결과 <span class="pill">일·주·월 · 기준일 연동</span></div>'
+      + '<div id="odtOpsBox">' + (typeof odt_opsHtml === 'function' ? odt_opsHtml() : '') + '</div>'   /* [v673] 연체 해소 흐름(입금내역 기준 · 전수) — 연체추이 Raw DATA */
       + '<div id="dresBox">' + dpay_resBlock() + '</div>'
       + okpi_respSection(_callRows, _callRange, _callPeriod)   /* [v557] 담당자별 대응 KPI */
       + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
@@ -29271,7 +29276,7 @@ function renderExitMgmtView(){
   function mlabel(y,mo){ return String(y).slice(2)+'.'+('0'+mo).slice(-2); }
   var cache = {};
   var _curSig = null, _rerender = null, _lastRenderSig = null;
-  function dataSig(){ var p=0,c=0; try{ p=(paymentRawData||[]).length; }catch(e){} try{ c=(contractRawData||[]).length; }catch(e){} return p+'_'+c; }
+  function dataSig(){ var p=0,c=0,o=''; try{ p=(paymentRawData||[]).length; }catch(e){} try{ c=(contractRawData||[]).length; }catch(e){} try{ o=(typeof window.odt_sig==='function')?window.odt_sig():''; }catch(e){} return p+'_'+c+'_'+o; }   /* [v673] 연체추이 집계 도착 시 캐시 무효화 */
   function compute(pt){
     var _sig = dataSig();
     if (_curSig !== _sig) { cache = {}; _curSig = _sig; }   // [v375] 데이터 변경 시 캐시 무효화 (덜 로드된 상태로 고정되는 버그 방지)
@@ -29294,11 +29299,14 @@ function renderExitMgmtView(){
     function monthDaily(y,mo){ var ld=lastDay(y,mo),isCur=(y===TY&&mo===TM),cap=isCur?TD:ld,b=billed(y,mo)||1,cnt=[],rate=[],cN=[],cC=[];
       var mS=y*10000+mo*100+1;
       for(var d=1;d<=31;d++){ if(d>ld||d>cap){cnt.push(null);rate.push(null);cN.push(null);cC.push(null);} else {var sp=delqSplitAsOf(y*10000+mo*100+d,mS);var c=sp.nw+sp.cy;cnt.push(c);rate.push(+(c/b*100).toFixed(2));cN.push(sp.nw);cC.push(sp.cy);} }
+      /* [v673] 그날 기준시각(08:20 아침 첫 집계)이 있으면 그 값으로 — 연체추이(Raw DATA) · 없는 날(주말·집계 전·누락)은 기존 소급 계산 유지 */
+      var snapN=0; try{ if(typeof window.odt_dayBase==='function'){ for(var d9=1;d9<=31;d9++){ if(cnt[d9-1]==null) continue; var ob9=window.odt_dayBase(y,mo,d9,pt); if(!ob9) continue; cnt[d9-1]=ob9.n; rate[d9-1]=+(ob9.n/b*100).toFixed(2); cN[d9-1]=ob9.nw; cC[d9-1]=ob9.cy; snapN++; } } }catch(e9){}
       var sd={'정상납부':[],'연체납부':[],'연체중':[],'분납중':[],'납부예정':[]}; for(var d=1;d<=31;d++){for(var k in sd)sd[k].push(0);}
       var bd=[]; for(var d=1;d<=31;d++) bd.push(0);
       for(var i=0;i<all.length;i++){var r=all[i];if(r.due==null)continue;var yy=Math.floor(r.due/10000),mm=Math.floor(r.due/100)%100,dd=r.due%100;if(yy===y&&mm===mo&&dd>=1&&dd<=31&&activeAt(r.cno,r.due)){ if(sd[r.st])sd[r.st][dd-1]++; bd[dd-1]++; }}
-      return {cnt:cnt,rate:rate,cntNew:cN,cntCarry:cC,status:sd,billedDaily:bd,projectedDaily:projectedBilled(y,mo),label:mlabel(y,mo),billed:b,y:y,mo:mo}; }  /* [v469] y/mo 노출 — 명단 모달 클릭 키 계산용 · [v379] cntNew/cntCarry */
+      return {cnt:cnt,rate:rate,cntNew:cN,cntCarry:cC,status:sd,billedDaily:bd,projectedDaily:projectedBilled(y,mo),label:mlabel(y,mo),billed:b,y:y,mo:mo,snapN:snapN}; }  /* [v469] y/mo 노출 — 명단 모달 클릭 키 계산용 · [v379] cntNew/cntCarry */
     function monthAgg(y,mo){ var ld=lastDay(y,mo),day=Math.min(TD,ld),asof=y*10000+mo*100+day,b=billed(y,mo)||1,c=delqAsOf(asof);
+      try{ if(typeof window.odt_dayBase==='function'){ var ob8=window.odt_dayBase(y,mo,day,pt); if(ob8) c=ob8.n; } }catch(e8){}   /* [v673] 기준시각 집계 우선 */
       var sc={'정상납부':0,'연체납부':0,'연체중':0,'분납중':0,'납부예정':0}; for(var i=0;i<all.length;i++){var r=all[i];if(r.due==null)continue;var yy=Math.floor(r.due/10000),mm=Math.floor(r.due/100)%100;if(yy===y&&mm===mo&&sc[r.st]!=null&&activeAt(r.cno,r.due))sc[r.st]++;}
       var _pj=projectedBilled(y,mo),_pjT=0; for(var _q=0;_q<_pj.length;_q++)_pjT+=_pj[_q];
       return {count:c,rate:+(c/b*100).toFixed(2),label:mlabel(y,mo),billed:b,status:sc,projected:_pjT}; }
@@ -29333,7 +29341,7 @@ function renderExitMgmtView(){
       '<div id="rnwMetrics" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px;"></div>'+
       '<div id="rnwLegend" style="display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:#6b7280;margin-bottom:4px;"></div>'+
       '<div style="position:relative;width:100%;height:200px;"><canvas id="rnwCanvas"></canvas></div>'+
-      '<div style="margin-top:8px;font-size:11px;color:#9aa0a6;">계약중(마스터 정상)·납기 경과·연체중+분납중 · 퇴실일(Z열) 기준 당시 계약중 · 계약번호 중복제거 · 종료 계약 제외 · 각 월 막대 = 이월분(하단)+신규분(상단) · <b style="color:#185FA5">build v381</b></div>';
+      '<div style="margin-top:8px;font-size:11px;color:#9aa0a6;">계약중(마스터 정상)·납기 경과·연체중+분납중 · 퇴실일(Z열) 기준 당시 계약중 · 계약번호 중복제거 · 종료 계약 제외 · 각 월 막대 = 이월분(하단)+신규분(상단) · <b style="color:#185FA5">일자별 인원 = 그날 08:20 아침 첫 집계</b>(연체추이 Raw DATA · 2026-10-13~ · 집계 없는 날·주말은 입금내역 소급 계산) · <b style="color:#185FA5">build v673</b></div>';
     anchorCard.parentNode.insertBefore(card, anchorCard);
     var sw=function(c,t){ return '<span><i style="display:inline-block;vertical-align:middle;margin-right:5px;width:11px;height:11px;border-radius:2px;background:'+c+'"></i>'+t+'</span>'; };
     var ml=function(c,k,v){ return '<div style="border-radius:8px;padding:7px 12px;min-width:108px;background:#f4f6fa;"><div style="font-size:11px;color:#6b7280;">'+k+'</div><div style="font-size:19px;font-weight:600;line-height:1.15;color:'+c+'">'+v+'</div></div>'; };
@@ -29520,7 +29528,7 @@ function renderExitMgmtView(){
         var curToday=lastVal(recent[key]);
         if(mode==='count'){ var pToday=prev?(prev.cnt[S.today.day-1]!=null?prev.cnt[S.today.day-1]:lastVal(prev.cnt)):0, p2Today=prev2?(prev2.cnt[S.today.day-1]!=null?prev2.cnt[S.today.day-1]:lastVal(prev2.cnt)):0;
           var _nwT=canSplit?lastVal(recent.cntNew):null, _cyT=canSplit?lastVal(recent.cntCarry):null;
-          mt.innerHTML=(prev?ml('#A32D2D','전월 동일 대비',pc(curToday,pToday)):'')+(prev2?ml('#A32D2D','전전월 동일 대비',pc(curToday,p2Today)):'')+ml('#185FA5','당월 연체(오늘)',curToday+'명')+(canSplit?ml(C_NW,'당월 신규분',_nwT+'명')+ml(C_CY,'당월 이월분(소화 실패)',_cyT+'명'):''); }
+          mt.innerHTML=(prev?ml('#A32D2D','전월 동일 대비',pc(curToday,pToday)):'')+(prev2?ml('#A32D2D','전전월 동일 대비',pc(curToday,p2Today)):'')+ml('#185FA5',(function(){ try{ var s9=(typeof window.odt_dayBase==='function')?window.odt_dayBase(recent.y,recent.mo,S.TD,curType):null; return s9?'당월 연체(오늘 '+s9.slot+' 기준)':'당월 연체(오늘)'; }catch(e){ return '당월 연체(오늘)'; } })(),curToday+'명')+(canSplit?ml(C_NW,'당월 신규분',_nwT+'명')+ml(C_CY,'당월 이월분(소화 실패)',_cyT+'명'):''); }
         else { mt.innerHTML=ml('#185FA5','당월 연체율',curToday+'%')+(prev?ml('#e8852b','전월',lastVal(prev.rate)+'%'):'')+(prev2?ml('#6b7280','전전월',lastVal(prev2.rate)+'%'):''); }
         var ds=[];
         md.forEach(function(x,i){ var c=cols[i];
@@ -29574,5 +29582,292 @@ function renderExitMgmtView(){
   }
   var iv = setInterval(function(){ if (typeof Chart === 'undefined') return; var title = [].slice.call(document.querySelectorAll('.sum-card-title')).filter(function(e){ return /③\s*초기\s*연체자/.test(e.textContent||''); })[0]; if (!title) return; var card = title.closest('.sum-card') || title.parentElement; var view = card.closest('.view-content.active'); if (!view) return; if (!document.getElementById(CARD_ID)) { build(card); return; } var _s = dataSig(); if (_rerender && _s !== _lastRenderSig) { _lastRenderSig = _s; _rerender(); } }, 1000);
 })();</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════════
+   [v673] 연체추이(Raw DATA) — 08:20 아침 첫 집계 기준 시간대별 연체 인원 · 연체 해소 흐름
+   · 데이터: OD '연체추이(Raw DATA)' 탭(gid 1477881084). krg-db-sync/overdue_snapshot.py 가 평일 08:20(당일 기준값)·12·15·18시에 1줄씩 기록
+   · 운영관리 > 📋 연체 대응 결과 상단 "연체 해소 흐름"(입금내역 기준 · 전수) — 일: 기준 08:20 → 마지막 회차 / 주·월: 일자별 표 + 합계 (기준일 연동)
+   · 연체관리 탭 "오늘 연체 인원" 한 줄(접이식) — 입금 상세는 운영관리로 링크
+   · DashBoard '계약중 연체 · 일자별': 그날 기준시각 집계가 있으면 그 값(인원·이월/신규) — odt_dayBase() · 없는 날은 기존 소급 계산
+   · 로드 실패·미집계는 블록 안에서만 안내 — 다른 화면에는 영향 없음
+   ═══════════════════════════════════════════════════════════════════════════════ */
+(function(){
+  if (window.__odtInit) return; window.__odtInit = true;
+  var GID = '1477881084', START = '2026-10-13', TTL = 5 * 60 * 1000;
+  var SLOTS = ['08:20', '12:00', '15:00', '18:00'];
+  var SLOT_LB = { '08:20': '08:20', '12:00': '12시', '15:00': '15시', '18:00': '18시' };
+  var WD = ['일', '월', '화', '수', '목', '금', '토'];
+  var S = window.__odTrend = { rows: [], byDay: {}, days: [], loadedAt: 0, loading: null, err: '', sig: '0' };
+  var openMem = null;
+
+  function pad2(n){ return ('0' + n).slice(-2); }
+  function ymdOf(d){ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function dateOf(ymd){ var m = String(ymd || '').match(/(\d{4})-(\d{2})-(\d{2})/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+  function cellStr(c){ if (!c) return ''; var f = (c.f != null ? c.f : c.v); return f == null ? '' : String(f); }
+  function num(s){ var t = String(s == null ? '' : s).replace(/[^0-9.\-]/g, ''); if (!t || t === '-' || t === '.') return 0; var n = parseFloat(t); return isFinite(n) ? n : 0; }
+  function ymdStr(s){ s = String(s || ''); var m = s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); if (m) return m[1] + '-' + pad2(+m[2]) + '-' + pad2(+m[3]); m = s.match(/Date\((\d+),(\d+),(\d+)/); if (m) return m[1] + '-' + pad2(+m[2] + 1) + '-' + pad2(+m[3]); return ''; }
+  function hmStr(s){ s = String(s || ''); var m = s.match(/(\d{1,2}):(\d{2})/); if (m) return pad2(+m[1]) + ':' + m[2]; m = s.match(/Date\(\d+,\d+,\d+,(\d+),(\d+)/); if (m) return pad2(+m[1]) + ':' + pad2(+m[2]); return s.trim(); }
+  function wonS(n){ n = Math.round(n || 0); var a = Math.abs(n); var s = a >= 1e8 ? (a / 1e8).toFixed(a % 1e8 ? 1 : 0) + '억' : a >= 1e4 ? Math.round(a / 1e4).toLocaleString() + '만' : a.toLocaleString(); return (n < 0 ? '-' : '') + '₩' + s; }
+  function won(n){ n = Math.round(n || 0); return (n < 0 ? '-' : '') + '₩' + Math.abs(n).toLocaleString(); }
+  function mdLb(ymd){ var d = dateOf(ymd); return d ? (d.getMonth() + 1) + '/' + d.getDate() + ' (' + WD[d.getDay()] + ')' : ymd; }
+  function mdShort(ymd){ var d = dateOf(ymd); return d ? (d.getMonth() + 1) + '/' + d.getDate() : ymd; }
+  function esc(s){ return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+  function isWk(ymd){ var d = dateOf(ymd); return !!d && (d.getDay() === 0 || d.getDay() === 6); }
+
+  function parse(gv){
+    var cols = (gv.table.cols || []).map(function(c){ return String(c.label || '').trim(); });
+    var out = [];
+    (gv.table.rows || []).forEach(function(r){
+      var o = {}; (r.c || []).forEach(function(c, i){ if (cols[i]) o[cols[i]] = cellStr(c); });
+      var day = ymdStr(o['일자']), slot = hmStr(o['시각']); if (!day || !slot) return;
+      out.push({ day: day, slot: slot, at: String(o['기록시각'] || ''),
+        n:  { '임대료': num(o['연체자(임대료)']), '변동관리비': num(o['연체자(변동관리비)']), '기타계약금': num(o['연체자(기타계약금)']), '전체': num(o['연체자(합집합)']) },
+        cy: { '임대료': num(o['이월(임대료)']), '변동관리비': num(o['이월(변동관리비)']), '기타계약금': num(o['이월(기타계약금)']), '전체': num(o['이월(전체)']) },
+        nw: { '임대료': num(o['신규(임대료)']), '변동관리비': num(o['신규(변동관리비)']), '기타계약금': num(o['신규(기타계약금)']), '전체': num(o['신규(전체)']) },
+        b: [num(o['1~3일']), num(o['4~15일']), num(o['16~30일']), num(o['30일초과'])],
+        amt: num(o['계약중 연체금액']), owed: num(o['임대료 미납총액']), nAct: num(o['계약중 계약수']), rate: num(o['연체율(%)']),
+        paid: num(o['완납(오늘)']), part: num(o['분납·일부입금(오늘)']), unpaid: num(o['미입금']), other: num(o['기타해소']), newd: num(o['신규발생(낮)']), got: num(o['오늘 회수금액']),
+        base: hmStr(o['기준시각']) || '', note: String(o['비고'] || '') });
+    });
+    return out;
+  }
+  function index(rows){
+    var by = {};
+    rows.forEach(function(r){ var d = by[r.day] || (by[r.day] = { day: r.day, list: [], slots: {} }); if (d.slots[r.slot]) return; d.slots[r.slot] = r; d.list.push(r); });
+    Object.keys(by).forEach(function(k){
+      var d = by[k]; d.list.sort(function(a, b){ return a.slot < b.slot ? -1 : a.slot > b.slot ? 1 : 0; });
+      d.first = d.list[0]; d.last = d.list[d.list.length - 1];
+      d.baseSlot = d.last.base || d.first.slot; d.base = d.slots[d.baseSlot] || d.first;
+      d.baseN = d.last.paid + d.last.part + d.last.unpaid + d.last.other;   /* 기준 연체자 수 = 흐름 4분할 합 (기록 파일 기준) */
+      if (!(d.baseN > 0)) d.baseN = d.base.n['임대료'];
+    });
+    S.byDay = by; S.days = Object.keys(by).sort(); S.rows = rows;
+    S.sig = rows.length + '_' + (rows.length ? rows[rows.length - 1].day + rows[rows.length - 1].slot : '');
+  }
+  function load(force){
+    var now = Date.now();
+    if (!force && S.loadedAt && now - S.loadedAt < TTL) return Promise.resolve(S);
+    if (S.loading) return S.loading;
+    var sid = (typeof SHEET_ID !== 'undefined' && SHEET_ID) ? SHEET_ID : '1fhp2DBul3tffFKexNXrFiduSoJ8g-8FLvpfXKaDBo2Q';
+    var url = 'https://docs.google.com/spreadsheets/d/' + sid + '/gviz/tq?tqx=out:json&gid=' + GID + '&range=A:AE&tq=' + encodeURIComponent('SELECT *') + '&headers=1&_t=' + now;
+    S.loading = fetch(url, { cache: 'no-store' }).then(function(res){ return res.text(); }).then(function(text){
+      var i = text.indexOf('setResponse('), j = text.lastIndexOf(')');
+      if (i < 0 || j <= i) throw new Error('gviz parse');
+      var gv = JSON.parse(text.slice(i + 12, j).replace(/;\s*$/, ''));
+      if (!gv || !gv.table) throw new Error('gviz table');
+      index(parse(gv)); S.loadedAt = Date.now(); S.err = '';
+      return S;
+    }).catch(function(e){
+      S.err = (e && e.message) || String(e); S.loadedAt = Date.now() - TTL + 60000;   /* 1분 뒤 재시도 */
+      console.warn('[v673] 연체추이 로드 실패:', S.err); return S;
+    }).then(function(r){ S.loading = null; try { fillAll(); } catch(_){ } return r; });
+    return S.loading;
+  }
+  function prevDataDay(ymd){ for (var i = S.days.length - 1; i >= 0; i--) { if (S.days[i] < ymd) return S.byDay[S.days[i]]; } return null; }
+  function lastDataDay(ymd){ for (var i = S.days.length - 1; i >= 0; i--) { if (S.days[i] <= ymd) return S.byDay[S.days[i]]; } return null; }
+  function noDataWhy(ymd){
+    var today = ymdOf(new Date());
+    if (!dateOf(ymd)) return '집계 없음';
+    if (isWk(ymd)) return '주말 — 집계 없음';
+    if (ymd < START) return '집계 시작 전 (2026-10-13부터 기록)';
+    if (ymd > today) return '아직 오지 않은 날짜';
+    if (!S.loadedAt && !S.err) return '집계 데이터 불러오는 중…';
+    if (ymd === today) { var n = new Date(); if (n.getHours() * 60 + n.getMinutes() < 8 * 60 + 45) return '08:20 첫 집계 대기 중'; }
+    if (S.err) return '집계 데이터를 불러오지 못했습니다 — 잠시 후 자동 재시도';
+    return '집계 누락 (기록 없음 — 동기화 PC 미가동 가능성)';
+  }
+
+  var cssDone = false;
+  function css(){
+    if (cssDone || document.getElementById('odtCss')) { cssDone = true; return; }
+    cssDone = true;
+    var st = document.createElement('style'); st.id = 'odtCss';
+    st.textContent = [
+      '.odt-wrap{border:1.5px dashed #A5B4FC;border-radius:12px;padding:10px 14px 10px;background:linear-gradient(90deg,#FBFBFF,#fff);margin:0 0 10px;position:relative;font-family:inherit}',
+      '.odt-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}',
+      '.odt-title{font-size:13.5px;font-weight:900;color:#0F172A;display:flex;align-items:center;gap:7px}.odt-title .dot{width:8px;height:8px;border-radius:50%;background:#6366F1}',
+      '.odt-pill{font-size:10px;color:#4F46E5;background:#EEF2FF;border-radius:999px;padding:2px 8px;font-weight:800}',
+      '.odt-sub{font-size:10.5px;color:#64748B;margin-top:3px;font-weight:600;line-height:1.5}.odt-sub b{color:#334155}',
+      '.odt-right{font-size:11px;color:#334155;font-weight:800;white-space:nowrap;text-align:right;line-height:1.5}.odt-src{font-size:10px;color:#94A3B8;font-weight:600}',
+      '.odt-flow{display:flex;align-items:stretch;gap:7px;margin-top:9px;flex-wrap:wrap}',
+      '.odt-f{border-radius:10px;padding:7px 11px;background:#fff;border:1px solid #E5E7EB;min-width:104px}.odt-f .t{font-size:10.5px;font-weight:800;color:#64748B;white-space:nowrap}.odt-f .n{font-size:21px;font-weight:900;margin-top:1px;line-height:1.1;color:#0F172A}.odt-f .n small{font-size:11px;color:#64748B;font-weight:700;margin-left:3px}.odt-f .s{font-size:10px;color:#94A3B8;margin-top:2px;font-weight:600;white-space:nowrap}',
+      '.odt-f.base{border-color:#C7D2FE;background:#FBFBFF;min-width:140px}.odt-f.base .n{color:#4F46E5}.odt-f.good .n{color:#15803D}.odt-f.warn .n{color:#B45309}.odt-f.bad .n{color:#B91C1C}.odt-f.new .n{color:#7C3AED}.odt-f.etc .n{color:#64748B}',
+      '.odt-f.res{border:2px solid #6366F1;min-width:140px}.odt-f.res .n small.dn{color:#15803D;font-weight:900}.odt-f.res .n small.up{color:#B91C1C;font-weight:900}',
+      '.odt-f.amt{margin-left:auto;border-color:#BBF7D0;background:#F6FFFA;min-width:140px}.odt-f.amt .n{color:#15803D;font-size:17px;margin-top:4px}',
+      '.odt-ar{display:flex;align-items:center;color:#94A3B8;font-size:17px;font-weight:300;padding:0 1px}.odt-plus{display:flex;align-items:center;color:#94A3B8;font-size:13px;font-weight:800;padding:0 1px}',
+      '.odt-warn{font-style:normal;font-size:9px;color:#B45309;background:#FFFBEB;border-radius:999px;padding:1px 6px;margin-left:4px;font-weight:800}',
+      '.odt-tl{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:#64748B;font-weight:700;flex-wrap:wrap}.odt-tl .sl{font-size:10px;color:#94A3B8}.odt-tl b{font-size:13px;font-weight:900;color:#0F172A}.odt-tl b.base{color:#4F46E5}.odt-tl b.dim{color:#CBD5E1}.odt-tl .ar{color:#94A3B8;font-weight:300}.odt-tl .sep{color:#CBD5E1}.odt-tl .pv{color:#64748B;font-weight:700}.odt-tl .def{margin-left:auto;font-size:10px;color:#94A3B8;font-weight:600}',
+      '.odt-empty{margin-top:8px;padding:12px 14px;border-radius:10px;background:#F8FAFC;border:1px dashed #E2E8F0;font-size:12px;color:#64748B;font-weight:700}',
+      '.odt-sum{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;margin-top:9px;font-size:11.5px;color:#334155;font-weight:700}.odt-sum b{font-weight:900;color:#0F172A}.odt-sum .g{color:#15803D}.odt-sum .w{color:#B45309}.odt-sum .p{color:#7C3AED}',
+      '.odt-tblwrap{margin-top:8px;max-height:290px;overflow:auto;border:1px solid #EEF2F7;border-radius:10px}',
+      '.odt-tbl{width:100%;border-collapse:collapse;font-size:11.5px}.odt-tbl th{position:sticky;top:0;background:#F8FAFC;font-size:10px;color:#64748B;font-weight:800;text-align:right;padding:6px 8px;border-bottom:1px solid #E5E7EB;white-space:nowrap}.odt-tbl th:first-child,.odt-tbl td:first-child{text-align:left}.odt-tbl td{padding:5px 8px;border-bottom:1px solid #F1F5F9;font-weight:700;color:#334155;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}',
+      '.odt-tbl td.a{color:#4F46E5;font-weight:900}.odt-tbl td.g{color:#15803D}.odt-tbl td.w{color:#B45309}.odt-tbl td.b{color:#B91C1C}.odt-tbl td.p{color:#7C3AED}.odt-tbl td.m{color:#94A3B8;font-weight:600}.odt-tbl td.dn{color:#15803D;font-weight:900}.odt-tbl td.up{color:#B91C1C;font-weight:900}.odt-tbl tr.na td{color:#94A3B8;font-weight:600}',
+      '.odt-note{margin-top:7px;font-size:10px;color:#94A3B8;line-height:1.6;font-weight:600}.odt-note b{color:#64748B}',
+      /* 연체관리 탭 한 줄 */
+      '.odt-strip{border:2px solid #6366F1;border-radius:14px;background:linear-gradient(90deg,#FBFBFF,#fff);padding:10px 16px;margin:0 0 14px;box-shadow:0 6px 18px rgba(79,70,229,.06)}',
+      '.odt-strip-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}.odt-strip .ft{font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:8px;white-space:nowrap;color:#0F172A}.odt-strip .ft .dot{width:9px;height:9px;border-radius:50%;background:#6366F1}',
+      '.odt-seq{display:flex;align-items:center;gap:8px;font-size:13px;color:#334155;font-weight:700;flex-wrap:wrap}.odt-seq .k{font-size:11px;color:#64748B;font-weight:700;margin-right:3px}.odt-seq b{font-size:17px;font-weight:900;color:#0F172A}.odt-seq b.base{color:#4F46E5}.odt-seq b.dim{color:#CBD5E1}.odt-seq .ar{color:#94A3B8;font-weight:400}.odt-seq .dl{font-size:12px;font-weight:900;margin-left:2px}.odt-seq .dl.dn{color:#15803D}.odt-seq .dl.up{color:#B91C1C}.odt-seq.muted{font-size:12px;color:#64748B}',
+      '.odt-basetag{font-size:10px;font-weight:800;color:#fff;background:#4F46E5;border-radius:999px;padding:2px 8px;white-space:nowrap}',
+      '.odt-strip-right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:11px;color:#64748B;font-weight:600;white-space:nowrap}',
+      '.odt-link{font-size:11px;font-weight:800;color:#334155;background:#F1F5F9;border-radius:999px;padding:5px 10px;cursor:pointer}.odt-link:hover{background:#E2E8F0}',
+      '.odt-open{font-size:12px;font-weight:800;color:#4F46E5;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:999px;padding:5px 12px;cursor:pointer;white-space:nowrap}',
+      '.odt-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}',
+      '.odt-tile{border:1px solid #E5E7EB;border-radius:12px;padding:10px 12px 8px;position:relative;background:#fff}.odt-tile .t{font-size:11px;font-weight:700;color:#64748B;display:flex;align-items:center;gap:7px}.odt-tile .t .tm{background:#F1F5F9;border-radius:6px;padding:2px 7px;color:#334155;font-weight:800}.odt-tile .n{font-size:26px;font-weight:900;letter-spacing:-.02em;margin-top:3px;color:#0F172A}.odt-tile .n small{font-size:12px;font-weight:700;color:#334155;margin-left:3px}.odt-tile .c{font-size:11px;color:#64748B;margin-top:4px;font-weight:600}.odt-tile .c .dn{color:#15803D;font-weight:900}.odt-tile .c .up{color:#B91C1C;font-weight:900}',
+      '.odt-tile.base{border-color:#C7D2FE;background:linear-gradient(180deg,#fff,#FBFBFF)}.odt-tile.base::after{content:"당일 기준값";position:absolute;right:10px;top:10px;font-size:10px;font-weight:800;color:#fff;background:#4F46E5;border-radius:999px;padding:2px 8px}',
+      '.odt-tile.now{border:2px solid #6366F1}.odt-tile.now .t .tm{background:#4F46E5;color:#fff}.odt-tile.pending{border-style:dashed;background:#FAFAFA}.odt-tile.pending .n{color:#CBD5E1}',
+      '.odt-strip-foot{margin-top:7px;font-size:10.5px;color:#94A3B8;font-weight:600}',
+      '@media (max-width:900px){.odt-tiles{grid-template-columns:repeat(2,1fr)}.odt-f.amt{margin-left:0}}'
+    ].join('\n');
+    document.head.appendChild(st);
+  }
+
+  /* ── 운영관리: 일 보기 흐름 ── */
+  function flowHtml(di){
+    var b = di.base, l = di.last, isToday = (di.day === ymdOf(new Date())), fin = (l.slot === '18:00');
+    var baseN = di.baseN, cur = l.n['임대료'], delta = cur - baseN;
+    var box = function(cls, t, n, s){ return '<div class="odt-f ' + cls + '"><div class="t">' + t + '</div><div class="n">' + n + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; };
+    var h = '<div class="odt-flow">'
+      + box('base', '기준 ' + di.baseSlot + ' 연체자' + (di.baseSlot !== '08:20' ? '<i class="odt-warn">08:20 누락 · ' + di.baseSlot + ' 대체</i>' : ''), baseN + '<small>명</small>', '계약중 · 임대료 미납 · 합집합 ' + b.n['전체'])
+      + '<div class="odt-ar">→</div>'
+      + box('good', '✅ 완납 해소', l.paid, '임대료 미납 0원')
+      + box('warn', '💧 일부 입금', l.part, '줄었지만 잔여')
+      + box('bad', '⏳ 미입금', l.unpaid, '기준 그대로')
+      + (l.other > 0 ? box('etc', '↗ 기타 해소', l.other, '상태 변경 · 정정') : '')
+      + '<div class="odt-plus">+</div>'
+      + box('new', '🆕 신규 발생', '+' + l.newd, '낮에 새로 연체')
+      + '<div class="odt-ar">→</div>'
+      + box('res', (fin ? '18:00 마감' : (isToday ? '현재 (' + l.slot + ' 회차)' : l.slot + ' 회차')), cur + '<small class="' + (delta < 0 ? 'dn' : delta > 0 ? 'up' : '') + '">' + (delta < 0 ? '▼' + (-delta) : delta > 0 ? '▲' + delta : '—') + '</small>', '= ' + baseN + ' − ' + l.paid + (l.other ? ' − ' + l.other : '') + ' + ' + l.newd)
+      + box('amt', '💰 오늘 회수금액', wonS(l.got), '기준 연체자의 임대료 입금 합')
+      + '</div>';
+    var tl = '<div class="odt-tl"><span class="k">시간대별</span>';
+    SLOTS.forEach(function(s, i){ var r = di.slots[s]; tl += (i ? '<span class="ar">→</span>' : '') + '<span><span class="sl">' + SLOT_LB[s] + '</span> <b class="' + (r ? (s === di.baseSlot ? 'base' : '') : 'dim') + '"' + (r ? ' title="기록 ' + esc(r.at) + '"' : '') + '>' + (r ? r.n['임대료'] : '—') + '</b></span>'; });
+    var pv = prevDataDay(di.day);
+    if (pv) tl += '<span class="sep">|</span><span class="pv">전일(' + mdShort(pv.day) + ') ' + pv.baseN + ' → ' + pv.last.n['임대료'] + ' · 완납 ' + pv.last.paid + ' · 회수 ' + wonS(pv.last.got) + '</span>';
+    tl += '<span class="def">' + (fin ? '18:00 확정치' : (isToday ? '다음 회차에 갱신' : '18:00 회차 누락 — ' + l.slot + ' 회차까지')) + (l.note ? ' · ' + esc(l.note) : '') + '</span></div>';
+    return h + tl;
+  }
+  /* ── 운영관리: 주/월 보기 일자별 표 ── */
+  function rangeHtml(a, b, lbl){
+    var t0 = new Date(); t0.setHours(0, 0, 0, 0);
+    var rows = [], sum = { paid: 0, part: 0, newd: 0, got: 0, other: 0, days: 0, biz: 0 }, first = null, last = null, preStart = 0;
+    var today = ymdOf(t0), nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    for (var k = a; k <= b; k++) {
+      var ymd = ymdOf(new Date(t0.getTime() + k * 86400000)); var di = S.byDay[ymd];
+      if (!di) { if (isWk(ymd)) continue; if (ymd < START) { preStart++; continue; } sum.biz++; rows.push({ ymd: ymd, why: noDataWhy(ymd) }); continue; }
+      sum.biz++; sum.days++; if (!first) first = di; last = di;
+      sum.paid += di.last.paid; sum.part += di.last.part; sum.newd += di.last.newd; sum.got += di.last.got; sum.other += di.last.other;
+      rows.push({ ymd: ymd, di: di });
+    }
+    if (!first) return '<div class="odt-empty">' + (rows.length ? rows[0].why : (preStart ? '집계 시작 전 (2026-10-13부터 기록)' : '집계 없음')) + (rows.length > 1 ? ' · 기간 내 집계 ' + sum.days + '/' + sum.biz + '일' : '') + '</div>';
+    var dl = last.last.n['임대료'] - first.baseN;
+    var h = '<div class="odt-sum"><span>' + (lbl || '기간') + ' <b>' + mdShort(first.day) + ' ' + first.baseSlot + ' ' + first.baseN + '명 → ' + mdShort(last.day) + ' ' + last.last.slot + ' ' + last.last.n['임대료'] + '명</b> <b class="' + (dl < 0 ? 'g' : dl > 0 ? 'b' : '') + '">' + (dl < 0 ? '▼' + (-dl) : dl > 0 ? '▲' + dl : '—') + '</b></span>'
+      + '<span>완납 해소 <b class="g">' + sum.paid + '</b></span><span>일부 입금 <b class="w">' + sum.part + '</b></span><span>신규 발생 <b class="p">+' + sum.newd + '</b></span>' + (sum.other ? '<span>기타 해소 <b>' + sum.other + '</b></span>' : '')
+      + '<span>회수 <b class="g">' + won(sum.got) + '</b></span><span style="color:#94A3B8">집계 ' + sum.days + '/' + sum.biz + '영업일' + (preStart ? ' · 10/13 집계 시작 전 ' + preStart + '일 제외' : '') + '</span></div>';
+    h += '<div class="odt-tblwrap"><table class="odt-tbl"><thead><tr><th>일자</th><th>기준 연체자</th><th>완납 해소</th><th>일부 입금</th><th>신규 발생</th><th>마감 인원</th><th>증감</th><th>회수금액</th><th>기준시각</th><th>마지막 회차</th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      if (!r.di) { h += '<tr class="na"><td>' + mdLb(r.ymd) + '</td><td colspan="9" style="text-align:left">' + r.why + '</td></tr>'; return; }
+      var d = r.di, l = d.last, dd = l.n['임대료'] - d.baseN;
+      h += '<tr><td>' + mdLb(d.day) + '</td><td class="a">' + d.baseN + '</td><td class="g">' + l.paid + '</td><td class="w">' + l.part + '</td><td class="p">+' + l.newd + '</td><td>' + l.n['임대료'] + '</td>'
+        + '<td class="' + (dd < 0 ? 'dn' : dd > 0 ? 'up' : 'm') + '">' + (dd < 0 ? '▼' + (-dd) : dd > 0 ? '▲' + dd : '—') + '</td><td>' + won(l.got) + '</td>'
+        + '<td class="' + (d.baseSlot === '08:20' ? 'm' : 'w') + '">' + d.baseSlot + (d.baseSlot === '08:20' ? '' : ' 대체') + '</td>'
+        + (function(){ var live = (d.day === today && nowMin < 18 * 60 + 30 && l.slot !== '18:00'); return '<td class="' + (l.slot === '18:00' || live ? 'm' : 'w') + '">' + l.slot + (l.slot === '18:00' ? '' : (live ? ' (진행 중)' : ' (18시 누락)')) + '</td>'; })() + '</tr>';
+    });
+    h += '</tbody></table></div>';
+    return h;
+  }
+  function opsHtml(){
+    css();
+    var off = (typeof window._dresOff === 'number') ? Math.min(0, window._dresOff) : 0;
+    var span = window._dresSpan || null, isRange = !!(span && span.a < span.b);
+    var t0 = new Date(); t0.setHours(0, 0, 0, 0); var ymd = ymdOf(new Date(t0.getTime() + off * 86400000));
+    var head = '<div class="odt-head"><div><div class="odt-title"><span class="dot"></span>💧 연체 해소 흐름 <span class="odt-pill">입금내역 기준 · 전수</span></div>'
+      + '<div class="odt-sub">그날 <b>08:20 연체자(계약중 · 임대료)</b>가 저녁까지 어떻게 움직였나 — 담당자 대응 기록과 무관하게 입금내역으로 판정 · 08:20 기준값은 DashBoard \'계약중 연체 · 일자별\'과 같은 숫자 · 아래 "담당자 대응 결과"와는 기준이 다릅니다</div></div>'
+      + '<div class="odt-right">' + (isRange ? esc(span.lbl || '기간') + ' · 일자별' : mdLb(ymd) + (off === 0 ? ' · 오늘' : '')) + '<br><span class="odt-src">연체추이(Raw DATA) · ' + (S.loadedAt && !S.err ? '갱신 ' + new Date(S.loadedAt).toTimeString().slice(0, 5) : (S.err ? '로드 실패' : '불러오는 중')) + '</span></div></div>';
+    var body;
+    if (!S.loadedAt && !S.err) body = '<div class="odt-empty">⏳ 집계 데이터 불러오는 중…</div>';
+    else if (isRange) body = rangeHtml(span.a, span.b, span.lbl);
+    else { var di = S.byDay[ymd]; body = di ? flowHtml(di) : '<div class="odt-empty">' + noDataWhy(ymd) + '</div>'; }
+    var note = '<div class="odt-note"><b>완납 해소</b> = 기준 연체자 중 임대료 미납이 0원이 되고 그날 연체납부 기록이 있는 사람 · <b>일부 입금</b> = 아직 연체지만 미납총액이 줄어든 사람 · <b>미입금</b> = 기준 그대로 · <b>기타 해소</b> = 입금 기록 없이 연체자에서 빠짐(상태 변경·정정) · <b>신규 발생</b> = 기준 이후 새로 연체 · <b>회수금액</b> = 기준 연체자의 임대료 미납 감소분 합 · 집계 평일 08:20 / 12 / 15 / 18시</div>';
+    if (!S.loading && (Date.now() - S.loadedAt > TTL)) load(true);
+    return '<div class="odt-wrap">' + head + body + note + '</div>';
+  }
+
+  /* ── 연체관리: 오늘 연체 인원 한 줄 ── */
+  function isOpen(){ if (openMem !== null) return openMem; try { return localStorage.getItem('odt_strip_open') === '1'; } catch(_){ return false; } }
+  function stripHtml(){
+    css();
+    var today = ymdOf(new Date()), di = S.byDay[today], open = isOpen();
+    var pv = di ? prevDataDay(today) : lastDataDay(today);   /* 오늘 집계 없으면 가장 최근 집계일 */
+    var seq = '';
+    SLOTS.forEach(function(s, i){
+      var r = di && di.slots[s], isB = di && di.baseSlot === s;
+      seq += (i ? '<span class="ar">→</span>' : '') + '<span><span class="k">' + SLOT_LB[s] + '</span><b class="' + (r ? (isB ? 'base' : '') : 'dim') + '">' + (r ? r.n['임대료'] : '—') + '</b></span>'
+        + (r && isB ? '<span class="odt-basetag">당일 기준값' + (s !== '08:20' ? ' · ' + s + ' 대체' : '') + '</span>' : '');
+    });
+    var delta = di ? di.last.n['임대료'] - di.baseN : null;
+    var right = (pv ? '<span title="' + esc(mdLb(pv.day)) + ' 기준 ' + pv.baseSlot + ' → ' + pv.last.slot + '">' + (di ? '전일' : '최근') + '(' + mdShort(pv.day) + ') ' + pv.baseN + ' → ' + pv.last.n['임대료'] + '</span>' : '')
+      + '<span class="odt-link" onclick="odt_goOps()" title="운영관리 > 연체 대응 결과 > 연체 해소 흐름으로 이동">완납·입금 상세 → 운영관리</span>'
+      + '<span class="odt-open" onclick="odt_toggle()">' + (open ? '▴ 접기' : '▾ 펼치기') + '</span>';
+    var h = '<div class="odt-strip' + (open ? ' open' : '') + '"><div class="odt-strip-top"><span class="ft"><span class="dot"></span>⏱ 오늘 연체 인원</span>'
+      + (di ? '<span class="odt-seq">' + seq + (delta ? '<span class="dl ' + (delta < 0 ? 'dn' : 'up') + '">' + (delta < 0 ? '▼' + (-delta) : '▲' + delta) + '</span>' : '') + '</span>'
+            : '<span class="odt-seq muted">' + noDataWhy(today) + '</span>')
+      + '<span class="odt-strip-right">' + right + '</span></div>';
+    if (open) {
+      if (di) {
+        h += '<div class="odt-tiles">';
+        var prevR = null, lastSlot = di.last.slot;
+        SLOTS.forEach(function(s){
+          var r = di.slots[s];
+          if (!r) { h += '<div class="odt-tile pending"><div class="t"><span class="tm">' + SLOT_LB[s] + '</span>' + (s > lastSlot ? '예정' : '누락') + '</div><div class="n">—</div><div class="c">' + (s > lastSlot ? '회차 도래 시 자동 기록' : '이 회차 기록 없음') + '</div></div>'; return; }
+          var isB = (s === di.baseSlot), isNow = (s === lastSlot && !isB);
+          var dp = prevR ? r.n['임대료'] - prevR.n['임대료'] : null, db = r.n['임대료'] - di.baseN;
+          h += '<div class="odt-tile' + (isB ? ' base' : '') + (isNow ? ' now' : '') + '"><div class="t"><span class="tm">' + SLOT_LB[s] + '</span>' + (isB ? '아침 첫 집계' : '회차 집계') + '</div>'
+            + '<div class="n">' + r.n['임대료'] + '<small>명</small></div>'
+            + '<div class="c">' + (isB ? '구간 ' + r.b.join(' / ') + ' · 변동관리비 ' + r.n['변동관리비']
+                : '전 회차 ' + (dp < 0 ? '<span class="dn">▼' + (-dp) + '</span>' : dp > 0 ? '<span class="up">▲' + dp + '</span>' : '—') + ' · 기준 대비 ' + (db < 0 ? '<span class="dn">▼' + (-db) + '</span>' : db > 0 ? '<span class="up">▲' + db + '</span>' : '—')) + '</div></div>';
+          prevR = r;
+        });
+        h += '</div><div class="odt-strip-foot">계약중 · 임대료 기준 · 아침 08:20 첫 집계가 그날의 기준값(DashBoard 일자별 카드와 동일) · 완납/일부 입금/미입금 상세는 운영관리 &gt; 연체 대응 결과에서</div>';
+      } else {
+        h += '<div class="odt-strip-foot">' + noDataWhy(today) + (pv ? ' · 최근 집계 ' + mdLb(pv.day) + ' ' + pv.baseSlot + ' ' + pv.baseN + '명 → ' + pv.last.slot + ' ' + pv.last.n['임대료'] + '명' : '') + '</div>';
+      }
+    }
+    h += '</div>';
+    if (!S.loading && (Date.now() - S.loadedAt > TTL)) load(true);
+    return h;
+  }
+  function fillAll(){
+    var ob = document.getElementById('odtOpsBox'); if (ob) ob.innerHTML = opsHtml();
+    var sb = document.getElementById('odtStripBox'); if (sb) sb.innerHTML = stripHtml();
+  }
+
+  window.odt_opsHtml = function(){ try { return opsHtml(); } catch(e){ console.warn('[v673] odt ops', e); return ''; } };
+  window.odt_stripHtml = function(){ try { return stripHtml(); } catch(e){ console.warn('[v673] odt strip', e); return ''; } };
+  window.odt_fillAll = function(){ try { fillAll(); } catch(e){ console.warn('[v673] odt fill', e); } };
+  window.odt_toggle = function(){ var o = isOpen(); openMem = !o; try { localStorage.setItem('odt_strip_open', o ? '0' : '1'); } catch(_){ } window.odt_fillAll(); };
+  window.odt_goOps = function(){
+    try {
+      switchView('opskpi');
+      var tries = 0, t = setInterval(function(){
+        tries++; var el = document.getElementById('odtOpsBox');
+        if (el && el.innerHTML.length > 200) { clearInterval(t); setTimeout(function(){ window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 125, behavior: 'smooth' }); }, 150); }
+        else if (tries > 40) clearInterval(t);
+      }, 250);
+    } catch(e){ console.warn('[v673] odt go', e); }
+  };
+  window.odt_load = function(force){ return load(!!force); };
+  window.odt_sig = function(){ return S.sig; };
+  /* DashBoard 일자별 카드용 — 그날 기준시각 집계. pt: 임대료|변동관리비|기타계약금|전체 */
+  window.odt_dayBase = function(y, mo, d, pt){
+    var di = S.byDay[y + '-' + pad2(mo) + '-' + pad2(d)]; if (!di) return null;
+    var k = (pt === '전체') ? '전체' : (di.base.n.hasOwnProperty(pt) ? pt : null); if (!k) return null;
+    return { n: di.base.n[k], cy: di.base.cy[k], nw: di.base.nw[k], slot: di.baseSlot };
+  };
+  setTimeout(function(){ load(); }, 2500);
+  setInterval(function(){
+    if (document.getElementById('odtOpsBox') || document.getElementById('odtStripBox') || document.getElementById('rnwDelqTrendCard')) load();
+  }, TTL);
+})();
+</script>
 </body>
 </html>
