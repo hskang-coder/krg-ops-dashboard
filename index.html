@@ -29718,7 +29718,7 @@ function renderExitMgmtView(){
       '.odt-f{border-radius:10px;padding:7px 11px;background:#fff;border:1px solid #E5E7EB;min-width:104px}.odt-f .t{font-size:10.5px;font-weight:800;color:#64748B;white-space:nowrap}.odt-f .n{font-size:21px;font-weight:900;margin-top:1px;line-height:1.1;color:#0F172A}.odt-f .n small{font-size:11px;color:#64748B;font-weight:700;margin-left:3px}.odt-f .s{font-size:10px;color:#94A3B8;margin-top:2px;font-weight:600;white-space:nowrap}',
       '.odt-f.base{border-color:#C7D2FE;background:#FBFBFF;min-width:140px}.odt-f.base .n{color:#4F46E5}.odt-f.good .n{color:#15803D}.odt-f.warn .n{color:#B45309}.odt-f.bad .n{color:#B91C1C}.odt-f.new .n{color:#7C3AED}.odt-f.etc .n{color:#64748B}',
       '.odt-f.res{border:2px solid #6366F1;min-width:140px}.odt-f.res .n small.dn{color:#15803D;font-weight:900}.odt-f.res .n small.up{color:#B91C1C;font-weight:900}',
-      '.odt-f.amt{margin-left:auto;border-color:#BBF7D0;background:#F6FFFA;min-width:140px}.odt-f.amt .n{color:#15803D;font-size:17px;margin-top:4px}',
+      '.odt-f.amt{margin-left:auto;border-color:#BBF7D0;background:#F6FFFA;min-width:140px}.odt-f.amt .n{color:#15803D;font-size:16px;margin-top:5px;white-space:nowrap}',
       '.odt-ar{display:flex;align-items:center;color:#94A3B8;font-size:17px;font-weight:300;padding:0 1px}.odt-plus{display:flex;align-items:center;color:#94A3B8;font-size:13px;font-weight:800;padding:0 1px}',
       '.odt-warn{font-style:normal;font-size:9px;color:#B45309;background:#FFFBEB;border-radius:999px;padding:1px 6px;margin-left:4px;font-weight:800}',
       '.odt-tl{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:#64748B;font-weight:700;flex-wrap:wrap}.odt-tl .sl{font-size:10px;color:#94A3B8}.odt-tl b{font-size:13px;font-weight:900;color:#0F172A}.odt-tl b.base{color:#4F46E5}.odt-tl b.dim{color:#CBD5E1}.odt-tl .ar{color:#94A3B8;font-weight:300}.odt-tl .sep{color:#CBD5E1}.odt-tl .pv{color:#64748B;font-weight:700}.odt-tl .def{margin-left:auto;font-size:10px;color:#94A3B8;font-weight:600}',
@@ -29782,12 +29782,12 @@ function renderExitMgmtView(){
       + box('new', '🆕 신규 발생', '+' + l.newd, '낮에 새로 연체', 'newd')
       + '<div class="odt-ar">→</div>'
       + box('res', (fin ? '18:00 마감' : (isToday ? '현재 (' + l.slot + ' 회차)' : l.slot + ' 회차')), cur + '<small class="' + (delta < 0 ? 'dn' : delta > 0 ? 'up' : '') + '">' + (delta < 0 ? '▼' + (-delta) : delta > 0 ? '▲' + delta : '—') + '</small>', '= ' + baseN + ' − ' + l.paid + (l.other ? ' − ' + l.other : '') + ' + ' + l.newd)
-      + box('amt', '💰 오늘 회수금액', wonS(l.got), '기준 연체자의 임대료 입금 합')
+      + box('amt', '💰 오늘 회수금액', won(l.got), '기준 연체자의 임대료 입금 합')   /* [v681] 전체 숫자 */
       + '</div>';
     var tl = '<div class="odt-tl"><span class="k">시간대별</span>';
     daySlots(di).forEach(function(s, i){ var r = di.slots[s]; tl += (i ? '<span class="ar">→</span>' : '') + '<span><span class="sl">' + slotLb(s) + '</span> <b class="' + (r ? (s === di.baseSlot ? 'base' : '') : 'dim') + '"' + (r ? ' title="기록 ' + esc(r.at) + '"' : '') + '>' + (r ? r.n['임대료'] : '—') + '</b></span>'; });
     var pv = prevDataDay(di.day);
-    if (pv) tl += '<span class="sep">|</span><span class="pv">전일(' + mdShort(pv.day) + ') ' + pv.baseN + ' → ' + pv.last.n['임대료'] + ' · 완납 ' + pv.last.paid + ' · 회수 ' + wonS(pv.last.got) + '</span>';
+    if (pv) tl += '<span class="sep">|</span><span class="pv">전일(' + mdShort(pv.day) + ') ' + pv.baseN + ' → ' + pv.last.n['임대료'] + ' · 완납 ' + pv.last.paid + ' · 회수 ' + won(pv.last.got) + '</span>';
     tl += '<span class="def">' + (fin ? '18:00 확정치' : (isToday ? '다음 회차에 갱신' : '18:00 회차 누락 — ' + l.slot + ' 회차까지')) + (l.note ? ' · ' + esc(l.note) : '') + '</span></div>';
     return h + tl;
   }
