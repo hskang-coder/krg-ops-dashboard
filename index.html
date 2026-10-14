@@ -29633,6 +29633,10 @@ function renderExitMgmtView(){
     return out;
   }
   var LIST_KEYS = ['paid', 'part', 'unpaid', 'other', 'newd'];
+  /* [v682] 회수율 = 회수금액 ÷ 기준 시각 임대료 미납총액(owed) · 소수 1자리 */
+  function recRate(got, owed){ got = +got || 0; owed = +owed || 0; return owed > 0 ? Math.round(got / owed * 1000) / 10 : null; }
+  function pctTxt(p){ return p == null ? '' : p.toFixed(1) + '%'; }
+  function dayRate(di){ return (di && di.base) ? recRate(di.last.got, di.base.owed) : null; }
   var LIST_META = { paid: { lb: '완납 해소', ic: '✅', col: '#15803D' }, part: { lb: '일부 입금', ic: '💧', col: '#B45309' }, unpaid: { lb: '미입금', ic: '⏳', col: '#B91C1C' }, other: { lb: '기타 해소', ic: '↗', col: '#64748B' }, newd: { lb: '신규 발생', ic: '🆕', col: '#7C3AED' } };
 
   function parse(gv){
@@ -29752,7 +29756,7 @@ function renderExitMgmtView(){
       '.odt-tile.now{border:2px solid #6366F1}.odt-tile.now .t .tm{background:#4F46E5;color:#fff}.odt-tile.pending{border-style:dashed;background:#FAFAFA}.odt-tile.pending .n{color:#CBD5E1}',
       '.odt-strip-foot{margin-top:7px;font-size:10.5px;color:#94A3B8;font-weight:600}',
       '.odt-pay{display:inline-flex;align-items:center;gap:6px;padding-left:10px;border-left:1px solid #E5E7EB;font-size:11px;color:#64748B;font-weight:700;white-space:nowrap}.odt-pay .k9{font-size:11px;color:#64748B;font-weight:700}',
-      '.odt-chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 9px;font-weight:800;font-size:11.5px}.odt-chip b{font-weight:900}.odt-chip.good{background:#ECFDF5;color:#15803D}.odt-chip.warn{background:#FFFBEB;color:#B45309}.odt-chip.got{background:#EEF2FF;color:#3730A3;border:1px solid #C7D2FE;padding:2px 9px}.odt-chip.got b{font-size:13.5px;letter-spacing:-.2px;font-variant-numeric:tabular-nums}.odt-chip.click{cursor:pointer}.odt-chip.click:hover{box-shadow:0 0 0 2px #C7D2FE}',
+      '.odt-chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 9px;font-weight:800;font-size:11.5px}.odt-chip b{font-weight:900}.odt-chip.good{background:#ECFDF5;color:#15803D}.odt-chip.warn{background:#FFFBEB;color:#B45309}.odt-chip.got{background:#EEF2FF;color:#3730A3;border:1px solid #C7D2FE;padding:2px 9px}.odt-chip.got b{font-size:13.5px;letter-spacing:-.2px;font-variant-numeric:tabular-nums}.odt-chip.got .pct{margin-left:3px;background:#4F46E5;color:#fff;border-radius:999px;padding:1px 7px;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums}.odt-f.amt .n .odt-pct{display:inline-block;margin-left:6px;background:#DCFCE7;color:#15803D;border-radius:999px;padding:1px 7px;font-size:11.5px;font-weight:800;vertical-align:2px}.odt-chip.click{cursor:pointer}.odt-chip.click:hover{box-shadow:0 0 0 2px #C7D2FE}',
       '.odt-tile .c2{font-size:10px;color:#64748B;margin-top:2px;font-weight:700;white-space:nowrap}.odt-tile .c2 b.g{color:#15803D}.odt-tile .c2 b.w{color:#B45309}.odt-tile .c2 b.p{color:#7C3AED}',
       '@media (max-width:900px){.odt-f.amt{margin-left:0}}'
     ].join('\n');
@@ -29782,42 +29786,43 @@ function renderExitMgmtView(){
       + box('new', '🆕 신규 발생', '+' + l.newd, '낮에 새로 연체', 'newd')
       + '<div class="odt-ar">→</div>'
       + box('res', (fin ? '18:00 마감' : (isToday ? '현재 (' + l.slot + ' 회차)' : l.slot + ' 회차')), cur + '<small class="' + (delta < 0 ? 'dn' : delta > 0 ? 'up' : '') + '">' + (delta < 0 ? '▼' + (-delta) : delta > 0 ? '▲' + delta : '—') + '</small>', '= ' + baseN + ' − ' + l.paid + (l.other ? ' − ' + l.other : '') + ' + ' + l.newd)
-      + box('amt', '💰 오늘 회수금액', won(l.got), '기준 연체자의 임대료 입금 합')   /* [v681] 전체 숫자 */
+      + (function(){ var pr = dayRate(di); return box('amt', '💰 오늘 회수금액', won(l.got) + (pr != null ? '<span class="odt-pct" title="회수율 = 회수금액 ÷ 기준 ' + di.baseSlot + ' 임대료 미납총액 ' + won(di.base.owed) + '">회수율 ' + pctTxt(pr) + '</span>' : ''), '기준 연체자의 임대료 입금 합' + (pr != null ? ' · 회수율 = ÷ 기준 미납총액 ' + won(di.base.owed) : '')); })()   /* [v681] 전체 숫자 · [v682] 회수율 */
       + '</div>';
     var tl = '<div class="odt-tl"><span class="k">시간대별</span>';
     daySlots(di).forEach(function(s, i){ var r = di.slots[s]; tl += (i ? '<span class="ar">→</span>' : '') + '<span><span class="sl">' + slotLb(s) + '</span> <b class="' + (r ? (s === di.baseSlot ? 'base' : '') : 'dim') + '"' + (r ? ' title="기록 ' + esc(r.at) + '"' : '') + '>' + (r ? r.n['임대료'] : '—') + '</b></span>'; });
     var pv = prevDataDay(di.day);
-    if (pv) tl += '<span class="sep">|</span><span class="pv">전일(' + mdShort(pv.day) + ') ' + pv.baseN + ' → ' + pv.last.n['임대료'] + ' · 완납 ' + pv.last.paid + ' · 회수 ' + won(pv.last.got) + '</span>';
+    if (pv) tl += '<span class="sep">|</span><span class="pv">전일(' + mdShort(pv.day) + ') ' + pv.baseN + ' → ' + pv.last.n['임대료'] + ' · 완납 ' + pv.last.paid + ' · 회수 ' + won(pv.last.got) + (dayRate(pv) != null ? ' (' + pctTxt(dayRate(pv)) + ')' : '') + '</span>';   /* [v682] 회수율 */
     tl += '<span class="def">' + (fin ? '18:00 확정치' : (isToday ? '다음 회차에 갱신' : '18:00 회차 누락 — ' + l.slot + ' 회차까지')) + (l.note ? ' · ' + esc(l.note) : '') + '</span></div>';
     return h + tl;
   }
   /* ── 운영관리: 주/월 보기 일자별 표 ── */
   function rangeHtml(a, b, lbl){
     var t0 = new Date(); t0.setHours(0, 0, 0, 0);
-    var rows = [], sum = { paid: 0, part: 0, newd: 0, got: 0, other: 0, days: 0, biz: 0 }, first = null, last = null, preStart = 0;
+    var rows = [], sum = { paid: 0, part: 0, newd: 0, got: 0, other: 0, days: 0, biz: 0, owed: 0 }, first = null, last = null, preStart = 0;
     var today = ymdOf(t0), nowMin = new Date().getHours() * 60 + new Date().getMinutes();
     for (var k = a; k <= b; k++) {
       var ymd = ymdOf(new Date(t0.getTime() + k * 86400000)); var di = S.byDay[ymd];
       if (!di) { if (isWk(ymd)) continue; if (ymd < START) { preStart++; continue; } sum.biz++; rows.push({ ymd: ymd, why: noDataWhy(ymd) }); continue; }
       sum.biz++; sum.days++; if (!first) first = di; last = di;
-      sum.paid += di.last.paid; sum.part += di.last.part; sum.newd += di.last.newd; sum.got += di.last.got; sum.other += di.last.other;
+      sum.paid += di.last.paid; sum.part += di.last.part; sum.newd += di.last.newd; sum.got += di.last.got; sum.other += di.last.other; sum.owed += (di.base && di.base.owed) || 0;   /* [v682] 기간 회수율 분모 */
       rows.push({ ymd: ymd, di: di });
     }
     if (!first) return '<div class="odt-empty">' + (rows.length ? rows[0].why : (preStart ? '집계 시작 전 (2026-10-13부터 기록)' : '집계 없음')) + (rows.length > 1 ? ' · 기간 내 집계 ' + sum.days + '/' + sum.biz + '일' : '') + '</div>';
     var dl = last.last.n['임대료'] - first.baseN;
     var h = '<div class="odt-sum"><span>' + (lbl || '기간') + ' <b>' + mdShort(first.day) + ' ' + first.baseSlot + ' ' + first.baseN + '명 → ' + mdShort(last.day) + ' ' + last.last.slot + ' ' + last.last.n['임대료'] + '명</b> <b class="' + (dl < 0 ? 'g' : dl > 0 ? 'b' : '') + '">' + (dl < 0 ? '▼' + (-dl) : dl > 0 ? '▲' + dl : '—') + '</b></span>'
       + '<span>완납 해소 <b class="g">' + sum.paid + '</b></span><span>일부 입금 <b class="w">' + sum.part + '</b></span><span>신규 발생 <b class="p">+' + sum.newd + '</b></span>' + (sum.other ? '<span>기타 해소 <b>' + sum.other + '</b></span>' : '')
-      + '<span>회수 <b class="g">' + won(sum.got) + '</b></span><span style="color:#94A3B8">집계 ' + sum.days + '/' + sum.biz + '영업일' + (preStart ? ' · 10/13 집계 시작 전 ' + preStart + '일 제외' : '') + '</span></div>';
-    h += '<div class="odt-tblwrap"><table class="odt-tbl"><thead><tr><th>일자</th><th>기준 연체자</th><th>완납 해소</th><th>일부 입금</th><th>미입금</th><th>신규 발생</th><th>마감 인원</th><th>증감</th><th>회수금액</th><th>기준시각</th><th>마지막 회차</th></tr></thead><tbody>';
+      + '<span title="기간 회수율 = 회수금액 합 ÷ 일자별 기준 임대료 미납총액 합 ' + won(sum.owed) + '">회수 <b class="g">' + won(sum.got) + (recRate(sum.got, sum.owed) != null ? ' (' + pctTxt(recRate(sum.got, sum.owed)) + ')' : '') + '</b></span><span style="color:#94A3B8">집계 ' + sum.days + '/' + sum.biz + '영업일' + (preStart ? ' · 10/13 집계 시작 전 ' + preStart + '일 제외' : '') + '</span></div>';
+    h += '<div class="odt-tblwrap"><table class="odt-tbl"><thead><tr><th>일자</th><th>기준 연체자</th><th>완납 해소</th><th>일부 입금</th><th>미입금</th><th>신규 발생</th><th>마감 인원</th><th>증감</th><th>회수금액</th><th title="회수금액 ÷ 그날 기준 시각 임대료 미납총액">회수율</th><th>기준시각</th><th>마지막 회차</th></tr></thead><tbody>';
     var cell = function(d, l, key, cls, txt){
       var can = l[key] > 0 && l.hasList;
       return '<td class="' + cls + (can ? ' odt-click' : '') + '"' + (can ? ' onclick="odt_list(\'' + d.day + '\',\'' + key + '\')" title="클릭하면 명단"' : '') + '>' + txt + '</td>';
     };
     rows.forEach(function(r){
-      if (!r.di) { h += '<tr class="na"><td>' + mdLb(r.ymd) + '</td><td colspan="10" style="text-align:left">' + r.why + '</td></tr>'; return; }
+      if (!r.di) { h += '<tr class="na"><td>' + mdLb(r.ymd) + '</td><td colspan="11" style="text-align:left">' + r.why + '</td></tr>'; return; }
       var d = r.di, l = d.last, dd = l.n['임대료'] - d.baseN;
       h += '<tr><td>' + mdLb(d.day) + '</td><td class="a">' + d.baseN + '</td>' + cell(d, l, 'paid', 'g', l.paid) + cell(d, l, 'part', 'w', l.part) + cell(d, l, 'unpaid', 'b', l.unpaid) + cell(d, l, 'newd', 'p', '+' + l.newd) + '<td>' + l.n['임대료'] + '</td>'
         + '<td class="' + (dd < 0 ? 'dn' : dd > 0 ? 'up' : 'm') + '">' + (dd < 0 ? '▼' + (-dd) : dd > 0 ? '▲' + dd : '—') + '</td><td>' + won(l.got) + '</td>'
+        + '<td class="g" title="' + won(l.got) + ' ÷ 기준 ' + d.baseSlot + ' 임대료 미납총액 ' + won((d.base && d.base.owed) || 0) + '">' + (dayRate(d) != null ? pctTxt(dayRate(d)) : '—') + '</td>'   /* [v682] 회수율 */
         + '<td class="' + (d.baseSlot === '08:20' ? 'm' : 'w') + '">' + d.baseSlot + (d.baseSlot === '08:20' ? '' : ' 대체') + '</td>'
         + (function(){ var live = (d.day === today && nowMin < 18 * 60 + 30 && l.slot !== '18:00'); return '<td class="' + (l.slot === '18:00' || live ? 'm' : 'w') + '">' + l.slot + (l.slot === '18:00' ? '' : (live ? ' (진행 중)' : ' (18시 누락)')) + '</td>'; })() + '</tr>';
     });
@@ -29861,7 +29866,7 @@ function renderExitMgmtView(){
       var l9 = di.last, can9 = !!l9.hasList;
       var chip9 = function(key, cls, lb, n, tip){ return '<span class="odt-chip ' + cls + (can9 && n > 0 ? ' click" onclick="odt_list(\'' + di.day + '\',\'' + key + '\')"' : '"') + ' title="' + tip + (can9 && n > 0 ? ' · 클릭하면 명단' : '') + '">' + lb + ' <b>' + n + '</b></span>'; };
       payChips = '<span class="odt-pay"><span class="k9">오늘 입금</span>' + chip9('paid', 'good', '✅ 완납', l9.paid, TIP_PAID) + chip9('part', 'warn', '💧 분납', l9.part, TIP_PART)
-        + (l9.got > 0 ? '<span class="odt-chip got" title="오늘 회수 금액 = 기준 연체자의 임대료 미납 감소분 합 (' + l9.slot + ' 집계까지)">회수 <b>' + won(l9.got) + '</b></span>' : '') + '</span>';   /* [v678] 전체 숫자 칩 */
+        + (l9.got > 0 ? (function(){ var p9 = dayRate(di); return '<span class="odt-chip got" title="오늘 회수 금액 = 기준 연체자의 임대료 미납 감소분 합 (' + l9.slot + ' 집계까지)' + (p9 != null ? ' · 회수율 ' + pctTxt(p9) + ' = ' + won(l9.got) + ' ÷ 기준 ' + di.baseSlot + ' 임대료 미납총액 ' + won(di.base.owed) : '') + '">회수 <b>' + won(l9.got) + '</b>' + (p9 != null ? '<span class="pct">' + pctTxt(p9) + '</span>' : '') + '</span>'; })() : '') + '</span>';   /* [v682] 회수율 */   /* [v678] 전체 숫자 칩 */
     }
     var right = (pv ? '<span title="' + esc(mdLb(pv.day)) + ' 기준 ' + pv.baseSlot + ' → ' + pv.last.slot + '">' + (di ? '전일' : '최근') + '(' + mdShort(pv.day) + ') ' + pv.baseN + ' → ' + pv.last.n['임대료'] + '</span>' : '')
       + '<span class="odt-link" onclick="odt_goOps()" title="완납·입금 상세 — 운영관리 > 연체 대응 결과 > 연체 해소 흐름으로 이동">상세 → 운영관리</span>'
