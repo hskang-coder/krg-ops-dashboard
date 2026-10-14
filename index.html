@@ -27329,6 +27329,13 @@ function exm_leadModal(kind, ix){
             {h:'계약해지일',k:'term',f:function(r){ return r.term||'-'; }},
             {h:'공실 경과',k:'vacD',f:function(r){ if(r.vacD==null) return '<span style="color:#94A3B8">-</span>'; var c9=r.vacD>=61?'#B91C1C':(r.vacD>=31?'#D97706':'#64748B'); return '<b style="color:'+c9+'">'+(r.vacD>=61?'⚠ ':'')+r.vacD+'일</b>'; }},
             {h:'연체금액',k:'dlq',f:function(r){ return r.dlq?'<b style="color:#B91C1C">₩'+Number(r.dlq).toLocaleString()+'</b>':'<span style="color:#94A3B8">-</span>'; }}]; }
+    else if(kind==='schedSel'){ rows=L.schedSel||[]; title='만기퇴실예정 ('+(L.schedSelLb||'선택 월')+' 만기 · 계약중 · 해지일 미확정 '+(L.schedSelRem||0)+'건 포함)'; color='#1D4ED8';   /* [v685] 선택 월 */
+      cols=[{h:'만기일',k:'end',f:function(r){ return r.end; }},
+            {h:'D-DAY',k:'dday',f:function(r){ return r.dday>=0?'<b style="color:#1D4ED8">D-'+r.dday+'</b>':'<b style="color:#B91C1C">경과 '+(-r.dday)+'일</b>'; }},
+            {h:'해지일',k:'termC',f:function(r){ return r.termC?'<span title="계약해지일 확정 — 퇴실 확정 집계에 포함" style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:#FEF2F2;color:#B91C1C">'+r.termC+'</span>':'<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:#FFFBEB;color:#B45309">미확정</span>'; }},
+            {h:'갱신심사',k:'judge',f:function(r){ var J={app:['승인','#ECFDF5','#0B7A45'],cond:['조건부','#FFFBEB','#B45309'],deny:['거절','#FEF2F2','#B91C1C'],none:['이력없음','#F1F5F9','#64748B']}[r.judge]; return J?'<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:'+J[1]+';color:'+J[2]+'">'+J[0]+'</span>':'<span style="color:#94A3B8">-</span>'; }},
+            {h:'갱신 최근 대응',k:'rnwD',f:function(r){ if(!r.rnw&&!r.rnwD) return '<span style="color:#94A3B8">-</span>'; return '<span'+(r.rnwPg?' title="진척: '+String(r.rnwPg).replace(/"/g,'&quot;')+'"':'')+'>'+(r.rnw||'-')+' <span style="color:#94A3B8;font-size:10px">'+(r.rnwD?exm_fmtD8(r.rnwD):'')+'</span></span>'; }},
+            {h:'연체금액',k:'dlq',f:function(r){ return r.dlq?'<b style="color:#B91C1C">₩'+Number(r.dlq).toLocaleString()+'</b>':'<span style="color:#94A3B8">-</span>'; }}]; }
     else { rows=L.sched||[]; title='만기퇴실예정 (이번 달 만기)'; color='#1D4ED8';   /* [v550] */
       cols=[{h:'만기일',k:'end',f:function(r){ return r.end; }},
             {h:'D-DAY',k:'dday',f:function(r){ return r.dday>=0?'<b style="color:#1D4ED8">D-'+r.dday+'</b>':'<b style="color:#B91C1C">경과 '+(-r.dday)+'일</b>'; }},
@@ -27498,8 +27505,14 @@ function renderExitMgmtView(){
   var GRP_NM={exp:'만기',vol:'자진',god:'불가항력',gz:'개런티즈 조치'};
   var GRP_CL={exp:'#3B82F6',vol:'#D97706',god:'#8B5CF6',gz:'#DC2626'};
   // ── 최근 12개월 버킷 (선택월 포함) ──
-  var months=[]; for(var i=11;i>=0;i--){ var d=new Date(Y, M-1-i, 1); months.push({y:d.getFullYear(), m:d.getMonth()+1, lb:(d.getFullYear()%100)+'.'+('0'+(d.getMonth()+1)).slice(-2), exp:0, vol:0, god:0, gz:0}); }
+  var months=[]; for(var i=11;i>=0;i--){ var d=new Date(Y, M-1-i, 1); months.push({y:d.getFullYear(), m:d.getMonth()+1, lb:(d.getFullYear()%100)+'.'+('0'+(d.getMonth()+1)).slice(-2), exp:0, vol:0, god:0, gz:0, sched:0}); }
   var mIdx={}; months.forEach(function(b,ix){ mIdx[b.y*100+b.m]=ix; });
+  /* [v685] 월별 만기퇴실예정(해지일 미확정) — 계약중 + 만기일이 그 달 · 이번 달 이후만 (지난 달 만기 미처리 건은 묵시적 갱신 취급) */
+  try{
+    var _sn=new Date(), _symN=_sn.getFullYear()*100+(_sn.getMonth()+1);
+    V.forEach(function(v){ var k6=String(v.contractKind||'').trim(); if(k6!=='정상'&&k6!=='계약중') return; var e6=exm_pd(v.endDate); if(!e6) return;
+      var ym6=e6.getFullYear()*100+(e6.getMonth()+1); if(ym6<_symN||mIdx[ym6]==null) return; if(exm_pd(v.terminateDate)) return; months[mIdx[ym6]].sched++; });
+  }catch(_se){}
   // [v544] 실퇴실일 맵 — DR(중도퇴실관리) D열 기재 행 중 최신(대응일·행순) 값 우선, 없으면 BP열(실제퇴실일) 폴백
   var drReal={};
   try{
@@ -27608,6 +27621,7 @@ function renderExitMgmtView(){
   var zAct=[], zStall=[], zForced=[], zFore=[[],[]], zExp60=[], zLeadN=0, zLeadAvg=null, zNowM='', zNxtM='';
   var zDef=[[],[],[]], zDefPct=null, zDefEx={gz:0,god:0};   // [v549] 퇴실 방어율: 0=방어 성공, 1=자진퇴실(실패), 2=판정 유보
   var zSchedM=[];   // [v550] 만기퇴실예정 = 계약중 + 만기일이 이번 달 (갱신 미처리 시 퇴실)
+  var zSchedSel=[], zSchedSelRem=0;   // [v685] 선택 월(Y/M) 만기 도래·계약중 — 해지일 미확정 건수 별도
   try{
     var _zn=new Date(); var _ztd=new Date(_zn.getFullYear(),_zn.getMonth(),_zn.getDate());
     var _znx=new Date(_zn.getFullYear(),_zn.getMonth()+1,1);
@@ -27687,6 +27701,12 @@ function renderExitMgmtView(){
       if(ed&&ed>=_ztd&&_zdays(ed,_ztd)<=60) zExp60.push(_zrow(cno,{dday:_zdays(ed,_ztd), judge:_zj(cno), dlq:exm_num(_v5.dlqAmt)||0,
         rnw:(_zrnw[cno]?_zrnw[cno].f:''), rnwD:(_zrnw[cno]?_zrnw[cno].d:0), rnwPg:(_zrnw[cno]?_zrnw[cno].pg:'')}));   /* [v548.1/2] 갱신심사·갱신 최근 대응·연체금액 */
       if(ed&&ed.getFullYear()*100+(ed.getMonth()+1)===_zymN) zSchedM.push(_zrow(cno,{dday:_zdays(ed,_ztd), judge:_zj(cno), dlq:exm_num(_v5.dlqAmt)||0}));   /* [v550] 이번 달 만기 도래·계약중 */
+      if(ed&&ed.getFullYear()*100+(ed.getMonth()+1)===Y*100+M){   /* [v685] 선택 월 만기 도래·계약중 (해지일 확정 건은 배지로 구분) */
+        var _tC=exm_pd(String(_v5.terminateDate||'').trim());
+        if(!_tC) zSchedSelRem++;
+        zSchedSel.push(_zrow(cno,{dday:_zdays(ed,_ztd), judge:_zj(cno), dlq:exm_num(_v5.dlqAmt)||0, termC:(_tC?exm_fmtDt(String(_v5.terminateDate||'').trim()):''),
+          rnw:(_zrnw[cno]?_zrnw[cno].f:''), rnwD:(_zrnw[cno]?_zrnw[cno].d:0), rnwPg:(_zrnw[cno]?_zrnw[cno].pg:'')}));
+      }
       // [v548.5/549.2] 강제퇴실 진행: 강제 계열 상태(DR 최신 기록 or BO)인데 계약중 + 계약해지일 미확정 — 강제는 실퇴실 후 종료 처리하므로 해지일 확정 전까지 '진행', 확정 시 '퇴실대기 중'으로 이동 (상호 배타)
       var _bo5=String(_v5.status||'').trim(), _R5=_zrec[cno];
       var _tD5=exm_pd(String(_v5.terminateDate||'').trim());
@@ -27729,7 +27749,8 @@ function renderExitMgmtView(){
     stageLists.forEach(function(a){ a.sort(function(x,y){ return (y.d||0)-(x.d||0); }); });
     waitList.sort(function(x,y){ var dx=exm_pd(x.src==='해지일 확정'?x.term:x.real), dy=exm_pd(y.src==='해지일 확정'?y.term:y.real); return (dx?+dx:9e15)-(dy?+dy:9e15); });   /* [v549.7] */
     schedList.sort(function(x,y){ var dx=exm_pd(x.end), dy=exm_pd(y.end); return (dx?+dx:9e15)-(dy?+dy:9e15); });
-    window._exmLead={ stages:stageLists, wait:waitList, sched:zSchedM,
+    zSchedSel.sort(function(a,b){ return (a.dday||0)-(b.dday||0); });   /* [v685] 만기일 순 */
+    window._exmLead={ stages:stageLists, wait:waitList, sched:zSchedM, schedSel:zSchedSel, schedSelLb:Y+'년 '+M+'월', schedSelRem:zSchedSelRem,
       act:zAct, stall:zStall, forced:zForced, fore:zFore, exp60:zExp60, lead:{n:zLeadN, avg:zLeadAvg}, def:zDef };   /* [v548/549/550] sched = 이번 달 만기·계약중 */
   }catch(_le){}
   // [v551] 강제퇴실 공실 부담 집계 — 실퇴실 완료(집 비움) + 해지일 미확정 = KRG 월세 부담 중
@@ -27760,8 +27781,8 @@ function renderExitMgmtView(){
   // [v550.1] 이번 달 조회 시 월말 추정 — 확정 + 만기예정 전환 예상 + 강제 진행 확정 예상 (총 퇴실 카드에 병기)
   var estHtml='';
   try{
-    var _en=new Date(); var _eym=_en.getFullYear()*100+(_en.getMonth()+1);
-    if(Y*100+M===_eym){
+    var _en=new Date(); var _eym=_en.getFullYear()*100+(_en.getMonth()+1); var _selYM=Y*100+M, _isCurM=(_selYM===_eym);   /* [v685] 미래 달에도 예상 표시 */
+    if(_selYM>=_eym){
       var _emon=function(d){ return d?d.getFullYear()*100+(d.getMonth()+1):0; };
       // 만기 전환율: 최근 6개 완결월 — 만기 도래(갱신 미연장) 건 중 당월 해지 확정 비율 (갱신 건은 만기일이 연장되어 모수에서 자동 제외)
       var _cN=0,_cD=0;
@@ -27772,14 +27793,14 @@ function renderExitMgmtView(){
       var _rExp=_cD?Math.min(1,_cN/_cD):0.5;
       // 이번 달 만기·계약중 중 해지일 미확정 건 (확정 건은 이미 cur에 집계됨)
       var _schedRem=0;
-      V.forEach(function(v){ var k4=String(v.contractKind||'').trim(); if(k4!=='정상'&&k4!=='계약중') return; var e3=exm_pd(v.endDate); if(!e3||_emon(e3)!==_eym) return; if(!exm_pd(v.terminateDate)) _schedRem++; });
+      V.forEach(function(v){ var k4=String(v.contractKind||'').trim(); if(k4!=='정상'&&k4!=='계약중') return; var e3=exm_pd(v.endDate); if(!e3||_emon(e3)!==_selYM) return; if(!exm_pd(v.terminateDate)) _schedRem++; });   /* [v685] 선택 월 */
       var _estExp=Math.round(_schedRem*_rExp);
       // 강제: 최근 3개 완결월 월평균 대비 이번 달 부족분 (진행 건 중 월내 해지 확정 예상)
       var _gzAvg=(months[8].gz+months[9].gz+months[10].gz)/3;
-      var _estGz=Math.max(0, Math.round(_gzAvg)-cur.gz);
+      var _estGz=_isCurM?Math.max(0, Math.round(_gzAvg)-cur.gz):0;   /* [v685] 강제 예상은 이번 달에만 */
       var _est=cur.tot+_estExp+_estGz;
       var _edl=_est-prev.tot;
-      estHtml='<br><span title="확정 '+cur.tot+'명 + 만기 예상 '+_estExp+'명 (만기예정 미확정 '+_schedRem+'건 × 최근 6개월 전환율 '+Math.round(_rExp*100)+'%) + 강제 예상 '+_estGz+'명 (최근 3개월 강제 월평균 '+(Math.round(_gzAvg*10)/10)+'명 대비 부족분)" style="color:#4F46E5;font-weight:800;cursor:help">📈 월말 추정 ~'+_est+'명 <span style="color:'+(_edl>0?'#B91C1C':(_edl<0?'#0B7A45':'#64748B'))+'">'+(_edl>0?'▲'+_edl:(_edl<0?'▼'+(-_edl):'—'))+'</span><span style="color:#8A9AB5;font-weight:400"> vs 전월</span></span>';
+      estHtml='<br><span title="확정 '+cur.tot+'명 + 만기 예상 '+_estExp+'명 (만기예정 미확정 '+_schedRem+'건 × 최근 6개월 전환율 '+Math.round(_rExp*100)+'%)'+(_isCurM?' + 강제 예상 '+_estGz+'명 (최근 3개월 강제 월평균 '+(Math.round(_gzAvg*10)/10)+'명 대비 부족분)':' · 미래 달은 만기 예상만 반영')+'" style="color:#4F46E5;font-weight:800;cursor:help">📈 '+(_isCurM?'월말 추정':M+'월 예상')+' ~'+_est+'명 <span style="color:'+(_edl>0?'#B91C1C':(_edl<0?'#0B7A45':'#64748B'))+'">'+(_edl>0?'▲'+_edl:(_edl<0?'▼'+(-_edl):'—'))+'</span><span style="color:#8A9AB5;font-weight:400"> vs 전월</span></span>';
     }
   }catch(_ee){}
   // ── KPI 카드 ──
@@ -27802,21 +27823,22 @@ function renderExitMgmtView(){
   var pctb=function(n,cl){ return cur.tot?' <span style="font-size:12.5px;font-weight:800;color:'+cl+';background:'+cl+'14;border-radius:6px;padding:1.5px 7px;vertical-align:3px">'+pc(n)+'%</span>':''; };
   var kpiHtml='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:10px;margin-bottom:14px">'
     +kpi('총 퇴실', cur.tot+'명', badge(cur.tot,prev.tot), '전월 '+prev.tot+'명 · 만기 '+cur.exp+' / 중도 '+(cur.tot-cur.exp)+estHtml)   /* [v550.1] 월말 추정 병기 */
-    +kpi('만기퇴실', cur.exp+'명'+pctb(cur.exp,'#1D4ED8'), badge(cur.exp,prev.exp), '만기퇴실예정(이번 달 만기·계약중) '+zSchedM.length+'건')   /* [v550] */
+    +kpi('만기퇴실', cur.exp+'명'+pctb(cur.exp,'#1D4ED8'), badge(cur.exp,prev.exp), '<span onclick="exm_leadModal(\'schedSel\')" title="'+M+'월에 만기가 도래하는 계약중 건 — 갱신 미처리 시 만기퇴실 후보 · 클릭하면 명단" style="cursor:pointer;text-decoration:underline dotted;color:#1D4ED8;font-weight:700">만기퇴실예정('+M+'월 만기·계약중) '+zSchedSel.length+'건</span>'+(zSchedSel.length?' · 해지일 미확정 <b style="color:#B45309">'+zSchedSelRem+'</b>건':''))   /* [v550] · [v685] 선택 월 기준·클릭 명단 */
     +kpi('자진 중도퇴실', cur.vol+'명'+pctb(cur.vol,'#B45309'), badge(cur.vol,prev.vol), '단순 자진 '+rs.volPlain+' · 기타 사유 '+rs.volEtc)
     +kpi('불가항력', cur.god+'명'+pctb(cur.god,'#6D28D9'), badge(cur.god,prev.god), '사망 '+rs.death+' · 임대인 '+rs.owner+' · 하자 '+rs.flaw+' · 주위환경 '+rs.env+' · 월세부담 '+rs.burden)   /* [v562] */
     +kpi('개런티즈 조치 (강제)', cur.gz+'명'+pctb(cur.gz,'#B91C1C'), badge(cur.gz,prev.gz), '공실 '+rs.vac+' · 연체 '+rs.dlq+' · 갱신불가 '+rs.rnw+' · 계약위반 '+rs.brk, '#B91C1C')
     +kpi('선조치 대상 (연체 보유)', curDlqCnt+'건', '', '중도퇴실자 연체 합계 '+mil2(curDlqSum), '#B45309')
     +'</div>';
   // ── 사유 구성 박스 ──
-  var maxN=Math.max(1,cur.exp,rs.volPlain,rs.volEtc,rs.owner,rs.death,rs.flaw,rs.env,rs.burden,rs.vac,rs.dlq,rs.rnw,rs.brk);   /* [v562] */
+  var maxN=Math.max(1,cur.exp,zSchedSelRem,rs.volPlain,rs.volEtc,rs.owner,rs.death,rs.flaw,rs.env,rs.burden,rs.vac,rs.dlq,rs.rnw,rs.brk);   /* [v562] · [v685] */
   var rrow=function(nm,n,cl,op,tip){ var w=Math.round(n/maxN*100);   /* [v542.3] 행 간격·바 높이 압축 */
     return '<div'+(tip?' title="'+tip+'"':'')+' style="display:flex;align-items:center;gap:8px;font-size:11px;padding:1px 0'+(tip?';cursor:help':'')+'"><span style="width:114px;color:#475569;font-weight:600">'+nm+'</span>'
     +'<div style="flex:1;height:7px;background:#F1F5F9;border-radius:4px;overflow:hidden"><i style="display:block;height:100%;border-radius:4px;width:'+w+'%;background:'+cl+';opacity:'+(op||1)+'"></i></div>'
     +'<b style="width:50px;text-align:right;'+(n===0?'color:#94A3B8':'')+'">'+n+'명</b></div>'; };
   var pct2=function(n){ return cur.tot?Math.round(n/cur.tot*100):0; };
   var grpBox=function(bg,bd,cl,ttl,inner){ return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:9px;padding:5px 11px 6px;margin-bottom:5px"><div style="font-size:10.5px;font-weight:800;color:'+cl+';margin-bottom:2px">'+ttl+'</div>'+inner+'</div>'; };   /* [v542.3/4] 그룹 박스 여백 압축 */
-  var compHtml=grpBox('#EFF6FF','#BFDBFE','#1D4ED8','📅 만기퇴실 — '+cur.exp+'명 ('+pct2(cur.exp)+'%)', rrow('계약만기 종료',cur.exp,GRP_CL.exp))
+  var compHtml=grpBox('#EFF6FF','#BFDBFE','#1D4ED8','📅 만기퇴실 — '+cur.exp+'명 ('+pct2(cur.exp)+'%)', rrow('계약만기 종료',cur.exp,GRP_CL.exp)
+      +'<div onclick="exm_leadModal(\'schedSel\')" style="cursor:pointer">'+rrow('만기퇴실예정(해지일 미확정)',zSchedSelRem,'#93C5FD',.75,M+'월 만기 도래·계약중·해지일 미확정 — 갱신 미처리 시 퇴실 후보 (총 퇴실·%에는 미포함) · 클릭 → 명단')+'</div>')   /* [v685] */
     +grpBox('#FFFBEB','#FDE68A','#B45309','🚶 자진 — '+cur.vol+'명 ('+pct2(cur.vol)+'%)', rrow('중도퇴실(자진)',rs.volPlain,GRP_CL.vol)+rrow('기타(직장·개인 등)',rs.volEtc,GRP_CL.vol,.55,volEtcTip))
     +grpBox('#F5F3FF','#DDD6FE','#6D28D9','⚖️ 불가항력 — '+cur.god+'명 ('+pct2(cur.god)+'%)', rrow('임대인사유퇴실',rs.owner,GRP_CL.god)+rrow('사망',rs.death,GRP_CL.god,.7)+rrow('물건하자',rs.flaw,GRP_CL.god,.55,'곰팡이, 누수')+rrow('주위환경',rs.env,GRP_CL.god,.48,'소음, 치안 등')+rrow('월세부담',rs.burden,GRP_CL.god,.4))   /* [v562] 주위환경 행 추가 */
     +grpBox('#FEF2F2','#FECACA','#B91C1C','🚨 개런티즈 조치 — '+cur.gz+'명 ('+pct2(cur.gz)+'%)', rrow('강제퇴실(공실)',rs.vac,GRP_CL.gz)+rrow('강제퇴실(연체)',rs.dlq,GRP_CL.gz,.7)+rrow('갱신불가',rs.rnw,GRP_CL.gz,.55)+rrow('계약위반',rs.brk,GRP_CL.gz,.4));
@@ -27866,7 +27888,7 @@ function renderExitMgmtView(){
     +  '<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:11px 14px;display:flex;flex-direction:column">'
     +    '<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:8px">📈 월별 퇴실 추이 <span style="font-size:10px;color:#8A9AB5;font-weight:400">최근 12개월 · 스택 = 퇴실 주체 구분</span></div>'
     +    '<div style="flex:1;min-height:185px;position:relative"><canvas id="exmTrend"></canvas></div>'   /* [v542.1] 차트가 사유 구성 높이에 맞춰 확장 · [v542.3/4] 최소 높이 압축 */
-    +    '<div style="font-size:10px;color:#8A9AB5;line-height:1.7;border-top:1px dashed #D7DFEC;padding-top:8px;margin-top:10px">막대 위 숫자 = 월 총 퇴실. 강제퇴실(빨강) 비중이 커지는 달은 연체 초기 대응 점검 신호입니다.</div>'
+    +    '<div style="font-size:10px;color:#8A9AB5;line-height:1.7;border-top:1px dashed #D7DFEC;padding-top:8px;margin-top:10px">막대 위 숫자 = 월 총 퇴실(확정) · <b style="color:#2563EB">+n</b> = 그 달 만기 도래·계약중·해지일 미확정(빗금, 이번 달 이후) — 갱신 미처리 시 퇴실 후보, 클릭 → 명단. 강제퇴실(빨강) 비중이 커지는 달은 연체 초기 대응 점검 신호입니다.</div>'
     +  '</div>'
     +  '<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:11px 14px">'
     +    '<div style="font-size:13px;font-weight:800;color:#1A3A5C;margin-bottom:7px">🧭 '+M+'월 퇴실 사유 구성 <span style="font-size:10px;color:#8A9AB5;font-weight:400">공실상태 값 기준 · '+cur.tot+'명</span></div>'
@@ -27932,26 +27954,30 @@ function renderExitMgmtView(){
       var el2=document.getElementById('exmTrend');
       if(el2){
         var mkTot=function(ix){ var b=months[ix]; return b.exp+b.vol+b.god+b.gz; };
+        var schedPat=(function(){ try{ var pc=document.createElement('canvas'); pc.width=8; pc.height=8; var px=pc.getContext('2d'); px.fillStyle='rgba(59,130,246,.10)'; px.fillRect(0,0,8,8); px.strokeStyle='rgba(37,99,235,.55)'; px.lineWidth=1.5; px.beginPath(); px.moveTo(-2,6); px.lineTo(6,-2); px.moveTo(2,10); px.lineTo(10,2); px.stroke(); return el2.getContext('2d').createPattern(pc,'repeat'); }catch(_p){ return 'rgba(59,130,246,.22)'; } })();   /* [v685] 빗금 */
         window._exmChart=new Chart(el2,{ type:'bar',
           data:{ labels:months.map(function(b){return b.lb;}),
             datasets:[
               {label:'만기퇴실',data:months.map(function(b){return b.exp;}),backgroundColor:GRP_CL.exp,stack:'s',borderColor:'#fff',borderWidth:1.5},
               {label:'자진 중도',data:months.map(function(b){return b.vol;}),backgroundColor:GRP_CL.vol,stack:'s',borderColor:'#fff',borderWidth:1.5},
               {label:'불가항력',data:months.map(function(b){return b.god;}),backgroundColor:GRP_CL.god,stack:'s',borderColor:'#fff',borderWidth:1.5},
-              {label:'개런티즈 조치',data:months.map(function(b){return b.gz;}),backgroundColor:GRP_CL.gz,stack:'s',borderColor:'#fff',borderWidth:1.5,borderRadius:{topLeft:4,topRight:4}}
+              {label:'개런티즈 조치',data:months.map(function(b){return b.gz;}),backgroundColor:GRP_CL.gz,stack:'s',borderColor:'#fff',borderWidth:1.5,borderRadius:{topLeft:4,topRight:4}},
+              {label:'만기퇴실예정(미확정)',data:months.map(function(b){return b.sched;}),backgroundColor:schedPat,stack:'s',borderColor:'#60A5FA',borderWidth:1,borderRadius:{topLeft:4,topRight:4}}   /* [v685] 이번 달 이후 만기 도래·계약중·해지일 미확정 */
             ]},
           options:{ responsive:true, maintainAspectRatio:false,
             onClick:function(_e9,_els){ try{ if(!_els||!_els.length) return; var _el9=_els[0]; var _b9=months[_el9.index]; if(!_b9) return;
-              window._exm={y:_b9.y,m:_b9.m}; window._exmKindF=['만기','중도','중도','강제'][_el9.datasetIndex]||'all'; renderExitMgmtView(); }catch(_ce){} },   /* [v552] 스택 클릭 → 해당 월+퇴실구분 필터로 이동 */
+              window._exm={y:_b9.y,m:_b9.m}; window._exmKindF=['만기','중도','중도','강제'][_el9.datasetIndex]||'all'; renderExitMgmtView();
+              if(_el9.datasetIndex===4) setTimeout(function(){ try{ exm_leadModal('schedSel'); }catch(_m9){} }, 60); }catch(_ce){} },   /* [v552] 스택 클릭 → 해당 월+퇴실구분 필터로 이동 · [v685] 예정 스택 → 명단 */
             plugins:{ legend:{position:'bottom',labels:{boxWidth:10,boxHeight:10,font:{size:10.5},color:'#475569'}},
               tooltip:{mode:'index',callbacks:{
-                label:function(x3){ var t3=0; x3.chart.data.datasets.forEach(function(d3){ var v3=d3.data[x3.dataIndex]; if(v3!=null)t3+=v3; }); var v9=x3.parsed.y||0; var p9=t3>0?Math.round(v9/t3*100):0; return ' '+x3.dataset.label+': '+v9+'명 ('+p9+'%)'; },   /* [v552.5] 툴팁 % 병기 */
-                footer:function(it){ return '총 '+it.reduce(function(s3,x){return s3+x.parsed.y;},0)+'명'; }}} },
+                label:function(x3){ if(x3.datasetIndex===4){ var v8=x3.parsed.y||0; return v8?' 만기퇴실예정(해지일 미확정): '+v8+'건 · 클릭 → 명단':null; }   /* [v685] */
+                  var t3=0; x3.chart.data.datasets.forEach(function(d3,i3){ if(i3===4) return; var v3=d3.data[x3.dataIndex]; if(v3!=null)t3+=v3; }); var v9=x3.parsed.y||0; var p9=t3>0?Math.round(v9/t3*100):0; return ' '+x3.dataset.label+': '+v9+'명 ('+p9+'%)'; },   /* [v552.5] 툴팁 % 병기 */
+                footer:function(it){ var tot9=0, sc9=0; it.forEach(function(x){ if(x.datasetIndex===4) sc9+=x.parsed.y||0; else tot9+=x.parsed.y||0; }); return '총 '+tot9+'명'+(sc9?' · 만기예정 +'+sc9+'건':''); }}} },
             scales:{ x:{stacked:true,grid:{display:false},ticks:{font:{size:10},color:'#8A9AB5'}},
               y:{stacked:true,grid:{color:'#F1F5F9'},ticks:{font:{size:10},color:'#8A9AB5',precision:0},border:{display:false}} } },
           plugins:[{ id:'exmTotal', afterDatasetsDraw:function(c2){
             var cx=c2.ctx; cx.save(); cx.font='800 10px Pretendard,sans-serif'; cx.fillStyle='#64748B'; cx.textAlign='center';
-            c2.data.labels.forEach(function(_,ix){ var mE=c2.getDatasetMeta(3).data[ix]; if(mE) cx.fillText(mkTot(ix), mE.x, mE.y-5); });
+            c2.data.labels.forEach(function(_,ix){ var sc=months[ix].sched||0; var mE=c2.getDatasetMeta(sc?4:3).data[ix]; if(mE){ var tt=mkTot(ix); if(sc){ cx.fillStyle='#64748B'; cx.fillText(tt, mE.x-(sc?12:0), mE.y-5); cx.fillStyle='#2563EB'; cx.fillText('+'+sc, mE.x+12, mE.y-5); } else cx.fillText(tt, mE.x, mE.y-5); } });   /* [v685] 확정 (+만기예정) */
             cx.restore(); } }]
         });
       }
