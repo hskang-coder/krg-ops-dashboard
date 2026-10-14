@@ -29607,8 +29607,8 @@ function renderExitMgmtView(){
   if (window.__odtInit) return; window.__odtInit = true;
   var GID = '1477881084', START = '2026-10-13', TTL = 5 * 60 * 1000;
   /* 기록 회차(2026-10-13 확정): 08:20 당일 기준값 + 11~18시 매시 — 시트에 다른 회차가 있으면 그것도 함께 표시 */
-  var SLOTS = ['08:20', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
-  function slotLb(s){ return s === '08:20' ? '08:20' : (parseInt(s, 10) + '시'); }
+  var SLOTS = ['08:20', '09:30', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];   /* [v679] 09:30 회차 추가 */
+  function slotLb(s){ if (s === '08:20') return '08:20'; var m = String(s).match(/^(\d{1,2}):(\d{2})$/); if (!m) return s; return m[2] === '00' ? (parseInt(m[1], 10) + '시') : (parseInt(m[1], 10) + ':' + m[2]); }
   function daySlots(di){ var set = {}; SLOTS.forEach(function(s){ set[s] = 1; }); if (di) Object.keys(di.slots).forEach(function(s){ set[s] = 1; }); return Object.keys(set).sort(); }
   var WD = ['일', '월', '화', '수', '목', '금', '토'];
   var S = window.__odTrend = { rows: [], byDay: {}, days: [], loadedAt: 0, loading: null, err: '', sig: '0' };
@@ -29835,7 +29835,7 @@ function renderExitMgmtView(){
     if (!S.loadedAt && !S.err) body = '<div class="odt-empty">⏳ 집계 데이터 불러오는 중…</div>';
     else if (isRange) body = rangeHtml(span.a, span.b, span.lbl);
     else { var di = S.byDay[ymd]; body = di ? flowHtml(di) : '<div class="odt-empty">' + noDataWhy(ymd) + '</div>'; }
-    var note = '<div class="odt-note"><b>완납 해소</b> = 기준 연체자 중 임대료 미납이 0원이 되고 그날 연체납부 기록이 있는 사람 · <b>일부 입금</b> = 아직 연체지만 미납총액이 줄어든 사람 · <b>미입금</b> = 기준 그대로 · <b>기타 해소</b> = 입금 기록 없이 연체자에서 빠짐(상태 변경·정정) · <b>신규 발생</b> = 기준 이후 새로 연체 · <b>회수금액</b> = 기준 연체자의 임대료 미납 감소분 합 · 집계 평일 08:20 + 11~18시 매시 · <b>숫자를 누르면 명단</b>(계약번호·이름·기준/현재 미납·입금액 — 10/13 18:00 기록부터)</div>';
+    var note = '<div class="odt-note"><b>완납 해소</b> = 기준 연체자 중 임대료 미납이 0원이 되고 그날 연체납부 기록이 있는 사람 · <b>일부 입금</b> = 아직 연체지만 미납총액이 줄어든 사람 · <b>미입금</b> = 기준 그대로 · <b>기타 해소</b> = 입금 기록 없이 연체자에서 빠짐(상태 변경·정정) · <b>신규 발생</b> = 기준 이후 새로 연체 · <b>회수금액</b> = 기준 연체자의 임대료 미납 감소분 합 · 집계 평일 08:20 · 09:30 · 11~18시 매시 · <b>숫자를 누르면 명단</b>(계약번호·이름·기준/현재 미납·입금액 — 10/13 18:00 기록부터)</div>';
     if (!S.loading && (Date.now() - S.loadedAt > TTL)) load(true);
     return '<div class="odt-wrap">' + head + body + note + '</div>';
   }
@@ -29880,7 +29880,7 @@ function renderExitMgmtView(){
           var dp = prevR ? r.n['임대료'] - prevR.n['임대료'] : null, db = r.n['임대료'] - di.baseN;
           h += '<div class="odt-tile' + (isB ? ' base' : '') + (isNow ? ' now' : '') + '"><div class="t"><span class="tm">' + slotLb(s) + '</span>' + (isB ? '' : '회차 집계') + '</div>'
             + '<div class="n">' + r.n['임대료'] + '<small>명</small></div>'
-            + '<div class="c">' + (isB ? '구간 ' + r.b.join(' / ') + ' · 변동관리비 ' + r.n['변동관리비']
+            + '<div class="c">' + (isB ? '구간 ' + r.b.join(' / ')
                 : '전 회차 ' + (dp < 0 ? '<span class="dn">▼' + (-dp) + '</span>' : dp > 0 ? '<span class="up">▲' + dp + '</span>' : '—') + ' · 기준 대비 ' + (db < 0 ? '<span class="dn">▼' + (-db) + '</span>' : db > 0 ? '<span class="up">▲' + db + '</span>' : '—')) + '</div>'
             + (isB ? '' : '<div class="c2" title="기준 이후 이 회차까지 누적 · ' + TIP_PAID + ' · ' + TIP_PART + '">완납 <b class="g">' + r.paid + '</b> · 분납 <b class="w">' + r.part + '</b>' + (r.newd ? ' · 신규 <b class="p">+' + r.newd + '</b>' : '') + '</div>') + '</div>';
           prevR = r;
