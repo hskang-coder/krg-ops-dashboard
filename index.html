@@ -29745,14 +29745,15 @@ function renderExitMgmtView(){
       '.odt-strip-right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:11px;color:#64748B;font-weight:600;white-space:nowrap}',
       '.odt-link{font-size:11px;font-weight:800;color:#334155;background:#F1F5F9;border-radius:999px;padding:5px 10px;cursor:pointer}.odt-link:hover{background:#E2E8F0}',
       '.odt-open{font-size:12px;font-weight:800;color:#4F46E5;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:999px;padding:5px 12px;cursor:pointer;white-space:nowrap}',
-      '.odt-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:8px;margin-top:10px}',
-      '.odt-tile{border:1px solid #E5E7EB;border-radius:12px;padding:10px 12px 8px;position:relative;background:#fff}.odt-tile .t{font-size:11px;font-weight:700;color:#64748B;display:flex;align-items:center;gap:7px}.odt-tile .t .tm{background:#F1F5F9;border-radius:6px;padding:2px 7px;color:#334155;font-weight:800}.odt-tile .n{font-size:26px;font-weight:900;letter-spacing:-.02em;margin-top:3px;color:#0F172A}.odt-tile .n small{font-size:12px;font-weight:700;color:#334155;margin-left:3px}.odt-tile .c{font-size:11px;color:#64748B;margin-top:4px;font-weight:600}.odt-tile .c .dn{color:#15803D;font-weight:900}.odt-tile .c .up{color:#B91C1C;font-weight:900}',
-      '.odt-tile.base{border-color:#C7D2FE;background:linear-gradient(180deg,#fff,#FBFBFF)}.odt-tile.base::after{content:"당일 기준값";position:absolute;right:10px;top:10px;font-size:10px;font-weight:800;color:#fff;background:#4F46E5;border-radius:999px;padding:2px 8px}',
+      '.odt-tiles{display:grid;grid-template-columns:repeat(var(--odt-n,10),minmax(0,1fr));gap:6px;margin-top:10px}',   /* [v680] 회차 수만큼 1행 */
+      '@media (max-width:1180px){.odt-tiles{grid-template-columns:repeat(5,minmax(0,1fr))}}',
+      '.odt-tile{border:1px solid #E5E7EB;border-radius:11px;padding:8px 9px 7px;position:relative;background:#fff;min-width:0}.odt-tile .t{font-size:10px;font-weight:700;color:#64748B;display:flex;align-items:center;gap:5px;white-space:nowrap}.odt-tile .t .tm{background:#F1F5F9;border-radius:6px;padding:2px 6px;color:#334155;font-weight:800}.odt-tile .n{font-size:22px;font-weight:900;letter-spacing:-.02em;margin-top:2px;color:#0F172A;line-height:1.15}.odt-tile .n small{font-size:11px;font-weight:700;color:#334155;margin-left:2px}.odt-tile .c{font-size:10px;color:#64748B;margin-top:3px;font-weight:600;line-height:1.35}.odt-tile .c .dn{color:#15803D;font-weight:900}.odt-tile .c .up{color:#B91C1C;font-weight:900}',
+      '.odt-tile.base{border-color:#C7D2FE;background:linear-gradient(180deg,#fff,#FBFBFF)}.odt-tile.base::after{content:"기준값";position:absolute;right:8px;top:8px;font-size:9px;font-weight:800;color:#fff;background:#4F46E5;border-radius:999px;padding:2px 7px}',
       '.odt-tile.now{border:2px solid #6366F1}.odt-tile.now .t .tm{background:#4F46E5;color:#fff}.odt-tile.pending{border-style:dashed;background:#FAFAFA}.odt-tile.pending .n{color:#CBD5E1}',
       '.odt-strip-foot{margin-top:7px;font-size:10.5px;color:#94A3B8;font-weight:600}',
       '.odt-pay{display:inline-flex;align-items:center;gap:6px;padding-left:10px;border-left:1px solid #E5E7EB;font-size:11px;color:#64748B;font-weight:700;white-space:nowrap}.odt-pay .k9{font-size:11px;color:#64748B;font-weight:700}',
       '.odt-chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 9px;font-weight:800;font-size:11.5px}.odt-chip b{font-weight:900}.odt-chip.good{background:#ECFDF5;color:#15803D}.odt-chip.warn{background:#FFFBEB;color:#B45309}.odt-chip.got{background:#EEF2FF;color:#3730A3;border:1px solid #C7D2FE;padding:2px 9px}.odt-chip.got b{font-size:13.5px;letter-spacing:-.2px;font-variant-numeric:tabular-nums}.odt-chip.click{cursor:pointer}.odt-chip.click:hover{box-shadow:0 0 0 2px #C7D2FE}',
-      '.odt-tile .c2{font-size:10.5px;color:#64748B;margin-top:3px;font-weight:700}.odt-tile .c2 b.g{color:#15803D}.odt-tile .c2 b.w{color:#B45309}.odt-tile .c2 b.p{color:#7C3AED}',
+      '.odt-tile .c2{font-size:10px;color:#64748B;margin-top:2px;font-weight:700;white-space:nowrap}.odt-tile .c2 b.g{color:#15803D}.odt-tile .c2 b.w{color:#B45309}.odt-tile .c2 b.p{color:#7C3AED}',
       '@media (max-width:900px){.odt-f.amt{margin-left:0}}'
     ].join('\n');
     document.head.appendChild(st);
@@ -29871,17 +29872,17 @@ function renderExitMgmtView(){
       + '<span class="odt-strip-right">' + right + '</span></div>';
     if (open) {
       if (di) {
-        h += '<div class="odt-tiles">';
+        var slots9 = daySlots(di); h += '<div class="odt-tiles" style="--odt-n:' + slots9.length + '">';
         var prevR = null, lastSlot = di.last.slot;
-        daySlots(di).forEach(function(s){
+        slots9.forEach(function(s){
           var r = di.slots[s];
-          if (!r) { h += '<div class="odt-tile pending"><div class="t"><span class="tm">' + slotLb(s) + '</span>' + (s > lastSlot ? '예정' : '누락') + '</div><div class="n">—</div><div class="c">' + (s > lastSlot ? '회차 도래 시 자동 기록' : '이 회차 기록 없음') + '</div></div>'; return; }
+          if (!r) { h += '<div class="odt-tile pending"><div class="t"><span class="tm">' + slotLb(s) + '</span>' + (s > lastSlot ? '예정' : '누락') + '</div><div class="n">—</div><div class="c">' + (s > lastSlot ? '자동 기록 예정' : '기록 없음') + '</div></div>'; return; }
           var isB = (s === di.baseSlot), isNow = (s === lastSlot && !isB);
           var dp = prevR ? r.n['임대료'] - prevR.n['임대료'] : null, db = r.n['임대료'] - di.baseN;
           h += '<div class="odt-tile' + (isB ? ' base' : '') + (isNow ? ' now' : '') + '"><div class="t"><span class="tm">' + slotLb(s) + '</span>' + (isB ? '' : '회차 집계') + '</div>'
             + '<div class="n">' + r.n['임대료'] + '<small>명</small></div>'
             + '<div class="c">' + (isB ? '구간 ' + r.b.join(' / ')
-                : '전 회차 ' + (dp < 0 ? '<span class="dn">▼' + (-dp) + '</span>' : dp > 0 ? '<span class="up">▲' + dp + '</span>' : '—') + ' · 기준 대비 ' + (db < 0 ? '<span class="dn">▼' + (-db) + '</span>' : db > 0 ? '<span class="up">▲' + db + '</span>' : '—')) + '</div>'
+                : '전 회차 ' + (dp < 0 ? '<span class="dn">▼' + (-dp) + '</span>' : dp > 0 ? '<span class="up">▲' + dp + '</span>' : '—') + ' · 기준 ' + (db < 0 ? '<span class="dn">▼' + (-db) + '</span>' : db > 0 ? '<span class="up">▲' + db + '</span>' : '—')) + '</div>'
             + (isB ? '' : '<div class="c2" title="기준 이후 이 회차까지 누적 · ' + TIP_PAID + ' · ' + TIP_PART + '">완납 <b class="g">' + r.paid + '</b> · 분납 <b class="w">' + r.part + '</b>' + (r.newd ? ' · 신규 <b class="p">+' + r.newd + '</b>' : '') + '</div>') + '</div>';
           prevR = r;
         });
