@@ -29622,7 +29622,7 @@ function renderExitMgmtView(){
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════════
    [v673] 연체추이(Raw DATA) — 08:20 아침 첫 집계 기준 시간대별 연체 인원 · 연체 해소 흐름
-   · 데이터: OD '연체추이(Raw DATA)' 탭(gid 1477881084). krg-db-sync/overdue_snapshot.py 가 평일 08:20(당일 기준값)·12·15·18시에 1줄씩 기록
+   · 데이터: OD '연체추이(Raw DATA)' 탭(gid 1477881084). krg-db-sync/overdue_snapshot.py 가 평일 08:20(당일 기준값)·09:30·11~18시 매시, [v698] 다음날 00:05 자정 회차가 전날 24:00(일 마감값)으로 1줄씩 기록
    · 운영관리 > 📋 연체 대응 결과 상단 "연체 해소 흐름"(입금내역 기준 · 전수) — 일: 기준 08:20 → 마지막 회차 / 주·월: 일자별 표 + 합계 (기준일 연동)
    · 연체관리 탭 "오늘 연체 인원" 한 줄(접이식) — 입금 상세는 운영관리로 링크
    · DashBoard '계약중 연체 · 일자별': 그날 기준시각 집계가 있으면 그 값(인원·이월/신규) — odt_dayBase() · 없는 날은 기존 소급 계산
@@ -29633,9 +29633,12 @@ function renderExitMgmtView(){
   if (window.__odtInit) return; window.__odtInit = true;
   var GID = '1477881084', START = '2026-10-13', TTL = 5 * 60 * 1000;
   /* 기록 회차(2026-10-13 확정): 08:20 당일 기준값 + 11~18시 매시 — 시트에 다른 회차가 있으면 그것도 함께 표시 */
-  var SLOTS = ['08:20', '09:30', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];   /* [v679] 09:30 회차 추가 */
+  var SLOTS = ['08:20', '09:30', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '24:00'];   /* [v679] 09:30 회차 추가 · [v698] 24:00 자정 회차(전날 날짜로 기록) */
+  var FINAL_SLOT = '24:00', START24 = '2026-10-15';   /* [v698] 24:00 이 그날의 마감 회차 (START24 이전 날짜는 18:00 이 마감) */
+  function finalSlotOf(day){ return day < START24 ? '18:00' : FINAL_SLOT; }
+  function isFinal(di){ return !!di && di.last.slot === finalSlotOf(di.day); }
   function slotLb(s){ if (s === '08:20') return '08:20'; var m = String(s).match(/^(\d{1,2}):(\d{2})$/); if (!m) return s; return m[2] === '00' ? (parseInt(m[1], 10) + '시') : (parseInt(m[1], 10) + ':' + m[2]); }
-  function daySlots(di){ var set = {}; SLOTS.forEach(function(s){ set[s] = 1; }); if (di) Object.keys(di.slots).forEach(function(s){ set[s] = 1; }); return Object.keys(set).sort(); }
+  function daySlots(di){ var set = {}; SLOTS.forEach(function(s){ if (s === FINAL_SLOT && di && di.day < START24) return; set[s] = 1; }); if (di) Object.keys(di.slots).forEach(function(s){ set[s] = 1; }); return Object.keys(set).sort(); }   /* [v698] 24:00 은 START24 부터 */
   var WD = ['일', '월', '화', '수', '목', '금', '토'];
   var S = window.__odTrend = { rows: [], byDay: {}, days: [], loadedAt: 0, loading: null, err: '', sig: '0' };
   var openMem = null;
@@ -29799,7 +29802,7 @@ function renderExitMgmtView(){
 
   /* ── 운영관리: 일 보기 흐름 ── */
   function flowHtml(di){
-    var b = di.base, l = di.last, isToday = (di.day === ymdOf(new Date())), fin = (l.slot === '18:00');
+    var b = di.base, l = di.last, isToday = (di.day === ymdOf(new Date())), fin = isFinal(di);   /* [v698] 마감 = 24:00(10/15 이전은 18:00) */
     var baseN = di.baseN, cur = l.n['임대료'], delta = cur - baseN;
     var box = function(cls, t, n, s, key){
       var click = '';
@@ -29819,7 +29822,7 @@ function renderExitMgmtView(){
       + '<div class="odt-plus">+</div>'
       + box('new', '🆕 신규 발생', '+' + l.newd, '낮에 새로 연체', 'newd')
       + '<div class="odt-ar">→</div>'
-      + box('res', (fin ? '18:00 마감' : (isToday ? '현재 (' + l.slot + ' 회차)' : l.slot + ' 회차')), cur + '<small class="' + (delta < 0 ? 'dn' : delta > 0 ? 'up' : '') + '">' + (delta < 0 ? '▼' + (-delta) : delta > 0 ? '▲' + delta : '—') + '</small>', '= ' + baseN + ' − ' + l.paid + (l.other ? ' − ' + l.other : '') + ' + ' + l.newd)
+      + box('res', (fin ? l.slot + ' 마감' : (isToday ? '현재 (' + l.slot + ' 회차)' : l.slot + ' 회차')), cur + '<small class="' + (delta < 0 ? 'dn' : delta > 0 ? 'up' : '') + '">' + (delta < 0 ? '▼' + (-delta) : delta > 0 ? '▲' + delta : '—') + '</small>', '= ' + baseN + ' − ' + l.paid + (l.other ? ' − ' + l.other : '') + ' + ' + l.newd)
       + (function(){ var pr = dayRate(di);
           /* [v696] 회수금액 카드 2장 좌·우 — 왼쪽 계약중(08:20 기준 흐름) · 오른쪽 전체(종료 포함 · 계약상태별 표 segData 와 같은 값) */
           var left = box('amt', '💰 오늘 회수 <small class="odt-amt-k">계약중 · 임대료 · ' + di.baseSlot + ' 기준</small>', won(l.got) + (pr != null ? '<span class="odt-pct" title="회수율 = 회수금액 ÷ 기준 ' + di.baseSlot + ' 임대료 미납총액 ' + won(di.base.owed) + '">회수율 ' + pctTxt(pr) + '</span>' : ''), '기준 연체자의 임대료 입금 합' + (pr != null ? '<br>회수율 = ÷ 기준 미납 ' + won(di.base.owed) : ''));
@@ -29841,7 +29844,7 @@ function renderExitMgmtView(){
     daySlots(di).forEach(function(s, i){ var r = di.slots[s]; tl += (i ? '<span class="ar">→</span>' : '') + '<span><span class="sl">' + slotLb(s) + '</span> <b class="' + (r ? (s === di.baseSlot ? 'base' : '') : 'dim') + '"' + (r ? ' title="기록 ' + esc(r.at) + '"' : '') + '>' + (r ? r.n['임대료'] : '—') + '</b></span>'; });
     var pv = prevDataDay(di.day);
     if (pv) tl += '<span class="sep">|</span><span class="pv">전일(' + mdShort(pv.day) + ') ' + pv.baseN + ' → ' + pv.last.n['임대료'] + ' · 완납 ' + pv.last.paid + ' · 회수 ' + won(pv.last.got) + (dayRate(pv) != null ? ' (' + pctTxt(dayRate(pv)) + ')' : '') + '</span>';   /* [v682] 회수율 */
-    tl += '<span class="def">' + (fin ? '18:00 확정치' : (isToday ? '다음 회차에 갱신' : '18:00 회차 누락 — ' + l.slot + ' 회차까지')) + (l.note ? ' · ' + esc(l.note) : '') + '</span></div>';
+    tl += '<span class="def">' + (fin ? l.slot + ' 마감 확정치' : (isToday ? '다음 회차에 갱신' + (l.slot === '18:00' ? ' (24:00 자정 회차 예정)' : '') : finalSlotOf(di.day) + ' 회차 누락 — ' + l.slot + ' 회차까지')) + (l.note ? ' · ' + esc(l.note) : '') + '</span></div>';
     return h + tl;   /* [v686] 계약상태별 표는 opsHtml 에서 날짜 기준으로 붙임 */
   }
   /* ── 운영관리: 주/월 보기 일자별 표 ── */
@@ -29873,7 +29876,7 @@ function renderExitMgmtView(){
         + '<td class="' + (dd < 0 ? 'dn' : dd > 0 ? 'up' : 'm') + '">' + (dd < 0 ? '▼' + (-dd) : dd > 0 ? '▲' + dd : '—') + '</td><td>' + won(l.got) + '</td>'
         + '<td class="g" title="' + won(l.got) + ' ÷ 기준 ' + d.baseSlot + ' 임대료 미납총액 ' + won((d.base && d.base.owed) || 0) + '">' + (dayRate(d) != null ? pctTxt(dayRate(d)) : '—') + '</td>'   /* [v682] 회수율 */
         + '<td class="' + (d.baseSlot === '08:20' ? 'm' : 'w') + '">' + d.baseSlot + (d.baseSlot === '08:20' ? '' : ' 대체') + '</td>'
-        + (function(){ var live = (d.day === today && nowMin < 18 * 60 + 30 && l.slot !== '18:00'); return '<td class="' + (l.slot === '18:00' || live ? 'm' : 'w') + '">' + l.slot + (l.slot === '18:00' ? '' : (live ? ' (진행 중)' : ' (18시 누락)')) + '</td>'; })() + '</tr>';
+        + (function(){ var fin9 = isFinal(d), live = (d.day === today && !fin9); return '<td class="' + (fin9 || live ? 'm' : 'w') + '">' + l.slot + (fin9 ? (l.slot === FINAL_SLOT ? ' 마감' : '') : (live ? ' (진행 중)' : ' (' + slotLb(finalSlotOf(d.day)) + ' 누락)')) + '</td>'; })() + '</tr>';   /* [v698] 24:00 마감 */
     });
     h += '</tbody></table></div>';
     return h;
