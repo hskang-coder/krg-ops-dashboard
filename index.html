@@ -29826,8 +29826,7 @@ function renderExitMgmtView(){
     var pv = prevDataDay(di.day);
     if (pv) tl += '<span class="sep">|</span><span class="pv">전일(' + mdShort(pv.day) + ') ' + pv.baseN + ' → ' + pv.last.n['임대료'] + ' · 완납 ' + pv.last.paid + ' · 회수 ' + won(pv.last.got) + (dayRate(pv) != null ? ' (' + pctTxt(dayRate(pv)) + ')' : '') + '</span>';   /* [v682] 회수율 */
     tl += '<span class="def">' + (fin ? '18:00 확정치' : (isToday ? '다음 회차에 갱신' : '18:00 회차 누락 — ' + l.slot + ' 회차까지')) + (l.note ? ' · ' + esc(l.note) : '') + '</span></div>';
-    var sg = ''; try { if (isToday) sg = segHtml(); } catch(e){ console.warn('[v683] seg', e); }   /* [v683] 계약상태별(현재) — 오늘 보기에서만 */
-    return h + tl + sg;
+    return h + tl;   /* [v686] 계약상태별 표는 opsHtml 에서 날짜 기준으로 붙임 */
   }
   /* ── 운영관리: 주/월 보기 일자별 표 ── */
   function rangeHtml(a, b, lbl){
@@ -29874,7 +29873,7 @@ function renderExitMgmtView(){
     var body;
     if (!S.loadedAt && !S.err) body = '<div class="odt-empty">⏳ 집계 데이터 불러오는 중…</div>';
     else if (isRange) body = rangeHtml(span.a, span.b, span.lbl);
-    else { var di = S.byDay[ymd]; body = di ? flowHtml(di) : '<div class="odt-empty">' + noDataWhy(ymd) + '</div>'; }
+    else { var di = S.byDay[ymd]; body = (di ? flowHtml(di) : '<div class="odt-empty">' + noDataWhy(ymd) + '</div>') + (function(){ try { return segHtml(ymd); } catch(e){ console.warn('[v686] seg', e); return ''; } })(); }   /* [v686] 계약상태별 — 보고 있는 날 기준(전일 포함) */
     var note = '<div class="odt-note"><b>완납 해소</b> = 기준 연체자 중 임대료 미납이 0원이 되고 그날 연체납부 기록이 있는 사람 · <b>일부 입금</b> = 아직 연체지만 미납총액이 줄어든 사람 · <b>미입금</b> = 기준 그대로 · <b>기타 해소</b> = 입금 기록 없이 연체자에서 빠짐(상태 변경·정정) · <b>신규 발생</b> = 기준 이후 새로 연체 · <b>회수금액</b> = 기준 연체자의 임대료 미납 감소분 합 · 집계 평일 08:20 · 09:30 · 11~18시 매시 · <b>숫자를 누르면 명단</b>(계약번호·이름·기준/현재 미납·입금액 — 10/13 18:00 기록부터)</div>';
     if (!S.loading && (Date.now() - S.loadedAt > TTL)) load(true);
     return '<div class="odt-wrap">' + head + body + note + '</div>';
@@ -29939,12 +29938,13 @@ function renderExitMgmtView(){
   var SEG_META = { act: SEG[0], end3: SEG[1], end: SEG[2], all: { k: 'all', lb: '전체', col: '#0F172A' } };
   var segCache = { ref: null, day: '', data: null };
   function pdate(s){ var m = String(s == null ? '' : s).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
-  function segData(){
+  function segData(ymd){
     var P = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData : null;
     if (!P || !P.length) return null;
-    var today = ymdOf(new Date());
+    var todayY = ymdOf(new Date()); var today = (ymd && dateOf(ymd)) ? ymd : todayY;   /* [v686] 기준일(D) — 기본 오늘 */
     if (segCache.ref === P && segCache.day === today && segCache.data) return segCache.data;
-    var t0 = new Date(); t0.setHours(0, 0, 0, 0); var lim = new Date(t0.getFullYear(), t0.getMonth() - 3, t0.getDate());
+    var t0 = dateOf(today); t0.setHours(0, 0, 0, 0); var Dt = t0.getTime(); var isPast = today < todayY;
+    var lim = new Date(t0.getFullYear(), t0.getMonth() - 3, t0.getDate());
     var exitMap = {};
     try {
       var V = (typeof vacancyRawData !== 'undefined' && Array.isArray(vacancyRawData)) ? vacancyRawData : [];
@@ -29957,23 +29957,37 @@ function renderExitMgmtView(){
       var cs = String((p[csK] == null ? p._col_N : p[csK]) || '').trim(); if (cs === '삭제' || cs === '계약 철회') continue;
       var cno = _normCno(p[cnoK] == null ? p._col_E : p[cnoK]); if (!cno) continue;
       var st = String((p[stK] == null ? p._col_T : p[stK]) || '').trim();
-      var e = per[cno] || (per[cno] = { cno: cno, cs: '', nm: '', end: null, cur: 0, got: 0, bills: 0 });
+      if (st !== '연체중' && st !== '분납중' && st !== '연체납부') continue;   /* [v686] 정상납부·납부예정은 연체 이력 아님 */
+      var e = per[cno] || (per[cno] = { cno: cno, cs: '', nm: '', end: null, cur: 0, got: 0, bills: 0, base: 0 });
       if (cs) e.cs = cs; if (!e.nm) e.nm = String((p[nmK] == null ? p._col_O : p[nmK]) || '').trim();
       if (!e.end) { var m = String((p[prK] == null ? p._col_P : p[prK]) || '').match(/~\s*(\d{4}\D+\d{1,2}\D+\d{1,2})/); if (m) e.end = pdate(m[1]); }
       var unp = num(p[unK] == null ? p._col_AB : p[unK]);
-      if (st === '연체중' || st === '분납중') { e.cur += unp; e.bills++; }
-      if (st === '연체납부' || st === '분납중') {
-        var pdd = pdate(p[pdK] == null ? p._col_AE : p[pdK]);
-        if (pdd && ymdOf(pdd) === today) { var U = num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)'] == null ? p._col_U : p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']); e.got += (st === '연체납부') ? U : Math.max(0, U - unp); }
+      var U = num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)'] == null ? p._col_U : p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']);
+      var due = pdate(p['납기일'] == null ? p._col_AC : p['납기일']);
+      var pdd = pdate(p[pdK] == null ? p._col_AE : p[pdK]);
+      /* D일 회수 = 납부일이 D 인 연체납부 청구액 (분납중은 청구액−잔여) */
+      var g1 = (pdd && pdd.getTime() === Dt) ? ((st === '연체납부') ? U : (st === '분납중' ? Math.max(0, U - unp) : 0)) : 0;
+      /* [v686] 기준 미납(base) — 오늘: 입금내역 현재 상태 그대로(v683 동일) = 현재 미납 + 오늘 회수 · 과거 D: 납기일 < D 이고 D 이전에 납부되지 않은 청구 (납부일 없음 → 현재 미납액, 납부일 ≥ D → 청구액(납부 전), 납부일 < D → 분납중이면 잔여) */
+      var amt = 0;
+      if (!isPast) amt = ((st === '연체중' || st === '분납중') ? unp : 0) + g1;
+      else if (due && due.getTime() < Dt) {
+        if (!pdd) amt = (st === '연체중' || st === '분납중') ? unp : 0;
+        else if (pdd.getTime() >= Dt) amt = U;
+        else amt = (st === '분납중') ? unp : 0;
       }
+      if (amt > 0) { e.base += amt; if (isPast || st !== '연체납부') e.bills++; }   /* 오늘 보기의 건수 = 현재 미납 청구(v683 동일) · 과거 = 그날 아침 미납 청구 */
+      e.got += g1;
     }
+    Object.keys(per).forEach(function(k){ var e = per[k]; e.cur = Math.max(0, e.base - e.got); });
     var mk = function(){ return { n: 0, cur: 0, got: 0, paid: 0, part: 0, unp: 0, rows: [] }; };
-    var out = { act: mk(), end3: mk(), end: mk(), all: mk(), today: today, lim: lim };
+    var out = { act: mk(), end3: mk(), end: mk(), all: mk(), today: today, lim: lim, isPast: isPast };
     var add = function(g, e){ g.n++; g.cur += e.cur; g.got += e.got; if (e.got > 0 && !(e.cur > 0)) g.paid++; else if (e.got > 0) g.part++; else g.unp++; g.rows.push(e); };
     Object.keys(per).forEach(function(k){
-      var e = per[k]; if (!(e.cur > 0) && !(e.got > 0)) return;
+      var e = per[k]; if (!(e.base > 0)) return;
       e.exit = exitMap[k] || e.end;
-      e.seg = (e.cs === '종료') ? ((e.exit && e.exit >= lim) ? 'end3' : 'end') : 'act';
+      var ended = (e.cs === '종료') && (!isPast || !(e.exit && e.exit.getTime() > Dt));   /* [v686] 과거 D 기준 계약상태 — 퇴실일이 D 이후면 당시 계약중 (오늘 보기는 v683 동일) */
+      e.csAt = ended ? '종료' : (e.cs === '종료' ? '계약중(당시)' : e.cs);
+      e.seg = ended ? ((e.exit && e.exit >= lim) ? 'end3' : 'end') : 'act';
       add(out[e.seg], e); add(out.all, e);
     });
     ['act', 'end3', 'end', 'all'].forEach(function(k){ out[k].rows.sort(function(a, b){ return (b.cur + b.got) - (a.cur + a.got); }); });
@@ -30013,7 +30027,7 @@ function renderExitMgmtView(){
   window.__odtSegSort = window.__odtSegSort || { key: 'cur', dir: -1 };
   window.__odtSegCur = null;
   window.odt_segSort = function(key){
-    var st = window.__odtSegSort; var NUMK = { cno:1, bills:1, cur:1, got:1 };
+    var st = window.__odtSegSort; var NUMK = { cno:1, bills:1, cur:1, got:1, base:1 };
     if (st.key === key) st.dir = -st.dir; else { st.key = key; st.dir = NUMK[key] ? -1 : 1; }
     if (window.__odtSegCur) window.odt_seg(window.__odtSegCur.k, window.__odtSegCur.key);
   };
@@ -30023,7 +30037,7 @@ function renderExitMgmtView(){
       switch (key) {
         case 'cno': return +String(r.cno).replace(/\D/g, '') || 0;
         case 'nm': return String(r.nm || '');
-        case 'cs': return String(r.cs || '');
+        case 'cs': return String(r.csAt || r.cs || '');
         case 'exit': return r.exit ? r.exit.getTime() : null;
         case 'pm': return (r.pm && r.pm.pay) ? r.pm.pay.getTime() : null;
         case 'bills': return r.bills || 0;
@@ -30044,48 +30058,53 @@ function renderExitMgmtView(){
     var st = window.__odtSegSort, on = st.key === key;
     return '<th class="srt' + (on ? ' on' : '') + (cls ? ' ' + cls : '') + '" onclick="odt_segSort(\'' + key + '\')" title="클릭: ' + (on ? (st.dir > 0 ? '내림차순' : '오름차순') + '으로 전환' : '이 열로 정렬') + '">' + lb + '<span class="ar">' + (on ? (st.dir > 0 ? '▲' : '▼') : '⇅') + '</span></th>';
   }
-  function segHtml(){
-    var D = segData();
+  function segHtml(ymd){
+    var D = segData(ymd);
+    var dq = D ? D.today : '';   /* [v686] 모달 기준일 — onclick 인자로 전달 */
     var limTxt = D ? mdLb(ymdOf(D.lim)) : '';
-    var head = '<div class="odt-seg"><div class="odt-seg-h">🧾 계약상태별 연체 · 오늘 회수 <span class="odt-pill">입금내역 현재 기준 · 오늘</span>'
-      + '<span class="sub">종료 3개월 이내 = 퇴실(종료)일 ' + (limTxt || '오늘−3개월') + ' 이후 · 오늘 회수 = 납부일이 오늘인 연체납부 청구액 · 회수율 = 회수 ÷ (현재 미납 + 회수) · 08:20 기준 흐름(위)과 시점·집계 방식이 달라 계약중 숫자가 조금 다를 수 있음 · 숫자 클릭 → 명단</span></div>';
+    var dl = D ? (D.isPast ? mdLb(D.today) : '오늘') : '오늘';
+    var head = '<div class="odt-seg"><div class="odt-seg-h">🧾 계약상태별 연체 · ' + dl + ' 회수 <span class="odt-pill">입금내역 기준 · ' + (D && D.isPast ? mdLb(D.today) + ' 아침 소급' : '현재 · 오늘') + '</span>'
+      + '<span class="sub">' + (D && D.isPast ? '기준 미납 = ' + mdLb(D.today) + ' 아침 기준 미납(납기 경과 · 그날 이전 미납부) · 회수 = 납부일이 그날인 연체납부 청구액 · 계약상태·종료 3개월(퇴실일 ' + (limTxt || '') + ' 이후)은 그날 기준' : '종료 3개월 이내 = 퇴실(종료)일 ' + (limTxt || '오늘−3개월') + ' 이후 · 오늘 회수 = 납부일이 오늘인 연체납부 청구액') + ' · 회수율 = 회수 ÷ 기준 미납 · 08:20 기준 흐름(위)과 시점·집계 방식이 달라 계약중 숫자가 조금 다를 수 있음 · 숫자 클릭 → 명단</span></div>';
     if (!D) return head + '<div class="odt-empty">입금내역(Raw DATA) 로드 후 표시됩니다.</div></div>';
     var tr = function(k){
       var g = D[k], m = SEG_META[k], tot = (k === 'all');
-      var c = function(key, cls, txt){ return '<td class="' + cls + (g[key] > 0 ? ' odt-click' : '') + '"' + (g[key] > 0 ? ' onclick="odt_seg(\'' + k + '\',\'' + key + '\')" title="클릭하면 명단"' : '') + '>' + txt + '</td>'; };
+      var c = function(key, cls, txt){ return '<td class="' + cls + (g[key] > 0 ? ' odt-click' : '') + '"' + (g[key] > 0 ? ' onclick="odt_seg(\'' + k + '\',\'' + key + '\',\'' + dq + '\')" title="클릭하면 명단"' : '') + '>' + txt + '</td>'; };   /* [v686] 기준일 전달 */
       var r = segRate(g);
       return '<tr' + (tot ? ' class="tot"' : '') + '><td class="k"><span class="sw" style="background:' + m.col + '"></span>' + m.lb + '</td>'
         + c('n', 'a', g.n + '<small style="font-weight:600;color:#94A3B8">명</small>')
-        + '<td class="b">' + won(g.cur) + '</td>'
+        + '<td class="b" title="' + (D.isPast ? '그날 아침 기준 미납 합' : '현재 미납 합 (회수 전 기준 미납 ' + won(g.cur + g.got) + ')') + '">' + won(D.isPast ? g.cur + g.got : g.cur) + '</td>'
         + c('paid', 'g', g.paid) + c('part', 'w', g.part) + c('unp', 'b', g.unp)
         + '<td class="g">' + won(g.got) + '</td>'
-        + '<td class="g" title="' + won(g.got) + ' ÷ (' + won(g.cur) + ' + ' + won(g.got) + ')">' + (r != null ? pctTxt(r) : '—') + '</td></tr>';
+        + '<td class="g" title="' + won(g.got) + ' ÷ ' + won(g.cur + g.got) + '">' + (r != null ? pctTxt(r) : '—') + '</td></tr>';
     };
-    return head + '<div class="odt-tblwrap"><table class="odt-tbl odt-segt"><thead><tr><th>구분</th><th>연체 계약</th><th>현재 미납(임대료)</th><th>오늘 완납</th><th>오늘 분납</th><th>미입금</th><th>오늘 회수</th><th>회수율</th></tr></thead><tbody>'
+    var dh = D.isPast ? mdShort(D.today) : '오늘';
+    return head + '<div class="odt-tblwrap"><table class="odt-tbl odt-segt"><thead><tr><th>구분</th><th>연체 계약' + (D.isPast ? '(아침)' : '') + '</th><th>' + (D.isPast ? '기준 미납(임대료)' : '현재 미납(임대료)') + '</th><th>' + dh + ' 완납</th><th>' + dh + ' 분납</th><th>미입금</th><th>' + dh + ' 회수</th><th>회수율</th></tr></thead><tbody>'
       + tr('act') + tr('end3') + tr('end') + tr('all') + '</tbody></table></div></div>';
   }
   function segLineHtml(){
     var D = segData();
     if (!D) return '';
-    var it = function(k){ var g = D[k], m = SEG_META[k], r = segRate(g); return '<span><span class="k">' + m.lb + '</span> <b class="c" onclick="odt_seg(\'' + k + '\',\'n\')" title="클릭하면 명단">' + g.n + '</b>명 · ' + won(g.cur) + (g.got > 0 ? ' · 회수 ' + won(g.got) + ' <span class="pct">' + pctTxt(r) + '</span>' : '') + '</span>'; };
+    var it = function(k){ var g = D[k], m = SEG_META[k], r = segRate(g); return '<span><span class="k">' + m.lb + '</span> <b class="c" onclick="odt_seg(\'' + k + '\',\'n\',\'\')" title="클릭하면 명단">' + g.n + '</b>명 · ' + won(g.cur) + (g.got > 0 ? ' · 회수 ' + won(g.got) + ' <span class="pct">' + pctTxt(r) + '</span>' : '') + '</span>'; };
     return '<div class="odt-segline"><span class="k" title="입금내역(Raw DATA) 현재 기준 — 종료 3개월 이내 = 퇴실(종료)일 ' + mdLb(ymdOf(D.lim)) + ' 이후 · 회수 = 오늘 납부일의 연체납부 청구액 · 회수율 = 회수 ÷ (현재 미납 + 회수)">계약상태별(현재)</span>'
       + it('act') + '<span class="sep">│</span>' + it('end3') + '<span class="sep">│</span>' + it('end') + '<span class="sep">│</span><span>합계 <b>' + D.all.n + '</b>명 · ' + won(D.all.cur) + '</span></div>';
   }
-  window.odt_seg = function(k, key){
+  window.odt_seg = function(k, key, day){
     try {
-      var D = segData(); if (!D) return;
+      if (typeof day === 'string') window.__odtSegDay = day;   /* [v686] 표에서 넘어온 기준일('' = 오늘) · 모달 내부 탭/정렬은 유지 */
+      var D = segData(window.__odtSegDay || ''); if (!D) return;
+      var dl9 = D.isPast ? mdShort(D.today) : '오늘';
       var g = D[k], m = SEG_META[k]; if (!g || !m) return;
       key = key || 'n';
       var rows = g.rows.filter(function(e){ return key === 'n' ? true : key === 'paid' ? (e.got > 0 && !(e.cur > 0)) : key === 'part' ? (e.got > 0 && e.cur > 0) : key === 'unp' ? !(e.got > 0) : true; });
       var INFO = infoMap();
-      var KL = { n: '연체 계약', paid: '오늘 완납', part: '오늘 분납', unp: '미입금' };
+      var KL = { n: '연체 계약', paid: dl9 + ' 완납', part: dl9 + ' 분납', unp: '미입금' };
       var PM = promiseMap();   /* [v684] */
-      var list = rows.map(function(e){ var i = INFO[e.cno] || INFO[String(+e.cno)] || {}; return { cno: e.cno, nm: e.nm || i.nm || '-', tel: i.tel || '-', grade: i.grade || '', days: i.days || 0, base: e.cur + e.got, cur: e.cur, got: e.got, cs: e.cs, exit: e.exit, bills: e.bills, pm: PM[e.cno] || PM[String(+e.cno)] || null }; });
+      var list = rows.map(function(e){ var i = INFO[e.cno] || INFO[String(+e.cno)] || {}; return { cno: e.cno, nm: e.nm || i.nm || '-', tel: i.tel || '-', grade: i.grade || '', days: i.days || 0, base: e.cur + e.got, cur: e.cur, got: e.got, cs: e.cs, csAt: e.csAt, exit: e.exit, bills: e.bills, pm: PM[e.cno] || PM[String(+e.cno)] || null }; });
       list = segSortRows(list);   /* [v684] 머리글 정렬 */
       window.__odtSegCur = { k: k, key: key };
       var sumGot = 0, sumCur = 0; list.forEach(function(r){ sumGot += r.got; sumCur += r.cur; });
       window.__odtListRows = list; window.__odtListTitle = D.today + '_' + m.lb + '_' + KL[key];
-      window.__odtListExcelMap = function(r, i){ return { 'No': i + 1, '계약번호': r.cno, '임(전)차인': r.nm, '계약상태': r.cs || '', '퇴실·종료일': r.exit ? ymdOf(r.exit) : '', '입금예정일': (r.pm && r.pm.pay) ? ymdOf(r.pm.pay) : (r.pm ? '미등록' : ''), '최근 대응일': r.pm ? r.pm.date : '', '미납 청구(건)': r.bills || 0, '현재 미납(임대료)': r.cur, '오늘 회수': r.got, '연락처': r.tel }; };
+      window.__odtListExcelMap = function(r, i){ var o = { 'No': i + 1, '계약번호': r.cno, '임(전)차인': r.nm, '계약상태': r.csAt || r.cs || '', '퇴실·종료일': r.exit ? ymdOf(r.exit) : '', '입금예정일': (r.pm && r.pm.pay) ? ymdOf(r.pm.pay) : (r.pm ? '미등록' : ''), '최근 대응일': r.pm ? r.pm.date : '', '미납 청구(건)': r.bills || 0 }; if (D.isPast) { o['기준 미납(임대료)'] = r.base; o['잔여 미납(회수 후)'] = r.cur; } else o['현재 미납(임대료)'] = r.cur; o[dl9 + ' 회수'] = r.got; o['연락처'] = r.tel; return o; };
       var prev = document.getElementById('odtListModal'); if (prev) prev.remove();
       var ov = document.createElement('div'); ov.id = 'odtListModal'; ov.className = 'odt-ov';
       ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
@@ -30096,21 +30115,22 @@ function renderExitMgmtView(){
         return '<tr><td style="color:#94A3B8;font-size:11px">' + (i + 1) + '</td>'
           + '<td class="cno"><b onclick="odt_nav(\'' + cq + '\')" title="연체관리 계약 상세로 이동">' + esc(r.cno) + '</b></td>'
           + '<td>' + esc(r.nm) + (r.grade ? ' <span style="font-size:10px;color:#64748B;background:#F1F5F9;border-radius:5px;padding:1px 5px;margin-left:4px">' + esc(r.grade) + '</span>' : '') + '</td>'
-          + '<td style="font-size:11px;color:' + (r.cs === '종료' ? '#64748B' : '#4F46E5') + ';font-weight:800">' + esc(r.cs || '-') + '</td>'
+          + '<td style="font-size:11px;color:' + (r.csAt === '종료' ? '#64748B' : '#4F46E5') + ';font-weight:800">' + esc(r.csAt || r.cs || '-') + '</td>'
           + '<td style="font-size:11px;color:#64748B">' + (r.exit ? ymdOf(r.exit) + ' (' + WD[r.exit.getDay()] + ')' : '-') + '</td>'
           + '<td style="font-size:11px;color:#334155;font-weight:700">' + pmHtml(r.pm) + '</td>'   /* [v684] 입금예정일 */
           + '<td class="r" style="color:#64748B">' + (r.bills > 0 ? r.bills + '건' : '-') + '</td>'
+          + (D.isPast ? '<td class="r" style="font-weight:700;color:#334155">' + won(r.base) + '</td>' : '')   /* [v686] 그날 아침 기준 미납 */
           + '<td class="r" style="font-weight:700;color:' + (r.cur > 0 ? '#B91C1C' : '#15803D') + '">' + won(r.cur) + '</td>'
           + '<td class="r" style="font-weight:800;color:' + (r.got > 0 ? '#15803D' : '#94A3B8') + '">' + (r.got > 0 ? won(r.got) : '-') + '</td>'
           + '<td style="font-size:11px;color:#6B7280">' + esc(r.tel) + '</td></tr>';
-      }).join('') || '<tr><td colspan="10" style="padding:18px;text-align:center;color:#94A3B8">해당 계약이 없습니다.</td></tr>';
+      }).join('') || '<tr><td colspan="' + (D.isPast ? 11 : 10) + '" style="padding:18px;text-align:center;color:#94A3B8">해당 계약이 없습니다.</td></tr>';
       ov.innerHTML = '<div class="odt-md" onclick="event.stopPropagation()">'
         + '<div class="odt-md-h"><span class="sw" style="background:' + m.col + '"></span><b style="color:' + m.col + '">' + m.lb + ' · ' + KL[key] + ' ' + list.length + '명</b>'
-        + '<span class="sub">' + mdLb(D.today) + ' · 입금내역(Raw DATA) 현재 기준 · 종료 3개월 이내 = 퇴실(종료)일 ' + mdLb(ymdOf(D.lim)) + ' 이후</span>'
+        + '<span class="sub">' + mdLb(D.today) + (D.isPast ? ' 아침 기준 소급(입금내역 납기일·납부일)' : ' · 입금내역(Raw DATA) 현재 기준') + ' · 종료 3개월 이내 = 퇴실(종료)일 ' + mdLb(ymdOf(D.lim)) + ' 이후</span>'
         + '<span class="btns"><button class="x" onclick="odt_listExcel()">⬇️ 엑셀</button><button onclick="document.getElementById(\'odtListModal\').remove()">닫기</button></span></div>'
         + '<div class="odt-md-tabs"><span class="lb">계약상태</span>' + tabs + '</div>'
-        + '<div class="odt-md-b"><table><thead><tr><th>No</th>' + segTh('cno', '계약번호') + segTh('nm', '임(전)차인') + segTh('cs', '계약상태') + segTh('exit', '퇴실·종료일') + segTh('pm', '입금 예정일') + segTh('bills', '미납 청구', 'r') + segTh('cur', '현재 미납(임대료)', 'r') + segTh('got', '오늘 회수', 'r') + segTh('tel', '연락처') + '</tr></thead><tbody>' + body + '</tbody></table></div>'
-        + '<div class="odt-md-f"><span>현재 미납 합 <b>' + won(sumCur) + '</b></span><span>오늘 회수 합 <b style="color:#15803D">' + won(sumGot) + '</b></span><span>회수율 <b>' + (recRate(sumGot, sumCur + sumGot) != null ? pctTxt(recRate(sumGot, sumCur + sumGot)) : '—') + '</b></span><span>머리글 클릭 → 정렬(다시 클릭 시 반대) · 입금 예정일 = 대응내역 최근 수납·연체관리 기록의 약속일(−n일 경과 · 오늘 · D+n) · 계약번호 클릭 → 계약 상세 · 퇴실·종료일은 계약관리 퇴실일(없으면 계약기간 종료일)</span></div>'
+        + '<div class="odt-md-b"><table><thead><tr><th>No</th>' + segTh('cno', '계약번호') + segTh('nm', '임(전)차인') + segTh('cs', '계약상태') + segTh('exit', '퇴실·종료일') + segTh('pm', '입금 예정일') + segTh('bills', '미납 청구', 'r') + (D.isPast ? segTh('base', '기준 미납(아침)', 'r') : '') + segTh('cur', (D.isPast ? '잔여 미납(' + dl9 + ' 회수 후)' : '현재 미납(임대료)'), 'r') + segTh('got', dl9 + ' 회수', 'r') + segTh('tel', '연락처') + '</tr></thead><tbody>' + body + '</tbody></table></div>'
+        + '<div class="odt-md-f"><span>' + (D.isPast ? '기준 미납 합 <b>' + won(sumCur + sumGot) + '</b></span><span>잔여 미납 합 <b>' + won(sumCur) + '</b>' : '현재 미납 합 <b>' + won(sumCur) + '</b>') + '</span><span>' + dl9 + ' 회수 합 <b style="color:#15803D">' + won(sumGot) + '</b></span><span>회수율 <b>' + (recRate(sumGot, sumCur + sumGot) != null ? pctTxt(recRate(sumGot, sumCur + sumGot)) : '—') + '</b></span><span>머리글 클릭 → 정렬(다시 클릭 시 반대) · 입금 예정일 = 대응내역 최근 수납·연체관리 기록의 약속일(−n일 경과 · 오늘 · D+n) · 계약번호 클릭 → 계약 상세 · 퇴실·종료일은 계약관리 퇴실일(없으면 계약기간 종료일)</span></div>'
         + '</div>';
       document.body.appendChild(ov);
     } catch(e){ console.warn('[v683] odt seg', e); }
