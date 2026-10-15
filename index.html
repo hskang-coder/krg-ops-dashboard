@@ -30251,15 +30251,43 @@ function renderExitMgmtView(){
     return M;
   }
   window.__odtListRows = [];
+  /* [v689] 기준일 D 의 연체일수 — 입금내역 임대료 청구 중 납기 경과(납기일 < D) · D 이전 미납부 청구의 (D − 납기일) 최장값
+     납부일 = D 인 청구(그날 완납)는 '납부 직전' 연체일수, 미납 청구는 그날 기준 연체일수 (시트 연체일수 열과 같은 셈법) */
+  function dlqDaysMap(day){
+    var P = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData : null;
+    var D = dateOf(day); if (!P || !D) return {};
+    D.setHours(0, 0, 0, 0); var Dt = D.getTime(); var M = {};
+    for (var i = 0; i < P.length; i++) {
+      var p = P[i];
+      if (String(p['납부종류'] == null ? p._col_F : p['납부종류']).trim() !== '임대료') continue;
+      var st = String((p['납부상태'] == null ? p._col_T : p['납부상태']) || '').trim();
+      if (st !== '연체중' && st !== '분납중' && st !== '연체납부') continue;
+      var cno = _normCno(p['계약번호'] == null ? p._col_E : p['계약번호']); if (!cno) continue;
+      var due = pdate(p['납기일'] == null ? p._col_AC : p['납기일']); if (!due || due.getTime() >= Dt) continue;
+      var pdd = pdate(p['납부일'] == null ? p._col_AE : p['납부일']);
+      if (pdd && pdd.getTime() < Dt) continue;   /* D 이전에 이미 납부 */
+      var days = Math.round((Dt - due.getTime()) / 86400000);
+      var e = M[cno] || (M[cno] = { days: 0, n: 0, due: null, bill: '', paid: false });
+      e.n++;
+      if (days > e.days) { e.days = days; e.due = due; e.bill = String((p['청구서명'] == null ? p._col_S : p['청구서명']) || '').trim(); e.paid = !!(pdd && pdd.getTime() === Dt); }
+    }
+    return M;
+  }
+  function daysTitle(r, day){
+    var dm = r.dm; if (!dm) return r.days > 0 ? '연체관리 현재 연체일수' : '';
+    return '납기 ' + ymdOf(dm.due) + (dm.paid ? ' → ' + mdShort(day) + ' 납부 (납부 직전 ' + dm.days + '일)' : ' → ' + mdShort(day) + ' 기준 ' + dm.days + '일') + (dm.n > 1 ? ' · 납기 경과 청구 ' + dm.n + '건 중 최장' : '') + (dm.bill ? ' · ' + dm.bill : '');
+  }
   window.odt_list = function(day, key){
     try {
       var di = S.byDay[day]; if (!di) return;
       var l = di.last, meta = LIST_META[key]; if (!meta) return;
       var rows = (l.L && l.L[key]) ? l.L[key].slice() : [];
       var INFO = infoMap();
-      rows = rows.map(function(x){ var i = INFO[x.cno] || INFO[String(+x.cno)] || {}; return { cno: x.cno, nm: i.nm || '-', tel: i.tel || '-', grade: i.grade || '', days: i.days || 0, base: x.base, cur: x.cur, got: Math.max(0, x.base - x.cur) }; });
+      var DM = dlqDaysMap(day), RC = recentMap();   /* [v689] 납부 직전 연체일수 · 최근 대응 */
+      rows = rows.map(function(x){ var i = INFO[x.cno] || INFO[String(+x.cno)] || {}; var dm = DM[_normCno(x.cno)] || null; return { cno: x.cno, nm: i.nm || '-', tel: i.tel || '-', grade: i.grade || '', days: dm ? dm.days : (i.days || 0), dm: dm, rc: RC[_normCno(x.cno)] || null, base: x.base, cur: x.cur, got: Math.max(0, x.base - x.cur) }; });
       var sumGot = 0, sumBase = 0, sumCur = 0; rows.forEach(function(r){ sumGot += r.got; sumBase += r.base; sumCur += r.cur; });
-      window.__odtListRows = rows; window.__odtListTitle = day + '_' + meta.lb; window.__odtListExcelMap = null;   /* [v684] 기본 매핑 */
+      window.__odtListRows = rows; window.__odtListTitle = day + '_' + meta.lb;
+      window.__odtListExcelMap = function(r, i){ return { 'No': i + 1, '계약번호': r.cno, '임(전)차인': r.nm, '연체일수(납부 직전·기준일)': r.days, '납기일': (r.dm && r.dm.due) ? ymdOf(r.dm.due) : '', '청구서': r.dm ? r.dm.bill : '', '기준 미납(임대료)': r.base, '현재 미납': r.cur, '입금액': r.got, '최근 대응 일자': r.rc ? (r.rc.ymd || r.rc.date) : '', '최근 대응 구분': r.rc ? (r.rc.jobType + (r.rc.jobSub ? '·' + r.rc.jobSub : '')) : '', '최근 대응 내용': r.rc ? r.rc.content : '', '최근 대응 담당': r.rc ? r.rc.person : '', '연락처': r.tel }; };   /* [v689] */
       var prev = document.getElementById('odtListModal'); if (prev) prev.remove();
       var ov = document.createElement('div'); ov.id = 'odtListModal'; ov.className = 'odt-ov';
       ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
@@ -30272,19 +30300,20 @@ function renderExitMgmtView(){
         return '<tr><td style="color:#94A3B8;font-size:11px">' + (i + 1) + '</td>'
           + '<td class="cno"><b onclick="odt_nav(\'' + cq + '\')" title="연체관리 계약 상세로 이동">' + esc(r.cno) + '</b></td>'
           + '<td>' + esc(r.nm) + (r.grade ? ' <span style="font-size:10px;color:#64748B;background:#F1F5F9;border-radius:5px;padding:1px 5px;margin-left:4px">' + esc(r.grade) + '</span>' : '') + '</td>'
-          + '<td class="r" style="color:#64748B">' + (r.days > 0 ? r.days + '일' : '-') + '</td>'
+          + '<td class="r" style="color:' + (r.dm && r.dm.paid ? '#0F172A;font-weight:700' : '#64748B') + '" title="' + esc(daysTitle(r, day)) + '">' + (r.days > 0 ? r.days + '일' : '-') + (r.dm && r.dm.n > 1 ? '<small style="color:#94A3B8;margin-left:3px">' + r.dm.n + '건</small>' : '') + '</td>'   /* [v689] 납부 직전 연체일수 */
           + '<td class="r">' + (r.base ? won(r.base) : '-') + '</td>'
           + '<td class="r" style="font-weight:700;color:' + (r.cur > 0 ? '#B91C1C' : '#15803D') + '">' + won(r.cur) + '</td>'
           + '<td class="r" style="font-weight:800;color:' + (r.got > 0 ? '#15803D' : '#94A3B8') + '">' + (r.got > 0 ? won(r.got) : '-') + '</td>'
+          + '<td class="rc">' + rcHtml(r.rc) + '</td>'   /* [v689] 최근 대응 */
           + '<td style="font-size:11px;color:#6B7280">' + esc(r.tel) + '</td></tr>';
-      }).join('') || '<tr><td colspan="8" style="padding:18px;text-align:center;color:#94A3B8">명단이 없습니다.</td></tr>';
-      ov.innerHTML = '<div class="odt-md" onclick="event.stopPropagation()">'
+      }).join('') || '<tr><td colspan="9" style="padding:18px;text-align:center;color:#94A3B8">명단이 없습니다.</td></tr>';
+      ov.innerHTML = '<div class="odt-md wide" onclick="event.stopPropagation()">'
         + '<div class="odt-md-h"><span class="sw" style="background:' + meta.col + '"></span><b style="color:' + meta.col + '">' + meta.ic + ' ' + meta.lb + ' · ' + rows.length + '명</b>'
         + '<span class="sub">' + mdLb(day) + ' · 기준 ' + di.baseSlot + ' → ' + l.slot + ' 회차 · 입금내역 기준</span>'
         + '<span class="btns"><button class="x" onclick="odt_listExcel()">⬇️ 엑셀</button><button onclick="document.getElementById(\'odtListModal\').remove()">닫기</button></span></div>'
         + '<div class="odt-md-tabs"><span class="lb">구분 전환</span>' + tabs + '</div>'
-        + '<div class="odt-md-b"><table><thead><tr><th>No</th><th>계약번호</th><th>임(전)차인</th><th class="r">연체일</th><th class="r">기준 미납(임대료)</th><th class="r">현재 미납</th><th class="r">입금액</th><th>연락처</th></tr></thead><tbody>' + body + '</tbody></table></div>'
-        + '<div class="odt-md-f"><span>기준 미납 합 <b>' + won(sumBase) + '</b></span><span>현재 미납 합 <b>' + won(sumCur) + '</b></span><span>입금 합 <b style="color:#15803D">' + won(sumGot) + '</b></span><span>계약번호 클릭 → 연체관리 계약 상세 · 이름·연락처는 대시보드 계약 데이터에서 보강(없으면 -)</span></div>'
+        + '<div class="odt-md-b"><table><thead><tr><th>No</th><th>계약번호</th><th>임(전)차인</th><th class="r" title="기준일 − 납기일 (납기 경과 임대료 청구 중 최장) · 그날 완납 건은 납부 직전 연체일수">연체일<small style="color:#94A3B8;font-weight:600;margin-left:3px">납부 직전</small></th><th class="r">기준 미납(임대료)</th><th class="r">현재 미납</th><th class="r">입금액</th><th>최근 대응</th><th>연락처</th></tr></thead><tbody>' + body + '</tbody></table></div>'
+        + '<div class="odt-md-f"><span>기준 미납 합 <b>' + won(sumBase) + '</b></span><span>현재 미납 합 <b>' + won(sumCur) + '</b></span><span>입금 합 <b style="color:#15803D">' + won(sumGot) + '</b></span><span>연체일 = 기준일 − 납기일(납기 경과 임대료 청구 중 최장 · 그날 완납 건은 납부 직전 · 마우스를 올리면 납기일·청구서) · 최근 대응 = 대응내역 전체 업무 중 최신 기록(마우스를 올리면 전문) · 계약번호 클릭 → 연체관리 계약 상세 · 이름·연락처는 대시보드 계약 데이터에서 보강(없으면 -)</span></div>'
         + '</div>';
       document.body.appendChild(ov);
     } catch(e){ console.warn('[v674] odt list', e); }
