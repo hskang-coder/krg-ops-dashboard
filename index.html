@@ -29762,7 +29762,7 @@ function renderExitMgmtView(){
       /* 명단 모달 */
       '.odt-ov{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px}',
       '.odt-md{background:#fff;border-radius:12px;max-width:1000px;width:100%;max-height:84vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25);font-family:inherit}',
-      '.odt-md.wide{max-width:min(1400px,96vw);max-height:88vh}.odt-md td.rc{white-space:normal;min-width:240px;max-width:400px;line-height:1.35;font-size:11.5px;color:#334155}.odt-md td.rc b{color:#0F172A;margin-right:4px;white-space:nowrap}.odt-md td.rc .t{color:#4F46E5;font-weight:700;margin-right:4px;white-space:nowrap}.odt-md td.rc .ag{color:#94A3B8;font-size:10.5px;margin-left:2px;white-space:nowrap}.odt-md td.rc small{color:#94A3B8;margin-left:4px;white-space:nowrap}',   /* [v688] 넓은 모달 · 최근 대응 열 */
+      '.odt-md.wide{max-width:min(1600px,97vw);max-height:88vh}.odt-md td.rc{white-space:normal;min-width:340px;line-height:1.35;font-size:11.5px;color:#334155}.odt-md table.odt-segtbl th:not(.rc):not(.nm),.odt-md table.odt-segtbl td:not(.rc):not(.nm){width:1%;white-space:nowrap}.odt-md table.odt-segtbl td.nm{white-space:normal;max-width:170px;min-width:120px}.odt-md td.rc b{color:#0F172A;margin-right:4px;white-space:nowrap}.odt-md td.rc .t{color:#4F46E5;font-weight:700;margin-right:4px;white-space:nowrap}.odt-md td.rc .ag{color:#94A3B8;font-size:10.5px;margin-left:2px;white-space:nowrap}.odt-md td.rc small{color:#94A3B8;margin-left:4px;white-space:nowrap}',   /* [v688] 넓은 모달 · 최근 대응 열 */
       '.odt-md-h{display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid #EEF2F7;flex-wrap:wrap}.odt-md-h .sw{width:11px;height:11px;border-radius:3px;flex:none}.odt-md-h b{font-size:14px}.odt-md-h .sub{font-size:11.5px;color:#8A97A8}.odt-md-h .btns{margin-left:auto;display:flex;gap:6px}',
       '.odt-md-h button{border-radius:6px;padding:5px 12px;font-size:11.5px;font-weight:700;cursor:pointer;border:1px solid #CBD5E1;background:#fff;color:#64748B}.odt-md-h button.x{background:#1d4ed8;color:#fff;border-color:#1d4ed8}',
       '.odt-md-tabs{display:flex;gap:5px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #F1F5F9;background:#FCFDFF;align-items:center}.odt-md-tabs .lb{font-size:10.5px;color:#94A3B8;font-weight:700;margin-right:2px}.odt-md-tabs button{border-radius:14px;padding:3px 11px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid #E2E8F0;background:#fff;color:#475569}.odt-md-tabs button:disabled{opacity:.45;cursor:default}',
@@ -30130,13 +30130,14 @@ function renderExitMgmtView(){
     rcCache = { ref: R, map: M };
     return M;
   }
-  function rcHtml(rc){
+  function rcHtml(rc, max){
+    max = max || 70;   /* [v697] 표시 글자 수(세그 모달 140) */
     if (!rc) return '<span style="color:#CBD5E1">-</span>';
     var t0 = new Date(); t0.setHours(0, 0, 0, 0); var ag = rc.at ? Math.round((t0.getTime() - rc.at) / 86400000) : null;
     var agTxt = ag == null ? '' : (ag === 0 ? '오늘' : ag > 0 ? ag + '일 전' : 'D+' + (-ag));
     var tag = rc.jobType + (rc.jobSub ? '·' + rc.jobSub : '');
     var full = (rc.ymd || rc.date) + (tag ? ' ' + tag : '') + (rc.content ? ' — ' + rc.content : '') + (rc.person ? ' (' + rc.person + ')' : '');
-    var c = rc.content.length > 70 ? rc.content.slice(0, 70) + '…' : rc.content;
+    var c = rc.content.length > max ? rc.content.slice(0, max) + '…' : rc.content;
     return '<span title="' + esc(full) + '"><b>' + (rc.ymd ? mdShort(rc.ymd) : esc(rc.date)) + '</b>' + (agTxt ? '<span class="ag">' + agTxt + '</span> ' : ' ') + (tag ? '<span class="t">' + esc(tag) + '</span>' : '') + esc(c || '(내용 없음)') + (rc.person ? '<small>' + esc(rc.person) + '</small>' : '') + '</span>';
   }
   function pmHtml(pm){
@@ -30290,12 +30291,12 @@ function renderExitMgmtView(){
         var cq = String(r.cno).replace(/'/g, '');
         return '<tr><td style="color:#94A3B8;font-size:11px">' + (i + 1) + '</td>'
           + '<td class="cno"><b onclick="odt_nav(\'' + cq + '\')" title="연체관리 계약 상세로 이동">' + esc(r.cno) + '</b></td>'
-          + '<td>' + esc(r.nm) + (r.grade ? ' <span style="font-size:10px;color:#64748B;background:#F1F5F9;border-radius:5px;padding:1px 5px;margin-left:4px">' + esc(r.grade) + '</span>' : '') + '</td>'
+          + '<td class="nm">' + esc(r.nm) + (r.grade ? ' <span style="font-size:10px;color:#64748B;background:#F1F5F9;border-radius:5px;padding:1px 5px;margin-left:4px">' + esc(r.grade) + '</span>' : '') + '</td>'   /* [v697] 이름은 170px 안에서 줄바꿈 */
           + '<td style="font-size:11px;font-weight:800">' + kindChip(r.kind) + (r.badge ? '<br><span style="font-size:10px;color:#64748B;font-weight:600;background:#F1F5F9;border-radius:5px;padding:0 5px">' + r.badge + '</span>' : '') + '</td>'   /* [v687] 구분 배지 · [v690] 퇴실구분 */
           + '<td class="r" style="color:' + (r.dm && r.dm.paid ? '#0F172A;font-weight:700' : '#64748B') + '" title="' + esc(daysTitle(r, D.today)) + '">' + (r.days > 0 ? r.days + '일' : '-') + (r.dm && r.dm.n > 1 ? '<small style="color:#94A3B8;margin-left:3px">' + r.dm.n + '건</small>' : '') + '</td>'   /* [v695] 연체일수(직전·오늘) */
           + '<td style="font-size:11px;color:#64748B">' + (r.exit ? ymdOf(r.exit) + ' (' + WD[r.exit.getDay()] + ')' : '-') + '</td>'
           + '<td style="font-size:11px;color:#334155;font-weight:700">' + pmHtml(r.pm) + '</td>'   /* [v684] 입금예정일 */
-          + '<td class="rc">' + rcHtml(r.rc) + '</td>'   /* [v688] 최근 대응 */
+          + '<td class="rc">' + rcHtml(r.rc, 140) + '</td>'   /* [v688] 최근 대응 · [v697] 140자 */
           + '<td class="r" style="color:#64748B">' + (r.bills > 0 ? r.bills + '건' : '-') + '</td>'
           + (D.isPast ? '<td class="r" style="font-weight:700;color:#334155">' + won(r.base) + '</td>' : '')   /* [v686] 그날 아침 기준 미납 */
           + '<td class="r" style="font-weight:700;color:' + (r.cur > 0 ? '#B91C1C' : '#15803D') + '" title="' + (isAll ? esc('임대료 ' + won(r.rcur) + ' · 관리비·기타 ' + won(r.cur - r.rcur) + (Object.keys(r.oty).length ? ' (' + Object.keys(r.oty).map(function(t){ return t + ' ' + won(r.oty[t]); }).join(', ') + ')' : '')) : '') + '">' + won(r.cur) + (isAll && r.cur > 0 && !(r.rcur > 0) ? '<br><small style="color:#B45309;font-weight:600">관리비·기타만</small>' : '') + '</td>'   /* [v691] 범위별 내역 */
@@ -30307,7 +30308,7 @@ function renderExitMgmtView(){
         + '<span class="sub">' + mdLb(D.today) + (D.isPast ? ' 아침 기준 소급(입금내역 납기일·납부일)' : ' · 입금내역(Raw DATA) 현재 기준') + ' · ' + (isAll ? '임대료+관리비·기타(모든 납부종류)' : '임대료만') + ' · 종료 3개월 이내 = 퇴실(종료)일 ' + mdLb(ymdOf(D.lim)) + ' 이후</span>'
         + '<span class="btns"><button class="x" onclick="odt_listExcel()">⬇️ 엑셀</button><button onclick="document.getElementById(\'odtListModal\').remove()">닫기</button></span></div>'
         + '<div class="odt-md-tabs"><span class="lb">계약상태</span>' + tabs + '</div>'
-        + '<div class="odt-md-b"><table><thead><tr><th>No</th>' + segTh('cno', '계약번호') + segTh('nm', '임(전)차인') + segTh('cs', '퇴실구분') + segTh('days', '연체일수<small style="color:#94A3B8;font-weight:600;margin-left:3px">직전·' + dl9 + '</small>', 'r') + segTh('exit', '퇴실·종료일') + segTh('pm', '입금 예정일') + segTh('rc', '최근 대응') + segTh('bills', '미납 청구', 'r') + (D.isPast ? segTh('base', '기준 미납(아침)', 'r') : '') + segTh('cur', (D.isPast ? '잔여 미납(' + dl9 + ' 회수 후)' : '현재 미납(' + (isAll ? '임대료+관리비' : '임대료') + ')'), 'r') + segTh('got', dl9 + ' 회수', 'r') + segTh('tel', '연락처') + '</tr></thead><tbody>' + body + '</tbody></table></div>'
+        + '<div class="odt-md-b"><table class="odt-segtbl"><thead><tr><th>No</th>' + segTh('cno', '계약번호') + segTh('nm', '임(전)차인', 'nm') + segTh('cs', '퇴실구분') + segTh('days', '연체일수<small style="color:#94A3B8;font-weight:600;margin-left:3px">직전·' + dl9 + '</small>', 'r') + segTh('exit', '퇴실·종료일') + segTh('pm', '입금 예정일') + segTh('rc', '최근 대응', 'rc') + segTh('bills', '미납 청구', 'r') + (D.isPast ? segTh('base', '기준 미납(아침)', 'r') : '') + segTh('cur', (D.isPast ? '잔여 미납(' + dl9 + ' 회수 후)' : '현재 미납(' + (isAll ? '임대료+관리비' : '임대료') + ')'), 'r') + segTh('got', dl9 + ' 회수', 'r') + segTh('tel', '연락처') + '</tr></thead><tbody>' + body + '</tbody></table></div>'
         + '<div class="odt-md-f"><span>' + (D.isPast ? '기준 미납 합 <b>' + won(sumCur + sumGot) + '</b></span><span>잔여 미납 합 <b>' + won(sumCur) + '</b>' : '현재 미납 합 <b>' + won(sumCur) + '</b>') + '</span><span>' + dl9 + ' 회수 합 <b style="color:#15803D">' + won(sumGot) + '</b></span><span>회수율 <b>' + (recRate(sumGot, sumCur + sumGot) != null ? pctTxt(recRate(sumGot, sumCur + sumGot)) : '—') + '</b></span><span>머리글 클릭 → 정렬(다시 클릭 시 반대) · 입금 예정일 = 대응내역 최근 수납·연체관리 기록의 약속일(−n일 경과 · 오늘 · D+n) · 최근 대응 = 대응내역 전체 업무 중 가장 최근 기록(날짜 · 업무구분·하위 · 내용 · 담당자, 마우스를 올리면 전문) · 퇴실구분 = 퇴실관리와 같은 단일 기준(강제 = 공실상태 강제퇴실·대위변제 · 만기 = 만기퇴실 또는 퇴실일 ≥ 종료일−31일 · 그 외 중도 · 계약중은 빈칸, 퇴실일이 잡힌 계약중은 ○○퇴실 예정) · 연체일수 = 기준일 − 납기일(현재 범위의 납기 경과 청구 중 최장 · 그날 완납 건은 납부 직전, 미납 건은 기준일 현재 · 마우스를 올리면 납기일·청구서) · 계약번호 클릭 → 계약 상세 · 퇴실·종료일은 계약관리 퇴실일(없으면 계약기간 종료일)</span></div>'
         + '</div>';
       document.body.appendChild(ov);
