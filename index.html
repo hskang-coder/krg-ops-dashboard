@@ -29530,7 +29530,7 @@ function renderExitMgmtView(){
       '<div id="rnwMetrics" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px;"></div>'+
       '<div id="rnwLegend" style="display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:#6b7280;margin-bottom:4px;"></div>'+
       '<div style="position:relative;width:100%;height:200px;"><canvas id="rnwCanvas"></canvas></div>'+
-      '<div style="margin-top:8px;font-size:11px;color:#9aa0a6;">계약중(마스터 정상)·납기 경과·연체중+분납중 · 퇴실일(Z열) 기준 당시 계약중 · 계약번호 중복제거 · 종료 계약 제외 · 각 월 막대 = 이월분(하단)+신규분(상단) · <b style="color:#185FA5">일자별 인원 = 그날 08:20 아침 첫 집계</b>(연체추이 Raw DATA · 2026-10-13~ · 집계 없는 날·주말은 입금내역 소급 계산) · <b style="color:#185FA5">build v673</b></div>';
+      '<div style="margin-top:8px;font-size:11px;color:#9aa0a6;">계약중(마스터 정상)·납기 경과·연체중+분납중 · 퇴실일(Z열) 기준 당시 계약중 · 계약번호 중복제거 · 종료 계약 제외 · 각 월 막대 = 이월분(하단)+신규분(상단) · <b style="color:#185FA5">일자별 인원 = 그날 08:20 아침 첫 집계</b>(연체추이 Raw DATA · 2026-10-13~ · 집계 없는 날은 입금내역 소급 계산 · 10/17부터 토·일도 기록) · <b style="color:#185FA5">build v673</b></div>';
     anchorCard.parentNode.insertBefore(card, anchorCard);
     var sw=function(c,t){ return '<span><i style="display:inline-block;vertical-align:middle;margin-right:5px;width:11px;height:11px;border-radius:2px;background:'+c+'"></i>'+t+'</span>'; };
     var ml=function(c,k,v){ return '<div style="border-radius:8px;padding:7px 12px;min-width:108px;background:#f4f6fa;"><div style="font-size:11px;color:#6b7280;">'+k+'</div><div style="font-size:19px;font-weight:600;line-height:1.15;color:'+c+'">'+v+'</div></div>'; };
@@ -29976,7 +29976,7 @@ function renderExitMgmtView(){
   function noDataWhy(ymd){
     var today = ymdOf(new Date());
     if (!dateOf(ymd)) return '집계 없음';
-    if (isWk(ymd)) return '주말 — 집계 없음';
+    if (isWk(ymd) && ymd < '2026-10-17') return '주말 — 집계 없음 (10/17부터 토·일도 기록)';   /* [v703] 10/17부터 주말도 동기화 */
     if (ymd < START) return '집계 시작 전 (2026-10-13부터 기록)';
     if (ymd > today) return '아직 오지 않은 날짜';
     if (!S.loadedAt && !S.err) return '집계 데이터 불러오는 중…';
@@ -30143,7 +30143,7 @@ function renderExitMgmtView(){
     if (!S.loadedAt && !S.err) body = '<div class="odt-empty">⏳ 집계 데이터 불러오는 중…</div>';
     else if (isRange) body = rangeHtml(span.a, span.b, span.lbl);
     else { var di = S.byDay[ymd]; body = (di ? flowHtml(di) : '<div class="odt-empty">' + noDataWhy(ymd) + '</div>') + (function(){ try { return segHtml(ymd); } catch(e){ console.warn('[v686] seg', e); return ''; } })(); }   /* [v686] 계약상태별 — 보고 있는 날 기준(전일 포함) */
-    var note = '<div class="odt-note"><b>완납 해소</b> = 기준 연체자 중 임대료 미납이 0원이 되고 그날 연체납부 기록이 있는 사람 · <b>일부 입금</b> = 아직 연체지만 미납총액이 줄어든 사람 · <b>미입금</b> = 기준 그대로 · <b>기타 해소</b> = 입금 기록 없이 연체자에서 빠짐(상태 변경·정정) · <b>신규 발생</b> = 기준 이후 새로 연체 · <b>회수금액</b> = 기준 연체자의 임대료 미납 감소분 합 · 집계 평일 08:20 · 09:30 · 11~18시 매시 · <b>숫자를 누르면 명단</b>(계약번호·이름·기준/현재 미납·입금액 — 10/13 18:00 기록부터)</div>';
+    var note = '<div class="odt-note"><b>완납 해소</b> = 기준 연체자 중 임대료 미납이 0원이 되고 그날 연체납부 기록이 있는 사람 · <b>일부 입금</b> = 아직 연체지만 미납총액이 줄어든 사람 · <b>미입금</b> = 기준 그대로 · <b>기타 해소</b> = 입금 기록 없이 연체자에서 빠짐(상태 변경·정정) · <b>신규 발생</b> = 기준 이후 새로 연체 · <b>회수금액</b> = 기준 연체자의 임대료 미납 감소분 합 · 집계 매일 08:20 · 09:30 · 11~18시 매시 · 23:30(24:00 마감) · <b>숫자를 누르면 명단</b>(계약번호·이름·기준/현재 미납·입금액 — 10/13 18:00 기록부터)</div>';
     if (!S.loading && (Date.now() - S.loadedAt > TTL)) load(true);
     return '<div class="odt-wrap">' + head + body + note + '</div>';
   }
