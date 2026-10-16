@@ -9191,7 +9191,9 @@ function dpay_scoreFor(off, who, person){
     S.gk = 'g' + S.grade;
     /* [v616→v699] 대응자 필터 선택 시 — 성과 35 · 업무량 30 · 성실성 20 · 이행 15 (종료자 ×1.5) */
     if (person) { var d7 = new Date(); d7.setHours(0,0,0,0); d7 = new Date(d7.getTime() + off * 86400000);
-      dpay_applyEval(S, dpay_evalRows(dpay_personRows(off, person), person, [dpay_ymd(d7)]), 1); }   /* [v701] 근태·일정 반영 */
+      dpay_applyEval(S, dpay_evalRows(dpay_personRows(off, person), person, [dpay_ymd(d7)]), 1);   /* [v701] 근태·일정 반영 */
+      try { if (S.ev && !S.ev.n && !(S.ev.cal && S.ev.cal.n) && typeof att_dayInfo === 'function') { var A7 = att_dayInfo(person, dpay_ymd(d7)); if (A7 && A7.off >= 1) S.leave = (A7.kinds || []).join('·') || '연차'; } } catch(_7){ }   /* [v702] 휴가일(기록 없음) → 산출 제외 표시 */
+    }
   } catch(e){ console.warn('[v589] scoreFor', e); }
   C[ck] = S;
   return S;
@@ -9202,6 +9204,8 @@ function dpay_scoreBar(off, who, person){
 }
 function dpay_scoreBarHtml(S, Pv, note, prevLb){
   if (S.none) return '';
+  if (S.leave) return '<div class="dres-sc"><span class="g gX">📅</span><span class="s" style="color:#64748B">' + String(S.leave).replace(/</g, '&lt;') + '</span>'
+    + '<span class="lb">근태·일정 탭 기준 휴가일 — 대응 기록이 없어 성적 산출에서 제외' + (note ? ' · ' + note : '') + '</span></div>';   /* [v702] */
   if (!S.payReady) {
     /* [v591] 입금내역 로드 전 — 잘못된 0점을 보여주지 않는다. 로드가 끝나면 자동 갱신(1분 주기)으로 채워진다 */
     return '<div class="dres-sc"><span class="g gX">—</span>'
@@ -27209,6 +27213,10 @@ function okpi_respSection(all, range, period){
   };
   /* [v557.1] 역할별 맞춤 지표 — 업무 내용이 달라 개별 최적화 (업무하위·진척사항 기반) */
   var ROLE={'김영철':'전화·방문 회수 집중','오진선':'법적 진행 (KCB·내용증명·지급명령)','이지희':'운영 — 거주·퇴거 정산 대응','고송미':'운영 — 초동 대응·계약 진행'};
+  /* [v702] 기간 내 평일(오늘까지)이 전부 휴가(근태·일정 탭 off ≥ 1)면 그 구분을 돌려준다 — 기록 0건이 정상임을 표시 */
+  var leaveAll=function(p){ try { if(typeof att_dayInfo!=='function'||!range||!(range.start instanceof Date)||!(range.end instanceof Date)) return ''; var t9=new Date(); t9.setHours(0,0,0,0); var ks={}, n9=0;
+      for(var d9=new Date(range.start); d9<=range.end&&d9<=t9&&n9<70; d9.setDate(d9.getDate()+1)){ if(d9.getDay()===0||d9.getDay()===6) continue; var A9=att_dayInfo(p, dpay_ymd(d9)); if(!A9||!(A9.off>=1)) return ''; (A9.kinds||[]).forEach(function(k9){ ks[k9]=1; }); n9++; }
+      return n9? Object.keys(ks).join('·')+(n9>1?' '+n9+'일':'') : ''; } catch(_9){ return ''; } };
   var cards=PEOPLE.map(function(p){
     var arr=W(p);
     var s=stat(arr), sp=stat(WP(p));
@@ -27221,6 +27229,8 @@ function okpi_respSection(all, range, period){
     var pg9=function(keys){ var n=0; arr.forEach(function(r){ if(keys.indexOf((r.prog||'').trim())>=0) n++; }); return n; };
     var avg9=s.nd? (Math.round(s.n/s.nd*10)/10)+'건' : '—';
     var cells, extra='';
+    var lv9=s.n? '' : leaveAll(p);   /* [v702] */
+    if(lv9) extra='<div style="font-size:10px;color:#6D28D9;margin-top:6px;font-weight:700">📅 '+lv9+' — 근태·일정 탭 기준 휴가 (기록 0건 정상)</div>';
     if(p==='김영철'){ var ctc=s.n? Math.round((s.n-s.miss)/s.n*100):0;
       cells=[['일평균',avg9,0],['접촉률', s.n?ctc+'%':'—', ctc>=80?'#15803D':ctc>=60?'#B45309':'#DC2626'],['현장방문', sub9(['현장방문'])+'건','#7C3AED'],
              ['완납', pg9(['완납'])+'건','#15803D'],['분납·약속', pg9(['분납','납부약속'])+'건','#4F46E5'],['미수신', s.miss+'건'+(s.n?' ('+Math.round(s.miss/s.n*100)+'%)':''), (s.n&&s.miss/s.n>=0.25)?'#DC2626':'#475569']];
@@ -27275,7 +27285,7 @@ function okpi_respSection(all, range, period){
   /* 룰 기반 개선 제안 */
   var tips=[];
   try{
-    PEOPLE.forEach(function(p){ var s=stat(W(p)); if(!s.n){ tips.push('⚠️ <b>'+p+'</b> — 선택 기간 대응 기록 0건. 담당 공백 또는 기록 누락 확인 필요.'); return; }
+    PEOPLE.forEach(function(p){ var s=stat(W(p)); if(!s.n){ var lv8=leaveAll(p); tips.push(lv8 ? '📅 <b>'+p+'</b> — '+lv8+' (근태·일정 탭) · 대응 기록 0건은 정상입니다.' : '⚠️ <b>'+p+'</b> — 선택 기간 대응 기록 0건. 담당 공백 또는 기록 누락 확인 필요.'); return; }   /* [v702] 휴가 안내 */
       var fillR=Math.round(s.fill/s.n*100);
       if(fillR<40) tips.push('📝 <b>'+p+'</b> 진척사항 기재율 <b>'+fillR+'%</b> — 결과(완납/약속/미수신 등) 기록을 정착시키면 성과 측정과 후속 대응 자동화가 가능해집니다.');
       var missR=Math.round(s.miss/s.n*100);
