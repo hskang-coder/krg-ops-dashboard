@@ -8959,24 +8959,99 @@ function dpay_resultFor(dayOffset, who, person){
   } catch(e){ console.warn('[v587] resultFor', e); }
   return O;
 }
-/* [v616] 대응자별 하루 업무량 — 대응 기록 유형별 표준 소요시간(분) 추정
-   대응자 필터 선택 시 성적에 업무량(50%)이 반영된다. 종료자(계약 종료) 대응은 협상 난도가 높아 ×1.5 가산. */
-var DPAY_WORK_STD = 420;   /* 하루 기준 근무시간(분) = 7시간 */
-var DPAY_WORKMIN = [
-  { re:/지급명령\s*도달|지급명령\s*확정/, min:10, lb:'지급명령 도달·확정' },
-  { re:/보정명령/, min:30, lb:'보정명령 대응' },
-  { re:/내용증명\s*이미지/, min:5, lb:'내용증명 이미지 발송' },
-  { re:/내용증명/, min:30, lb:'내용증명 발송' },
-  { re:/지급명령/, min:30, lb:'지급명령 진행' },
-  { re:/기타집행|강제집행|가압류|소송/, min:30, lb:'집행·소송' },
-  { re:/특별송달/, min:20, lb:'특별송달' },
-  { re:/현장\s*방문/, min:30, lb:'현장 방문' },
-  { re:/슬랙\s*대응/, min:5, lb:'슬랙 대응' },
-  { re:/위임\s*업무/, min:30, lb:'위임 업무' },
-  { re:/KCB|신용조회|법적\s*조치\s*검토/i, min:5, lb:'KCB·법적조치 검토' }
+/* [v616→v699] 대응자별 산출 평가 — 기록 1건의 표준 소요시간(분)·성과 점수(업무하위·상세내용·진척 기반)
+   · 업무량 = Σ 소요시간 ÷ 기준 420분/일      · 성과 = 당일 납부완료(입금내역) + 법적 진행 + 현장·변론 점수 ÷ 목표 80점/일
+   · 성실성 = 진척 기재율 40% + 상세내용 충실도 30% + 미수신 후속(문자·재시도) 30%      · 종료자 대응 ×1.5 (시간·성과 모두) */
+var DPAY_WORK_STD = 420;    /* 하루 기준 근무시간(분) = 7시간 */
+var DPAY_PTS_STD = 80;      /* 하루 성과 목표 점수 */
+var DPAY_GEN_CAP = 20;      /* 일반 대응(전화·문자·기타) 성과 점수의 1일 상한 — 건수 몰이 방지 */
+var DPAY_SUB_RULES = [      /* 업무하위 기준 (순서대로 첫 매칭) */
+  { re:/현장\s*방문/, min:90, pts:6, lb:'현장 방문' },
+  { re:/지급명령\s*도달/, min:10, pts:4, lb:'지급명령 도달' },
+  { re:/지급명령\s*확정/, min:10, pts:8, lb:'지급명령 확정' },
+  { re:/보정명령/, min:40, pts:6, lb:'보정명령 대응' },
+  { re:/지급명령/, min:40, pts:8, lb:'지급명령 신청·진행' },
+  { re:/내용증명\s*이미지/, min:5, pts:1, lb:'내용증명 이미지 발송' },
+  { re:/내용증명/, min:30, pts:6, lb:'내용증명 발송' },
+  { re:/기타집행|강제집행|가압류|소송/, min:45, pts:10, lb:'집행·소송' },
+  { re:/특별송달|공시송달/, min:20, pts:3, lb:'특별·공시송달' },
+  { re:/위임\s*업무/, min:30, pts:3, lb:'위임 업무' },
+  { re:/KCB|신용조회|법적\s*조치\s*검토/i, min:10, pts:1, lb:'KCB·법적조치 검토' },
+  { re:/계약\s*종료자\s*대응/, min:15, pts:2, lb:'종료자 대응' },
+  { re:/슬랙/, min:5, pts:1, lb:'슬랙 대응', gen:1 },
+  { re:/실제퇴실|원상복구|퇴실정산|강제퇴실/, min:60, pts:4, lb:'퇴실 현장·정산' },
+  { re:/임대료\s*수납\s*처리/, min:6, pts:1, lb:'수납 안내·처리', gen:1 }
 ];
-function dpay_workLoad(off, person){
-  var out = { total:0, det:{}, endN:0, endMin:0 };
+var DPAY_TXT_RULES = [      /* 상세내용 기준 — 업무하위에 없는 사건(변론·송달·집행 등) */
+  { re:/변론|법원\s*출석|재판\s*출석|공판|심문\s*기일|변론기일/, min:180, pts:15, lb:'변론·법원 출석' },
+  { re:/강제집행|가압류|압류\s*신청|명도\s*집행|소장\s*접수/, min:45, pts:10, lb:'집행·소송' },
+  { re:/특별송달|공시송달/, min:20, pts:3, lb:'특별·공시송달' },
+  { re:/지급명령\s*도달/, min:10, pts:4, lb:'지급명령 도달' },
+  { re:/보정명령/, min:40, pts:6, lb:'보정명령 대응' },
+  { re:/내용증명\s*발송/, min:30, pts:6, lb:'내용증명 발송' },
+  { re:/완납\s*확인|입금\s*확인|납부\s*확인|결제\s*완료|카드결제/, min:3, pts:0, lb:'입금 확인', gen:1 }
+];
+function dpay_recEval(sub, content, prog, task){
+  sub = String(sub||'').trim(); content = String(content||''); prog = String(prog||'').trim(); task = String(task||'').trim();
+  var i9;
+  for (i9 = 0; i9 < DPAY_SUB_RULES.length; i9++){ if (DPAY_SUB_RULES[i9].re.test(sub)) return DPAY_SUB_RULES[i9]; }
+  for (i9 = 0; i9 < DPAY_TXT_RULES.length; i9++){ if (DPAY_TXT_RULES[i9].re.test(content)) return DPAY_TXT_RULES[i9]; }
+  if (/전화응대/.test(sub) || ((!sub || sub === '기타') && /통화|전화/.test(content))) {
+    var miss = prog === '미수신' || /부재|미수신|전원\s*꺼짐|연락\s*안\s*됨|안\s*받|받지\s*않/.test(content);
+    return miss ? { min:3, pts:0, lb:'전화 부재·미수신', gen:1, miss:1 } : { min:8, pts:1, lb:'전화 통화', gen:1 };
+  }
+  if (/문자|카톡|카카오|알림톡/.test(content)) return { min:2, pts:1, lb:'문자·카톡 교섭', gen:1 };
+  if (task === '계약(입주)관리') return { min:20, pts:2, lb:'계약·입주 대응' };
+  if (task === '갱신관리') return { min:10, pts:1, lb:'갱신 대응' };
+  if (task === '중도퇴실관리' || task === '퇴실관리') return { min:15, pts:2, lb:'퇴실 대응' };
+  return { min:5, pts:1, lb:'일반 대응(기타)', gen:1 };
+}
+/* rows: [{cno, date(Date), sub, content, prog, payDate(Date|null), task}] → 합산 평가 (여러 날이면 날짜별로 입금내역을 본다) */
+function dpay_evalRows(rows){
+  var out = { n:0, min:0, pts:0, genPts:0, det:{}, endN:0, endMin:0, fill:0, detail:0, misN:0, misFollow:0,
+              pay:{ paid:0, part:0, prom:0, pts:0 }, days:{}, nDays:0, ptsTotal:0, rW:0, rP:0, rD:0, fillR:0, detR:0, folR:null };
+  try {
+    var byDay = {};
+    (rows || []).forEach(function(r){ if (!r || !r.date) return; var k = dpay_ymd(r.date); (byDay[k] = byDay[k] || []).push(r); });
+    var t0 = new Date(); t0.setHours(0,0,0,0);
+    Object.keys(byDay).forEach(function(k){
+      var rs = byDay[k], off = Math.round((rs[0].date.getTime() - t0.getTime()) / 86400000);
+      var AM = dpay_amtMap(off), DUE = dpay_dueSet(0) || {};
+      var gen = 0, promC = {}, dayC = {}, sameDay = {};
+      rs.forEach(function(r){ if (r.cno) sameDay[r.cno] = (sameDay[r.cno] || 0) + 1; });
+      rs.forEach(function(r){
+        var ended = r.cno ? dpay_isEnded(r.cno) : false, ev = dpay_recEval(r.sub, r.content, r.prog, r.task), f = ended ? 1.5 : 1;
+        out.n++; out.min += ev.min * f; if (ended) { out.endN++; out.endMin += ev.min * 0.5; }
+        if (ev.gen) gen += ev.pts * f; else out.pts += ev.pts * f;
+        var d9 = out.det[ev.lb] || (out.det[ev.lb] = { n:0, min:0, pts:0, gen:!!ev.gen }); d9.n++; d9.min += ev.min * f; d9.pts += ev.pts * f;
+        if (String(r.prog||'').trim()) out.fill++;
+        if (String(r.content||'').replace(/\s+/g, '').length >= 15) out.detail++;
+        if (ev.miss) { out.misN++; if (/문자|카톡|알림톡|재시도|비상연락|재통화/.test(String(r.content||'')) || sameDay[r.cno] > 1) out.misFollow++; }
+        var pg = String(r.prog||'').trim();
+        if (r.cno && (pg === '납부약속' || pg === '납부일 확정' || (r.payDate && dpay_ymd(r.payDate) >= k))) promC[r.cno] = 1;
+        if (r.cno) dayC[r.cno] = ended;
+      });
+      out.genPts += Math.min(DPAY_GEN_CAP, gen);
+      Object.keys(dayC).forEach(function(c){ var got = AM[c] || 0, rest = DUE[c] || 0, f = dayC[c] ? 1.5 : 1;
+        if (got > 0 && rest <= 0) { out.pay.paid++; out.pay.pts += 10 * f; }
+        else if (got > 0) { out.pay.part++; out.pay.pts += 5 * f; }
+        else if (promC[c]) { out.pay.prom++; out.pay.pts += 2 * f; } });
+      out.days[k] = 1;
+    });
+    out.nDays = Object.keys(out.days).length;
+    out.ptsTotal = Math.round(out.pts + out.genPts + out.pay.pts);
+    var nd = Math.max(1, out.nDays);
+    out.rW = Math.min(100, Math.round(100 * out.min / (DPAY_WORK_STD * nd)));
+    out.rP = Math.min(100, Math.round(100 * out.ptsTotal / (DPAY_PTS_STD * nd)));
+    var fillR = out.n ? out.fill / out.n * 100 : 0, detR = out.n ? out.detail / out.n * 100 : 0, folR = out.misN ? out.misFollow / out.misN * 100 : null;
+    out.rD = Math.round(folR == null ? (fillR * 0.4 + detR * 0.3) / 0.7 : fillR * 0.4 + detR * 0.3 + folR * 0.3);
+    out.fillR = Math.round(fillR); out.detR = Math.round(detR); out.folR = folR == null ? null : Math.round(folR);
+  } catch(e){ console.warn('[v699] evalRows', e); }
+  return out;
+}
+/* 대응자의 하루 기록(수납관리·연체관리) → evalRows 입력 */
+function dpay_personRows(off, person){
+  var rows = [];
   try {
     var R = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
     var d0 = new Date(); d0.setHours(0,0,0,0);
@@ -8987,21 +9062,20 @@ function dpay_workLoad(off, person){
       var jt = String(r.jobType||'').trim();
       if (jt !== '수납관리' && jt !== '연체관리') return;
       if (person && String(r.person||'').trim().indexOf(person) < 0) return;
-      var cno9 = _normCno(r.no != null ? r.no : r.cno);
-      var t9 = String(r.jobSub||'') + ' ' + String(r.content||'');
-      var m9 = 5, lb9 = '일반 대응(전화·문자 등)';
-      for (var i9 = 0; i9 < DPAY_WORKMIN.length; i9++){
-        if (DPAY_WORKMIN[i9].re.test(t9)) { m9 = DPAY_WORKMIN[i9].min; lb9 = DPAY_WORKMIN[i9].lb; break; }
-      }
-      var ended9 = cno9 ? dpay_isEnded(cno9) : false;
-      var v9 = ended9 ? m9 * 1.5 : m9;   /* [v616] 종료자 대응 가산 */
-      if (ended9) { out.endN++; out.endMin += m9 * 0.5; }
-      out.total += v9;
-      if (!out.det[lb9]) out.det[lb9] = { n:0, min:0 };
-      out.det[lb9].n++; out.det[lb9].min += v9;
+      rows.push({ cno:_normCno(r.no != null ? r.no : r.cno), date:ad, sub:r.jobSub, content:r.content, prog:r.progress, payDate:_parseAnyDateCell(r.payDate), task:jt });
     });
-  } catch(e){ console.warn('[v616] workLoad', e); }
-  return out;
+  } catch(e){ console.warn('[v699] personRows', e); }
+  return rows;
+}
+/* 성적 객체에 평가 결과 반영 — 성과 35 · 업무량 30 · 성실성 20 · 이행 15 */
+function dpay_applyEval(S, E, nDaysBase){
+  S.legal = true; S.ev = E; S.workMin = E.min; S.workDet = E.det; S.endN = E.endN; S.endMin = E.endMin; S.wmBase = DPAY_WORK_STD * Math.max(1, nDaysBase || 1);
+  S.rW = E.rW; S.rP = E.rP; S.rD = E.rD; S.pts = E.ptsTotal;
+  var sum9 = S.rP * 0.35 + S.rW * 0.30 + S.rD * 0.20, w9 = 0.85;
+  if (S.r1 !== null) { sum9 += S.r1 * 0.15; w9 += 0.15; }
+  S.score = Math.round(sum9 / w9);
+  S.grade = S.score >= 75 ? 'A' : S.score >= 60 ? 'B' : S.score >= 45 ? 'C' : S.score >= 30 ? 'D' : 'E';
+  S.gk = 'g' + S.grade;
 }
 /* [v589] 하루 성적 — 약속 이행률(60%) · 대응 회수율(20%) · 기록 완성도(20%)
    이행률만으로는 미수신·법조치 대응이 안 보이고, 회수율만 보면 담당자가 통제할 수 없는 대상까지
@@ -9051,19 +9125,8 @@ function dpay_scoreFor(off, who, person){
     S.score = Math.round(sum / w);
     S.grade = S.score >= 75 ? 'A' : S.score >= 60 ? 'B' : S.score >= 45 ? 'C' : S.score >= 30 ? 'D' : 'E';
     S.gk = 'g' + S.grade;
-    /* [v616] 대응자 필터 선택 시 — 하루 업무량 기준 평가 (업무량 50 + 이행 20 + 회수 15 + 기록 15) */
-    if (person) {
-      var W9 = dpay_workLoad(off, person);
-      S.legal = true; S.workMin = W9.total; S.workDet = W9.det; S.endN = W9.endN; S.endMin = W9.endMin; S.wmBase = DPAY_WORK_STD;
-      S.rW = Math.min(100, Math.round(100 * W9.total / S.wmBase));
-      var sum9 = S.rW * 0.5, w9 = 0.5;
-      if (S.r1 !== null) { sum9 += S.r1 * 0.2; w9 += 0.2; }
-      sum9 += S.r2 * 0.15; w9 += 0.15;
-      sum9 += S.r3 * 0.15; w9 += 0.15;
-      S.score = Math.round(sum9 / w9);
-      S.grade = S.score >= 75 ? 'A' : S.score >= 60 ? 'B' : S.score >= 45 ? 'C' : S.score >= 30 ? 'D' : 'E';
-      S.gk = 'g' + S.grade;
-    }
+    /* [v616→v699] 대응자 필터 선택 시 — 성과 35 · 업무량 30 · 성실성 20 · 이행 15 (종료자 ×1.5) */
+    if (person) dpay_applyEval(S, dpay_evalRows(dpay_personRows(off, person)), 1);
   } catch(e){ console.warn('[v589] scoreFor', e); }
   C[ck] = S;
   return S;
@@ -9089,17 +9152,27 @@ function dpay_scoreBarHtml(S, Pv, note, prevLb){
   var w = function(n){ return '₩' + Math.round(n||0).toLocaleString(); };
   return '<div class="dres-sc">'
     + '<span class="g ' + S.gk + '" title="종합 성적 — ' + (S.legal
-        ? '하루 업무량 50% + 약속 이행률 20% + 대응 회수율 15% + 기록 완성도 15%&#10;(대응자 기준 · 종료자 대응 ×1.5 가산 · 이행 표본 없으면 가중 재배분)'
+        ? '성과 35% + 업무량 30% + 성실성 20% + 약속 이행률 15%&#10;(대응자 기준 · 종료자 대응 ×1.5 가산 · 이행 표본 없으면 가중 재배분)'
         : '약속 이행률 60% + 대응 회수율 20% + 기록 완성도 20%') + '&#10;A 75점 이상 · B 60 · C 45 · D 30 · E 30 미만">' + S.grade + '</span>'
     + '<span class="s"><b>' + S.score + '</b>점' + arrow(S.score, Pv.none ? null : Pv.score) + '</span>'
-    + '<span class="lb">종합 성적' + (S.legal ? ' · 업무량 기준' : '') + (note ? ' · ' + note : '') + '</span>'
+    + '<span class="lb">종합 성적' + (S.legal ? ' · 대응자 산출 기준' : '') + (note ? ' · ' + note : '') + '</span>'
     + (S.legal ? (function(){
-        var bd9 = Object.keys(S.workDet||{}).map(function(k9){ var d9 = S.workDet[k9]; return k9 + ' ' + d9.n + '건·' + Math.round(d9.min) + '분'; }).join('&#10;');
-        return '<span class="bd" title="하루 업무량 — 대응 유형별 표준 소요시간 합산 ÷ 기준 ' + S.wmBase + '분&#10;'
-          + '(KCB·검토/슬랙 5분 · 도달/확정 10분 · 특별송달 20분 · 내용증명/지급명령/보정/집행/현장방문/위임 30분 · 일반 5분)&#10;'
+        var E9 = S.ev || {}, P9 = E9.pay || { paid:0, part:0, prom:0, pts:0 };
+        var bd9 = Object.keys(S.workDet||{}).map(function(k9){ var d9 = S.workDet[k9]; return k9 + ' ' + d9.n + '건 · ' + Math.round(d9.min) + '분' + (d9.pts ? ' · ' + Math.round(d9.pts) + '점' : ''); }).join('&#10;');
+        var nd9 = Math.max(1, E9.nDays || 1);
+        return '<span class="bd" title="성과 — 당일 납부완료(입금내역) + 법적 진행 + 현장·변론 점수 ÷ 목표 ' + (DPAY_PTS_STD * nd9) + '점&#10;'
+          + '납부완료 ' + P9.paid + '건×10 · 부분 입금 ' + P9.part + '건×5 · 납부약속 ' + P9.prom + '건×2 = ' + Math.round(P9.pts) + '점&#10;'
+          + '법적·현장(내용증명 6 · 지급명령 신청 8 · 보정 6 · 도달 4 · 확정 8 · 집행 10 · 송달 3 · KCB 1 · 현장방문 6 · 변론 15) = ' + Math.round(E9.pts || 0) + '점&#10;'
+          + '일반 대응(통화·문자·기타 1점, 1일 ' + DPAY_GEN_CAP + '점 상한) = ' + Math.round(E9.genPts || 0) + '점 · 종료자 ×1.5">'
+          + '🏁 성과 ' + S.rP + '% <i>' + Math.round(S.pts || 0) + '점</i></span>'
+          + '<span class="bd" title="업무량 — 대응 유형별 표준 소요시간 합산 ÷ 기준 ' + S.wmBase + '분&#10;'
+          + '(현장방문 90 · 변론 180 · 집행 45 · 지급명령·보정 40 · 내용증명·위임 30 · 송달 20 · 도달·확정·KCB 10 · 통화 8 · 수납 6 · 기타·슬랙 5 · 부재 3 · 문자 2 · 퇴실 현장 60)&#10;'
           + '종료자 대응은 ×1.5 가산' + (S.endN ? ' — 이번 기간 ' + S.endN + '건, +' + Math.round(S.endMin) + '분' : '')
           + (bd9 ? '&#10;— 내역 —&#10;' + bd9 : '') + '">'
-          + '⏱️ 업무량 ' + S.rW + '% <i>' + Math.round(S.workMin) + '분</i></span>';
+          + '⏱️ 업무량 ' + S.rW + '% <i>' + Math.round(S.workMin) + '분</i></span>'
+          + '<span class="bd" title="성실성 — 진척 기재율 40% + 상세내용 충실도(15자 이상) 30% + 미수신 후속(문자·재시도·같은 날 재대응) 30%&#10;'
+          + '기재 ' + (E9.fillR || 0) + '% · 상세 ' + (E9.detR || 0) + '% · 미수신 후속 ' + (E9.folR == null ? '해당 없음(재배분)' : E9.folR + '% (' + E9.misFollow + '/' + E9.misN + ')') + '">'
+          + '🧾 성실성 ' + S.rD + '%</span>';
       })() : '')
     + '<span class="bd k' + (pick==='broke'?' on':'') + '"' + (S.broke.length ? ' onclick="dpay_resPick(\'broke\')"' : '')
     +   ' title="입금예정일이 그날이었던 계약 중 실제 입금이 확인된 비율입니다.&#10;클릭하면 약속을 지키지 않은 명단이 열립니다.">'
@@ -9109,7 +9182,7 @@ function dpay_scoreBarHtml(S, Pv, note, prevLb){
     + '<span class="bd k' + (pick==='unrec'?' on':'') + '"' + (S.unrec ? ' onclick="dpay_resPick(\'unrec\')"' : '')
     +   ' title="그날 입금이 없고 납기 도래 미납이 남았으며 다음 약속도 없는 건입니다">💸 미회수 ' + S.unrec + '명 <i>' + w(S.unrecAmt) + '</i></span>'
     + '<span style="margin-left:auto;font-size:9.5px;font-weight:700;color:#B6C2D1;white-space:nowrap" title="종합 성적 산식과 등급 기준">'
-    +   (S.legal ? '산식 업무량50·이행20·회수15·기록15 <i style="font-style:normal;color:#CBD5E1">·</i> 종료자 ×1.5' : '산식 이행60·회수20·기록20')
+    +   (S.legal ? '산식 성과35·업무량30·성실성20·이행15 <i style="font-style:normal;color:#CBD5E1">·</i> 종료자 ×1.5' : '산식 이행60·회수20·기록20')
     +   ' <i style="font-style:normal;color:#CBD5E1">·</i> A75+ B60 C45 D30</span>'
     + '</div>';
 }
@@ -9176,25 +9249,12 @@ function dpay_scoreRange(span, who, person){
     S.score = Math.round(sum / w);
     S.grade = S.score >= 75 ? 'A' : S.score >= 60 ? 'B' : S.score >= 45 ? 'C' : S.score >= 30 ? 'D' : 'E';
     S.gk = 'g' + S.grade;
-    /* [v616] 대응자 필터 — 기간 합산 업무량 (기록 있는 날만 기준시간 합산) */
+    /* [v616→v699] 대응자 필터 — 기간 합산 평가 (기록 있는 날만 기준일수에 산입) */
     if (person) {
-      var W9 = { total:0, det:{}, endN:0, endMin:0 }, days9 = 0;
-      for (var o9 = span.a; o9 <= Math.min(span.b, -1); o9++){
-        var w9d = dpay_workLoad(o9, person);
-        if (w9d.total > 0) {
-          days9++; W9.total += w9d.total; W9.endN += w9d.endN; W9.endMin += w9d.endMin;
-          Object.keys(w9d.det).forEach(function(k9){ if (!W9.det[k9]) W9.det[k9] = { n:0, min:0 }; W9.det[k9].n += w9d.det[k9].n; W9.det[k9].min += w9d.det[k9].min; });
-        }
-      }
-      S.legal = true; S.workMin = W9.total; S.workDet = W9.det; S.endN = W9.endN; S.endMin = W9.endMin; S.wmBase = DPAY_WORK_STD * Math.max(1, days9);
-      S.rW = Math.min(100, Math.round(100 * W9.total / S.wmBase));
-      var sum9 = S.rW * 0.5, w9 = 0.5;
-      if (S.r1 !== null) { sum9 += S.r1 * 0.2; w9 += 0.2; }
-      sum9 += S.r2 * 0.15; w9 += 0.15;
-      sum9 += S.r3 * 0.15; w9 += 0.15;
-      S.score = Math.round(sum9 / w9);
-      S.grade = S.score >= 75 ? 'A' : S.score >= 60 ? 'B' : S.score >= 45 ? 'C' : S.score >= 30 ? 'D' : 'E';
-      S.gk = 'g' + S.grade;
+      var rows9 = [];
+      for (var o9 = span.a; o9 <= Math.min(span.b, -1); o9++){ rows9 = rows9.concat(dpay_personRows(o9, person)); }
+      var E9 = dpay_evalRows(rows9);
+      dpay_applyEval(S, E9, E9.nDays);
     }
   } catch(e){ console.warn('[v597] scoreRange', e); }
   return S;
@@ -27031,7 +27091,7 @@ function okpi_parseResp(resp){
   return (resp.table.rows||[]).map(function(r){
     var c=r.c||[];
     var g=function(i){return c[i]?String(c[i].f!=null?c[i].f:(c[i].v!=null?c[i].v:'')).trim():'';};
-    return { date:g(0), cno:g(1), nm:g(2), task:g(4), sub:g(5), who:g(6), note:g(7), prog:g(8) };
+    return { date:g(0), cno:g(1), nm:g(2), payDate:g(3), task:g(4), sub:g(5), who:g(6), note:g(7), prog:g(8) };   /* [v699] 입금예정일 */
   }).filter(function(r){ return r.date; });
 }
 function okpi_respSection(all, range, period){
@@ -27114,13 +27174,27 @@ function okpi_respSection(all, range, period){
              ['미수신',(s.n?Math.round(s.miss/s.n*100):0)+'%',0],['기재율',fillR+'%',0],['활동일',s.nd+'일',0]];
     }
     var m9=function(c){ return '<div style="flex:1;min-width:0"><div style="font-size:9.5px;color:#8A97A8;font-weight:700;white-space:nowrap">'+c[0]+'</div><div style="font-size:12.5px;font-weight:800;color:'+(c[2]||'#1E293B')+';white-space:nowrap">'+c[1]+'</div></div>'; };
+    /* [v699] 시간 환산 산출 — 건수가 아니라 유형별 표준 소요시간·성과 점수로 비교 (종합 성적과 같은 규칙) */
+    var evl='';
+    try {
+      if (s.n && typeof dpay_evalRows === 'function') {
+        var rows9=arr.map(function(r){ var ad=_parseAnyDateCell(r.date); return ad? { cno:_normCno(r.cno), date:ad, sub:r.sub, content:r.note, prog:r.prog, payDate:_parseAnyDateCell(r.payDate), task:r.task } : null; }).filter(Boolean);
+        var E9=dpay_evalRows(rows9);
+        var top9=Object.keys(E9.det).sort(function(a,b){ return E9.det[b].min-E9.det[a].min; }).slice(0,3).map(function(k){ return k+' '+E9.det[k].n+'건 '+Math.round(E9.det[k].min)+'분'; }).join(' · ');
+        var all9=Object.keys(E9.det).sort(function(a,b){ return E9.det[b].min-E9.det[a].min; }).map(function(k){ return k+' '+E9.det[k].n+'건 · '+Math.round(E9.det[k].min)+'분'+(E9.det[k].pts?' · '+Math.round(E9.det[k].pts)+'점':''); }).join('&#10;');
+        var hrs9=Math.round(E9.min/60*10)/10, perDay9=Math.round(E9.min/60/Math.max(1,E9.nDays)*10)/10;
+        evl='<div style="margin-top:7px;padding:6px 8px;background:#F8FAFC;border-radius:7px;font-size:10.5px;color:#334155;line-height:1.5" title="시간 환산(표준 소요시간): '+all9.replace(/"/g,'&quot;')+'&#10;성과 '+E9.ptsTotal+'점 = 납부완료 '+E9.pay.paid+'×10 · 부분 '+E9.pay.part+'×5 · 약속 '+E9.pay.prom+'×2 + 법적·현장 '+Math.round(E9.pts)+' + 일반 '+Math.round(E9.genPts)+' (종료자 ×1.5)&#10;성실성 = 기재 '+E9.fillR+'% · 상세 '+E9.detR+'% · 미수신 후속 '+(E9.folR==null?'해당 없음':E9.folR+'%')+'">'
+          +'<b>⏱ 환산 '+hrs9+'h</b>'+(E9.nDays>1?' <span style="color:#8A97A8">(일 '+perDay9+'h)</span>':'')+' · <b style="color:#15803D">🏁 성과 '+E9.ptsTotal+'점</b>'+(E9.nDays>1?' <span style="color:#8A97A8">(일 '+Math.round(E9.ptsTotal/E9.nDays)+')</span>':'')+' · 🧾 성실성 '+E9.rD+'%'
+          +(top9?'<div style="font-size:9.5px;color:#8A97A8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+top9+'</div>':'')+'</div>';
+      }
+    } catch(e9){ console.warn('[v699] kpi eval', e9); }
     /* [v557.2] 진행 bar·하단 정보를 카드 맨 아래로 고정 — 4카드 수평 정렬 */
     return '<div style="display:flex;flex-direction:column;background:#fff;border:1px solid #E2E8F0;border-top:3px solid '+(PC[p]||'#64748B')+';border-radius:10px;padding:12px 14px'+(s.n?'':';opacity:.55')+'">'
       +'<div style="display:flex;align-items:baseline;gap:7px;margin-bottom:2px"><span style="font-size:14px;font-weight:800;color:#1E293B">'+p+'</span><span style="font-size:9.5px;color:'+(PC[p]||'#64748B')+';font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(ROLE[p]||'')+'</span><span style="margin-left:auto;font-size:10px;color:#8A97A8;flex:none">비중 '+share+'%</span></div>'
       +'<div style="font-size:22px;font-weight:900;color:'+(PC[p]||'#1E293B')+';line-height:1.2">'+s.n+'<span style="font-size:11px;color:#8A97A8;font-weight:600">건</span>'+arrow(s.n,sp.n)+'</div>'
       +'<div style="display:flex;gap:8px;margin-top:7px">'+m9(cells[0])+m9(cells[1])+m9(cells[2])+'</div>'
       +'<div style="display:flex;gap:8px;margin-top:5px">'+m9(cells[3])+m9(cells[4])+m9(cells[5])+'</div>'
-      + extra
+      + extra + evl
       +'<div style="margin-top:auto;padding-top:7px">'+mixBar
       +'<div style="font-size:9px;color:#B0BDCE;margin-top:5px">활동 '+s.nd+'일 · 진척 기재 '+fillR+'%</div></div>'
       +'</div>';
