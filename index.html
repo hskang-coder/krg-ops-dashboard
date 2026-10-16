@@ -8963,10 +8963,11 @@ function dpay_resultFor(dayOffset, who, person){
    · 업무량 = Σ 소요시간 ÷ 기준 420분/일      · 성과 = 당일 납부완료(입금내역) + 법적 진행 + 현장·변론 점수 ÷ 목표 80점/일
    · 성실성 = 진척 기재율 40% + 상세내용 충실도 30% + 미수신 후속(문자·재시도) 30%      · 종료자 대응 ×1.5 (시간·성과 모두) */
 var DPAY_WORK_STD = 420;    /* 하루 기준 근무시간(분) = 7시간 */
-var DPAY_PTS_STD = 80;      /* 하루 성과 목표 점수 */
+var DPAY_PTS_STD = 100;     /* 하루 성과 목표 점수 ([v700] 80→100) */
+var DPAY_PROM_CAP = 10;     /* 납부약속 성과 점수의 1일 상한 */
 var DPAY_GEN_CAP = 20;      /* 일반 대응(전화·문자·기타) 성과 점수의 1일 상한 — 건수 몰이 방지 */
 var DPAY_SUB_RULES = [      /* 업무하위 기준 (순서대로 첫 매칭) */
-  { re:/현장\s*방문/, min:90, pts:6, lb:'현장 방문' },
+  { re:/현장\s*방문/, min:90, pts:8, lb:'현장 방문' },
   { re:/지급명령\s*도달/, min:10, pts:4, lb:'지급명령 도달' },
   { re:/지급명령\s*확정/, min:10, pts:8, lb:'지급명령 확정' },
   { re:/보정명령/, min:40, pts:6, lb:'보정명령 대응' },
@@ -9017,7 +9018,7 @@ function dpay_evalRows(rows){
     Object.keys(byDay).forEach(function(k){
       var rs = byDay[k], off = Math.round((rs[0].date.getTime() - t0.getTime()) / 86400000);
       var AM = dpay_amtMap(off), DUE = dpay_dueSet(0) || {};
-      var gen = 0, promC = {}, dayC = {}, sameDay = {};
+      var gen = 0, prom = 0, promC = {}, dayC = {}, sameDay = {};
       rs.forEach(function(r){ if (r.cno) sameDay[r.cno] = (sameDay[r.cno] || 0) + 1; });
       rs.forEach(function(r){
         var ended = r.cno ? dpay_isEnded(r.cno) : false, ev = dpay_recEval(r.sub, r.content, r.prog, r.task), f = ended ? 1.5 : 1;
@@ -9035,7 +9036,8 @@ function dpay_evalRows(rows){
       Object.keys(dayC).forEach(function(c){ var got = AM[c] || 0, rest = DUE[c] || 0, f = dayC[c] ? 1.5 : 1;
         if (got > 0 && rest <= 0) { out.pay.paid++; out.pay.pts += 10 * f; }
         else if (got > 0) { out.pay.part++; out.pay.pts += 5 * f; }
-        else if (promC[c]) { out.pay.prom++; out.pay.pts += 2 * f; } });
+        else if (promC[c]) { out.pay.prom++; prom += 1 * f; } });
+      out.pay.pts += Math.min(DPAY_PROM_CAP, prom);   /* [v700] 납부약속 1점 · 1일 10점 상한 */
       out.days[k] = 1;
     });
     out.nDays = Object.keys(out.days).length;
@@ -9161,8 +9163,8 @@ function dpay_scoreBarHtml(S, Pv, note, prevLb){
         var bd9 = Object.keys(S.workDet||{}).map(function(k9){ var d9 = S.workDet[k9]; return k9 + ' ' + d9.n + '건 · ' + Math.round(d9.min) + '분' + (d9.pts ? ' · ' + Math.round(d9.pts) + '점' : ''); }).join('&#10;');
         var nd9 = Math.max(1, E9.nDays || 1);
         return '<span class="bd" title="성과 — 당일 납부완료(입금내역) + 법적 진행 + 현장·변론 점수 ÷ 목표 ' + (DPAY_PTS_STD * nd9) + '점&#10;'
-          + '납부완료 ' + P9.paid + '건×10 · 부분 입금 ' + P9.part + '건×5 · 납부약속 ' + P9.prom + '건×2 = ' + Math.round(P9.pts) + '점&#10;'
-          + '법적·현장(내용증명 6 · 지급명령 신청 8 · 보정 6 · 도달 4 · 확정 8 · 집행 10 · 송달 3 · KCB 1 · 현장방문 6 · 변론 15) = ' + Math.round(E9.pts || 0) + '점&#10;'
+          + '납부완료 ' + P9.paid + '건×10 · 부분 입금 ' + P9.part + '건×5 · 납부약속 ' + P9.prom + '건×1(상한 ' + DPAY_PROM_CAP + ') = ' + Math.round(P9.pts) + '점&#10;'
+          + '법적·현장(내용증명 6 · 지급명령 신청 8 · 보정 6 · 도달 4 · 확정 8 · 집행 10 · 송달 3 · KCB 1 · 현장방문 8 · 변론 15) = ' + Math.round(E9.pts || 0) + '점&#10;'
           + '일반 대응(통화·문자·기타 1점, 1일 ' + DPAY_GEN_CAP + '점 상한) = ' + Math.round(E9.genPts || 0) + '점 · 종료자 ×1.5">'
           + '🏁 성과 ' + S.rP + '% <i>' + Math.round(S.pts || 0) + '점</i></span>'
           + '<span class="bd" title="업무량 — 대응 유형별 표준 소요시간 합산 ÷ 기준 ' + S.wmBase + '분&#10;'
@@ -27183,7 +27185,7 @@ function okpi_respSection(all, range, period){
         var top9=Object.keys(E9.det).sort(function(a,b){ return E9.det[b].min-E9.det[a].min; }).slice(0,3).map(function(k){ return k+' '+E9.det[k].n+'건 '+Math.round(E9.det[k].min)+'분'; }).join(' · ');
         var all9=Object.keys(E9.det).sort(function(a,b){ return E9.det[b].min-E9.det[a].min; }).map(function(k){ return k+' '+E9.det[k].n+'건 · '+Math.round(E9.det[k].min)+'분'+(E9.det[k].pts?' · '+Math.round(E9.det[k].pts)+'점':''); }).join('&#10;');
         var hrs9=Math.round(E9.min/60*10)/10, perDay9=Math.round(E9.min/60/Math.max(1,E9.nDays)*10)/10;
-        evl='<div style="margin-top:7px;padding:6px 8px;background:#F8FAFC;border-radius:7px;font-size:10.5px;color:#334155;line-height:1.5" title="시간 환산(표준 소요시간): '+all9.replace(/"/g,'&quot;')+'&#10;성과 '+E9.ptsTotal+'점 = 납부완료 '+E9.pay.paid+'×10 · 부분 '+E9.pay.part+'×5 · 약속 '+E9.pay.prom+'×2 + 법적·현장 '+Math.round(E9.pts)+' + 일반 '+Math.round(E9.genPts)+' (종료자 ×1.5)&#10;성실성 = 기재 '+E9.fillR+'% · 상세 '+E9.detR+'% · 미수신 후속 '+(E9.folR==null?'해당 없음':E9.folR+'%')+'">'
+        evl='<div style="margin-top:7px;padding:6px 8px;background:#F8FAFC;border-radius:7px;font-size:10.5px;color:#334155;line-height:1.5" title="시간 환산(표준 소요시간): '+all9.replace(/"/g,'&quot;')+'&#10;성과 '+E9.ptsTotal+'점 = 납부완료 '+E9.pay.paid+'×10 · 부분 '+E9.pay.part+'×5 · 약속 '+E9.pay.prom+'×1(상한 10) + 법적·현장 '+Math.round(E9.pts)+' + 일반 '+Math.round(E9.genPts)+' (종료자 ×1.5)&#10;성실성 = 기재 '+E9.fillR+'% · 상세 '+E9.detR+'% · 미수신 후속 '+(E9.folR==null?'해당 없음':E9.folR+'%')+'">'
           +'<b>⏱ 환산 '+hrs9+'h</b>'+(E9.nDays>1?' <span style="color:#8A97A8">(일 '+perDay9+'h)</span>':'')+' · <b style="color:#15803D">🏁 성과 '+E9.ptsTotal+'점</b>'+(E9.nDays>1?' <span style="color:#8A97A8">(일 '+Math.round(E9.ptsTotal/E9.nDays)+')</span>':'')+' · 🧾 성실성 '+E9.rD+'%'
           +(top9?'<div style="font-size:9.5px;color:#8A97A8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+top9+'</div>':'')+'</div>';
       }
