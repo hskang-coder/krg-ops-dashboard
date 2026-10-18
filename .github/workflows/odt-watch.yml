@@ -1,0 +1,31 @@
+name: 연체추이 누락 감시
+
+# 맥(동기화 PC)과 무관하게 GitHub에서 돌며, OD '연체추이(Raw DATA)' 회차 기록이 빠지면 Slack으로 알린다.
+# 시각은 UTC. 08:50 KST = 23:50 UTC(전날), 18:45 KST = 09:45 UTC. (GitHub 일정은 수 분~수십 분 늦을 수 있음)
+on:
+  schedule:
+    - cron: '50 23 * * *'   # 08:50 KST — 오늘 08:20 기준값 + 어제 마감(24:00)
+    - cron: '45 9 * * *'    # 18:45 KST — 오늘 18:00 마감
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'morning / evening / test (test = 무조건 1건 전송, 연결 확인용)'
+        required: false
+        default: 'test'
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 감시 실행
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python3 tools/odt_watch.py "${{ github.event.inputs.mode || 'auto' }}"
