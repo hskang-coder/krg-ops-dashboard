@@ -27487,6 +27487,167 @@ function exm_shift(d){ var s=window._exm; var t=new Date(s.y, s.m-1+d, 1); s.y=t
 function exm_today(){ var d=new Date(); window._exm={ y:d.getFullYear(), m:d.getMonth()+1 }; renderExitMgmtView(); }
 function exm_sortBy(k){ var s=window._exmSort||{key:'term',dir:'asc'}; if(s.key===k) s.dir=(s.dir==='asc'?'desc':'asc'); else s={key:k,dir:'asc'}; window._exmSort=s; renderExitMgmtView(); }
 function exm_kindF(k){ window._exmKindF=(k==='all'||window._exmKindF===k)?'all':k; renderExitMgmtView(); }   /* [v552] 월 상세 퇴실구분 필터 (재클릭 = 전체) */
+/* [v705] 퇴실관리 — 🚨 강제·중도퇴실 리스크 카드 (⏳ 퇴실 선행지표 카드 아래 · 관리자 요청 2026-10-21 · 미회수 상위 명단은 제외)
+   · 기간: 선택 월 포함 최근 N개월(기본 12) · 퇴실일 = krgExitDate(계약해지일 → 실퇴실일) · 퇴실구분 = krgExitKind(v667 단일 기준)
+   · 비율 = 기간 내 퇴실 ÷ 현재(오늘) 계약자 · 보조: 기간 중 계약자(현재 + 기간 내 퇴실) 대비
+   · 강제퇴실 금액(입금내역): 미회수 = 현재 미납(연체·분납·납기 경과) · 회수 = 연체·분납 청구 중 납부액 · 퇴실 후 회수 = 그중 납부일 > 퇴실일
+   · 입주월 코호트 = 계약 시작일 월(최근 24개월) — 그 달 입주 계약 중 지금까지 강제퇴실 인원·비율, 6개월 미만은 '관찰 중'
+   · 법적 단계 = Daily Report 연체관리·수납관리 업무하위의 최고 단계 */
+window._exmRiskSpan = window._exmRiskSpan || 12;
+window.exmR_won = function(x){ x = Math.round(x || 0); var a = Math.abs(x); var s = a >= 1e8 ? (a / 1e8).toFixed(2) + '억' : a >= 1e4 ? Math.round(a / 1e4).toLocaleString() + '만' : a.toLocaleString(); return (x < 0 ? '-' : '') + '₩' + s; };
+window.exmR_span = function(n){ window._exmRiskSpan = n; var el = document.getElementById('exmRiskCard'); if (el) el.outerHTML = exm_riskCard(); };
+window.exmR_isOpen = function(){ if (typeof window._exmRiskOpen === 'boolean') return window._exmRiskOpen; try { return localStorage.getItem('exm_risk_open') === '1'; } catch(_){ return false; } };   /* 기본 접힘 */
+window.exmR_toggle = function(){ window._exmRiskOpen = !exmR_isOpen(); try { localStorage.setItem('exm_risk_open', window._exmRiskOpen ? '1' : '0'); } catch(_){ } var el = document.getElementById('exmRiskCard'); if (el) el.outerHTML = exm_riskCard(); };
+window.exm_riskData = function(){
+  var V = (typeof vacancyRawData !== 'undefined' && Array.isArray(vacancyRawData)) ? vacancyRawData : [];
+  var P = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData : [];
+  var R = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
+  var span = window._exmRiskSpan || 12, Y = window._exm.y, Mo = window._exm.m;
+  var T = new Date(); T.setHours(0,0,0,0);
+  var from = new Date(Y, Mo - span, 1), endM = new Date(Y, Mo, 0), to = endM;
+  var num = function(x){ return parseFloat(String(x == null ? '' : x).replace(/[^0-9.\-]/g, '')) || 0; };
+  var seen = {}, VV = []; V.forEach(function(v){ var c = String(v.no || '').trim(); if (!c || seen[c]) return; seen[c] = 1; VV.push(v); });
+  var isAlive = function(v){ var k = String(v.contractKind || '').trim(); return k === '정상' || k === '계약중'; };
+  var D = { from: from, to: to, span: span, alive: 0, exits: 0, exp: 0, vol: 0, god: 0, gz: [], gzSt: {}, prog: 0, payReady: P.length > 0, drReady: R.length > 0 };
+  VV.forEach(function(v){
+    if (isAlive(v)) { D.alive++; if (/강제퇴실|대위변제/.test(String(v.status || '')) && !krgPd(v.terminateDate)) D.prog++; }
+    var xd = krgExitDate(v); if (!xd || xd < from || xd > to) return;
+    var k = krgExitKind(v); D.exits++;
+    if (k === 'gz') {
+      var st = String(v.status || '').trim(); st = st.indexOf('대위변제') >= 0 ? '대위변제' : (st.replace(/^강제퇴실\s*\(?/, '').replace(/\)$/, '') || '기타');
+      D.gzSt[st] = (D.gzSt[st] || 0) + 1;
+      D.gz.push({ cno: String(v.no).trim(), v: v, xd: xd, st: st, nm: v.tenant1Name || v.tenantName || '-', sd: krgPd(v.startDate), liv: krgLivingMonths(v), rec: 0, recAfter: 0, unpaid: 0, lv: 0, lb: '법적 조치 없음' });
+    } else if (k === 'exp') D.exp++; else if (k === 'god') D.god++; else D.vol++;
+  });
+  /* 강제퇴실 금액 — 입금내역 */
+  var G = {}; D.gz.forEach(function(e){ G[e.cno] = e; });
+  P.forEach(function(p){
+    var e = G[_normCno(p['계약번호'])]; if (!e) return;
+    var st = String(p['납부상태'] || ''), bill = num(p['최종 청구금액(원)(①+②+③-④-⑤+⑥)']), u = num(p['미납(연체)금액(원)']);
+    var due = _parseAnyDateCell(p['납기일']), pd = _parseAnyDateCell(p['납부일']), od = /연체|분납/.test(st);
+    if (u > 0 && (od || !due || due <= T)) e.unpaid += u;
+    if (od) { var paid = Math.max(0, bill - u); e.rec += paid; if (pd && pd > e.xd) e.recAfter += paid; }
+  });
+  /* 법적 단계 — Daily Report 연체관리·수납관리 업무하위 */
+  var LEG = { '법적 조치 검토': [1, '검토(KCB)'], '내용증명이미지발송': [1, '검토(KCB)'], '내용증명 발송': [2, '내용증명'], '지급명령 진행': [3, '지급명령 신청'], '보정명령 대응': [4, '보정'], '지급명령 도달': [5, '도달'], '지급명령 확정': [6, '확정'], '기타집행': [7, '집행'] };
+  R.forEach(function(r){
+    var jt = String(r.jobType || '').trim(); if (jt !== '연체관리' && jt !== '수납관리') return;
+    var e = G[_normCno(r.no != null ? r.no : r.cno)]; if (!e) return;
+    var L = LEG[String(r.jobSub || '').trim()]; if (L && L[0] > e.lv) { e.lv = L[0]; e.lb = L[1]; }
+  });
+  D.sum = { rec: 0, recAfter: 0, unpaid: 0, full: 0, part: 0, none: 0, clean: 0 };
+  D.legal = {}; D.bySt = {};
+  D.gz.forEach(function(e){
+    D.sum.rec += e.rec; D.sum.recAfter += e.recAfter; D.sum.unpaid += e.unpaid;
+    e.rs = (e.unpaid <= 0) ? (e.rec > 0 ? 'full' : 'clean') : (e.recAfter > 0 ? 'part' : 'none'); D.sum[e.rs]++;
+    if (e.unpaid > 0) { var g = D.legal[e.lb] || (D.legal[e.lb] = { n: 0, u: 0, lv: e.lv }); g.n++; g.u += e.unpaid; }
+    var b = D.bySt[e.st] || (D.bySt[e.st] = { n: 0, u: 0 }); b.n++; b.u += e.unpaid;
+  });
+  /* 입주월 코호트 — 선택 월 포함 최근 24개월 */
+  D.cohort = [];
+  var cIdx = {};
+  for (var i = 23; i >= 0; i--) { var d = new Date(Y, Mo - 1 - i, 1), key = d.getFullYear() * 100 + d.getMonth() + 1; cIdx[key] = D.cohort.length;
+    D.cohort.push({ y: d.getFullYear(), m: d.getMonth() + 1, lb: String(d.getFullYear() % 100) + '.' + ('0' + (d.getMonth() + 1)).slice(-2), n: 0, gz: 0, gzP: 0, age: (T.getFullYear() - d.getFullYear()) * 12 + (T.getMonth() - d.getMonth()), inSpan: d >= from }); }
+  VV.forEach(function(v){
+    var k = String(v.contractKind || '').trim(); if (k !== '정상' && k !== '계약중' && k !== '종료') return;
+    var s = krgPd(v.startDate); if (!s) return; var ix = cIdx[s.getFullYear() * 100 + s.getMonth() + 1]; if (ix == null) return;
+    var c = D.cohort[ix]; c.n++;
+    var xd = krgExitDate(v);
+    if (xd && xd <= T) { if (krgExitKind(v) === 'gz') c.gz++; }
+    else if (isAlive(v) && /강제퇴실|대위변제/.test(String(v.status || ''))) c.gzP++;
+  });
+  var mN = 0, mG = 0; D.cohort.forEach(function(c){ c.rate = c.n ? c.gz / c.n * 100 : 0; if (c.age >= 6) { mN += c.n; mG += c.gz; } });
+  D.cAvg = mN ? mG / mN * 100 : 0;
+  var lv = D.gz.map(function(e){ return e.liv; }).filter(function(x){ return x != null; }).sort(function(a, b){ return a - b; });
+  D.livMed = lv.length ? lv[Math.floor(lv.length / 2)] : null; D.liv6 = lv.filter(function(x){ return x <= 6; }).length;
+  return D;
+};
+window.exm_riskCard = function(){
+  var D; try { D = exm_riskData(); } catch(e){ console.warn('[exmRisk]', e); return ''; }
+  var W = exmR_won, pct = function(a, b){ return b ? (Math.round(a / b * 1000) / 10).toFixed(1) : '0.0'; };
+  var f8 = function(d){ return d.getFullYear() + '.' + (d.getMonth() + 1) + '.' + d.getDate(); };
+  var mid = D.vol + D.god, gzN = D.gz.length, pool = D.alive + D.exits;
+  var dmg = D.sum.rec + D.sum.unpaid, atExit = D.sum.unpaid + D.sum.recAfter;
+  var chip = function(n, lb){ var on = (D.span === n); return '<span onclick="exmR_span(' + n + ')" style="cursor:pointer;border-radius:12px;padding:3px 10px;font-size:10.5px;font-weight:800;border:1px solid ' + (on ? '#1A3A5C' : '#D7DFEC') + ';color:' + (on ? '#fff' : '#475569') + ';background:' + (on ? '#1A3A5C' : '#fff') + '">' + lb + '</span>'; };
+  var badge = function(t, cl){ return ' <span style="font-size:12.5px;font-weight:800;color:' + cl + ';background:' + cl + '14;border-radius:6px;padding:1.5px 7px;vertical-align:3px">' + t + '</span>'; };
+  var tile = function(bg, bd, lbCol, vCol, lb, val, sub, tip){ return '<div' + (tip ? ' title="' + tip + '"' : '') + ' style="background:' + bg + ';border:1px solid ' + bd + ';border-radius:9px;padding:10px 12px">'
+    + '<div style="font-size:10.5px;color:' + lbCol + ';font-weight:700">' + lb + '</div>'
+    + '<div style="font-size:22px;font-weight:800;color:' + vCol + ';white-space:nowrap">' + val + '</div>'
+    + '<div style="font-size:10px;color:#5A6A8A;margin-top:3px;line-height:1.55">' + sub + '</div></div>'; };
+  var stTxt = ['공실', '연체', '갱신불가'].map(function(k){ return k + ' ' + (D.gzSt[k] || 0); }).join(' · ');
+  var etcN = gzN - (D.gzSt['공실'] || 0) - (D.gzSt['연체'] || 0) - (D.gzSt['갱신불가'] || 0);
+  var recP = dmg ? Math.round(D.sum.rec / dmg * 1000) / 10 : 0;
+  var LOAD = function(t){ return '<span style="font-size:13px;font-weight:700;color:#94A3B8">' + t + '</span>'; };   /* 입금내역 로드 전 — ₩0 대신 안내 */
+  var bar2 = '<div style="display:flex;height:7px;border-radius:4px;overflow:hidden;margin:5px 0 3px;background:#F1F5F9"><i style="width:' + recP + '%;background:#16A34A"></i><i style="flex:1;background:#DC2626"></i></div>';
+  var h = '<div id="exmRiskCard" style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:14px 16px;margin-bottom:14px">'
+    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+    +   '<span style="font-size:13px;font-weight:800;color:#1A3A5C">🚨 강제·중도퇴실 리스크</span>'
+    +   '<span style="font-size:10px;color:#8A9AB5">퇴실일(계약해지일·실퇴실일) 기준 ' + D.from.getFullYear() + '.' + (D.from.getMonth()+1) + ' ~ ' + D.to.getFullYear() + '.' + (D.to.getMonth()+1) + ' · ' + D.span + '개월(선택 월 확정 퇴실 포함 — 월별 추이와 같은 기준) · 비율 = 현재 계약자 대비</span>'
+    +   '<span style="margin-left:auto;display:inline-flex;gap:5px">' + chip(3, '3개월') + chip(6, '6개월') + chip(12, '1년') + chip(24, '2년') + '</span>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px">'
+    +   tile('#F8FAFC', '#E2EAF5', '#475569', '#1A3A5C', '👥 현재 계약자', D.alive.toLocaleString() + '명', '계약상태 정상(오늘) · 비율의 분모<br>기간 중 계약자 ' + pool.toLocaleString() + '명(현재+기간 퇴실)', '')
+    +   tile('#FFFBEB', '#FDE68A', '#B45309', '#B45309', '🚶 중도퇴실', mid + '명' + badge(pct(mid, D.alive) + '%', '#B45309'), '자진 ' + D.vol + ' · 불가항력 ' + D.god + '<br>기간 중 계약자 대비 ' + pct(mid, pool) + '%', '')
+    +   tile('#FEF2F2', '#FECACA', '#B91C1C', '#B91C1C', '🚨 강제퇴실', gzN + '명' + badge(pct(gzN, D.alive) + '%', '#B91C1C'), stTxt + (etcN ? ' · 기타 ' + etcN : '') + '<br>기간 중 계약자 대비 ' + pct(gzN, pool) + '% · 진행 중 ' + D.prog + '명', '')
+    +   (D.payReady ? tile('#FFF7ED', '#FED7AA', '#9A3412', '#DC2626', '💸 강제퇴실 연체 중(미회수)', W(D.sum.unpaid), bar2 + '연체 발생 ' + W(dmg) + ' 중 <b style="color:#15803D">회수 ' + W(D.sum.rec) + ' (' + recP + '%)</b>', '연체 발생 = 회수 + 미회수 · 회수 = 연체·분납 청구 중 납부된 금액(재직 중 연체납부 포함) · 미회수 = 현재 미납') : tile('#FFF7ED', '#FED7AA', '#9A3412', '#DC2626', '💸 강제퇴실 연체 중(미회수)', LOAD('입금내역 불러오는 중…'), '로드되면 자동으로 표시됩니다', ''))
+    +   (D.payReady ? tile('#F0FDF4', '#BBF7D0', '#166534', '#15803D', '🧾 퇴실 후 회수', W(D.sum.recAfter) + badge(pct(D.sum.recAfter, atExit) + '%', '#15803D'), '퇴실 시점 미납(추정) ' + W(atExit) + ' 대비<br>완전회수 ' + D.sum.full + ' · 일부 ' + D.sum.part + ' · 미회수 ' + D.sum.none + '명', '퇴실 시점 미납(추정) = 현재 미회수 + 퇴실일 이후 납부액 (분납은 마지막 납부일 기준)') : tile('#F0FDF4', '#BBF7D0', '#166534', '#15803D', '🧾 퇴실 후 회수', LOAD('입금내역 불러오는 중…'), '로드되면 자동으로 표시됩니다', ''))
+    + '</div>';
+  /* 입주월 코호트 차트 */
+  var mx = 5; D.cohort.forEach(function(c){ if (c.rate > mx) mx = c.rate; }); mx = Math.ceil(mx / 5) * 5;
+  var H = 112, avgY = Math.round(D.cAvg / mx * H);
+  var cols = D.cohort.map(function(c){
+    var hgt = c.n ? Math.max(c.gz ? 3 : 0, Math.round(c.rate / mx * H)) : 0, young = c.age < 6, hot = c.rate >= D.cAvg * 1.5 && c.gz >= 3 && !young;
+    return '<div title="' + c.y + '년 ' + c.m + '월 입주 ' + c.n + '명 중 강제퇴실 ' + c.gz + '명 (' + c.rate.toFixed(1) + '%)' + (c.gzP ? ' · 진행 중 ' + c.gzP : '') + (young ? ' · 입주 6개월 미만(관찰 중)' : '') + '" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;' + (c.inSpan ? 'background:#F8FAFF;' : '') + 'padding-top:2px">'
+      + '<div style="font-size:9px;font-weight:800;color:' + (hot ? '#B91C1C' : (young ? '#CBD5E1' : '#64748B')) + ';height:12px;white-space:nowrap">' + (c.gz ? c.rate.toFixed(c.rate >= 10 ? 0 : 1) + '%' : '') + '</div>'
+      + '<div style="height:' + H + 'px;width:100%;display:flex;align-items:flex-end;justify-content:center"><i style="display:block;width:58%;height:' + hgt + 'px;border-radius:4px 4px 0 0;background:' + (young ? '#FCA5A5' : (hot ? '#B91C1C' : '#EF4444')) + ';' + (young ? 'opacity:.55;' : '') + '"></i></div>'
+      + '<div style="font-size:9px;color:#475569;font-weight:700;margin-top:3px;white-space:nowrap">' + c.lb + '</div>'
+      + '<div style="font-size:8.5px;color:' + (c.gz ? '#B91C1C' : '#94A3B8') + ';white-space:nowrap">' + c.gz + '/' + c.n + '</div></div>';
+  }).join('');
+  var chart = '<div style="background:#fff;border:1px solid #E2EAF5;border-radius:10px;padding:10px 12px">'
+    + '<div style="font-size:11.5px;font-weight:800;color:#1A3A5C;margin-bottom:2px">📊 입주월별 강제퇴실률 <span style="font-size:9.5px;color:#8A9AB5;font-weight:400">그 달 입주 계약 중 지금까지 강제퇴실된 인원 ÷ 입주 계약 · 최근 24개월 입주 · 음영 = 검색기간 입주</span></div>'
+    + '<div style="position:relative;display:flex;gap:2px;align-items:stretch;margin-top:6px">' + cols
+    +   '<div style="position:absolute;left:0;right:0;bottom:' + (avgY + 26) + 'px;border-top:1.5px dashed #94A3B8;pointer-events:none"><span style="position:absolute;right:0;top:-14px;font-size:9px;color:#64748B;font-weight:800;background:#fff;padding:0 3px">평균 ' + D.cAvg.toFixed(1) + '% (6개월 경과 입주월)</span></div>'
+    + '</div>'
+    + '<div style="font-size:9.5px;color:#8A9AB5;margin-top:6px;line-height:1.6">숫자 = 강제퇴실/입주 · 강제퇴실은 입주 후 중앙값 <b>' + (D.livMed != null ? D.livMed : '-') + '개월</b>(6개월 이내 ' + D.liv6 + '/' + gzN + '명)에 발생 → 최근 6개월 입주(연한 막대)는 아직 관찰 중 · 진한 빨강 = 평균의 1.5배 이상</div>'
+    + '</div>';
+  /* 미회수 — 법적 단계·사유 */
+  var ORDER = ['법적 조치 없음', '검토(KCB)', '내용증명', '지급명령 신청', '보정', '도달', '확정', '집행'];
+  var maxU = 1; ORDER.forEach(function(k){ if (D.legal[k] && D.legal[k].u > maxU) maxU = D.legal[k].u; });
+  var lrow = function(k){ var g = D.legal[k] || { n: 0, u: 0 }, warn = (k === '법적 조치 없음' || k === '검토(KCB)');
+    return '<div style="display:flex;align-items:center;gap:7px;font-size:10.5px;padding:1.5px 0"><span style="width:82px;color:' + (warn ? '#B45309' : '#475569') + ';font-weight:700;white-space:nowrap">' + k + '</span>'
+      + '<div style="flex:1;height:7px;background:#F1F5F9;border-radius:4px;overflow:hidden"><i style="display:block;height:100%;border-radius:4px;width:' + Math.round(g.u / maxU * 100) + '%;background:' + (warn ? '#F59E0B' : '#64748B') + '"></i></div>'
+      + '<b style="width:30px;text-align:right;color:' + (g.n ? '#0F172A' : '#CBD5E1') + '">' + g.n + '명</b><span style="width:58px;text-align:right;color:' + (g.n ? '#B91C1C' : '#CBD5E1') + ';font-weight:800">' + W(g.u) + '</span></div>'; };
+  var pre = (D.legal['법적 조치 없음'] || { n: 0, u: 0 }), rev = (D.legal['검토(KCB)'] || { n: 0, u: 0 });
+  var stKeys = Object.keys(D.bySt).sort(function(a, b){ return D.bySt[b].u - D.bySt[a].u; });
+  var stCl = { '공실': '#DC2626', '연체': '#F97316', '갱신불가': '#A855F7', '계약위반': '#64748B', '대위변제': '#0EA5E9', '기타': '#94A3B8' };
+  var stBar = '<div style="display:flex;height:9px;border-radius:5px;overflow:hidden;background:#F1F5F9;margin:4px 0 4px">' + stKeys.map(function(k){ return D.bySt[k].u > 0 ? '<i title="' + k + ' ' + D.bySt[k].n + '명 ' + W(D.bySt[k].u) + '" style="width:' + (D.bySt[k].u / Math.max(1, D.sum.unpaid) * 100) + '%;background:' + (stCl[k] || '#94A3B8') + ';border-right:2px solid #fff"></i>' : ''; }).join('') + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:3px 10px;font-size:10px;color:#475569">' + stKeys.map(function(k){ return '<span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + (stCl[k] || '#94A3B8') + ';margin-right:3px"></i>' + k + ' ' + D.bySt[k].n + '명 <b>' + W(D.bySt[k].u) + '</b></span>'; }).join('') + '</div>';
+  var right = '<div style="background:#fff;border:1px solid #E2EAF5;border-radius:10px;padding:10px 12px">'
+    + '<div style="font-size:11.5px;font-weight:800;color:#1A3A5C;margin-bottom:6px">💸 미회수 ' + W(D.sum.unpaid) + ' — 어디에 묶여 있나 <span style="font-size:9.5px;color:#8A9AB5;font-weight:400">미납 남은 ' + (gzN - D.sum.full - D.sum.clean) + '명</span></div>'
+    + '<div style="font-size:10px;font-weight:800;color:#64748B;margin-bottom:2px">⚖️ 법적 진행 단계 (연체관리 최고 단계)</div>'
+    + ORDER.map(lrow).join('')
+    + '<div style="margin:6px 0 8px;padding:5px 8px;border-radius:7px;background:#FFFBEB;border:1px solid #FDE68A;font-size:10.5px;color:#92400E;font-weight:700">⚠ 법적 절차 미착수(조치 없음·검토만) <b>' + (pre.n + rev.n) + '명 · ' + W(pre.u + rev.u) + '</b> — 내용증명·지급명령 착수 대상</div>'
+    + '<div style="font-size:10px;font-weight:800;color:#64748B">🚪 강제퇴실 사유별 미회수</div>' + stBar
+    + '</div>';
+  if (!D.payReady) right = '<div style="background:#fff;border:1px solid #E2EAF5;border-radius:10px;padding:10px 12px;color:#94A3B8;font-size:11px;font-weight:700">💸 강제퇴실 미회수 — 입금내역 불러오는 중… (로드되면 자동 표시)</div>';
+  else if (!D.drReady) right = right.replace('⚖️ 법적 진행 단계 (연체관리 최고 단계)', '⚖️ 법적 진행 단계 — Daily Report 불러오는 중(단계가 비어 보일 수 있음)');
+  /* [관리자 지시 2026-10-21] 지표 카드 5개는 항상 표시 · 아래 퇴실율(입주월별 강제퇴실률)·미회수 병목(법적 단계·사유)은 접기 — 기본 접힘, 상태 기억 */
+  var open = exmR_isOpen();
+  var best = null; D.cohort.forEach(function(c){ if (c.age >= 6 && c.gz >= 3 && (!best || c.rate > best.rate)) best = c; });
+  var teaser = '입주월 평균 ' + D.cAvg.toFixed(1) + '%' + (best ? ' · 최고 ' + best.lb + ' 입주 ' + best.rate.toFixed(0) + '%(' + best.gz + '/' + best.n + ')' : '') + (D.payReady ? ' · 법적 절차 미착수 ' + (pre.n + rev.n) + '명 ' + W(pre.u + rev.u) : '');
+  h += '<div onclick="exmR_toggle()" title="입주월별 강제퇴실률 차트와 미회수 병목(법적 단계·사유)을 ' + (open ? '접습니다' : '펼칩니다') + '" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px dashed #D7DFEC;border-radius:9px;background:#FAFBFD">'
+    +   '<span style="font-size:11.5px;font-weight:800;color:#1A3A5C;white-space:nowrap">📊 퇴실율(입주월별) · 💸 미회수 병목</span>'
+    +   '<span style="font-size:10.5px;color:#64748B;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + teaser + '</span>'
+    +   '<span style="margin-left:auto;font-size:12px;font-weight:800;color:#4F46E5;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:999px;padding:4px 12px;white-space:nowrap">' + (open ? '▴ 접기' : '▾ 펼치기') + '</span>'
+    + '</div>'
+    + (open ? '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:12px;align-items:stretch;margin-top:10px">' + chart + right + '</div>'
+      + '<div style="font-size:9.5px;color:#8A9AB5;line-height:1.7;border-top:1px dashed #D7DFEC;padding-top:7px;margin-top:10px">'
+      + '· 퇴실구분 = v667 단일 기준(강제 = 공실상태 강제퇴실 4종·대위변제) · 퇴실일 = 계약해지일 → 실퇴실일(DR D열·BP열) · 진행 중 = 강제 상태인데 해지일 미확정<br>'
+      + '· 금액 = 입금내역(전체기간) — <b>미회수</b> = 현재 미납(연체·분납·납기 경과) · <b>회수</b> = 연체·분납 청구 중 납부된 금액 · <b>퇴실 후 회수</b> = 그중 납부일이 퇴실일 이후(분납은 마지막 납부일 기준 추정) · 법적 단계 = Daily Report 연체관리·수납관리 업무하위의 최고 단계'
+      + '</div>' : '')
+    + '</div>';
+  return h;
+};
 function exm_excel(){
   try{
     if(typeof XLSX==='undefined'){ alert('엑셀 모듈 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
@@ -28160,6 +28321,7 @@ function renderExitMgmtView(){
            +'</div>';
        })()
     +'</div>'
+    +(function(){ try { return exm_riskCard(); } catch(e){ console.warn('[v705] riskCard', e); return ''; } })()   /* [v705] 🚨 강제·중도퇴실 리스크 — 선행지표 카드 아래 */
     +'<div style="background:#fff;border:1px solid #E2EAF5;border-radius:12px;padding:14px 16px">'
     +  '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:13px;font-weight:800;color:#1A3A5C">📋 '+M+'월 퇴실 상세</span><span style="font-size:10px;color:#8A9AB5">계약번호 클릭 → 계약상세 이동 · 헤더 클릭 정렬</span>'
     +  (function(){ /* [v552] 퇴실구분 필터 칩 */
