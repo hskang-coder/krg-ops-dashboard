@@ -27516,8 +27516,8 @@ window.exm_riskData = function(){
   VV.forEach(function(v){
     if (!counted(v)) return;
     var s0 = krgPd(v.startDate); if (!s0 || s0 < from || s0 > to || s0 > T) return;
-    D.n++; if (isAlive(v)) D.alive++;
-    var xd = krgExitDate(v); if (!xd || xd > T) { if (isAlive(v) && forced(v)) D.prog++; return; }
+    D.n++;
+    var xd = krgExitDate(v); if (!xd || xd > T) { if (isAlive(v)) { D.alive++; if (forced(v)) D.prog++; } return; }   /* [v706.1] 계약중 = 아직 퇴실 전 (해지일 지난 정상 계약은 퇴실로만 셈) */
     var k = krgExitKind(v); D.exits++;
     if (k === 'gz') {
       var st = String(v.status || '').trim(); st = st.indexOf('대위변제') >= 0 ? '대위변제' : (st.replace(/^강제퇴실\s*\(?/, '').replace(/\)$/, '') || '기타');
