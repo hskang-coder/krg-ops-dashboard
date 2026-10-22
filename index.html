@@ -27796,20 +27796,32 @@ window.exm_riskCard = function(){
   /* 입주월 코호트 차트 */
   var mx = 5; D.cohort.forEach(function(c){ if (c.rate > mx) mx = c.rate; }); mx = Math.ceil(mx / 5) * 5;
   var H = 112, avgY = Math.round(D.cAvg / mx * H);
+  var hotThr = Math.round(Math.round(D.cAvg * 10) / 10 * 15) / 10;   /* [v714] 표시 평균(소수 1자리) × 1.5 — 범례에 적힌 기준과 같은 값 */
   var cols = D.cohort.map(function(c){
-    var hgt = c.n ? Math.max(c.gz ? 3 : 0, Math.round(c.rate / mx * H)) : 0, young = c.age < D.MAT, hot = c.rate >= D.cAvg * 1.5 && c.gz >= 3 && !young;
+    var hgt = c.n ? Math.max(c.gz ? 3 : 0, Math.round(c.rate / mx * H)) : 0, young = c.age < D.MAT, hot = Math.round(c.rate * 10) / 10 >= hotThr && c.gz >= 3 && !young;   /* [v714] 표시값(소수 1자리)끼리 비교 */
     return '<div onclick="exmR_cohortModal(' + c.y + ',' + c.m + ')" title="' + c.y + '년 ' + c.m + '월 입주 ' + c.n + '명 중 강제퇴실 ' + c.gz + '명 (' + c.rate.toFixed(1) + '%)' + (c.gzP ? ' · 진행 중 ' + c.gzP : '') + (young ? ' · 입주 ' + D.MAT + '개월 미만(진행 중 — 비율이 더 오를 수 있음)' : '') + ' · 클릭 → 명단" style="cursor:pointer;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;' + (c.inSpan ? 'background:#F8FAFF;' : '') + 'padding-top:2px">'
-      + '<div style="font-size:9px;font-weight:800;color:' + (hot ? '#B91C1C' : (young ? '#CBD5E1' : '#64748B')) + ';height:12px;white-space:nowrap">' + (c.gz ? c.rate.toFixed(c.rate >= 10 ? 0 : 1) + '%' : '') + '</div>'
+      + '<div style="font-size:8.5px;letter-spacing:-.3px;font-weight:800;color:' + (hot ? '#B91C1C' : (young ? '#CBD5E1' : '#64748B')) + ';height:12px;white-space:nowrap">' + (c.gz ? c.rate.toFixed(1) + '%' : '') + '</div>'
       + '<div style="height:' + H + 'px;width:100%;display:flex;align-items:flex-end;justify-content:center"><i style="display:block;width:58%;height:' + hgt + 'px;border-radius:4px 4px 0 0;background:' + (young ? '#FCA5A5' : (hot ? '#B91C1C' : '#EF4444')) + ';' + (young ? 'opacity:.55;' : '') + '"></i></div>'
       + '<div style="font-size:9px;color:#475569;font-weight:700;margin-top:3px;white-space:nowrap">' + c.lb + '</div>'
       + '<div style="font-size:8.5px;color:' + (c.gz ? '#B91C1C' : '#94A3B8') + ';white-space:nowrap">' + c.gz + '/' + c.n + '</div></div>';
   }).join('');
+  /* [v714] 색 범례 — 막대 색 = 결과가 다 나왔는지(인원 수 아님) · 관리자 요청 2026-10-22 */
+  var spLb = { 3: '3개월', 6: '6개월', 12: '1년', 24: '2년' }[D.span] || (D.span + '개월');
+  var lgChip = function(bg, ex, lb, sub, tip){ return '<span title="' + tip + '" style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap;cursor:help"><i style="display:inline-block;width:12px;height:11px;border-radius:3px 3px 0 0;background:' + bg + ';' + (ex || '') + '"></i><b style="color:#334155">' + lb + '</b><span style="color:#94A3B8;font-weight:500">' + sub + '</span></span>'; };
+  var lgHtml = '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;margin-top:6px;padding:5px 9px;background:#FAFBFD;border:1px solid #EEF2F7;border-radius:7px;font-size:10px">'
+    + '<span style="color:#64748B;font-weight:800">막대 색</span>'
+    + lgChip('#EF4444', '', '결과 확정', '입주 ' + D.MAT + '개월 지남', '입주한 지 ' + D.MAT + '개월이 지난 달 — 강제퇴실의 ' + pI(D.liv12, D.livN) + '%가 입주 12개월 안에 생기므로 비율이 거의 확정')
+    + lgChip('#B91C1C', '', '특히 높음', '평균의 1.5배(' + hotThr.toFixed(1) + '%) 이상', '결과 확정된 달 중 비율이 평균 ' + D.cAvg.toFixed(1) + '% × 1.5 = ' + hotThr.toFixed(1) + '% 이상이고 강제퇴실 3명 이상인 달')
+    + lgChip('#FCA5A5', 'opacity:.55', '진행 중', '입주 ' + D.MAT + '개월 미만 · 더 오를 수 있음', '입주한 지 ' + D.MAT + '개월이 안 된 달 — 시간이 덜 지나 비율이 앞으로 오를 수 있음')
+    + '<span title="위 카드에서 고른 기간에 입주한 달" style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap;cursor:help"><i style="display:inline-block;width:14px;height:11px;border-radius:2px;background:#F8FAFF;border:1px solid #C7D2FE"></i><b style="color:#334155">옅은 배경</b><span style="color:#94A3B8;font-weight:500">카드 기간(' + spLb + ' · ' + f2(D.from) + '~' + f2(D.to) + ') 입주</span></span>'
+    + '<span style="margin-left:auto;color:#64748B;font-weight:700;white-space:nowrap">색은 인원 수가 아님 · 인원 = 막대 아래 숫자(강제퇴실/입주)</span>'
+    + '</div>';
   var chart = '<div style="background:#fff;border:1px solid #E2EAF5;border-radius:10px;padding:10px 12px">'
-    + '<div style="font-size:11.5px;font-weight:800;color:#1A3A5C;margin-bottom:2px">📊 입주월별 강제퇴실률 <span style="font-size:9.5px;color:#8A9AB5;font-weight:400">그 달 입주 계약 중 지금까지 강제퇴실된 인원 ÷ 입주 계약 · 최근 24개월 입주 · 음영 = 검색기간 입주 · <b style="color:#4F46E5">막대 클릭 → 그 달 강제퇴실 명단</b></span></div>'
+    + '<div style="font-size:11.5px;font-weight:800;color:#1A3A5C;margin-bottom:2px">📊 입주월별 강제퇴실률 <span style="font-size:9.5px;color:#8A9AB5;font-weight:400">그 달 입주 계약 중 지금까지 강제퇴실된 인원 ÷ 입주 계약 · 최근 24개월 입주 · <b style="color:#4F46E5">막대 클릭 → 그 달 강제퇴실 명단</b></span></div>' + lgHtml   /* [v714] 색 범례 */
     + '<div style="position:relative;display:flex;gap:2px;align-items:stretch;margin-top:6px">' + cols
     +   '<div style="position:absolute;left:0;right:0;bottom:' + (avgY + 26) + 'px;border-top:1.5px dashed #94A3B8;pointer-events:none"><span style="position:absolute;right:0;top:-14px;font-size:9px;color:#64748B;font-weight:800;background:#fff;padding:0 3px">평균 ' + D.cAvg.toFixed(1) + '% (입주 ' + D.MAT + '개월 경과 = 결과 확정)</span></div>'
     + '</div>'
-    + '<div style="font-size:9.5px;color:#8A9AB5;margin-top:6px;line-height:1.6">숫자 = 강제퇴실/입주 · 강제퇴실은 입주 후 중앙값 <b>' + (D.livMed != null ? D.livMed : '-') + '개월</b>에 발생(전체 ' + D.livN + '명 중 6개월 안 ' + pI(D.liv6, D.livN) + '% · 12개월 안 ' + pI(D.liv12, D.livN) + '%) → 입주 ' + D.MAT + '개월 미만(연한 막대)은 아직 진행 중 · 진한 빨강 = 평균의 1.5배 이상</div>'
+    + '<div style="font-size:9.5px;color:#8A9AB5;margin-top:6px;line-height:1.6">숫자 = 강제퇴실/입주 · 강제퇴실은 입주 후 중앙값 <b>' + (D.livMed != null ? D.livMed : '-') + '개월</b>에 발생(전체 ' + D.livN + '명 중 6개월 안 ' + pI(D.liv6, D.livN) + '% · 12개월 안 ' + pI(D.liv12, D.livN) + '%) → 그래서 입주 ' + D.MAT + '개월이 지난 달만 「결과 확정」으로 봄</div>'
     + '</div>';
   /* 미회수 — 법적 단계·사유 */
   var ORDER = ['법적 조치 없음', '검토(KCB)', '내용증명', '지급명령 신청', '보정', '도달', '확정', '집행'];
