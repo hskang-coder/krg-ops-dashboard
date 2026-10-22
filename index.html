@@ -27585,16 +27585,17 @@ window.exmR_lossModal = function(){
     var f = function(d){ return d ? d.getFullYear() + '.' + (d.getMonth() + 1) + '.' + d.getDate() : '-'; };
     var fy = function(d){ return d.getFullYear() + '.' + (d.getMonth() + 1); };
     var K = ['rent', 'exit', 'law', 'fee', 'pen'], S = { c: {}, all: D.sumAll ? D.sumAll.unpaid : D.sum.unpaid, nGz: D.gz.length, nLoss: 0, loss: 0, payReady: D.payReady, byUse: D.byUse || {} };
-    K.forEach(function(k){ S.c[k] = { u: 0, r: 0 }; });
+    K.forEach(function(k){ S.c[k] = { u: 0, r: 0, ra: 0 }; });
     var esc = function(t){ return String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); };
     var tip = function(o){ if (!o || !o.it || !o.it.length) return ''; return o.it.slice().sort(function(a, b){ return b[1] - a[1]; }).map(function(x){ return esc(x[0]) + ' ₩' + Math.round(x[1]).toLocaleString(); }).join('&#10;'); };
     var rows = [];
-    D.gz.forEach(function(e){ var c = e.c || {}, g = function(k){ return c[k] || { u: 0, r: 0, it: [] }; };
-      K.forEach(function(k){ S.c[k].u += g(k).u; S.c[k].r += g(k).r; });
+    D.gz.forEach(function(e){ var c = e.c || {}, g = function(k){ return c[k] || { u: 0, r: 0, ra: 0, it: [] }; };
+      K.forEach(function(k){ S.c[k].u += g(k).u; S.c[k].r += g(k).r; S.c[k].ra += (g(k).ra || 0); });
       var loss = g('rent').u + g('exit').u; if (loss <= 0) return;
       S.nLoss++; S.loss += loss; var v = e.v;
       rows.push({ cno: e.cno, nm: e.nm, addr: [v.propAddr, v.propBuilding, v.propRoom].filter(Boolean).join(' '), use: e.use, st: e.st, sdt: f(e.sd), xdt: f(e.xd),
-        uRent: g('rent').u, uExit: g('exit').u, loss: loss, rLoss: g('rent').r + g('exit').r, xFee: g('fee').u, xPen: g('pen').u, xLaw: g('law').u,
+        uRent: g('rent').u, uExit: g('exit').u, loss: loss, ra: (g('rent').ra || 0) + (g('exit').ra || 0), occ: loss + (g('rent').ra || 0) + (g('exit').ra || 0),
+        before: Math.max(0, g('rent').r + g('exit').r - (g('rent').ra || 0) - (g('exit').ra || 0)), xFee: g('fee').u, xPen: g('pen').u, xLaw: g('law').u,   /* [v712] 피해 발생 = 퇴실 후 회수 + 피해액 · 거주 중 납부(참고) */
         tRent: tip(c.rent), tExit: tip(c.exit), lv: e.lv, lb: e.lb });
     });
     rows.sort(function(a, b){ return b.loss - a.loss; });
@@ -27609,13 +27610,13 @@ window.exmR_cohortModal = function(y, m){
     var f = function(d){ return d ? d.getFullYear() + '.' + (d.getMonth() + 1) + '.' + d.getDate() : '-'; };
     var row = function(e, prog){ var v = e.v, td = krgPd(v.terminateDate);
       return { cno: e.cno, nm: e.nm, addr: [v.propAddr, v.propBuilding, v.propRoom].filter(Boolean).join(' '), gst: prog ? '진행 중' : '강제퇴실', st: e.st, partner: v.partnerName || '-',
-        sdt: f(e.sd), xdt: prog ? (td ? '해지 예정 ' + f(td) : '해지 미정') : f(e.xd), liv: e.liv, tot: e.rec + e.unpaid, rec: e.rec, unpaid: e.unpaid, recAfter: e.recAfter, lv: e.lv, lb: e.lb, rs: prog ? 'prog' : e.rs, use: e.use }; };   /* [v709] 피해액 기준 · 구분 */
+        sdt: f(e.sd), xdt: prog ? (td ? '해지 예정 ' + f(td) : '해지 미정') : f(e.xd), liv: e.liv, tot: e.recAfter + e.unpaid, rec: e.recAfter, unpaid: e.unpaid, recAfter: e.recAfter, recBefore: Math.max(0, e.rec - e.recAfter), lv: e.lv, lb: e.lb, rs: prog ? 'prog' : e.rs, use: e.use }; };   /* [v709] 피해액 기준 · 구분 */
     var rows = D.gz.map(function(e){ return row(e, false); }).sort(function(a, b){ return (b.unpaid - a.unpaid) || (krgPd(a.xdt) - krgPd(b.xdt)); })
       .concat(D.progL.map(function(e){ return row(e, true); }));
     var T = new Date(); T.setHours(0,0,0,0);
     var uN = D.gz.filter(function(e){ return e.unpaid > 0; }).length;
     window._exmCohort = { y: y, m: m, rows: rows, S: { n: D.n, alive: D.alive, exp: D.exp, mid: D.vol + D.god, gz: D.gz.length, prog: D.prog, rate: D.n ? (Math.round(D.gz.length / D.n * 1000) / 10).toFixed(1) : '0.0',
-      tot: D.sum.rec + D.sum.unpaid, rec: D.sum.rec, unpaid: D.sum.unpaid, unpaidN: uN, recAfter: D.sum.recAfter, payReady: D.payReady, avg: D.gz.length ? D.sum.unpaid / D.gz.length : 0, age: (T.getFullYear() - y) * 12 + (T.getMonth() + 1 - m) } };
+      tot: D.sum.recAfter + D.sum.unpaid, rec: D.sum.recAfter, recBefore: Math.max(0, D.sum.rec - D.sum.recAfter), unpaid: D.sum.unpaid, unpaidN: uN, recAfter: D.sum.recAfter, payReady: D.payReady, avg: D.gz.length ? D.sum.unpaid / D.gz.length : 0, age: (T.getFullYear() - y) * 12 + (T.getMonth() + 1 - m) } };
     exm_leadModal('cohort', y * 100 + m);
   } catch(e){ console.warn('[v707] cohortModal', e); }
 };
@@ -27681,8 +27682,8 @@ window.exm_riskData = function(opt){   /* [v707] opt = {y, m, span} — 지정 �
   D.gz.forEach(function(e){
     D.sum.rec += e.rec; D.sum.recAfter += e.recAfter; D.sum.unpaid += e.unpaid;
     D.sumAll.rec += e.recAll; D.sumAll.recAfter += e.recAfterAll; D.sumAll.unpaid += e.unpaidAll;
-    var bu = D.byUse[e.use] || (D.byUse[e.use] = { n: 0, u: 0, r: 0, nd: 0 }); bu.n++; bu.u += e.unpaid; bu.r += e.rec; if (e.unpaid > 0) bu.nd++;
-    e.rs = (e.unpaid <= 0) ? (e.rec > 0 ? 'full' : 'clean') : (e.recAfter > 0 ? 'part' : 'none'); D.sum[e.rs]++;
+    var bu = D.byUse[e.use] || (D.byUse[e.use] = { n: 0, u: 0, r: 0, nd: 0 }); bu.n++; bu.u += e.unpaid; bu.r += e.recAfter; if (e.unpaid > 0) bu.nd++;
+    e.rs = (e.unpaid <= 0) ? (e.recAfter > 0 ? 'full' : 'clean') : (e.recAfter > 0 ? 'part' : 'none'); D.sum[e.rs]++;   /* [v712] 완전회수 = 퇴실 후 다 받음 · 피해 없음 = 퇴실 때 남은 피해 없음 */
     if (e.unpaid > 0) { var g = D.legal[e.lb] || (D.legal[e.lb] = { n: 0, u: 0, lv: e.lv }); g.n++; g.u += e.unpaid; }
     var b = D.bySt[e.st] || (D.bySt[e.st] = { n: 0, u: 0 }); b.n++; b.u += e.unpaid;
   });
@@ -27721,7 +27722,8 @@ window.exm_riskCard = function(){
   var Pv = D.prev || { n: 0 }, pvOk = Pv.n > 0;
   var pvLine = function(a, b){ return pvOk ? '작년 같은 시점 ' + pct(a, Pv.n) + '% → 1년 뒤 ' + pct(b, Pv.n) + '%' : '작년 같은 시점 비교 없음'; };
   var pvTip = function(lb, a, b){ return pvOk ? '1년 전 입주 코호트(' + f2(Pv.from) + '~' + f2(Pv.to) + ' 입주 ' + Pv.n.toLocaleString() + '명) ' + lb + ': ' + f8(Pv.t) + ' 시점 ' + a + '명(' + pct(a, Pv.n) + '%) → 오늘 ' + b + '명(' + pct(b, Pv.n) + '%)&#10;같은 경과 기간끼리 비교 — 강제퇴실의 ' + pI(D.liv12, D.livN) + '%가 입주 12개월 안에 발생하므로 최근 입주분의 비율은 앞으로 오름' : '1년 전 같은 기간 입주 계약이 없어 비교하지 않음'; };
-  var dmg = D.sum.rec + D.sum.unpaid, atExit = D.sum.unpaid + D.sum.recAfter;
+  var dmg = D.sum.recAfter + D.sum.unpaid, atExit = D.sum.unpaid + D.sum.recAfter;   /* [v712] 피해 발생 = 퇴실 시점 피해 = 퇴실 후 회수 + 현재 피해액 */
+  var preLate = Math.max(0, D.sum.rec - D.sum.recAfter);   /* [v712] 거주 중 늦게 낸 연체(피해 아님 · 참고) */
   var chip = function(n, lb){ var on = (D.span === n); return '<span onclick="exmR_span(' + n + ')" style="cursor:pointer;border-radius:12px;padding:3px 10px;font-size:10.5px;font-weight:800;border:1px solid ' + (on ? '#1A3A5C' : '#D7DFEC') + ';color:' + (on ? '#fff' : '#475569') + ';background:' + (on ? '#1A3A5C' : '#fff') + '">' + lb + '</span>'; };
   var badge = function(t, cl){ return ' <span style="font-size:12.5px;font-weight:800;color:' + cl + ';background:' + cl + '14;border-radius:6px;padding:1.5px 7px;vertical-align:3px">' + t + '</span>'; };
   var tile = function(bg, bd, lbCol, vCol, lb, val, sub, tip){ return '<div' + (tip ? ' title="' + tip + '"' : '') + ' style="background:' + bg + ';border:1px solid ' + bd + ';border-radius:9px;padding:10px 12px">'
@@ -27730,7 +27732,7 @@ window.exm_riskCard = function(){
     + '<div style="font-size:10px;color:#5A6A8A;margin-top:3px;line-height:1.55">' + sub + '</div></div>'; };
   var stTxt = ['공실', '연체', '갱신불가'].map(function(k){ return k + ' ' + (D.gzSt[k] || 0); }).join(' · ');
   var etcN = gzN - (D.gzSt['공실'] || 0) - (D.gzSt['연체'] || 0) - (D.gzSt['갱신불가'] || 0);
-  var recP = dmg ? Math.round(D.sum.rec / dmg * 1000) / 10 : 0;
+  var recP = dmg ? Math.round(D.sum.recAfter / dmg * 1000) / 10 : 0;   /* [v712] 회수율 = 퇴실 후 회수 ÷ 피해 발생 */
   var LOAD = function(t){ return '<span style="font-size:13px;font-weight:700;color:#94A3B8">' + t + '</span>'; };   /* 입금내역 로드 전 — ₩0 대신 안내 */
   /* [v709] 피해액 — 주거용·상업용 (계약형태 N열) 인원·피해액·1인 평균 */
   var useRow = function(k, ic){ var o = (D.byUse || {})[k]; if (!o || !o.n) return ''; return '<div style="display:flex;justify-content:space-between;gap:6px;white-space:nowrap"><span>' + ic + ' ' + k + ' ' + o.n + '명</span><span><b style="color:#B91C1C">' + W(o.u) + '</b> <span style="color:#94A3B8">· 1인 ' + W(o.u / o.n) + '</span></span></div>'; };
@@ -27746,8 +27748,8 @@ window.exm_riskCard = function(){
     +   tile('#F8FAFC', '#E2EAF5', '#475569', '#1A3A5C', '👥 입주 계약자', den.toLocaleString() + '명', '기간 내 입주(계약 시작) · 비율의 분모<br>현재 계약중 ' + D.alive.toLocaleString() + ' · 퇴실 ' + D.exits.toLocaleString(), '계약상태 정상·종료(예정·가계약·철회 제외) 중 시작일이 기간 안이고 오늘까지 입주한 계약')
     +   tile('#FFFBEB', '#FDE68A', '#B45309', '#B45309', '🚶 중도퇴실', mid + '명' + badge(pct(mid, den) + '%', '#B45309'), '자진 ' + D.vol + ' · 불가항력 ' + D.god + '<br>' + pvLine(Pv.mid0, Pv.midN), pvTip('중도퇴실', Pv.mid0, Pv.midN))
     +   tile('#FEF2F2', '#FECACA', '#B91C1C', '#B91C1C', '🚨 강제퇴실', gzN + '명' + badge(pct(gzN, den) + '%', '#B91C1C'), stTxt + (etcN ? ' · 기타 ' + etcN : '') + (D.prog ? ' · 진행 중 ' + D.prog : '') + '<br>' + pvLine(Pv.gz0, Pv.gzN), pvTip('강제퇴실', Pv.gz0, Pv.gzN))
-    +   (D.payReady ? tile('#FFF7ED', '#FED7AA', '#9A3412', '#DC2626', '💸 강제퇴실 연체 중(케이알지 피해액) <span style="float:right;color:#4F46E5;font-weight:800">상세 ›</span>', W(D.sum.unpaid) + badge('1인 평균 ' + W(gzN ? D.sum.unpaid / gzN : 0), '#9A3412'), bar2 + '피해 발생 ' + W(dmg) + ' 중 <b style="color:#15803D">회수 ' + W(D.sum.rec) + ' (' + recP + '%)</b>' + useHtml, '케이알지 피해액 = 임대료 + 퇴실정산비용(공과금·청소·도배·중개비 등) 미회수 — 서비스 수수료·위약금·법비용 제외&#10;1인 평균 = 피해액 ÷ 강제퇴실 ' + gzN + '명(피해 0원 포함) · 클릭 → 피해액 상세').replace('<div', '<div onclick="exmR_lossModal()"').replace('style="background:#FFF7ED', 'style="cursor:pointer;background:#FFF7ED') : tile('#FFF7ED', '#FED7AA', '#9A3412', '#DC2626', '💸 강제퇴실 연체 중(케이알지 피해액)', LOAD('입금내역 불러오는 중…'), '로드되면 자동으로 표시됩니다', ''))
-    +   (D.payReady ? tile('#F0FDF4', '#BBF7D0', '#166534', '#15803D', '🧾 퇴실 후 회수(피해액)', W(D.sum.recAfter) + badge(pct(D.sum.recAfter, atExit) + '%', '#15803D'), '퇴실 시점 피해(추정) ' + W(atExit) + ' 대비<br>완전회수 ' + D.sum.full + ' · 일부 ' + D.sum.part + ' · 미회수 ' + D.sum.none + '명' + (D.sum.clean ? ' · 피해 없음 ' + D.sum.clean : ''), '퇴실 시점 피해(추정) = 현재 피해액 + 퇴실일 이후 회수액 (임대료·퇴실정산비용만 · 분납은 마지막 납부일 기준)') : tile('#F0FDF4', '#BBF7D0', '#166534', '#15803D', '🧾 퇴실 후 회수(피해액)', LOAD('입금내역 불러오는 중…'), '로드되면 자동으로 표시됩니다', ''))
+    +   (D.payReady ? tile('#FFF7ED', '#FED7AA', '#9A3412', '#DC2626', '💸 강제퇴실 연체 중(케이알지 피해액) <span style="float:right;color:#4F46E5;font-weight:800">상세 ›</span>', W(D.sum.unpaid) + badge('1인 평균 ' + W(gzN ? D.sum.unpaid / gzN : 0), '#9A3412'), bar2 + '피해 발생 ' + W(dmg) + ' 중 <b style="color:#15803D">퇴실 후 회수 ' + W(D.sum.recAfter) + ' (' + recP + '%)</b>' + useHtml, '케이알지 피해액 = 임대료 + 퇴실정산비용(공과금·청소·도배·중개비 등) 미회수 — 서비스 수수료·위약금·법비용 제외&#10;피해 발생 = 퇴실 시점에 남아 있던 피해 = 퇴실 후 회수 + 현재 피해액 (거주 중 늦게라도 낸 연체는 피해 아님)&#10;1인 평균 = 피해액 ÷ 강제퇴실 ' + gzN + '명(피해 0원 포함) · 클릭 → 피해액 상세').replace('<div', '<div onclick="exmR_lossModal()"').replace('style="background:#FFF7ED', 'style="cursor:pointer;background:#FFF7ED') : tile('#FFF7ED', '#FED7AA', '#9A3412', '#DC2626', '💸 강제퇴실 연체 중(케이알지 피해액)', LOAD('입금내역 불러오는 중…'), '로드되면 자동으로 표시됩니다', ''))
+    +   (D.payReady ? tile('#F0FDF4', '#BBF7D0', '#166534', '#15803D', '🧾 퇴실 후 회수(피해액)', W(D.sum.recAfter) + badge(pct(D.sum.recAfter, atExit) + '%', '#15803D'), '완전회수 ' + D.sum.full + ' · 일부 ' + D.sum.part + ' · 미회수 ' + D.sum.none + '명' + (D.sum.clean ? ' · 피해 없음 ' + D.sum.clean : '') + '<br><span style="color:#94A3B8">참고: 거주 중 늦게 낸 연체 ' + W(preLate) + ' — 피해 아님</span>', '퇴실 후 회수 = 퇴실일 이후 납부된 임대료·퇴실정산비용 (분납은 마지막 납부일 기준) · % = 피해 발생(퇴실 시점) ' + W(atExit) + ' 대비&#10;완전회수 = 퇴실 후 다 받음 · 일부 = 일부 받고 남음 · 미회수 = 퇴실 후 받은 돈 없음 · 피해 없음 = 퇴실 때 남은 피해 없음&#10;거주 중 늦게 낸 연체 = 연체됐지만 퇴실 전에 납부된 금액(피해가 아니라 회수에서 제외)') : tile('#F0FDF4', '#BBF7D0', '#166534', '#15803D', '🧾 퇴실 후 회수(피해액)', LOAD('입금내역 불러오는 중…'), '로드되면 자동으로 표시됩니다', ''))
     + '</div>';
   /* 입주월 코호트 차트 */
   var mx = 5; D.cohort.forEach(function(c){ if (c.rate > mx) mx = c.rate; }); mx = Math.ceil(mx / 5) * 5;
@@ -27803,7 +27805,7 @@ window.exm_riskCard = function(){
       + '· <b>작년 같은 시점</b> = 입주 기간을 12개월 앞당긴 코호트의 1년 전 오늘 시점 비율 → 오늘 비율 (같은 경과 기간끼리 비교)<br>'
       + '· 퇴실구분 = v667 단일 기준(강제 = 공실상태 강제퇴실 4종·대위변제) · 퇴실일 = 계약해지일 → 실퇴실일(DR D열·BP열) · 진행 중 = 강제 상태인데 해지일 미확정<br>'
       + '· <b>케이알지 피해액</b> = 임대료 + 퇴실정산비용(공과금·청소·도배·중개비 등) — 서비스 수수료·위약금·법비용은 제외 · 1인 평균 = 피해액 ÷ 강제퇴실 인원 · 구분 = 계약형태(N열) 주거용/상업용<br>'
-      + '· 금액 = 입금내역(전체기간) — <b>미회수</b> = 현재 미납(연체·분납·납기 경과) · <b>회수</b> = 연체·분납 청구 중 납부된 금액 · <b>퇴실 후 회수</b> = 그중 납부일이 퇴실일 이후(분납은 마지막 납부일 기준 추정) · 법적 단계 = Daily Report 연체관리·수납관리 업무하위의 최고 단계'
+      + '· 금액 = 입금내역(전체기간) — <b>피해액</b> = 현재 미납(연체·분납·납기 경과) · <b>회수</b> = 퇴실일 이후 납부된 금액(분납은 마지막 납부일 기준 추정) · <b>피해 발생</b> = 퇴실 시점에 남아 있던 피해 = 회수 + 피해액 · 거주 중 늦게라도 낸 연체는 피해가 아니어서 참고로만 표시 · 법적 단계 = Daily Report 연체관리·수납관리 업무하위의 최고 단계'
       + '</div>' : '')
     + '</div>';
   return h;
@@ -27895,10 +27897,12 @@ function exm_leadModal(kind, ix){
             {h:'사유',k:'st',f:function(r){ return r.st||'-'; }},
             {h:'입주일',k:'sdt',f:function(r){ return r.sdt; }},
             {h:'퇴실일',k:'xdt',f:function(r){ return r.xdt; }},
-            {h:'임대료',k:'uRent',f:function(r){ return _c8(r.uRent,r.tRent); }},
-            {h:'퇴실정산비용',k:'uExit',f:function(r){ return _c8(r.uExit,r.tExit); }},
+            {h:'피해 발생',k:'occ',f:function(r){ return _w8(r.occ); }},   /* [v712] = 퇴실 후 회수 + 피해액 */
+            {h:'퇴실 후 회수',k:'ra',f:function(r){ return r.ra>0?'<span style="color:#15803D;font-weight:700">'+_w8(r.ra)+'</span>':'<span style="color:#CBD5E1">-</span>'; }},
             {h:'피해액',k:'loss',f:function(r){ return '<b style="color:#7F1D1D">'+_w8(r.loss)+'</b>'; }},
-            {h:'회수(피해 항목)',k:'rLoss',f:function(r){ return r.rLoss>0?'<span style="color:#15803D;font-weight:700">'+_w8(r.rLoss)+'</span>':'<span style="color:#CBD5E1">-</span>'; }},
+            {h:'└ 임대료',k:'uRent',f:function(r){ return _c8(r.uRent,r.tRent); }},
+            {h:'└ 퇴실정산비용',k:'uExit',f:function(r){ return _c8(r.uExit,r.tExit); }},
+            {h:'거주 중 납부(참고)',k:'before',f:function(r){ return r.before>0?'<span title="연체됐지만 퇴실 전에 납부 — 피해 아님" style="color:#94A3B8">'+_w8(r.before)+'</span>':'<span style="color:#CBD5E1">-</span>'; }},
             {h:'법적 단계',k:'lv',f:function(r){ var w8=r.lv<=1; return '<span'+(w8?' title="피해가 남았는데 법적 절차 미착수(조치 없음·검토만)" style="color:#B45309;font-weight:800"':'')+'>'+(w8?'⚠ ':'')+r.lb+'</span>'; }}]; }
     else if(kind==='cohort'){ var C7=window._exmCohort||{rows:[]}; rows=C7.rows||[]; title=C7.y+'년 '+C7.m+'월 입주 — 강제퇴실 명단'; color='#B91C1C';   /* [v707] 입주월 막대 클릭 */
       var _b7=function(t,bg,cl){ return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:'+bg+';color:'+cl+'">'+t+'</span>'; };
@@ -27911,8 +27915,9 @@ function exm_leadModal(kind, ix){
             {h:'퇴실일',k:'xdt',f:function(r){ return r.gst==='진행 중'?'<span style="color:#9D174D;font-weight:700">'+r.xdt+'</span>':r.xdt; }},
             {h:'거주',k:'liv',f:function(r){ return r.liv!=null?r.liv+'개월':'-'; }},
             {h:'피해 발생',k:'tot',f:function(r){ return r.tot?_w7(r.tot):'<span style="color:#94A3B8">-</span>'; }},
-            {h:'회수',k:'rec',f:function(r){ return r.rec?'<span style="color:#15803D;font-weight:700">'+_w7(r.rec)+'</span>':'<span style="color:#94A3B8">-</span>'; }},
+            {h:'퇴실 후 회수',k:'rec',f:function(r){ return r.rec?'<span style="color:#15803D;font-weight:700">'+_w7(r.rec)+'</span>':'<span style="color:#94A3B8">-</span>'; }},
             {h:'피해액',k:'unpaid',f:function(r){ return r.unpaid>0?'<b style="color:#B91C1C">'+_w7(r.unpaid)+'</b>':'<span style="color:#94A3B8">₩0</span>'; }},
+            {h:'거주 중 납부(참고)',k:'recBefore',f:function(r){ return r.recBefore>0?'<span title="연체됐지만 퇴실 전에 납부 — 피해 아님" style="color:#94A3B8">'+_w7(r.recBefore)+'</span>':'<span style="color:#CBD5E1">-</span>'; }},   /* [v712] */
             {h:'회수 상태',k:'rs',f:function(r){ var R7={full:['완전회수','#ECFDF5','#047857'],part:['일부 회수','#FFFBEB','#B45309'],none:['미회수','#FEF2F2','#B91C1C'],clean:['피해 없음','#F1F5F9','#64748B'],prog:['진행 중','#FDF2F8','#9D174D']}[r.rs]||['-','#F1F5F9','#64748B']; return _b7(R7[0],R7[1],R7[2]); }},
             {h:'법적 단계',k:'lv',f:function(r){ var w7=r.unpaid>0&&r.lv<=1; return '<span'+(w7?' title="미회수가 남았는데 법적 절차 미착수(조치 없음·검토만)" style="color:#B45309;font-weight:800"':'')+'>'+(w7?'⚠ ':'')+r.lb+'</span>'; }}]; }
     else { rows=L.sched||[]; title='만기퇴실예정 (이번 달 만기)'; color='#1D4ED8';   /* [v550] */
@@ -27926,7 +27931,7 @@ function exm_leadModal(kind, ix){
     if(!(S&&S.kind===kind&&S.ix===ix&&S.key)) S=null;
     if(S){
       var _DK={real:1,term:1,end:1,eff:1,sdt:1,xdt:1};   /* [v548] eff 추가 · [v707] 입주일·퇴실일 */
-      var dv=function(o,k5){ var v=o[k5]; if(k5==='d'||k5==='age'||k5==='dday'||k5==='dlq'||k5==='rnwD'||k5==='lateR'||k5==='fd'||k5==='vacD'||k5==='tot'||k5==='rec'||k5==='unpaid'||k5==='liv'||k5==='lv'||k5==='uRent'||k5==='uExit'||k5==='uLaw'||k5==='loss'||k5==='rLoss') return +v||0;   /* [v707] 금액·거주·법적 단계 */   /* [v548.2/6, v549, v551] 숫자키 */
+      var dv=function(o,k5){ var v=o[k5]; if(k5==='d'||k5==='age'||k5==='dday'||k5==='dlq'||k5==='rnwD'||k5==='lateR'||k5==='fd'||k5==='vacD'||k5==='tot'||k5==='rec'||k5==='unpaid'||k5==='liv'||k5==='lv'||k5==='uRent'||k5==='uExit'||k5==='uLaw'||k5==='loss'||k5==='rLoss'||k5==='occ'||k5==='ra'||k5==='before'||k5==='recBefore') return +v||0;   /* [v707] 금액·거주·법적 단계 */   /* [v548.2/6, v549, v551] 숫자키 */
         if(k5==='judge'){ var _jr={deny:0,cond:1,app:2,none:3}; return _jr[v]!=null?_jr[v]:9; }   /* [v548.1] 거절→조건부→승인 순 */
         if(k5==='cls'){ var _cr={pre:0,mid:1,exp:2,agr:3}; return _cr[v]!=null?_cr[v]:9; }   /* [v551] 컨설팅전→중→만기확정 순 · [v553.2] 합의확정 */
         if(k5==='gst'){ var _gr={'진행':0,'대기':1,'완료':2}; return _gr[v]!=null?_gr[v]:9; }   /* [v552] 진행→대기→완료 순 */
@@ -27967,19 +27972,20 @@ function exm_leadModal(kind, ix){
         +'</div>';
     }
     else if(kind==='loss'){   /* [v709] 케이알지 피해액 요약 — 항목별 · 주거/상업 · 제외분 대조 */
-      var S8=(window._exmLoss||{}).S||{c:{}}, W8=exmR_won, Z8={u:0,r:0};
+      var S8=(window._exmLoss||{}).S||{c:{}}, W8=exmR_won, Z8={u:0,r:0,ra:0};
       var c8=function(k){ return (S8.c&&S8.c[k])||Z8; };
       var td8=function(t,st){ return '<td style="padding:3px 12px;text-align:right;white-space:nowrap;'+(st||'')+'">'+t+'</td>'; };
       var th8=function(t,al){ return '<th style="padding:2px 12px;text-align:'+(al||'right')+';white-space:nowrap">'+t+'</th>'; };
-      var ln8=function(lb,o,tip,last){ return '<tr'+(last?' style="border-top:1.5px solid #CBD5E1"':'')+'><td'+(tip?' title="'+tip+'"':'')+' style="padding:3px 12px;font-weight:800;color:#334155;white-space:nowrap'+(tip?';cursor:help':'')+'">'+lb+'</td>'+td8(W8(o.r+o.u))+td8(W8(o.r),'color:#15803D;font-weight:700')+td8(W8(o.u),'color:#B91C1C;font-weight:800')+'</tr>'; };
-      var tot8={u:c8('rent').u+c8('exit').u, r:c8('rent').r+c8('exit').r};
+      var ln8=function(lb,o,tip,last){ var ra=o.ra||0, bf=Math.max(0,(o.r||0)-ra); return '<tr'+(last?' style="border-top:1.5px solid #CBD5E1"':'')+'><td'+(tip?' title="'+tip+'"':'')+' style="padding:3px 12px;font-weight:800;color:#334155;white-space:nowrap'+(tip?';cursor:help':'')+'">'+lb+'</td>'+td8(W8(ra+o.u))+td8(W8(ra),'color:#15803D;font-weight:700')+td8(W8(o.u),'color:#B91C1C;font-weight:800')+td8(W8(bf),'color:#94A3B8')+'</tr>'; };   /* [v712] 피해 발생 · 퇴실 후 회수 · 피해액 · 거주 중 납부(참고) */
+      var tot8={u:c8('rent').u+c8('exit').u, r:c8('rent').r+c8('exit').r, ra:(c8('rent').ra||0)+(c8('exit').ra||0)};
       var U8=S8.byUse||{}, ur8=function(k,ic){ var o=U8[k]; if(!o||!o.n) return ''; return '<tr><td style="padding:3px 12px;font-weight:800;color:#334155;white-space:nowrap">'+ic+' '+k+(k==='미분류'?'':'용')+'</td>'+td8(o.n+'명')+td8(W8(o.u),'color:#B91C1C;font-weight:800')+td8(W8(o.n?o.u/o.n:0),'color:#7F1D1D;font-weight:700')+'</tr>'; };
       var ex8=c8('fee').u+c8('pen').u+c8('law').u;
       stripHtml='<div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap;padding:12px 16px 8px">'
         +'<div style="min-width:185px"><div style="font-size:11px;color:#64748B;font-weight:800">케이알지 피해액 (미회수)</div><div style="font-size:26px;font-weight:800;color:#B91C1C;line-height:1.2">'+W8(tot8.u)+'</div>'
         +'<div style="font-size:12px;color:#475569;margin-top:3px">1인 평균 <b style="color:#7F1D1D">'+W8(S8.nGz?tot8.u/S8.nGz:0)+'</b> <span style="color:#94A3B8;font-size:11px">(강제퇴실 '+(S8.nGz||0)+'명)</span></div>'
-        +'<div style="font-size:11px;color:#94A3B8">피해 남은 '+(S8.nLoss||0)+'명 기준 1인 '+W8(S8.nLoss?tot8.u/S8.nLoss:0)+'</div></div>'
-        +'<table style="border-collapse:collapse;font-size:12px"><thead><tr style="color:#94A3B8;font-size:10.5px">'+th8('항목','left')+th8('피해 발생')+th8('회수')+th8('피해액(미회수)')+'</tr></thead><tbody>'
+        +'<div style="font-size:11px;color:#94A3B8">피해 남은 '+(S8.nLoss||0)+'명 기준 1인 '+W8(S8.nLoss?tot8.u/S8.nLoss:0)+'</div>'
+        +'<div style="font-size:11.5px;color:#15803D;font-weight:700;margin-top:3px">퇴실 후 회수율 '+((tot8.ra+tot8.u)?Math.round(tot8.ra/(tot8.ra+tot8.u)*1000)/10:0)+'%</div></div>'
+        +'<table style="border-collapse:collapse;font-size:12px"><thead><tr style="color:#94A3B8;font-size:10.5px">'+th8('항목','left')+th8('피해 발생')+th8('퇴실 후 회수')+th8('피해액(미회수)')+th8('거주 중 납부(참고)')+'</tr></thead><tbody>'
         +ln8('🏠 임대료',c8('rent'),'임대료 청구 — KRG가 임대인에게 내는 월세')
         +ln8('🧹 퇴실정산비용',c8('exit'),'퇴실 정산금(공과금·청소·도배·원상복구·중개보수·임대인 합의금 등)과 그 밖의 퇴실 실비(공과금·청소비·중개수수료 등)')
         +ln8('합계',tot8,'',true)
@@ -27995,7 +28001,7 @@ function exm_leadModal(kind, ix){
         +'전체 미회수 '+W8(S8.all)+' = 피해액 '+W8(tot8.u)+' + 제외 '+W8(ex8)+'</div>'
         +'</div>'
         +(S8.payReady===false?'<div style="padding:0 16px 8px;color:#94A3B8;font-size:11px;font-weight:700">입금내역 불러오는 중 — 잠시 후 다시 열어 주세요</div>':'')
-        +'<div style="padding:0 16px 6px;font-size:10.5px;color:#94A3B8">금액 칸에 마우스를 올리면 청구 항목이 보입니다 · 1인 평균 = 피해액 ÷ 강제퇴실 인원(피해 0원 포함) · 피해 0원(수수료·위약금·법비용만 남음)인 계약은 명단에서 뺌</div>';
+        +'<div style="padding:0 16px 6px;font-size:10.5px;color:#94A3B8">피해 발생 = 퇴실 시점에 남아 있던 피해 = 퇴실 후 회수 + 피해액 · 거주 중 납부(참고) = 연체됐지만 퇴실 전에 낸 돈(피해 아님) · 금액 칸에 마우스를 올리면 청구 항목 · 1인 평균 = 피해액 ÷ 강제퇴실 인원(피해 0원 포함) · 피해 0원 계약은 명단에서 뺌</div>';
     }
     else if(kind==='cohort'){   /* [v707] 입주월 요약 스트립 */
       var S7=(window._exmCohort||{}).S||{}, W7=exmR_won;
@@ -28006,7 +28012,7 @@ function exm_leadModal(kind, ix){
         +'<span>중도퇴실 <b style="color:#B45309">'+(S7.mid||0)+'</b></span>'
         +'<span>강제퇴실 <b style="color:#B91C1C">'+(S7.gz||0)+'명 ('+(S7.rate||'0.0')+'%)</b></span>'
         +(S7.prog?'<span>진행 중 <b style="color:#9D174D">'+S7.prog+'</b></span>':'')
-        +(S7.payReady?'<span style="margin-left:auto" title="케이알지 피해액 = 임대료 + 퇴실정산비용(공과금·청소·도배·중개비 등) — 서비스 수수료·위약금·법비용 제외">피해 발생 <b>'+W7(S7.tot)+'</b> · 회수 <b style="color:#15803D">'+W7(S7.rec)+'</b> · 피해액 <b style="color:#B91C1C">'+W7(S7.unpaid)+'</b>('+(S7.unpaidN||0)+'건 · 1인 평균 '+W7(S7.avg||0)+') · 퇴실 후 회수 <b>'+W7(S7.recAfter)+'</b></span>'
+        +(S7.payReady?'<span style="margin-left:auto" title="케이알지 피해액 = 임대료 + 퇴실정산비용(공과금·청소·도배·중개비 등) — 서비스 수수료·위약금·법비용 제외">피해 발생 <b>'+W7(S7.tot)+'</b> · 퇴실 후 회수 <b style="color:#15803D">'+W7(S7.rec)+'</b>('+(S7.tot?Math.round(S7.rec/S7.tot*1000)/10:0)+'%) · 피해액 <b style="color:#B91C1C">'+W7(S7.unpaid)+'</b>('+(S7.unpaidN||0)+'건 · 1인 평균 '+W7(S7.avg||0)+') <span style="color:#94A3B8;font-weight:500">· 참고: 거주 중 늦게 낸 연체 '+W7(S7.recBefore||0)+'</span></span>'
           :'<span style="margin-left:auto;color:#94A3B8">입금내역 불러오는 중 — 금액은 잠시 후 다시 열면 표시</span>')
         +'</div>'
         +((S7.age!=null&&S7.age<12)?'<div style="padding:0 16px 6px;font-size:11px;color:#B45309;font-weight:700">⏳ 입주 '+S7.age+'개월 — 강제퇴실 대부분이 입주 12개월 안에 발생하므로 인원·비율이 더 늘 수 있음</div>':'');
@@ -28061,8 +28067,8 @@ function exm_leadModal(kind, ix){
       if(kind==='fore') return [r.cno,r.nm,r.addr,r.exit||'-',r.st||'-',r.eff||'-',r.end||'-'];   /* [v548] */
       if(kind==='exp60') return [r.cno,r.nm,r.addr,r.end,'D-'+r.dday,({app:'승인',cond:'조건부승인',deny:'거절',none:'이력없음'}[r.judge]||'-'),(r.rnw?r.rnw+' ('+exm_fmtD8(r.rnwD)+')'+(r.rnwPg?' / '+r.rnwPg:''):'-'),(r.dlq||0)];   /* [v548/548.1/2] */
       if(kind==='def') return [r.cno,r.nm,r.addr,exm_fmtD8(r.fd),r.age+'일',r.f||'-',exm_fmtD8(r.d),r.real,r.st||'-'];   /* [v549] */
-      if(kind==='loss') return [r.cno,r.nm,r.addr,(r.use||'-'),r.st||'-',r.sdt,r.xdt,Math.round(r.uRent||0),Math.round(r.uExit||0),Math.round(r.loss||0),Math.round(r.rLoss||0),Math.round(r.xFee||0),Math.round(r.xPen||0),Math.round(r.xLaw||0),r.lb];   /* [v709] */
-      if(kind==='cohort') return [r.cno,r.nm,r.addr,r.gst,(r.use||'-'),r.st||'-',r.partner||'-',r.sdt,r.xdt,(r.liv!=null?r.liv:'-'),Math.round(r.tot||0),Math.round(r.rec||0),Math.round(r.unpaid||0),Math.round(r.recAfter||0),({full:'완전회수',part:'일부 회수',none:'미회수',clean:'피해 없음',prog:'진행 중'}[r.rs]||'-'),r.lb];   /* [v707] · [v709] 구분·피해액 */
+      if(kind==='loss') return [r.cno,r.nm,r.addr,(r.use||'-'),r.st||'-',r.sdt,r.xdt,Math.round(r.occ||0),Math.round(r.ra||0),Math.round(r.loss||0),Math.round(r.uRent||0),Math.round(r.uExit||0),Math.round(r.before||0),Math.round(r.xFee||0),Math.round(r.xPen||0),Math.round(r.xLaw||0),r.lb];   /* [v709] · [v712] */
+      if(kind==='cohort') return [r.cno,r.nm,r.addr,r.gst,(r.use||'-'),r.st||'-',r.partner||'-',r.sdt,r.xdt,(r.liv!=null?r.liv:'-'),Math.round(r.tot||0),Math.round(r.rec||0),Math.round(r.unpaid||0),Math.round(r.recBefore||0),({full:'완전회수',part:'일부 회수',none:'미회수',clean:'피해 없음',prog:'진행 중'}[r.rs]||'-'),r.lb];   /* [v707] · [v709] 구분·피해액 */
       if(kind==='gzall') return [r.cno,r.nm,r.addr,r.gst,r.st||'-',(r.lp||'-'),r.real,r.term||'-',(r.vacD!=null?r.vacD+'일':'-'),(r.dlq||0)];   /* [v552] */
       return [r.cno,r.nm,r.addr,r.end,(r.dday>=0?'D-'+r.dday:'경과 '+(-r.dday)+'일'),({app:'승인',cond:'조건부승인',deny:'거절',none:'이력없음'}[r.judge]||'-'),(r.dlq||0)];   /* [v550] sched */
     });
@@ -28074,8 +28080,8 @@ function exm_leadModal(kind, ix){
       :(kind==='fore')?['계약번호','계약자','물건지','퇴실구분','공실상태(사유)','퇴실 예정일','만기일']   /* [v548/549.7] */
       :(kind==='exp60')?['계약번호','계약자','물건지','만기일','D-DAY','갱신심사','갱신 최근 대응','연체금액']   /* [v548/548.1/2] */
       :(kind==='def')?['계약번호','계약자','물건지','문의일','경과일','최신 기록','기록일','실퇴실일','퇴실사유']   /* [v549] */
-      :(kind==='loss')?['계약번호','계약자','물건지','구분','사유','입주일','퇴실일','임대료','퇴실정산비용','피해액','회수(피해 항목)','제외-서비스 수수료','제외-위약금','제외-법비용','법적 단계']   /* [v709] */
-      :(kind==='cohort')?['계약번호','계약자','물건지','상태','구분','사유','부동산','입주일','퇴실일','거주(M)','피해 발생','회수','피해액(미회수)','퇴실 후 회수','회수 상태','법적 단계']   /* [v707] */
+      :(kind==='loss')?['계약번호','계약자','물건지','구분','사유','입주일','퇴실일','피해 발생','퇴실 후 회수','피해액','피해액-임대료','피해액-퇴실정산비용','거주 중 납부(참고)','제외-서비스 수수료','제외-위약금','제외-법비용','법적 단계']   /* [v709] · [v712] */
+      :(kind==='cohort')?['계약번호','계약자','물건지','상태','구분','사유','부동산','입주일','퇴실일','거주(M)','피해 발생','퇴실 후 회수','피해액(미회수)','거주 중 납부(참고)','회수 상태','법적 단계']   /* [v707] */
       :(kind==='gzall')?['계약번호','계약자','물건지','상태','퇴실사유','진척사항','실퇴실일','계약해지일','공실 경과','연체금액']   /* [v552] */
       :['계약번호','계약자','물건지','만기일','D-DAY','갱신심사','연체금액'];   /* [v550] sched */
   }catch(e){ console.warn('[exm] leadModal:', e); }
