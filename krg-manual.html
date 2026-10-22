@@ -2,1285 +2,616 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="케이알지 운영팀의 D/W/M 체크리스트, KPI, 인센티브 통합 메뉴얼">
-<title>KRG 운영 메뉴얼 v0.1 · Pilot</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KRG 운영 메뉴얼 v0.2 · Visual Guide</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" rel="stylesheet">
 <style>
+*{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#FAFAF7; --panel:#FFFFFF; --ink:#1B1E24; --sub:#5A6070; --line:#E6E4DE; --soft:#F3F1EC;
-  --navy:#1F3864; --blue:#3B6FC9; --blue-soft:#EDF2FB; --blue-border:#C6D4EE;
-  --amber:#B7791F; --amber-soft:#FDF6E7; --amber-border:#EEDCB0;
-  --ok:#1E7B4D; --ok-soft:#E9F5EE;
-  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Consolas,monospace;
+  --bg:#F8F9FC;--panel:#FFF;--ink:#1B1E24;--sub:#5A6070;--line:#E5E7EB;
+  --c01:#3B82F6;--c02:#8B5CF6;--c03:#14B8A6;--c04:#EF4444;
+  --c05:#F59E0B;--c06:#F97316;--c07:#EC4899;--c08:#10B981;
+  --c01l:#EFF6FF;--c02l:#F5F3FF;--c03l:#F0FDFA;--c04l:#FEF2F2;
+  --c05l:#FFFBEB;--c06l:#FFF7ED;--c07l:#FDF2F8;--c08l:#ECFDF5;
 }
-*{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{font-family:'Pretendard Variable',Pretendard,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
-  background:var(--bg);color:var(--ink);line-height:1.6;font-size:15px}
-.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
-a{color:inherit}
-
-/* ---------- top ---------- */
-.top{position:sticky;top:0;z-index:50;background:rgba(250,250,247,.93);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-.top .wrap{display:flex;align-items:center;gap:12px;height:56px}
-.logo{font-weight:800;letter-spacing:-.02em;white-space:nowrap}
-.logo em{font-style:italic;color:var(--blue)}
-.ver{font-family:var(--mono);font-size:11px;color:var(--sub);white-space:nowrap}
-.top nav{margin-left:auto;display:flex;gap:2px;flex-wrap:wrap}
-.top nav a{font-size:13px;color:var(--sub);text-decoration:none;padding:6px 10px;border-radius:8px;white-space:nowrap}
-.top nav a:hover{background:var(--soft);color:var(--ink)}
-
-/* quick strip */
-.quick{border-bottom:1px solid var(--line);background:var(--panel)}
-.quick .wrap{display:flex;align-items:center;gap:8px;padding:9px 24px;flex-wrap:wrap}
-.quick .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--sub)}
-.quick a{font-size:12.5px;text-decoration:none;padding:4px 11px;border:1px solid var(--line);border-radius:99px;background:var(--bg)}
-.quick a:hover{border-color:var(--blue-border);background:var(--blue-soft);color:var(--navy)}
-.quick .stat{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
-.pill{font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:99px}
-.pill.pilot{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-border)}
-.pill.who{background:var(--blue-soft);color:var(--navy);border:1px solid var(--blue-border)}
-
-/* ---------- hero ---------- */
-.hero{padding:66px 0 46px}
-.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--sub);margin-bottom:14px}
-h1{font-size:clamp(30px,4.6vw,46px);font-weight:800;letter-spacing:-.03em;line-height:1.28}
-h1 em{font-style:italic;color:var(--blue)}
-.hero p{margin-top:16px;max-width:620px;color:var(--sub)}
-.hero-meta{display:flex;gap:22px;margin-top:26px;flex-wrap:wrap;font-size:13px}
-.hero-meta div b{display:block;font-size:11px;font-family:var(--mono);letter-spacing:.1em;color:var(--sub);font-weight:600;margin-bottom:2px}
-
-/* ---------- section ---------- */
-section{padding:44px 0}
-.sec-eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--sub)}
-h2{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:6px 0 8px}
-.sec-desc{color:var(--sub);max-width:720px;margin-bottom:26px}
-h2 .k{color:var(--blue)}
-
-/* ---------- L1 pipeline ---------- */
-.pipeline{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;overflow-x:auto;padding-bottom:6px}
-.pnode{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 11px;min-width:118px;
-  text-decoration:none;display:block;transition:border-color .15s, transform .15s}
-.pnode:hover{border-color:var(--blue-border);transform:translateY(-2px)}
-.pnode .no{font-family:var(--mono);font-size:10.5px;color:var(--sub)}
-.pnode .nm{font-weight:800;font-size:13.5px;margin:2px 0 6px;letter-spacing:-.01em}
-.pnode .mr{font-size:10.5px;color:var(--sub);line-height:1.5}
-.pnode .mr b{color:var(--navy);font-weight:700}
-.pnode .cad{display:inline-block;font-family:var(--mono);font-size:9.5px;font-weight:700;background:var(--soft);
-  color:var(--sub);border-radius:4px;padding:1px 5px;margin-top:6px}
-.pnode.pilot{border-color:var(--amber-border);background:linear-gradient(170deg,var(--amber-soft),#fff 60%)}
-.pnode.pilot .no::after{content:' PILOT';color:var(--amber);font-weight:800}
-
-/* ---------- tables ---------- */
-.tbl-wrap{overflow-x:auto;border-radius:14px;border:1px solid var(--line)}
-table{width:100%;border-collapse:collapse;background:var(--panel);font-size:13.5px}
-th{background:var(--navy);color:#fff;font-weight:700;text-align:left;padding:11px 14px;font-size:12.5px;white-space:nowrap}
-td{padding:10px 14px;border-top:1px solid var(--line);vertical-align:top}
-tr:nth-child(even) td{background:#FBFAF7}
-.mtag,.rtag{font-family:var(--mono);font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;margin-right:5px}
-.mtag{background:var(--navy);color:#fff}
-.rtag{background:var(--blue-soft);color:var(--navy);border:1px solid var(--blue-border)}
-
-/* ---------- L2 role cards ---------- */
-.role-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
-.role{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
-.role.pilot{border-color:var(--amber-border)}
-.role-head{padding:18px 20px 14px;border-bottom:1px solid var(--line)}
-.role-head .nm{font-size:19px;font-weight:800;display:flex;align-items:center;gap:8px}
-.role-head .info{font-size:12.5px;color:var(--sub);margin-top:5px;line-height:1.7}
-.role-head .info b{color:var(--ink)}
-.counts{display:flex;gap:14px;padding:11px 20px;background:var(--soft);font-size:12px;color:var(--sub)}
-.counts b{color:var(--navy);font-weight:800;font-family:var(--mono)}
-.role-body{padding:8px 12px 12px}
-details.task{border:1px solid var(--line);border-radius:10px;margin:7px 0;background:#fff;overflow:hidden}
-details.task[open]{box-shadow:0 2px 10px rgba(20,20,20,.05)}
-summary{list-style:none;cursor:pointer;padding:11px 13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-summary::-webkit-details-marker{display:none}
-.tw{font-family:var(--mono);font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;background:var(--blue-soft);color:var(--navy);white-space:nowrap}
-.aicc-tag{font-family:var(--mono);font-size:9.5px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:99px;background:#ede9fe;color:#6d28d9;border:1px solid #ddd3fb;white-space:nowrap;margin-left:6px}
-.proc-tag{font-family:var(--mono);font-size:9.5px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:99px;background:#fdf3f2;color:#c0392b;border:1px solid #eec5c0;white-space:nowrap;margin-left:6px;text-decoration:none}
-.proc-tag:hover{background:#c0392b;color:#fff;border-color:#c0392b}
-.tw.w{background:var(--amber-soft);color:var(--amber)}
-.tw.m{background:#EFE9F6;color:#5C4A82}
-summary .ttl{font-weight:700;font-size:13.5px;flex:1;min-width:130px}
-summary .n{font-family:var(--mono);font-size:10.5px;color:var(--sub)}
-summary .caret{color:var(--sub);font-size:10px;transition:transform .15s}
-details[open]>summary .caret{transform:rotate(90deg)}
-.checks{padding:2px 14px 13px;display:grid;gap:2px}
-.checks label{display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:5px 7px;border-radius:7px;cursor:pointer}
-.checks label:hover{background:var(--soft)}
-.checks input{margin-top:3.5px;accent-color:var(--blue);width:15px;height:15px;flex:none}
-.checks input:checked+span{color:var(--sub);text-decoration:line-through}
-/* kpi mini */
-.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:4px 12px 14px}
-.kpi{border:1px solid var(--line);border-radius:11px;padding:11px 12px;background:#fff}
-.kpi .v{font-size:21px;font-weight:800;letter-spacing:-.02em;color:var(--navy)}
-.kpi .l{font-size:11px;color:var(--sub);margin-top:1px}
-.kpi .s{font-size:10px;font-weight:800;margin-top:6px;display:inline-block;padding:2px 7px;border-radius:99px}
-.s.on{background:var(--ok-soft);color:var(--ok)}
-.s.warn{background:var(--amber-soft);color:var(--amber)}
-.s.base{background:var(--soft);color:var(--sub)}
-.memo{margin:0 12px 14px;border:1px dashed var(--line);border-radius:10px;padding:9px 13px;font-size:12px;color:var(--sub);background:var(--bg)}
+body{font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:15px}
+nav{position:sticky;top:0;z-index:100;background:#1B1E24;padding:0 20px}
+.nav-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;height:52px;gap:4px}
+.nav-logo{color:#fff;font-weight:800;font-size:15px;white-space:nowrap;margin-right:12px}
+.nav-links{display:flex;gap:2px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.nav-links a{color:#9CA3AF;text-decoration:none;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;white-space:nowrap;transition:all .15s}
+.nav-links a:hover{color:#fff;background:rgba(255,255,255,.1)}
+.quickbar{background:#2D3748;border-bottom:1px solid #374151;padding:0 20px}
+.quickbar-inner{max-width:1200px;margin:0 auto;display:flex;gap:6px;padding:8px 0;overflow-x:auto}
+.qb-btn{background:none;border:1px solid #4B5563;color:#D1D5DB;font-size:11px;font-weight:700;padding:4px 12px;border-radius:99px;cursor:pointer;white-space:nowrap;font-family:inherit;transition:all .15s}
+.qb-btn:hover{background:#4B5563;color:#fff}
+.wrap{max-width:1200px;margin:0 auto;padding:0 20px}
+section{padding:48px 0}
+section+section{border-top:1px solid var(--line)}
+.sec-head{margin-bottom:32px}
+.sec-num{font-size:11px;font-weight:700;font-family:monospace;color:#9CA3AF;margin-bottom:6px}
+.sec-title{font-size:24px;font-weight:800;color:var(--ink)}
+.sec-sub{font-size:14px;color:var(--sub);margin-top:4px}
+.hero{background:linear-gradient(135deg,#1B1E24 0%,#2D3748 100%);padding:48px 20px;text-align:center}
+.hero h1{font-size:28px;font-weight:800;color:#fff;margin-bottom:8px}
+.hero p{font-size:15px;color:#9CA3AF;max-width:480px;margin:0 auto}
+.area-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:900px){.area-grid{grid-template-columns:repeat(2,1fr)}}
+.area-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;cursor:pointer;transition:all .15s;text-decoration:none;color:inherit;display:block}
+.area-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.08)}
+.area-icon{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:12px}
+.area-num{font-size:10px;font-weight:700;font-family:monospace;color:#9CA3AF;margin-bottom:2px}
+.area-name{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px}
+.area-meta{font-size:11px;color:var(--sub);line-height:1.6}
+.freq-pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;margin-top:6px}
+.sop-hdr{display:flex;align-items:center;gap:16px;padding:20px 24px}
+.sop-hdr-icon{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0}
+.sop-num-label{font-size:11px;font-weight:700;font-family:monospace;color:rgba(255,255,255,.6);margin-bottom:2px}
+.sop-name{font-size:20px;font-weight:800;color:#fff}
+.sop-mgr{font-size:12px;color:rgba(255,255,255,.7);margin-top:2px}
+.sop-wrap{border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-bottom:32px}
+.sop-body{padding:24px;background:var(--panel)}
+.proc{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:16px}
+.proc-hdr{padding:12px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.proc-hdr h3{font-size:14px;font-weight:700;color:#fff;flex:1;margin:0}
+.freq-b{font-size:10px;font-weight:700;padding:3px 10px;border-radius:99px;background:rgba(255,255,255,.25);color:#fff;font-family:monospace;flex-shrink:0}
+.who-b{font-size:10px;font-weight:600;padding:3px 10px;border-radius:99px;background:rgba(255,255,255,.15);color:#fff;flex-shrink:0}
+.proc-body{padding:18px}
+.step-flow{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}
+.step-c{background:#F9FAFB;border:1px solid var(--line);border-radius:14px;padding:14px 10px;min-width:110px;flex:1;text-align:center;max-width:180px}
+.step-ei{width:60px;height:60px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:28px}
+.step-n{font-size:10px;color:#9CA3AF;font-weight:700;font-family:monospace;margin-bottom:3px}
+.step-t{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:3px;line-height:1.3}
+.step-d{font-size:11px;color:var(--sub);line-height:1.4}
+.arr{font-size:18px;color:#D1D5DB;align-self:center;flex-shrink:0}
+.wb{display:flex;gap:10px;padding:12px 14px;border-radius:12px;margin:12px 0;font-size:13px;line-height:1.5;align-items:flex-start}
+.wb-warn{background:#FFFBEB;border:1px solid #FCD34D;color:#92400E}
+.wb-danger{background:#FEF2F2;border:1px solid #FECACA;color:#991B1B}
+.wb-info{background:#EFF6FF;border:1px solid #BFDBFE;color:#1D4ED8}
+.wb em{font-size:18px;flex-shrink:0;margin-top:1px;font-style:normal}
+.tl{position:relative;padding-left:28px}
+.tl::before{content:'';position:absolute;left:9px;top:4px;bottom:4px;width:2px;background:#E5E7EB}
+.tl-i{position:relative;margin-bottom:14px}
+.tl-dot{position:absolute;left:-25px;top:5px;width:14px;height:14px;border-radius:50%;border:2px solid;background:#fff}
+.tl-b{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 14px}
+.tl-day{font-size:10px;font-weight:800;font-family:monospace;padding:2px 7px;border-radius:5px;display:inline-block;margin-bottom:4px}
+.tl-title{font-size:13px;font-weight:700;margin-bottom:2px}
+.tl-desc{font-size:12px;color:var(--sub);line-height:1.5}
+.person-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:800px){.person-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:500px){.person-grid{grid-template-columns:1fr}}
+.p-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.p-card-top{padding:18px;border-bottom:1px solid var(--line)}
+.p-avatar{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;margin-bottom:10px}
+.p-name{font-size:16px;font-weight:800;margin-bottom:2px}
+.p-role{font-size:12px;color:var(--sub)}
+.p-areas{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}
+.p-area-tag{font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600}
+.p-kpis{display:flex;gap:8px;padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.p-kpi{text-align:center;flex:1;min-width:60px}
+.p-kpi-val{font-size:18px;font-weight:800;line-height:1}
+.p-kpi-lbl{font-size:10px;color:var(--sub);margin-top:2px}
+.p-checks{padding:14px 18px}
+.p-check{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.4}
+.p-check em{font-size:14px;flex-shrink:0;font-style:normal}
+.tool-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:700px){.tool-grid{grid-template-columns:1fr}}
+.tool-c{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}
+.tool-icon{font-size:36px;margin-bottom:10px}
+.tool-name{font-size:15px;font-weight:800;margin-bottom:4px}
+.tool-desc{font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5}
+.tool-use{font-size:12px;line-height:1.6}
+.tool-use li{display:flex;gap:6px;margin-bottom:4px;list-style:none}
+.tool-use em{font-style:normal}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:800px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.kpi-c{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.kpi-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.kpi-dot{width:10px;height:10px;border-radius:50%}
+.kpi-area{font-size:12px;font-weight:700;color:var(--sub)}
+.kpi-val{font-size:28px;font-weight:900;line-height:1}
+.kpi-lbl{font-size:11px;color:var(--sub);margin-top:2px}
+.improve-flow{display:flex;gap:12px;flex-wrap:wrap}
+.imp-c{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;flex:1;min-width:140px;text-align:center}
+.imp-icon{font-size:36px;margin-bottom:10px}
+.imp-num{font-size:11px;font-weight:700;font-family:monospace;color:#9CA3AF;margin-bottom:4px}
+.imp-t{font-size:14px;font-weight:700;margin-bottom:4px}
+.imp-d{font-size:12px;color:var(--sub);line-height:1.4}
+.hist-form{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+@media(max-width:700px){.hist-form{grid-template-columns:1fr 1fr}}
+.hist-form label{font-size:11px;font-weight:700;color:var(--sub);display:block;margin-bottom:4px}
+.hist-form input,.hist-form select,.hist-form textarea{width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;background:var(--panel);color:var(--ink)}
+.hist-form textarea{grid-column:1/-1;resize:vertical;min-height:60px}
+.hist-form .full{grid-column:1/-1}
+.hist-actions{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.btn-pri{background:#1B1E24;color:#fff;border:none;padding:9px 18px;border-radius:9px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
+.btn-sec{background:var(--panel);color:var(--ink);border:1px solid var(--line);padding:9px 18px;border-radius:9px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
+.hist-table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:#F9FAFB;font-weight:700;font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em}
+tr:hover td{background:#FAFAFA}
+.co1{color:var(--c01)}.co2{color:var(--c02)}.co3{color:var(--c03)}.co4{color:var(--c04)}
+.co5{color:var(--c05)}.co6{color:var(--c06)}.co7{color:var(--c07)}.co8{color:var(--c08)}
+.bg01{background:var(--c01l)}.bg02{background:var(--c02l)}.bg03{background:var(--c03l)}.bg04{background:var(--c04l)}
+.bg05{background:var(--c05l)}.bg06{background:var(--c06l)}.bg07{background:var(--c07l)}.bg08{background:var(--c08l)}
 </style>
 </head>
 <body>
-
-<div class="top"><div class="wrap">
-  <div class="logo">KRG <em>Ops</em></div>
-  <span class="ver">Operations Manual · v0.1</span>
-  <nav>
-    <a href="#l1">L1 Master Map</a><a href="#l2">L2 Role Card</a><a href="#l3">L3 SOP</a><a href="#sop04" title="04 수납/연체관리 SOP로 이동 — 영역 헤더의 「연체 Process — SOP-04-연체 v1.2 ↗」 버튼으로 일자별 대응 매뉴얼 열기">연체Process</a>
-    <a href="#aicc">AICC</a>
-    <a href="#tools">담당·Tool</a><a href="#kpi">KPI</a><a href="#improve">개선루프</a><a href="#history">수정이력</a>
-  </nav>
-</div></div>
-
-<div class="quick"><div class="wrap">
-  <span class="lbl">QUICK</span>
-  <a href="https://hskang-coder.github.io/krg-ops-dashboard/">KRG 운영관리</a>
-  <a href="https://www.notion.so/krggroup/Database-1bda64b0445180e38b93c27b59c9c692">노션 Database</a>
-  <a href="#">홈버튼</a><a href="#">NAS</a><a href="#">Slack #ops</a>
-  <a href="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit#gid=554798125">KPI Sheet</a>
-  <span class="stat">
-    <span class="pill pilot">PILOT · 계약관리</span>
-    <span class="pill who">고송미 · W01</span>
-  </span>
-</div></div>
-
-<header class="hero"><div class="wrap">
-  <div class="eyebrow">KRG · 운영 메뉴얼</div>
-  <h1>매일의 업무를 <em>구조</em>로,<br>구조를 <em>성과</em>로.</h1>
-  <p>케이알지 운영 8개 영역의 D/W/M 체크리스트와 KPI를 한 곳에.
-  누락 없이 실행하고, 개선은 자발적으로.</p>
-  <div class="hero-meta">
-    <div><b>VERSION</b>0.1 (Pilot)</div>
-    <div><b>PILOT</b>계약관리 · 고송미</div>
-    <div><b>UPDATED</b>2026.05.17</div>
+<nav>
+<div class="nav-inner">
+  <span class="nav-logo">🏢 KRG 운영 메뉴얼 <span style="color:#6B7280;font-weight:400">v0.2</span></span>
+  <div class="nav-links">
+    <a href="#l1">8개 업무</a><a href="#l2">담당자</a><a href="#l3">상세절차</a>
+    <a href="#aicc">AICC</a><a href="#tools">도구안내</a><a href="#kpi">KPI</a>
+    <a href="#improve">개선루프</a><a href="#history">수정이력</a>
   </div>
-</div></header>
+</div>
+</nav>
+<div class="quickbar">
+<div class="quickbar-inner">
+  <a href="#sop01"><button class="qb-btn">🔍 01 심사</button></a>
+  <a href="#sop02"><button class="qb-btn">📄 02 계약</button></a>
+  <a href="#sop03"><button class="qb-btn">🏠 03 입주</button></a>
+  <a href="#sop04"><button class="qb-btn">💳 04 수납·연체</button></a>
+  <a href="#sop05"><button class="qb-btn">🔄 05 갱신</button></a>
+  <a href="#sop06"><button class="qb-btn">🚪 06 중도퇴실</button></a>
+  <a href="#sop07"><button class="qb-btn">📦 07 퇴실</button></a>
+  <a href="#sop08"><button class="qb-btn">💰 08 정산</button></a>
+</div>
+</div>
+<div class="hero"><div class="wrap">
+  <h1>업무를 그림으로 이해하는 KRG 운영 가이드</h1>
+  <p>누가, 언제, 무엇을 하는지 — 한눈에</p>
+</div></div>
 
-<!-- ============ L1 ============ -->
+<!-- L1 -->
 <section id="l1"><div class="wrap">
-  <div class="sec-eyebrow">— L1</div>
-  <h2>Master Map <span style="font-size:15px;font-weight:600;color:var(--sub)">운영 담당 역할 / 권한</span></h2>
-  <p class="sec-desc">전체 운영은 좌→우 파이프라인으로 흐릅니다. 각 단계를 누르면 해당 SOP로 이동합니다.
-  <b style="color:var(--amber)">PILOT</b>은 현재 시범 적용 중인 영역입니다.</p>
-
-  <div class="pipeline">
-    <a class="pnode" href="#sop01"><div class="no">01</div><div class="nm">심사관리</div><div class="mr"><b>M</b> 이지희<br><b>R</b> 고송미</div><span class="cad">D</span></a>
-    <a class="pnode pilot" href="#sop02"><div class="no">02</div><div class="nm">계약관리</div><div class="mr"><b>M</b> 이지희<br><b>R</b> 고송미</div><span class="cad">D·W</span></a>
-    <a class="pnode" href="#sop03"><div class="no">03</div><div class="nm">입주관리</div><div class="mr"><b>M</b> 이지희<br><b>R</b> 고송미·김영철</div><span class="cad">D</span></a>
-    <a class="pnode" href="#sop04"><div class="no">04</div><div class="nm">수납/연체</div><div class="mr"><b>M</b> 오진선<br><b>R</b> 오진선·김영철</div><span class="cad">D</span></a>
-    <a class="pnode" href="#sop05"><div class="no">05</div><div class="nm">갱신관리</div><div class="mr"><b>M</b> 이지희<br><b>R</b> 이지희</div><span class="cad">M</span></a>
-    <a class="pnode" href="#sop06"><div class="no">06</div><div class="nm">중도퇴실</div><div class="mr"><b>M</b> 오진선<br><b>R</b> 이지희·고송미·오진선</div><span class="cad">D·W</span></a>
-    <a class="pnode" href="#sop07"><div class="no">07</div><div class="nm">퇴실관리</div><div class="mr"><b>M</b> 오진선<br><b>R</b> 오진선·이지희</div><span class="cad">D·W</span></a>
-    <a class="pnode" href="#sop08"><div class="no">08</div><div class="nm">정산관리</div><div class="mr"><b>M</b> 김준영<br><b>R</b> 강휘수·김준영 외</div><span class="cad">D·M</span></a>
-  </div>
-
-  <h3 style="font-size:16px;font-weight:800;margin:30px 0 10px">R&amp;R 매트릭스
-    <span style="font-size:12px;font-weight:600;color:var(--sub)">&nbsp;<span class="mtag">M</span>Manager (Accountable) · <span class="rtag">R</span>Responsible (실무)</span></h3>
-  <div class="tbl-wrap"><table>
-    <tr><th>영역</th><th>매니저 (M)</th><th>실무 (R)</th><th>Backup</th><th>비고</th></tr>
-    <tr><td><b>01 심사관리</b></td><td>이지희</td><td>고송미</td><td>이지희 (cross-trained)</td><td>모든 업무 백업 가능</td></tr>
-    <tr><td><b>02 계약관리</b></td><td>이지희</td><td>고송미</td><td>이지희 (cross-trained)</td><td>모든 업무 백업 가능</td></tr>
-    <tr><td><b>03 입주관리</b></td><td>이지희</td><td>고송미 · 김영철</td><td>이지희 (cross-trained)</td><td>김영철: 수납·연체문의</td></tr>
-    <tr><td><b>04 수납/연체관리</b></td><td>오진선</td><td>오진선 · 김영철</td><td>TBD</td><td>오진선: 사전수납 (16시)</td></tr>
-    <tr><td><b>05 갱신관리</b></td><td>이지희</td><td>이지희</td><td>TBD</td><td>매니저=실무 단독</td></tr>
-    <tr><td><b>06 중도퇴실관리</b></td><td>오진선</td><td>이지희·고송미 (단순변심) / 오진선 (강제)</td><td>TBD</td><td>사유별 분기</td></tr>
-    <tr><td><b>07 퇴실관리</b></td><td>오진선</td><td>오진선 (연체) / 이지희 (만기)</td><td>TBD</td><td>사유별 분기</td></tr>
-    <tr><td><b>08 정산관리</b></td><td>김준영</td><td>강휘수 · 김준영 · 오진선 · 김영철 · 이지희</td><td>TBD</td><td>강휘수 보조 매니저</td></tr>
-  </table></div>
+<div class="sec-head"><div class="sec-num">SECTION 01</div><div class="sec-title">8개 업무 한눈에 보기</div><div class="sec-sub">KRG 임대관리 운영은 8개 영역으로 나뉩니다</div></div>
+<div class="area-grid">
+  <a href="#sop01" class="area-card"><div class="area-icon" style="background:var(--c01l)">🔍</div><div class="area-num">01</div><div class="area-name">심사관리</div><div class="area-meta">M: 이지희<br>R: 고송미</div><span class="freq-pill" style="background:var(--c01l);color:var(--c01)">매일</span></a>
+  <a href="#sop02" class="area-card"><div class="area-icon" style="background:var(--c02l)">📄</div><div class="area-num">02</div><div class="area-name">계약관리</div><div class="area-meta">M: 이지희<br>R: 고송미</div><span class="freq-pill" style="background:var(--c02l);color:var(--c02)">매일</span></a>
+  <a href="#sop03" class="area-card"><div class="area-icon" style="background:var(--c03l)">🏠</div><div class="area-num">03</div><div class="area-name">입주관리</div><div class="area-meta">M: 이지희<br>R: 고송미·김영철</div><span class="freq-pill" style="background:var(--c03l);color:var(--c03)">매일</span></a>
+  <a href="#sop04" class="area-card"><div class="area-icon" style="background:var(--c04l)">💳</div><div class="area-num">04</div><div class="area-name">수납·연체관리</div><div class="area-meta">M: 오진선<br>R: 오진선·김영철</div><span class="freq-pill" style="background:var(--c04l);color:var(--c04)">매일</span></a>
+  <a href="#sop05" class="area-card"><div class="area-icon" style="background:var(--c05l)">🔄</div><div class="area-num">05</div><div class="area-name">갱신관리</div><div class="area-meta">M: 이지희<br>R: 이지희</div><span class="freq-pill" style="background:var(--c05l);color:var(--c05)">월간</span></a>
+  <a href="#sop06" class="area-card"><div class="area-icon" style="background:var(--c06l)">🚪</div><div class="area-num">06</div><div class="area-name">중도퇴실관리</div><div class="area-meta">M: 오진선<br>R: 이지희·고송미·오진선</div><span class="freq-pill" style="background:var(--c06l);color:var(--c06)">발생시</span></a>
+  <a href="#sop07" class="area-card"><div class="area-icon" style="background:var(--c07l)">📦</div><div class="area-num">07</div><div class="area-name">퇴실관리</div><div class="area-meta">M: 오진선<br>R: 오진선·이지희</div><span class="freq-pill" style="background:var(--c07l);color:var(--c07)">발생시</span></a>
+  <a href="#sop08" class="area-card"><div class="area-icon" style="background:var(--c08l)">💰</div><div class="area-num">08</div><div class="area-name">정산관리</div><div class="area-meta">M: 김준영<br>R: 강휘수·김준영</div><span class="freq-pill" style="background:var(--c08l);color:var(--c08)">매일</span></a>
+</div>
+<div class="wb wb-info" style="margin-top:20px"><em>💡</em><div>내 담당 업무가 뭔지 모르겠으면? → <a href="#l2" style="color:inherit;font-weight:700">담당자 카드</a>에서 내 이름을 찾으세요</div></div>
 </div></section>
 
-<!-- ============ L2 ============ -->
+<!-- L2 담당자 -->
 <section id="l2"><div class="wrap">
-  <div class="sec-eyebrow">— L2</div>
-  <h2>Role Card</h2>
-  <p class="sec-desc">담당자별 개인 카드. 매일 펴보는 메뉴얼이자, 본인의 KPI를 직접 갱신하는 공간.
-  Pilot 단계에서는 <b>고송미</b>님 카드가 기준입니다. 체크는 페이지 안에서만 유지됩니다.</p>
-
-  <div class="role-grid">
-
-    <!-- 고송미 -->
-    <div class="role pilot">
-      <div class="role-head">
-        <div class="nm">고송미 <span class="pill pilot">PILOT</span></div>
-        <div class="info">Manager <b>이지희</b> · 영역 <b>심사·계약·입주</b> · Backup <b>이지희</b> (cross-trained)</div>
-      </div>
-      <div class="counts"><span><b>10</b> 일일 항목</span><span><b>2</b> 주간 항목</span><span><b>3</b> 핵심 KPI</span></div>
-      <div class="role-body">
-        <details class="task" open><summary><span class="tw">D 09:00</span><span class="ttl">심사결과 체크 · 가계약 등록</span><span class="n">ALL</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>심사결과 체크 (승인 / 거절)</span></label>
-            <label><input type="checkbox"><span>가계약일 / 계약조건 입력</span></label>
-            <label><input type="checkbox"><span>계약관리 Sheet 등록</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw">D 09:00</span><span class="ttl">입주전 관리</span><span class="n">5 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>전자계약서 NAS 보관</span></label>
-            <label><input type="checkbox"><span>첫 임대료 증빙 확인 (가계약 입금)</span></label>
-            <label><input type="checkbox"><span>신분증 확인</span></label>
-            <label><input type="checkbox"><span>수수료 입금 확인</span></label>
-            <label><input type="checkbox"><span>서명 확인</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw">D 10:00</span><span class="ttl">가계약 체크 (with 이지희)</span><span class="n">2 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>삼일 (조형섭 대표)</span></label>
-            <label><input type="checkbox"><span>태양 (장희제 대표)</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw">D 15:00</span><span class="ttl">계약정보 확인</span><span class="n">3 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>계약정보 입수 (입주일, 계약기간 등)</span></label>
-            <label><input type="checkbox"><span>서비스 중요사항 설명 (수수료/중도퇴실/퇴실청소비)</span></label>
-            <label><input type="checkbox"><span>납기일 -3D 설명 (YES / NO)</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw w">W 수요일 AM</span><span class="ttl">부동산 계약안내 (기존계약)</span><span class="n">4 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>계약서 확인</span></label>
-            <label><input type="checkbox"><span>임전대차 계약서 (이미지) 확인</span></label>
-            <label><input type="checkbox"><span>월 오후 계약 부동산 대표 전달</span></label>
-            <label><input type="checkbox"><span>수요일 오전까지 입수 완료</span></label>
-          </div></details>
-        <div class="kpi-row">
-          <div class="kpi"><div class="v">0건</div><div class="l">계약등록 누락 / 월 · 목표 0건</div><span class="s on">ON TRACK</span></div>
-          <div class="kpi"><div class="v">98%</div><div class="l">NAS 보관 적시율 · 목표 100%</div><span class="s warn">2% 부족</span></div>
-          <div class="kpi"><div class="v">95%</div><div class="l">마감시각 준수율 · 목표 95%↑</div><span class="s on">ACHIEVED</span></div>
-        </div>
-        <div class="memo">✎ 개선 메모 — 주간 회고용</div>
-      </div>
-    </div>
-
-    <!-- 이지희 -->
-    <div class="role">
-      <div class="role-head">
-        <div class="nm">이지희</div>
-        <div class="info">Manager <b>심사·계약·입주·갱신</b> · R <b>첫계약·만기퇴실·단순변심·갱신</b> · Backup <b>고송미</b></div>
-      </div>
-      <div class="counts"><span><b>5</b> 일일 항목</span><span><b>6</b> 월간 항목</span><span><b>1</b> 핵심 KPI</span></div>
-      <div class="role-body">
-        <details class="task"><summary><span class="tw">D 발생 시</span><span class="ttl">첫계약 부동산안내</span><span class="n">4 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>계약서 사전 체크</span></label>
-            <label><input type="checkbox"><span>특약내용 전달</span></label>
-            <label><input type="checkbox"><span>서비스계약 중요사항 안내</span></label>
-            <label><input type="checkbox"><span>영업담당 연락처 전달 (일정·내용)</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw">D 퇴실 시</span><span class="ttl">만기퇴실 정산이슈 대응</span><span class="n">ALL</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>퇴실정산 이슈사항 수집 및 대응</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw m">M 갱신</span><span class="ttl">갱신관리 (전체)</span><span class="n">6 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>갱신대상 관리 기준 적용</span></label>
-            <label><input type="checkbox"><span>갱신심사 상신 (5건 단위)</span></label>
-            <label><input type="checkbox"><span>갱신불가 대상 연락 (문자·통화)</span></label>
-            <label><input type="checkbox"><span>임대인 사전 임대료 변경 시 계약자 연락</span></label>
-            <label><input type="checkbox"><span>일시납 갱신수수료 청구서 발행</span></label>
-            <label><input type="checkbox"><span>갱신대상 홈버튼 등록 (만기 -1M)</span></label>
-          </div></details>
-        <div class="kpi-row">
-          <div class="kpi"><div class="v">—%</div><div class="l">갱신율 · 만기 도래 계약 중 갱신 %</div><span class="s base">베이스라인</span></div>
-          <div class="kpi"><div class="v">·</div><div class="l">KPI #2 · 추후 추가</div><span class="s base">—</span></div>
-          <div class="kpi"><div class="v">·</div><div class="l">KPI #3 · 추후 추가</div><span class="s base">—</span></div>
-        </div>
-        <div class="memo">✎ 개선 메모 — 주간 회고용</div>
-      </div>
-    </div>
-
-    <!-- 오진선 -->
-    <div class="role">
-      <div class="role-head">
-        <div class="nm">오진선</div>
-        <div class="info">Manager <b>수납·연체·중도퇴실·퇴실</b> · R <b>대응분류·법무·강제퇴실·연체퇴실</b> · Backup <b>김영철</b></div>
-      </div>
-      <div class="counts"><span><b>13</b> 일일 항목</span><span><b>8</b> 주간 항목</span><span><b>1</b> 핵심 KPI</span></div>
-      <div class="role-body">
-        <details class="task"><summary><span class="tw">D 16:00</span><span class="ttl">수납 대응 — 첫납부 대상자</span><span class="n">2 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>임대료 + 수수료 입금 안내</span></label>
-            <label><input type="checkbox"><span>퇴실청소비 안내</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw">D 09:00</span><span class="ttl">연체 대응 분류</span><span class="n">3 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>연락 대상 분류</span></label>
-            <label><input type="checkbox"><span>방문 대상 분류</span></label>
-            <label><input type="checkbox"><span>법적대응 대상 분류</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw">D 10:00</span><span class="ttl">법무관리</span><span class="n">8 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>내용증명 발송</span></label>
-            <label><input type="checkbox"><span>CB 조회</span></label>
-            <label><input type="checkbox"><span>지급명령 진행</span></label>
-            <label><input type="checkbox"><span>변론 참석</span></label>
-            <label><input type="checkbox"><span>채권압류 진행</span></label>
-            <label><input type="checkbox"><span>추심명령 진행</span></label>
-            <label><input type="checkbox"><span>명도소송 진행</span></label>
-            <label><input type="checkbox"><span>연체패턴 관리·기록</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw w">W 발생 시</span><span class="ttl">강제퇴실 처리 (SOP06)</span><span class="n">5 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>퇴실관리 SHEET 등록 — 계약번호 + 실제퇴실일</span></label>
-            <label><input type="checkbox"><span>청소일 등록 · 옵션/작업지시서 → 임을빈 팀장 멘션</span></label>
-            <label><input type="checkbox"><span>김기성 본부장 Slack 보고</span></label>
-            <label><input type="checkbox"><span>청소 완료 후 청소비 홈버튼 등록</span></label>
-            <label><input type="checkbox"><span>계약해지 확정 처리 — 홈버튼 · 분기② 판단</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw w">W 발생 시</span><span class="ttl">연체퇴실 정산</span><span class="n">3 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>퇴실정산비용 정산 품의</span></label>
-            <label><input type="checkbox"><span>퇴실정산청구 품의 문자 발송</span></label>
-            <label><input type="checkbox"><span>홈버튼 퇴실정산 반영</span></label>
-          </div></details>
-        <div class="kpi-row">
-          <div class="kpi"><div class="v">—%</div><div class="l">월말 연체율 · 미납 / 전체 계약</div><span class="s base">베이스라인</span></div>
-          <div class="kpi"><div class="v">·</div><div class="l">KPI #2 · 추후 추가</div><span class="s base">—</span></div>
-          <div class="kpi"><div class="v">·</div><div class="l">KPI #3 · 추후 추가</div><span class="s base">—</span></div>
-        </div>
-        <div class="memo">✎ 개선 메모 — 주간 회고용</div>
-      </div>
-    </div>
-
-    <!-- 김영철 -->
-    <div class="role">
-      <div class="role-head">
-        <div class="nm">김영철</div>
-        <div class="info">R <b>연체대응·임차인응대·입금관리</b> · Manager <b>오진선</b> (수납/연체) · <b>김준영</b> (정산) · Backup <b>오진선</b></div>
-      </div>
-      <div class="counts"><span><b>14</b> 일일 항목</span><span><b>4</b> 주간 항목</span><span><b>1</b> 핵심 KPI</span></div>
-      <div class="role-body">
-        <details class="task"><summary><span class="tw w">W 발생 시</span><span class="ttl">강제퇴실 현장 1차 대응 (SOP06)</span><span class="n">4 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>사전 현장 방문 — 실거주 확인 + 자진퇴실 회유</span></label>
-            <label><input type="checkbox"><span>정산금액 문의 시 확정 금액 언급 금지 (내부 산정 후 안내)</span></label>
-            <label><input type="checkbox"><span>비밀번호 입수 → 진척표 등록 + 매니저·차장 Slack 보고</span></label>
-            <label><input type="checkbox"><span>미입수 시 열쇠 출장 개문 → 비용 홈버튼 등록</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw">D 09:00</span><span class="ttl">연체 대응</span><span class="n">8 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>상습 연체자 (전월 연체자) 확인</span></label>
-            <label><input type="checkbox"><span>연체발생 후 통화</span></label>
-            <label><input type="checkbox"><span>연체발생 후 문자</span></label>
-            <label><input type="checkbox"><span>연체발생 후 방문</span></label>
-            <label><input type="checkbox"><span>방문 대상자 추출</span></label>
-            <label><input type="checkbox"><span>방문 진행</span></label>
-            <label><input type="checkbox"><span>방문 Report 작성</span></label>
-            <label><input type="checkbox"><span>차회 방문일정 등록</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw">D ALL</span><span class="ttl">임차인 응대 (입주관리)</span><span class="n">3 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>납기일 변경 요청 처리</span></label>
-            <label><input type="checkbox"><span>임대료 수납 처리</span></label>
-            <label><input type="checkbox"><span>연체문의 응대</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw">D ALL</span><span class="ttl">입금관리 (with 오진선)</span><span class="n">2 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>카드결제 + 가상계좌 외(개별 계좌 수동입금) 관리</span></label>
-            <label><input type="checkbox"><span>카드결제 입금 관리</span></label>
-          </div></details>
-        <div class="kpi-row">
-          <div class="kpi"><div class="v">—%</div><div class="l">연체 회수율 · 회수액 / 연체액</div><span class="s base">베이스라인</span></div>
-          <div class="kpi"><div class="v">·</div><div class="l">KPI #2 · 추후 추가</div><span class="s base">—</span></div>
-          <div class="kpi"><div class="v">·</div><div class="l">KPI #3 · 추후 추가</div><span class="s base">—</span></div>
-        </div>
-        <div class="memo">✎ 개선 메모 — 주간 회고용</div>
-      </div>
-    </div>
-
-    <!-- 강휘수 -->
-    <div class="role">
-      <div class="role-head">
-        <div class="nm">강휘수</div>
-        <div class="info">R <b>파트너인센티브·임대인정산</b> · Manager <b>김준영</b> (보조) · Backup <b>김준영</b></div>
-      </div>
-      <div class="counts"><span><b>3</b> 일일 항목</span><span><b>4</b> 월간 항목</span><span><b>1</b> 핵심 KPI</span></div>
-      <div class="role-body">
-        <details class="task"><summary><span class="tw">D 14:00</span><span class="ttl">임대인 정산</span><span class="n">2 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>정산금액 관리 (계산·검토)</span></label>
-            <label><input type="checkbox"><span>홈버튼 입금 확인 (with 김준영)</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw">D ALL</span><span class="ttl">인센티브 지급 안내</span><span class="n">1 item</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>지급금액·계산서 안내</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw m">M 파트너</span><span class="ttl">파트너 인센티브</span><span class="n">4 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>업무위탁 계약서 확인</span></label>
-            <label><input type="checkbox"><span>계약서 원본 관리</span></label>
-            <label><input type="checkbox"><span>인센티브 체크 및 품의</span></label>
-            <label><input type="checkbox"><span>지급금액·계산서 안내 (파트너용)</span></label>
-          </div></details>
-        <div class="kpi-row">
-          <div class="kpi"><div class="v">—%</div><div class="l">정산 정확도 · 오류 없는 정산 / 전체</div><span class="s base">베이스라인</span></div>
-          <div class="kpi"><div class="v">·</div><div class="l">KPI #2 · 추후 추가</div><span class="s base">—</span></div>
-          <div class="kpi"><div class="v">·</div><div class="l">KPI #3 · 추후 추가</div><span class="s base">—</span></div>
-        </div>
-        <div class="memo">✎ 개선 메모 — 주간 회고용</div>
-      </div>
-    </div>
-
-    <!-- 김준영 -->
-    <div class="role">
-      <div class="role-head">
-        <div class="nm">김준영</div>
-        <div class="info">Manager <b>정산관리</b> · R <b>임대인정산·입금관리</b> · Backup <b>강휘수</b></div>
-      </div>
-      <div class="counts"><span><b>3</b> 일일 항목</span><span><b>0</b> 주간/월간</span><span><b>1</b> 핵심 KPI</span></div>
-      <div class="role-body">
-        <details class="task"><summary><span class="tw">D 14:00</span><span class="ttl">임대인 정산 — 홈버튼입금</span><span class="n">1 item</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>홈버튼 입금 처리·확인</span></label>
-          </div></details>
-        <details class="task"><summary><span class="tw">D ALL</span><span class="ttl">입금관리 (with 오진선)</span><span class="n">2 items</span><span class="caret">▶</span></summary>
-          <div class="checks">
-            <label><input type="checkbox"><span>카드결제 + 가상계좌 외(개별 계좌 수동입금) 관리</span></label>
-            <label><input type="checkbox"><span>카드결제 입금 관리</span></label>
-          </div></details>
-        <div class="kpi-row">
-          <div class="kpi"><div class="v">—%</div><div class="l">정산일 준수율 · 14:00 마감 준수 %</div><span class="s base">베이스라인</span></div>
-          <div class="kpi"><div class="v">·</div><div class="l">KPI #2 · 추후 추가</div><span class="s base">—</span></div>
-          <div class="kpi"><div class="v">·</div><div class="l">KPI #3 · 추후 추가</div><span class="s base">—</span></div>
-        </div>
-        <div class="memo">✎ 개선 메모 — 주간 회고용</div>
-      </div>
-    </div>
-
+<div class="sec-head"><div class="sec-num">SECTION 02</div><div class="sec-title">담당자별 카드</div><div class="sec-sub">내 이름을 찾아 오늘 해야 할 일을 확인하세요</div></div>
+<div class="person-grid">
+<div class="p-card">
+  <div class="p-card-top"><div class="p-avatar" style="background:#3B82F6">고</div><div class="p-name">고송미</div><div class="p-role">계약 전 서류·입금 체크 전문가</div>
+  <div class="p-areas"><span class="p-area-tag" style="background:var(--c01l);color:var(--c01)">01 심사</span><span class="p-area-tag" style="background:var(--c02l);color:var(--c02)">02 계약</span><span class="p-area-tag" style="background:var(--c03l);color:var(--c03)">03 입주</span></div></div>
+  <div class="p-kpis"><div class="p-kpi"><div class="p-kpi-val co1">D+1</div><div class="p-kpi-lbl">심사결과 처리</div></div><div class="p-kpi"><div class="p-kpi-val co2">100%</div><div class="p-kpi-lbl">서류 검토율</div></div></div>
+  <div class="p-checks">
+    <div class="p-check"><em>🔍</em><span>매일 09:00 — 신규 심사 결과 처리</span></div>
+    <div class="p-check"><em>📥</em><span>전자계약서 NAS 저장</span></div>
+    <div class="p-check"><em>💰</em><span>첫 임대료·수수료 입금 확인</span></div>
+    <div class="p-check"><em>🪪</em><span>신분증 3가지 항목 체크 (30일 내 삭제)</span></div>
   </div>
+</div>
+<div class="p-card">
+  <div class="p-card-top"><div class="p-avatar" style="background:#8B5CF6">이</div><div class="p-name">이지희</div><div class="p-role">계약·갱신·중도퇴실 총괄 매니저</div>
+  <div class="p-areas"><span class="p-area-tag" style="background:var(--c01l);color:var(--c01)">01 심사</span><span class="p-area-tag" style="background:var(--c02l);color:var(--c02)">02 계약</span><span class="p-area-tag" style="background:var(--c05l);color:var(--c05)">05 갱신</span><span class="p-area-tag" style="background:var(--c06l);color:var(--c06)">06 퇴실</span></div></div>
+  <div class="p-kpis"><div class="p-kpi"><div class="p-kpi-val co5">-2M</div><div class="p-kpi-lbl">갱신 사전 처리</div></div><div class="p-kpi"><div class="p-kpi-val co6">100%</div><div class="p-kpi-lbl">중도퇴실 안내율</div></div></div>
+  <div class="p-checks">
+    <div class="p-check"><em>📅</em><span>매일 10:00 — 가계약 체크 (삼일·태양)</span></div>
+    <div class="p-check"><em>📢</em><span>계약정보 확인 전화 (15:00, AICC 지원)</span></div>
+    <div class="p-check"><em>🔄</em><span>만기 -1개월 갱신대상 선정·심사 상신</span></div>
+    <div class="p-check"><em>🚪</em><span>중도퇴실 5종 책임 안내 및 정산</span></div>
+  </div>
+</div>
+<div class="p-card">
+  <div class="p-card-top"><div class="p-avatar" style="background:#EF4444">오</div><div class="p-name">오진선</div><div class="p-role">수납·연체·퇴실 법무 총괄</div>
+  <div class="p-areas"><span class="p-area-tag" style="background:var(--c04l);color:var(--c04)">04 수납</span><span class="p-area-tag" style="background:var(--c06l);color:var(--c06)">06 퇴실</span><span class="p-area-tag" style="background:var(--c07l);color:var(--c07)">07 퇴실관리</span></div></div>
+  <div class="p-kpis"><div class="p-kpi"><div class="p-kpi-val co4">D+20</div><div class="p-kpi-lbl">지급명령 마감</div></div><div class="p-kpi"><div class="p-kpi-val co7">100%</div><div class="p-kpi-lbl">퇴실 처리율</div></div></div>
+  <div class="p-checks">
+    <div class="p-check"><em>⚠️</em><span>매일 09:00 — 연체 현황 확인·분류</span></div>
+    <div class="p-check"><em>⚖️</em><span>법무 관리 (내용증명→지급명령→명도)</span></div>
+    <div class="p-check"><em>📊</em><span>퇴실 시트 등록 및 청소 지시</span></div>
+  </div>
+</div>
+<div class="p-card">
+  <div class="p-card-top"><div class="p-avatar" style="background:#14B8A6">김</div><div class="p-name">김영철</div><div class="p-role">연체 현장 대응 전문가</div>
+  <div class="p-areas"><span class="p-area-tag" style="background:var(--c04l);color:var(--c04)">04 연체대응</span><span class="p-area-tag" style="background:var(--c03l);color:var(--c03)">03 입주응대</span></div></div>
+  <div class="p-kpis"><div class="p-kpi"><div class="p-kpi-val co4">D+1~7</div><div class="p-kpi-lbl">1차 전화</div></div><div class="p-kpi"><div class="p-kpi-val co4">D+3~4</div><div class="p-kpi-lbl">방문 독촉</div></div></div>
+  <div class="p-checks">
+    <div class="p-check"><em>📞</em><span>연체 D+1 — 첫 전화로 납부일 받기</span></div>
+    <div class="p-check"><em>🚪</em><span>연체 D+3~4 — 방문·독촉장 부착</span></div>
+    <div class="p-check"><em>🔑</em><span>강제퇴실 시 비밀번호 받기 (1차)</span></div>
+  </div>
+</div>
+<div class="p-card">
+  <div class="p-card-top"><div class="p-avatar" style="background:#10B981">강</div><div class="p-name">강휘수</div><div class="p-role">파트너 인센티브·임대인 정산</div>
+  <div class="p-areas"><span class="p-area-tag" style="background:var(--c08l);color:var(--c08)">08 정산</span></div></div>
+  <div class="p-kpis"><div class="p-kpi"><div class="p-kpi-val co8">14:00</div><div class="p-kpi-lbl">정산 입금</div></div><div class="p-kpi"><div class="p-kpi-val co8">100%</div><div class="p-kpi-lbl">2인 검토율</div></div></div>
+  <div class="p-checks">
+    <div class="p-check"><em>💰</em><span>파트너 인센티브 월간 체크·품의</span></div>
+    <div class="p-check"><em>🧮</em><span>임대인 정산 금액 계산 (임대료-수수료)</span></div>
+    <div class="p-check"><em>✅</em><span>김준영과 더블체크 후 14:00 정시 입금</span></div>
+  </div>
+</div>
+<div class="p-card">
+  <div class="p-card-top"><div class="p-avatar" style="background:#F59E0B">준</div><div class="p-name">김준영</div><div class="p-role">정산관리 총괄 매니저</div>
+  <div class="p-areas"><span class="p-area-tag" style="background:var(--c08l);color:var(--c08)">08 정산 총괄</span></div></div>
+  <div class="p-kpis"><div class="p-kpi"><div class="p-kpi-val co8">매일</div><div class="p-kpi-lbl">입금관리</div></div><div class="p-kpi"><div class="p-kpi-val co8">0건</div><div class="p-kpi-lbl">오입금 목표</div></div></div>
+  <div class="p-checks">
+    <div class="p-check"><em>🏦</em><span>494계좌 수동입금 건 매일 확인</span></div>
+    <div class="p-check"><em>🔗</em><span>홈버튼 매칭·미매칭 건 Slack 공유</span></div>
+  </div>
+</div>
+</div>
 </div></section>
 
-<!-- ============ L3 SOP ============ -->
-<style>
-.area{margin-top:34px;scroll-margin-top:72px}
-.area-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-.area-no{font-family:var(--mono);font-size:12px;font-weight:800;background:var(--navy);color:#fff;border-radius:7px;padding:4px 9px}
-.area-head h3{font-size:19px;font-weight:800;letter-spacing:-.01em}
-.area-head .who{font-size:12.5px;color:var(--sub)}
-.area-head .who b{color:var(--ink)}
-details.sop{border:1px solid var(--line);border-radius:12px;margin:9px 0;background:var(--panel);overflow:hidden}
-details.sop[open]{box-shadow:0 2px 12px rgba(20,20,20,.06)}
-.flow{display:flex;gap:8px;overflow-x:auto;padding:4px 16px 12px}
-.fstep{min-width:118px;flex:1;background:var(--blue-soft);border:1px solid var(--blue-border);border-radius:10px;padding:9px 11px}
-.fstep .fn{font-family:var(--mono);font-size:10px;font-weight:800;color:var(--blue)}
-.fstep .ft{font-weight:700;font-size:12.5px;color:var(--navy);line-height:1.4;margin-top:1px}
-.fstep .fd{font-size:10.5px;color:var(--sub);margin-top:3px}
-.fstep.auto{background:var(--ok-soft);border-color:#BFE3CE}
-.fstep.auto .fn,.fstep.auto .ft{color:var(--ok)}
-.steps{padding:2px 18px 15px;font-size:13.5px}
-.steps ol{padding-left:19px;display:grid;gap:7px}
-.steps ol li b{font-weight:700}
-.steps .sub-h{font-weight:800;font-size:12.5px;color:var(--navy);margin:10px 0 6px}
-.notice{margin:0 16px 13px;background:var(--ok-soft);border:1px solid #BFE3CE;color:var(--ok);border-radius:9px;padding:9px 13px;font-size:12.5px}
-.caution{margin:8px 0;background:var(--amber-soft);border:1px solid var(--amber-border);color:var(--amber);border-radius:9px;padding:8px 12px;font-size:12.5px}
-.linkbtn{display:inline-block;font-size:12px;font-weight:700;text-decoration:none;color:var(--navy);
-  background:var(--blue-soft);border:1px solid var(--blue-border);border-radius:8px;padding:5px 11px;margin:4px 0}
-.linkbtn:hover{background:#E0EAF9}
-.metabar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:2px 16px 12px}
-.metabar>div{background:var(--soft);border-radius:9px;padding:8px 11px;font-size:11.5px;color:var(--sub)}
-.metabar b{display:block;color:var(--ink);font-size:12.5px;margin-top:1px}
-.swim{padding:4px 16px 12px;overflow-x:auto}
-.swim table{font-size:11.5px;min-width:640px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.swim th{background:var(--soft);color:var(--ink);font-size:11px;padding:7px 9px}
-.swim td{padding:7px 9px;text-align:center}
-.swim td.on{background:var(--blue-soft);color:var(--navy);font-weight:700}
-.swim td.row-h{text-align:left;font-weight:800;background:#FBFAF7}
-@media(max-width:860px){.role-grid{grid-template-columns:1fr}.metabar{grid-template-columns:1fr 1fr}.pipeline{grid-template-columns:repeat(4,1fr)}}
-</style>
-
+<!-- L3 상세 절차 -->
 <section id="l3"><div class="wrap">
-  <div class="sec-eyebrow">— L3</div>
-  <h2>SOP · 표준업무절차서</h2>
-  <p class="sec-desc">전사 운영 8개 영역의 표준업무절차서. 각 SOP는 <b>흐름도 + 단계별 절차</b>로 구성.
-  신규 입사자 OJT용으로 작성됐고, 디테일은 운영하면서 점차 수정합니다.</p>
+<div class="sec-head"><div class="sec-num">SECTION 03</div><div class="sec-title">상세 업무 절차</div><div class="sec-sub">각 업무의 단계별 흐름을 그림으로 확인하세요</div></div>
 
-  <!-- 01 심사 -->
-  <div class="area" id="sop01">
-    <div class="area-head"><span class="area-no">01</span><h3>심사관리</h3><span class="who">매니저 <b>이지희</b> · 실무 고송미</span></div>
+<!-- SOP 01 심사 -->
+<div id="sop01" class="sop-wrap">
+<div class="sop-hdr" style="background:var(--c01)"><div class="sop-hdr-icon" style="background:rgba(255,255,255,.2)">🔍</div><div><div class="sop-num-label">SOP 01</div><div class="sop-name">심사관리</div><div class="sop-mgr">매니저: 이지희 · 실무: 고송미</div></div></div>
+<div class="sop-body">
+<div class="proc"><div class="proc-hdr" style="background:var(--c01)"><span class="freq-b">매일 09:00</span><h3>심사결과 처리</h3><span class="who-b">담당: 고송미</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg01">🔔</div><div class="step-n">1단계</div><div class="step-t">신청 수신</div><div class="step-d">심사 신청이 자동으로 들어옴</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg01">🔍</div><div class="step-n">2단계</div><div class="step-t">심사 평가</div><div class="step-d">소득·신용·보증 자동 확인</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg01">✅</div><div class="step-n">3단계</div><div class="step-t">결과 통보</div><div class="step-d">승인/거절 자동 발송</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg01">📊</div><div class="step-n">4단계</div><div class="step-t">시트 등록</div><div class="step-d">결과 자동 기록</div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c01)"><span class="freq-b">발생시</span><h3>가계약 등록</h3><span class="who-b">담당: 고송미</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg01">📅</div><div class="step-n">1단계</div><div class="step-t">가계약일 확정</div><div class="step-d">계약자와 날짜 조율</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg01">📝</div><div class="step-n">2단계</div><div class="step-t">조건 입력</div><div class="step-d">홈버튼에 계약조건 입력</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg01">📊</div><div class="step-n">3단계</div><div class="step-t">시트 등록</div><div class="step-d">계약관리 시트에 기록</div></div>
+</div></div></div>
+</div></div>
 
-    <details class="sop"><summary><span class="tw">D 09:00</span><span class="ttl">심사결과 처리 — 승인 / 거절</span><span class="caret">▶</span></summary>
-      <div class="notice">⚡ <b>26.4.1부터 자동 업무 대응으로 전환</b> — 아래 01~04 단계는 시스템이 자동 처리합니다. 예외 건 발생 시에만 수동 개입합니다.</div>
-      <div class="flow">
-        <div class="fstep auto"><div class="fn">01</div><div class="ft">📥 신청 수신</div><div class="fd">자동</div></div>
-        <div class="fstep auto"><div class="fn">02</div><div class="ft">🔍 심사 평가</div><div class="fd">자동</div></div>
-        <div class="fstep auto"><div class="fn">03</div><div class="ft">✅ 결과 통보</div><div class="fd">승인/거절 · 자동</div></div>
-        <div class="fstep auto"><div class="fn">04</div><div class="ft">📋 시트 등록</div><div class="fd">자동</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>신청 수신</b> — 홈버튼 신청 건 자동 수신. (26.4.1 이전: 전일 입수 건 홈버튼 수동 확인)</li>
-        <li><b>심사 평가</b> — 소득 / 신용 / 보증 여부 등 기준 자동 적용.</li>
-        <li><b>결과 통보</b> — 승인 시 가계약 절차 자동 안내, 거절 시 사유 자동 발송.</li>
-        <li><b>시트 등록</b> — 계약관리 Sheet에 결과·일자·사유 자동 기록.</li>
-      </ol></div></details>
+<!-- SOP 02 계약 -->
+<div id="sop02" class="sop-wrap">
+<div class="sop-hdr" style="background:var(--c02)"><div class="sop-hdr-icon" style="background:rgba(255,255,255,.2)">📄</div><div><div class="sop-num-label">SOP 02</div><div class="sop-name">계약관리</div><div class="sop-mgr">매니저: 이지희 · 실무: 고송미</div></div></div>
+<div class="sop-body">
+<div class="proc"><div class="proc-hdr" style="background:var(--c02)"><span class="freq-b">매일 09:00</span><h3>입주 전 서류·입금 체크</h3><span class="who-b">담당: 고송미</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg02">📥</div><div class="step-n">1단계</div><div class="step-t">계약서 저장</div><div class="step-d">홈버튼→PDF→NAS 저장</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">💰</div><div class="step-n">2단계</div><div class="step-t">임대료 확인</div><div class="step-d">494계좌 입금 확인·캡처</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">🪪</div><div class="step-n">3단계</div><div class="step-t">신분증 확인</div><div class="step-d">①유효기간 ②사진일치 ③뒷자리 가림</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">💳</div><div class="step-n">4단계</div><div class="step-t">수수료 확인</div><div class="step-d">금액 다르면 즉시 Slack</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">✍️</div><div class="step-n">5단계</div><div class="step-t">서명 확인</div><div class="step-d">임차인·공동계약자·KRG 날인 모두</div></div>
+</div>
+<div class="wb wb-warn"><em>⚠️</em><div>신분증은 <strong>30일 안에</strong> 삭제폴더로 이동! 개인정보 보호법 위반 주의</div></div>
+</div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c02)"><span class="freq-b">매일 10:00</span><h3>가계약 체크</h3><span class="who-b">담당: 고송미 + 이지희</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg02">🏢</div><div class="step-n">1단계</div><div class="step-t">삼일·조형섭</div><div class="step-d">가계약 건 전달</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">🏢</div><div class="step-n">2단계</div><div class="step-t">태양·장희제</div><div class="step-d">가계약 건 전달</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">⏰</div><div class="step-n">3단계</div><div class="step-t">답변 회수</div><div class="step-d">14:00까지 수집</div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c02)"><span class="freq-b">매일 15:00</span><h3>계약정보 안내 전화 (AICC)</h3></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg02">📋</div><div class="step-n">1단계</div><div class="step-t">정보 입수</div><div class="step-d">입주일·기간·임대료 등</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">📢</div><div class="step-n">2단계</div><div class="step-t">중요사항 설명</div><div class="step-d">①수수료 ②중도퇴실 ③청소비</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">📆</div><div class="step-n">3단계</div><div class="step-t">납기일 안내</div><div class="step-d">D-3 알림 동의 받기</div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c02)"><span class="freq-b">주간</span><h3>임대차신고 (5가지 체크 후 신고)</h3><span class="who-b">담당: 이현배</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg02">✅</div><div class="step-n">체크 1</div><div class="step-t">임대인 날인</div><div class="step-d">서명 확인</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">✅</div><div class="step-n">체크 2</div><div class="step-t">전차인 날인</div><div class="step-d">서명 확인</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">✅</div><div class="step-n">체크 3</div><div class="step-t">거래금액</div><div class="step-d">30만원 초과 여부</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">✅</div><div class="step-n">체크 4</div><div class="step-t">계약정보 대조</div><div class="step-d">내용 일치 확인</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">✅</div><div class="step-n">체크 5</div><div class="step-t">개런티즈 특약</div><div class="step-d">포함 여부 확인</div></div>
+</div>
+<div class="step-flow" style="margin-top:10px">
+  <div class="step-c"><div class="step-ei bg02">📤</div><div class="step-n">6단계</div><div class="step-t">파일 업로드</div><div class="step-d">rtms.molit.go.kr 신고</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg02">📝</div><div class="step-n">7단계</div><div class="step-t">개런티즈 등록</div><div class="step-d">개런티즈 7.0 등록</div></div>
+</div>
+</div></div>
+</div></div>
 
-    <details class="sop"><summary><span class="tw">D 09:00</span><span class="ttl">가계약 등록 — 승인 후 진행</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📅 가계약일 확정</div><div class="fd">계약자 협의</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">📝 계약조건 입력</div><div class="fd">홈버튼</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">📊 Sheet 등록</div><div class="fd">계약관리 Sheet</div></div>
-      </div>
-      <div class="steps">
-        <a class="linkbtn" href="https://app.notion.com/p/krggroup/36ba64b04451808b93dbe6c913e48d5b?source=copy_link#36ba64b0445180f3af1cd4db982e43b0" target="_blank">📋 노션 상세 가이드 — 스크린샷 포함 전체 절차 ↗</a>
-        <ol>
-          <li><b>가계약일 확정</b> — Slack 승인 알림 확인 후 카카오톡으로 계약필수정보 입수.</li>
-          <li><b>계약조건 입력</b> — 자동심사 결과 재확인 후 심사관리 Sheet 등록. <a class="linkbtn" href="https://docs.google.com/spreadsheets/d/1Z3w9ZhKwiLfL4JJhs-gfcU27QLKgZAWycyGFCK4iiMc/edit?gid=1762072805#gid=1762072805">심사관리 Sheet ↗</a></li>
-          <li><b>계약관리 Sheet 등록</b> — 심사번호 &amp; 홈버튼 가계약번호 채번. <a class="linkbtn" href="https://docs.google.com/spreadsheets/d/1Z3w9ZhKwiLfL4JJhs-gfcU27QLKgZAWycyGFCK4iiMc/edit?gid=1931755549#gid=1931755549">계약관리 Sheet ↗</a></li>
-        </ol>
-      </div></details>
-  </div>
+<!-- SOP 03 입주 -->
+<div id="sop03" class="sop-wrap">
+<div class="sop-hdr" style="background:var(--c03)"><div class="sop-hdr-icon" style="background:rgba(255,255,255,.2)">🏠</div><div><div class="sop-num-label">SOP 03</div><div class="sop-name">입주관리 · 응대</div><div class="sop-mgr">매니저: 이지희 · 실무: 고송미·김영철</div></div></div>
+<div class="sop-body">
+<div class="proc"><div class="proc-hdr" style="background:var(--c03)"><span class="freq-b">매일</span><h3>임대인 응대 (AICC)</h3></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg03">📞</div><div class="step-n">1단계</div><div class="step-t">문의 수신</div><div class="step-d">전화·카카오 등</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg03">🏷️</div><div class="step-n">2단계</div><div class="step-t">유형 분류</div><div class="step-d">5종 중 하나로</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg03">💬</div><div class="step-n">3단계</div><div class="step-t">1차 응답</div><div class="step-d">D+1 이내 답장</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg03">⚙️</div><div class="step-n">4단계</div><div class="step-t">담당자 처리</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg03">✅</div><div class="step-n">5단계</div><div class="step-t">결과 회신</div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c03)"><span class="freq-b">매일</span><h3>임차인 응대 — 담당자 연결</h3><span class="who-b">AICC → 김영철/이지희</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg03">📞</div><div class="step-n">1단계</div><div class="step-t">문의 수신</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg03">🔀</div><div class="step-n">2단계</div><div class="step-t">6종 분류</div><div class="step-d">①납기변경 ②수납 ③연체 ④중도퇴실 ⑤퇴실 ⑥갱신</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg03">👤</div><div class="step-n">3단계</div><div class="step-t">담당 연결</div><div class="step-d">①②③→김영철 / ④⑤⑥→이지희</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg03">✅</div><div class="step-n">4단계</div><div class="step-t">처리·회신</div></div>
+</div></div></div>
+</div></div>
 
-  <!-- 02 계약 -->
-  <div class="area" id="sop02">
-    <div class="area-head"><span class="area-no">02</span><h3>계약관리</h3><span class="who">매니저 <b>이지희</b> · 실무 고송미</span><span class="pill pilot">PILOT</span></div>
+<!-- SOP 04 수납·연체 -->
+<div id="sop04" class="sop-wrap">
+<div class="sop-hdr" style="background:var(--c04)"><div class="sop-hdr-icon" style="background:rgba(255,255,255,.2)">💳</div><div><div class="sop-num-label">SOP 04</div><div class="sop-name">수납 · 연체관리</div><div class="sop-mgr">매니저: 오진선 · 실무: 오진선·김영철</div></div></div>
+<div class="sop-body">
+<div class="proc"><div class="proc-hdr" style="background:var(--c04)"><span class="freq-b">매일 16:00</span><h3>수납 대응 (AICC)</h3></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg04">🎯</div><div class="step-n">1단계</div><div class="step-t">첫납부 대상 추출</div><div class="step-d">이번달 신규 입주자</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg04">💰</div><div class="step-n">2단계</div><div class="step-t">임대료 안내</div><div class="step-d">금액·계좌·납기일 문자</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg04">🧹</div><div class="step-n">3단계</div><div class="step-t">청소비 안내</div><div class="step-d">약정금액 안내</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg04">📋</div><div class="step-n">4단계</div><div class="step-t">전월 연체자 연락</div><div class="step-d">선제적으로 먼저 연락</div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c04)"><span class="freq-b">매일 09:00</span><h3>연체 분류 및 담당 배정</h3><span class="who-b">담당: 오진선</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg04">⚠️</div><div class="step-n">1단계</div><div class="step-t">연체 확인</div><div class="step-d">어제 미납건 확인</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg04">🔍</div><div class="step-n">2단계</div><div class="step-t">사유 분석</div><div class="step-d">상습연체자 먼저</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg04">🗂️</div><div class="step-n">3단계</div><div class="step-t">3단계 분류</div><div class="step-d">①1~7일 ②8~30일 ③30일+</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg04">👤</div><div class="step-n">4단계</div><div class="step-t">담당 배정</div><div class="step-d">①②→김영철 / ③→오진선</div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c04)"><span class="freq-b">D-3 ~ D+32</span><h3>연체 대응 타임라인</h3><span class="who-b">담당: 김영철·오진선</span></div>
+<div class="proc-body"><div class="tl">
+  <div class="tl-i"><div class="tl-dot" style="background:var(--c04);border-color:var(--c04)"></div><div class="tl-b"><span class="tl-day" style="background:var(--c04l);color:var(--c04)">D-3</span><div class="tl-title">📨 사전 문자 발송</div><div class="tl-desc">금액·계좌·납기일 안내 문자</div></div></div>
+  <div class="tl-i"><div class="tl-dot" style="background:#9CA3AF;border-color:#9CA3AF"></div><div class="tl-b"><span class="tl-day" style="background:#F3F4F6;color:#4B5563">D+0</span><div class="tl-title">📱 미납 확인 → 문자 1차</div><div class="tl-desc">납기일 미납 확인 즉시 발송</div></div></div>
+  <div class="tl-i"><div class="tl-dot" style="background:var(--c05);border-color:var(--c05)"></div><div class="tl-b"><span class="tl-day" style="background:var(--c05l);color:var(--c05)">D+1</span><div class="tl-title">📞 1차 전화 (김영철)</div><div class="tl-desc">납부 예정일 받기</div></div></div>
+  <div class="tl-i"><div class="tl-dot" style="background:var(--c05);border-color:var(--c05)"></div><div class="tl-b"><span class="tl-day" style="background:var(--c05l);color:var(--c05)">D+2</span><div class="tl-title">📞 2차 전화</div><div class="tl-desc">미수신 2회면 내용증명 즉시 준비</div></div></div>
+  <div class="tl-i"><div class="tl-dot" style="background:var(--c06);border-color:var(--c06)"></div><div class="tl-b"><span class="tl-day" style="background:var(--c06l);color:var(--c06)">D+3~4</span><div class="tl-title">🚪 방문 1차 (김영철)</div><div class="tl-desc">독촉장 부착 + 현장 사진 촬영</div></div></div>
+  <div class="tl-i"><div class="tl-dot" style="background:var(--c06);border-color:var(--c06)"></div><div class="tl-b"><span class="tl-day" style="background:var(--c06l);color:var(--c06)">D+5</span><div class="tl-title">🔎 팀장 판정 (오진선)</div><div class="tl-desc">"해결 가능" vs "문제 계약자" 결정</div></div></div>
+  <div class="tl-i"><div class="tl-dot" style="background:var(--c06);border-color:var(--c06)"></div><div class="tl-b"><span class="tl-day" style="background:var(--c06l);color:var(--c06)">D+6~10</span><div class="tl-title">🤝 직접 방문 대면 (김영철)</div><div class="tl-desc">돈 받거나 분납 확정</div></div></div>
+  <div class="tl-i"><div class="tl-dot" style="background:var(--c07);border-color:var(--c07)"></div><div class="tl-b"><span class="tl-day" style="background:var(--c07l);color:var(--c07)">D+11~15</span><div class="tl-title">📝 퇴실 협의 시작</div><div class="tl-desc">내용증명 2차 발송</div></div></div>
+  <div class="tl-i"><div class="tl-dot" style="background:#EF4444;border-color:#EF4444"></div><div class="tl-b"><span class="tl-day" style="background:#FEF2F2;color:#EF4444">D+20</span><div class="tl-title">⚖️ 지급명령 신청 마감 (오진선)</div><div class="tl-desc">전건 신청</div></div></div>
+  <div class="tl-i"><div class="tl-dot" style="background:#991B1B;border-color:#991B1B"></div><div class="tl-b"><span class="tl-day" style="background:#FEE2E2;color:#991B1B">D+32</span><div class="tl-title">🏛️ 명도 시작</div><div class="tl-desc">주거용 D+32 / 상업용 D+62</div></div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c04)"><span class="freq-b">발생시</span><h3>법무관리 7단계</h3><span class="who-b">담당: 오진선</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg04">📜</div><div class="step-n">1단계</div><div class="step-t">내용증명</div><div class="step-d">1차 경고 등기</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg04">🔍</div><div class="step-n">2단계</div><div class="step-t">CB 조회</div><div class="step-d">자산 파악</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg04">⚖️</div><div class="step-n">3단계</div><div class="step-t">지급명령</div><div class="step-d">법원 신청</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg04">👨‍⚖️</div><div class="step-n">4단계</div><div class="step-t">변론 참석</div><div class="step-d">이의신청 시</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg04">💸</div><div class="step-n">5단계</div><div class="step-t">채권압류</div><div class="step-d">예금·급여</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg04">📋</div><div class="step-n">6단계</div><div class="step-t">추심명령</div><div class="step-d">제3채무자</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg04">🏛️</div><div class="step-n">7단계</div><div class="step-t">명도소송</div><div class="step-d">최종 강제퇴거</div></div>
+</div></div></div>
+</div></div>
 
-    <details class="sop" open><summary><span class="tw">D 09:00</span><span class="ttl">입주전 관리 — 5단계 체크</span><span class="caret">▶</span></summary>
-      <div class="metabar">
-        <div>담당<b>고송미 / Backup 이지희</b></div>
-        <div>트리거<b>입주 -1일 09:00</b></div>
-        <div>소요시간<b>계약당 약 15분</b></div>
-        <div>산출물<b>NAS 보관 / 입금 증빙</b></div>
-      </div>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📄 전자계약서 NAS 보관</div><div class="fd">홈버튼 → NAS</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">💰 가계약금 증빙</div><div class="fd">494계좌</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">🪪 신분증 3종 검증</div><div class="fd">검증</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">💳 수수료 입금 확인</div><div class="fd">494계좌</div></div>
-        <div class="fstep"><div class="fn">05</div><div class="ft">✍️ 서명 완료 확인</div><div class="fd">홈버튼</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>전자계약서 NAS 보관</b> — 홈버튼 전자계약서 PDF 다운로드 → NAS/계약/YYYY/MM 경로에 채번 규칙(YYMMDD_계약자명_물건지)으로 저장.</li>
-        <li><b>첫 임대료 증빙 확인 (가계약 입금)</b> — 494계좌 입금 내역에서 확인 → 입금자명·금액·일시 캡처 → 동일 폴더 내 '증빙' 하위 저장.</li>
-        <li><b>신분증 확인</b> — (1) 유효기간 (2) 사진·계약자명 일치 (3) 주민번호 뒷자리 마스킹 — 3가지 확인.
-          <div class="caution">⚠ 신분증 사본은 채번 후 30일 내 폐기 폴더로 이동 (개인정보 보호).</div></li>
-        <li><b>수수료 입금 확인</b> — 서비스 수수료(계약정보 입수 ~ 입주 -1D) 금액 일치 확인. 부족/초과 시 즉시 Slack #ops 공유.</li>
-        <li><b>서명 확인</b> — (1) 임차인 (2) 공동계약자(있을 시) (3) KRG 날인 완료 여부. 누락 시 홈버튼 알림 + 재요청.</li>
-      </ol>
-      <div class="sub-h">완료 조건</div>
-      <ol>
-        <li><b>체크리스트 5항목 모두 ✓</b> — Role Card 09:00 그룹 5개 체크 완료.</li>
-        <li><b>NAS 채번 등록</b> — 채번 시트(gid=554798125)에 행 추가, 채번 자동 생성 확인.</li>
-        <li><b>이슈 시 슬랙 공유</b> — 신분증 오류·입금 불일치는 발견 즉시 #ops에 1줄 공유.</li>
-      </ol></div></details>
+<!-- SOP 05 갱신 -->
+<div id="sop05" class="sop-wrap">
+<div class="sop-hdr" style="background:var(--c05)"><div class="sop-hdr-icon" style="background:rgba(255,255,255,.2)">🔄</div><div><div class="sop-num-label">SOP 05</div><div class="sop-name">갱신관리</div><div class="sop-mgr">매니저: 이지희 · 실무: 이지희</div></div></div>
+<div class="sop-body">
+<div class="proc"><div class="proc-hdr" style="background:var(--c05)"><span class="freq-b">만기 -1개월</span><h3>갱신대상 선정 및 심사</h3><span class="who-b">담당: 이지희</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg05">📅</div><div class="step-n">1단계</div><div class="step-t">대상 추출</div><div class="step-d">다음달 만기 리스트</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg05">📐</div><div class="step-n">2단계</div><div class="step-t">기준 적용</div><div class="step-d">임대료·연체이력·임대인 의사</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg05">📤</div><div class="step-n">3단계</div><div class="step-t">심사 상신</div><div class="step-d">5건 단위로 상신</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg05">🗂️</div><div class="step-n">4단계</div><div class="step-t">결과 3종</div><div class="step-d">승인 / 조건부 / 불가</div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c05)"><span class="freq-b">갱신불가 시</span><h3>갱신불가 통보</h3><span class="who-b">담당: 이지희</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg05">🗂️</div><div class="step-n">1단계</div><div class="step-t">결과 분류</div><div class="step-d">불가 건 추출</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg05">📱</div><div class="step-n">2단계</div><div class="step-t">계약자 연락</div><div class="step-d">문자 발송 후 통화</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg05">🏠</div><div class="step-n">3단계</div><div class="step-t">임대인 연락</div><div class="step-d">임대인에게도 안내</div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c05)"><span class="freq-b">갱신 확정 후</span><h3>수수료 청구</h3></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg05">📄</div><div class="step-n">1단계</div><div class="step-t">청구서 발행</div><div class="step-d">홈버튼에서 발행</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg05">💰</div><div class="step-n">2단계</div><div class="step-t">입금 확인</div><div class="step-d">494계좌 확인</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg05">📝</div><div class="step-n">3단계</div><div class="step-t">홈버튼 등록</div><div class="step-d">갱신 완료 처리</div></div>
+</div></div></div>
+</div></div>
 
-    <details class="sop"><summary><span class="tw">D 10:00</span><span class="ttl">가계약 체크 — 삼일 / 태양 (with 이지희)</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">🏢 삼일 · 조형섭 대표</div><div class="fd">전달 → 회수</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">🏢 태양 · 장희제 대표</div><div class="fd">전달 → 회수</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>삼일 (조형섭 대표)</b> — 전일 가계약 건 리스트업 → 누락 확인 → 10:00 정시 일괄 전달.</li>
-        <li><b>태양 (장희제 대표)</b> — 동일 절차. 양 부동산 응답은 <b>14:00까지 회수</b>.</li>
-      </ol></div></details>
+<!-- SOP 06 중도퇴실 -->
+<div id="sop06" class="sop-wrap">
+<div class="sop-hdr" style="background:var(--c06)"><div class="sop-hdr-icon" style="background:rgba(255,255,255,.2)">🚪</div><div><div class="sop-num-label">SOP 06</div><div class="sop-name">중도퇴실관리</div><div class="sop-mgr">매니저: 오진선 · 실무: 이지희·고송미·오진선</div></div></div>
+<div class="sop-body">
+<div class="proc"><div class="proc-hdr" style="background:var(--c06)"><span class="freq-b">발생시</span><h3>단순변심 중도퇴실</h3><span class="who-b">AICC → 이지희</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg06">❓</div><div class="step-n">1단계</div><div class="step-t">이유 문의</div><div class="step-d">통화로 사유 확인</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg06">📢</div><div class="step-n">2단계</div><div class="step-t">Slack 공유</div><div class="step-d">팀 전체 인지</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg06">📋</div><div class="step-n">3단계</div><div class="step-t">5종 책임 안내</div><div class="step-d">①위약금 ②잔여임대료 ③중개보수 ④원상복구 ⑤청소비</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg06">💰</div><div class="step-n">4단계</div><div class="step-t">정산 진행</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg06">✅</div><div class="step-n">5단계</div><div class="step-t">홈버튼 종결</div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c06)"><span class="freq-b">발생시</span><h3>강제퇴실 처리 절차</h3><span class="who-b">담당: 김영철 → 오진선</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg06">🎯</div><div class="step-n">1단계</div><div class="step-t">대상자 선별</div><div class="step-d">연체 15~20일 대상</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg06">🚪</div><div class="step-n">2단계</div><div class="step-t">1차 방문</div><div class="step-d">실거주 확인+자진퇴실 유도 (김영철)</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg06">🔑</div><div class="step-n">3단계</div><div class="step-t">비밀번호 받기</div><div class="step-d">성공→진척표 / 실패→열쇠 출장</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg06">📊</div><div class="step-n">4단계</div><div class="step-t">시트 등록</div><div class="step-d">계약번호+퇴실일 (오진선)</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg06">🧹</div><div class="step-n">5단계</div><div class="step-t">청소 지시</div><div class="step-d">임을빈팀장 멘션</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg06">📑</div><div class="step-n">6단계</div><div class="step-t">계약 해지</div><div class="step-d">홈버튼 최종 처리</div></div>
+</div>
+<div class="wb wb-danger"><em>🚨</em><div>현장에서 정산금액 절대 언급 금지! 협상은 반드시 오진선을 통해</div></div>
+</div></div>
+</div></div>
 
-    <details class="sop"><summary><span class="tw">D 15:00</span><span class="ttl">계약정보 확인 — 3단계</span><span class="aicc-tag" title="AICC 자동화 대상 · 2026.12 도입 목표">AICC 발신</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📋 계약정보 입수</div><div class="fd">홈버튼</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">📢 중요사항 설명</div><div class="fd">대면/전화</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">📆 납기일 -3D 설명</div><div class="fd">동의 기록</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>계약정보 입수</b> — 입주일·계약기간·임대료·특약 등 기본 정보.</li>
-        <li><b>서비스 중요사항 설명</b> — (1) 서비스 수수료 (2) 중도퇴실 중요사항 (3) 퇴실청소비 안내 — 3건 모두 완료.</li>
-        <li><b>납기일 -3D 설명</b> — 납기일 -3일 안내 정책 설명 후 동의 여부 기록 (YES / NO).</li>
-      </ol></div></details>
+<!-- SOP 07 퇴실 -->
+<div id="sop07" class="sop-wrap">
+<div class="sop-hdr" style="background:var(--c07)"><div class="sop-hdr-icon" style="background:rgba(255,255,255,.2)">📦</div><div><div class="sop-num-label">SOP 07</div><div class="sop-name">퇴실관리</div><div class="sop-mgr">매니저: 오진선 · 실무: 오진선·이지희</div></div></div>
+<div class="sop-body">
+<div class="proc"><div class="proc-hdr" style="background:var(--c07)"><span class="freq-b">발생시</span><h3>연체퇴실 정산</h3><span class="who-b">담당: 오진선</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg07">📄</div><div class="step-n">1단계</div><div class="step-t">정산 품의</div><div class="step-d">연체액+원상복구비 산정</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg07">📨</div><div class="step-n">2단계</div><div class="step-t">청구 문자</div><div class="step-d">임차인에게 청구</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg07">📝</div><div class="step-n">3단계</div><div class="step-t">홈버튼 반영</div><div class="step-d">계약 종결 처리</div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c07)"><span class="freq-b">만기퇴실 시</span><h3>만기퇴실 처리</h3><span class="who-b">담당: 이지희·오진선</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg07">📅</div><div class="step-n">1단계</div><div class="step-t">만기일 확인</div><div class="step-d">홈버튼 알림</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg07">🤝</div><div class="step-n">2단계</div><div class="step-t">일정 조율</div><div class="step-d">열쇠반납·짐정리 협의</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg07">💰</div><div class="step-n">3단계</div><div class="step-t">정산·이슈</div><div class="step-d">노션에 기록</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg07">🧹</div><div class="step-n">4단계</div><div class="step-t">청소 연계</div><div class="step-d">현장관리팀 캘린더 등록</div></div>
+</div></div></div>
+</div></div>
 
-    <details class="sop"><summary><span class="tw">D ALL</span><span class="ttl">계약등록 — 8단계 스위밍레인 (D + W 혼합)</span><span class="caret">▶</span></summary>
-      <div class="swim"><table>
-        <tr><th style="text-align:left">참여자</th><th>01·D<br>채번</th><th>02·W<br>등록</th><th>03·D<br>작성</th><th>04·D<br>정보</th><th>05·D<br>수수료</th><th>06·D<br>날인</th><th>07·D<br>NAS</th><th>08·W<br>첨부</th></tr>
-        <tr><td class="row-h">KRG</td><td class="on">발행</td><td class="on">등록</td><td class="on">작성</td><td class="on">등록</td><td class="on">설정</td><td class="on">주관</td><td class="on">저장</td><td class="on">수집</td></tr>
-        <tr><td class="row-h">계약자</td><td>·</td><td>·</td><td>·</td><td class="on">입력</td><td>·</td><td class="on">날인</td><td>·</td><td class="on">제출</td></tr>
-        <tr><td class="row-h">공동계약자</td><td>·</td><td>·</td><td>·</td><td class="on">입력</td><td>·</td><td class="on">날인</td><td>·</td><td>·</td></tr>
-        <tr><td class="row-h">시스템</td><td class="on">홈버튼</td><td class="on">홈버튼</td><td class="on">홈버튼</td><td class="on">홈버튼</td><td class="on">홈버튼</td><td class="on">홈버튼</td><td class="on">NAS</td><td class="on">NAS</td></tr>
-      </table></div>
-      <div class="steps"><ol>
-        <li><b>[D] 홈버튼 가계약 번호채번</b> — 가계약 발생 시 채번 발행.</li>
-        <li><b>[W] 홈버튼 계약정보 등록</b> — 주간 단위 가계약 → 정식 계약 등록.</li>
-        <li><b>[D] 전자계약서 작성·발행</b> — 템플릿 호출 → 정보 입력 → 발행.</li>
-        <li><b>[D] 계약자/공동계약자 정보 등록</b></li>
-        <li><b>[D] 서비스수수료 설정</b> — 조건별 수수료 자동 계산 확인.</li>
-        <li><b>[D] 전자계약서 날인</b> — 임차인 → 공동계약자 → KRG 순.</li>
-        <li><b>[D] 계약정보 NAS 등록</b> — 채번 규칙에 따라 보관.</li>
-        <li><b>[W] 계약첨부파일 입수</b> — 누락 첨부(보증보험증서, 위임장 등) 주간 일괄 입수.</li>
-      </ol></div></details>
+<!-- SOP 08 정산 -->
+<div id="sop08" class="sop-wrap">
+<div class="sop-hdr" style="background:var(--c08)"><div class="sop-hdr-icon" style="background:rgba(255,255,255,.2)">💰</div><div><div class="sop-num-label">SOP 08</div><div class="sop-name">정산관리</div><div class="sop-mgr">매니저: 김준영 · 실무: 강휘수·김준영</div></div></div>
+<div class="sop-body">
+<div class="proc"><div class="proc-hdr" style="background:var(--c08)"><span class="freq-b">월간</span><h3>파트너 인센티브 지급</h3><span class="who-b">담당: 강휘수</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg08">📄</div><div class="step-n">1단계</div><div class="step-t">위탁계약서 확인</div><div class="step-d">이지희가 먼저 확인</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg08">🔍</div><div class="step-n">2단계</div><div class="step-t">인센티브 체크</div><div class="step-d">강휘수 품의</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg08">💰</div><div class="step-n">3단계</div><div class="step-t">금액 산정</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg08">📧</div><div class="step-n">4단계</div><div class="step-t">계산서 안내</div><div class="step-d">파트너에게 발급 요청</div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c08)"><span class="freq-b">매일 14:00</span><h3>임대인 정산 입금</h3><span class="who-b">담당: 김준영 + 강휘수 더블체크</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg08">🎯</div><div class="step-n">1단계</div><div class="step-t">정산 대상 추출</div><div class="step-d">오늘 정산할 임대인</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg08">🧮</div><div class="step-n">2단계</div><div class="step-t">금액 계산</div><div class="step-d">임대료-수수료 차감</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg08">✅</div><div class="step-n">3단계</div><div class="step-t">2인 검토</div><div class="step-d">김준영+강휘수</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg08">💳</div><div class="step-n">4단계</div><div class="step-t">14:00 정시 입금</div></div>
+</div></div></div>
+<div class="proc"><div class="proc-hdr" style="background:var(--c08)"><span class="freq-b">매일</span><h3>입금관리 (494계좌)</h3><span class="who-b">담당: 김준영+오진선</span></div>
+<div class="proc-body"><div class="step-flow">
+  <div class="step-c"><div class="step-ei bg08">🏦</div><div class="step-n">1단계</div><div class="step-t">494계좌 확인</div><div class="step-d">수동입금 건 파악</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg08">💳</div><div class="step-n">2단계</div><div class="step-t">카드결제 확인</div><div class="step-d">PG사 정산</div></div><div class="arr">→</div>
+  <div class="step-c"><div class="step-ei bg08">🔗</div><div class="step-n">3단계</div><div class="step-t">매칭 처리</div><div class="step-d">홈버튼 연결 / 미매칭→Slack</div></div>
+</div></div></div>
+</div></div>
 
-    <details class="sop"><summary><span class="tw w">W 수요일</span><span class="ttl">부동산계약안내 — 첫계약 / 기존계약</span><span class="aicc-tag" title="AICC 자동화 대상 · 2026.12 도입 목표">AICC 발신</span><span class="caret">▶</span></summary>
-      <div class="steps">
-        <div class="sub-h">첫계약 · 이지희 담당 (D · 4단계)</div>
-        <ol>
-          <li><b>계약서 사전 체크</b></li>
-          <li><b>특약내용 전달</b></li>
-          <li><b>서비스계약진행 중요사항 안내</b></li>
-          <li><b>영업담당 연락처 전달</b> (일정 및 내용)</li>
-        </ol>
-        <div class="sub-h">기존계약 부동산 · 고송미 담당 (W · 4단계 · 수요일 AM 마감)</div>
-        <ol>
-          <li><b>계약서 확인</b></li>
-          <li><b>임전대차 계약서 (이미지) 확인</b></li>
-          <li><b>월 오후 계약 부동산 대표 전달</b></li>
-          <li><b>수요일 오전까지 입수</b></li>
-        </ol>
-      </div></details>
-
-    <details class="sop"><summary><span class="tw w">W 이미지 입수</span><span class="ttl">임(전)대차 계약서 확인 · 임대차신고 — 신규 2026.10.12</span><span class="caret">▶</span></summary>
-      <div class="metabar">
-        <div>담당<b>이현배 (운영관리팀장)</b></div>
-        <div>트리거<b>계약서 이미지 주단위 입수 후</b></div>
-        <div>산출물<b>5점 확인 체크 · 신고파일 업로드</b></div>
-      </div>
-      <div class="steps">
-        <div class="sub-h">① 임(전)대차 계약서 확인 — 5점 체크</div>
-        <ol>
-          <li><b>임대인 날인</b> 확인.</li>
-          <li><b>전(대)차인 날인</b> 확인.</li>
-          <li><b>거래금액 30만원 초과 여부</b> — 임대차신고 대상 판단 기준.</li>
-          <li><b>계약정보 대조</b> — 계약기간 · 계약금액 등.</li>
-          <li><b>개런티즈계약 특약사항</b> 포함 여부.</li>
-        </ol>
-        <div class="sub-h">② 임대차신고 파일 등록 대응</div>
-        <ol>
-          <li><b>계약완료 파일 업로드</b> — 구글드라이브 전달.</li>
-          <li><b>개런티즈7.0 등록 업로드</b>.</li>
-        </ol>
-        <div class="sub-h">③ 임대차신고 진척사항 체크</div>
-        <ol>
-          <li>대상 건별 신고 진행 상태 확인 — 미신고 건 follow-up.</li>
-        </ol>
-      </div></details>
-
-    <details class="sop"><summary><span class="tw">D 계약 시</span><span class="ttl">퇴실청소비 청구 — 신규 2026.10.12</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📢 입주 시 안내</div><div class="fd">계약정보 확인 시</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">📄 계약서 체크</div><div class="fd">약정 금액</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">🧾 청구서 생성</div><div class="fd">홈버튼</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>입주 시 퇴실청소비 안내</b> — 계약정보 확인(15:00) 중요사항 설명과 함께 안내.</li>
-        <li><b>계약서 퇴실청소비 체크 확인</b> — 약정 금액 · 조항 기재 확인.</li>
-        <li><b>홈버튼 청구서 생성</b>.</li>
-      </ol></div></details>
-  </div>
-
-  <!-- 03 입주 -->
-  <div class="area" id="sop03">
-    <div class="area-head"><span class="area-no">03</span><h3>입주관리</h3><span class="who">매니저 <b>이지희</b> · 실무 고송미·김영철</span></div>
-
-    <details class="sop"><summary><span class="tw">D ALL</span><span class="ttl">임대인 응대 — 임대료·퇴실·갱신·중도·세금 문의</span><span class="aicc-tag" title="AICC 자동화 대상 · 2026.12 도입 목표">AICC 수신</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📞 문의 수신</div><div class="fd">전화/문자</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">🏷️ 유형 분류</div><div class="fd">5종</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">💬 1차 응답</div><div class="fd">D+1 이내</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">⚙️ 담당 처리</div><div class="fd">노션/운영웹</div></div>
-        <div class="fstep"><div class="fn">05</div><div class="ft">✅ 결과 회신</div><div class="fd">전화/문자</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>문의 수신</b> — 첫 응대자는 이지희 (부재 시 고송미).</li>
-        <li><b>유형 분류</b> — ① 임대료 정산 ② 퇴실 정산 ③ 갱신 진행 ④ 중도퇴실 ⑤ 세금 문의.</li>
-        <li><b>1차 응답</b> — D+1 이내. 정산·돈 관련은 노션 / 단순 응대는 운영관리 웹.</li>
-        <li><b>담당 처리</b> — 정산은 김준영, 갱신은 이지희, 그 외 적절 담당 라우팅.</li>
-        <li><b>결과 회신</b> — 회신 후 노션/웹에 종결 표시.</li>
-      </ol></div></details>
-
-    <details class="sop"><summary><span class="tw">D ALL</span><span class="ttl">임차인 응대 — 납기·수납·연체·중도·퇴실·갱신 문의</span><span class="aicc-tag" title="AICC 자동화 대상 · 2026.12 도입 목표">AICC 수신</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📞 문의 수신</div><div class="fd">전화/문자</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">🔀 카테고리 분류</div><div class="fd">6종</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">👥 담당 라우팅</div><div class="fd">Slack</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">✅ 처리 · 회신</div><div class="fd">운영웹/노션</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>문의 수신</b></li>
-        <li><b>카테고리 분류</b> — ① 납기일 변경 ② 임대료 수납 ③ 연체 ④ 중도퇴실 ⑤ 퇴실 ⑥ 갱신.</li>
-        <li><b>담당 라우팅</b> — <b>①②③ → 김영철</b> / <b>④⑤⑥ → 이지희(고송미)</b>. Slack 호출.</li>
-        <li><b>처리 · 회신</b> — 단순 응대는 운영관리 웹 / 금액 관련은 노션 기록.</li>
-      </ol></div></details>
-
-    <details class="sop"><summary><span class="tw">D ALL</span><span class="ttl">부동산 1차 응대 — 심사·인센티브·정산·중도퇴실 문의</span><span class="aicc-tag" title="AICC 자동화 대상 · 2026.12 도입 목표">AICC 수신</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📞 문의 수신</div><div class="fd">전화/Slack</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">💬 1차 응답</div><div class="fd">기본 정보</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">➡️ 영업담당 라우팅</div><div class="fd">필요 시</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>문의 수신</b> — 부동산 대표·중개사 문의. 4종: 심사, 인센티브, 임대인 정산, 중도퇴실.</li>
-        <li><b>1차 응답</b> — 즉답 가능한 기본 정보·일정 즉시 처리.</li>
-        <li><b>영업담당 라우팅</b> — 심층 응대 필요 시 영업담당 인계 (Slack으로 일정·내용 전달).</li>
-      </ol></div></details>
-  </div>
-
-  <!-- 04 수납/연체 -->
-  <div class="area" id="sop04">
-    <div class="area-head"><span class="area-no">04</span><h3>수납 / 연체관리</h3><span class="who">매니저 <b>오진선</b> · 실무 오진선·김영철</span><a class="linkbtn" href="krg-manual-yeonche-sop.html" target="_blank" rel="noopener" style="margin-left:auto;font-size:12.5px" title="연체관리 일자별 대응 매뉴얼 (L3 SOP · 2026-09-28 개정)">🗓️ 연체 Process — SOP-04-연체 v1.2 ↗</a></div>
-
-    <details class="sop"><summary><span class="tw">D 16:00</span><span class="ttl">수납 대응 — 첫납부 + 전월 연체이력자</span><span class="aicc-tag" title="AICC 자동화 대상 · 2026.12 도입 목표">AICC 발신</span><a class="proc-tag" href="krg-manual-yeonche-sop.html#s3" target="_blank" rel="noopener" title="연체 Process › 3. 일자별 타임라인 — D-3 사전고지 · D+0 미납 문자 (SOP-04-연체 v1.2)">연체Process</a><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">🎯 첫납부 대상 추출</div><div class="fd">홈버튼</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">💰 임대료+수수료 안내</div><div class="fd">문자</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">🧹 퇴실청소비 안내</div><div class="fd">문자</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">📋 전월 연체이력자 유도</div><div class="fd">사전 연락</div></div>
-      </div>
-      <div class="steps">
-        <div class="sub-h">① 첫납부 대상자 (16:00)</div>
-        <ol>
-          <li><b>대상 추출</b> — 이번 달 첫납부 대상자 리스트업 (홈버튼 신규 입주자 조회).</li>
-          <li><b>임대료 + 수수료 안내</b> — 임대료·수수료·납기일·계좌번호 문자 발송.</li>
-          <li><b>퇴실청소비 안내</b> — 계약 시 약정 금액 입금 안내.</li>
-        </ol>
-        <div class="sub-h">② 전월 연체이력자 (납기일 전 선제 대응)</div>
-        <ol>
-          <li><b>이력자 확인</b> — 지난달 1회 이상 연체 이력 계약자 추출.</li>
-          <li><b>사전납부 유도</b> — 납기일 전 선제 연락, 납기일·금액 재안내. 패턴 반복자는 노션 기록.</li>
-        </ol>
-      </div></details>
-
-    <details class="sop"><summary><span class="tw">D 09:00</span><span class="ttl">연체 대응 분류 — 연락 · 방문 · 법적대응</span><a class="proc-tag" href="krg-manual-yeonche-sop.html#s5" target="_blank" rel="noopener" title="연체 Process › 5. D+5 판정 체크리스트 · 문제 계약자 분류 · 방문·강제 프로세스 (SOP-04-연체 v1.2)">연체Process</a><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">⚠️ 연체 발생 확인</div><div class="fd">홈버튼</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">🔍 사유 분석</div><div class="fd">패턴 확인</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">🗂️ 분류 (3종)</div><div class="fd">연락/방문/법적</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">👤 담당 배정</div><div class="fd">Slack</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>연체 발생 확인</b> — 09:00 정시 전일 미납건 추출.</li>
-        <li><b>사유 분석</b> — 상습 연체자(전월 연체자) 우선 분류, 패턴 기반 위험도 평가.</li>
-        <li><b>분류</b> — ① 연락 (1~7일) ② 방문 (8~30일) ③ 법적대응 (30일+).</li>
-        <li><b>담당 배정</b> — 연락·방문 → 김영철 / 법적대응 → 오진선.</li>
-      </ol>
-      <div class="memo">📌 일자별 세부 기준은 <a href="krg-manual-yeonche-sop.html#s3" target="_blank" rel="noopener">연체 Process (SOP-04-연체 v1.2)</a>가 우선한다 — 미수신 2회 확정 시 D+2 법무 즉시 · D+3~4 방문요청 · D+5 판정 · 납부약속 상한 D+7 · 지급명령 마감 D+20 · 명도 D+32(상업용 D+62).</div>
-      </div></details>
-
-    <details class="sop"><summary><span class="tw">D 10:00</span><span class="ttl">법무관리 — 내용증명 · 지급명령 · 명도소송</span><a class="proc-tag" href="krg-manual-yeonche-sop.html#s6" target="_blank" rel="noopener" title="연체 Process › 6. 법무 트랙 — 내용증명·지급명령·서면 해지 통지·명도(D+32/상업 D+62) + 5-2 강제퇴실 확정 후 세부 액션 (SOP-04-연체 v1.2)">연체Process</a><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📋 대상 추출</div><div class="fd">법적대응 분류건</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">⚖️ 단계 결정</div><div class="fd">7단계 중 선택</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">📤 진행 · 절차</div><div class="fd">법무/외부</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">📝 결과 기록</div><div class="fd">노션</div></div>
-      </div>
-      <div class="steps">
-        <div class="sub-h">단계 결정 7종</div>
-        <ol>
-          <li><b>내용증명</b> — 1차 경고, 등기우편 발송.</li>
-          <li><b>CB 조회</b> — 신용정보 조회로 자산 상황 파악. <a class="linkbtn" href="https://app.notion.com/p/krggroup/36ba64b04451808b93dbe6c913e48d5b?source=copy_link#387a64b0445180468c92fd0bc4ce176b" target="_blank">CB 조회 매뉴얼 ↗</a></li>
-          <li><b>지급명령</b> — 법원 지급명령 신청.</li>
-          <li><b>변론 참석</b> — 이의신청 시 변론 진행.</li>
-          <li><b>채권압류</b> — 예금·급여 압류 신청.</li>
-          <li><b>추심명령</b> — 제3채무자에 대한 추심.</li>
-          <li><b>명도소송</b> — 최종 단계, 강제퇴거.</li>
-        </ol>
-        <div class="sub-h">연체패턴관리</div>
-        <ol>
-          <li><b>연체패턴 분석 · 기록</b> — 진행 중·종결 후 연체 패턴(횟수·금액·사유·주기)을 노션에 기록. 재연체 예측 및 갱신 심사 참고자료로 활용.</li>
-        </ol>
-      </div></details>
-
-    <details class="sop"><summary><span class="tw">D 09:00</span><span class="ttl">연체 대응 실행 — 통화 · 문자 · 방문 (김영철)</span><span class="aicc-tag" title="AICC 자동화 대상 · 2026.12 도입 목표">AICC 발신</span><a class="proc-tag" href="krg-manual-yeonche-sop.html#s4" target="_blank" rel="noopener" title="연체 Process › 4. 상황별 대응 기준·표준 멘트 — 미수신 2회 채널전환 · 납부약속 상한 D+7 (SOP-04-연체 v1.2)">연체Process</a><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">🎯 대상자 확정</div><div class="fd">분류 결과</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">📞 통화 · 문자</div><div class="fd">1차 접촉</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">🚶 방문 (필요 시)</div><div class="fd">Report 작성</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">📝 결과 기록</div><div class="fd">노션</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>대상자 확정</b> — 오진선 분류 결과 중 본인 담당(연락·방문) 확인.</li>
-        <li><b>통화 · 문자</b> — 1차 통화 → 미응답 시 문자 → 응답 여부 기록. <span class="aicc-tag" title="통화·문자 한정 (방문 제외)">AICC</span></li>
-        <li><b>방문</b> — 대상 추출 · 방문 진행 · Report 작성 · 차회 방문일정 등록. <a class="linkbtn" href="https://app.notion.com/p/krggroup/36ba64b04451808b93dbe6c913e48d5b?source=copy_link#39ea64b04451802d9358ce238cbb2bfc" target="_blank">📋 노션 방문 상세 가이드 ↗</a></li>
-        <li><b>결과 기록</b> — 모든 접촉 결과 노션 기록 (장기 추적용).</li>
-      </ol></div></details>
-  </div>
-
-  <!-- 05 갱신 -->
-  <div class="area" id="sop05">
-    <div class="area-head"><span class="area-no">05</span><h3>갱신관리</h3><span class="who">매니저 <b>이지희</b> · 실무 이지희 (단독 운영)</span></div>
-
-    <details class="sop"><summary><span class="tw m">M 만기 -1M</span><span class="ttl">갱신대상 선정 및 심사</span><span class="aicc-tag" title="AICC 자동화 대상 · 2026.12 도입 목표">AICC 발신</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📅 만기 -1M 추출</div><div class="fd">홈버튼</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">📐 갱신 기준 적용</div><div class="fd">관리 기준</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">📤 심사 상신</div><div class="fd">5건 단위</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">🗂️ 결과 정리</div><div class="fd">3종 분류</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>만기 -1M 대상 추출</b> — 익월 만기 도래 계약 리스트업.</li>
-        <li><b>갱신 기준 적용</b> — 임대료·연체 이력·임대인 의사 등.</li>
-        <li><b>심사 상신</b> — 5건 단위 묶음 상신.</li>
-        <li><b>결과 정리</b> — 승인 / 조건부 / 불가 3종 분류.</li>
-      </ol></div></details>
-
-    <details class="sop"><summary><span class="tw m">M 심사 후</span><span class="ttl">갱신불가 · 조건부승인 연락</span><span class="aicc-tag" title="AICC 자동화 대상 · 2026.12 도입 목표">AICC 발신</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">🗂️ 결과 분류</div><div class="fd">불가/조건부</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">👤 계약자 연락</div><div class="fd">문자+통화</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">🏠 임대인 연락</div><div class="fd">문자+통화</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>결과 분류</b> — 갱신 불가 / 조건부 승인 대상 정리.</li>
-        <li><b>계약자 연락</b> — 1차 문자 → 미응답 시 통화, 사유 안내.</li>
-        <li><b>임대인 연락</b> — 결과 통보. 임대인 사전 임대료 변경 의사가 있던 경우 계약자에게 사전 연락.</li>
-      </ol></div></details>
-
-    <details class="sop"><summary><span class="tw m">M 확정 후</span><span class="ttl">갱신 수수료 청구 및 홈버튼 등록</span><span class="aicc-tag" title="AICC 자동화 대상 · 2026.12 도입 목표">AICC 발신</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📄 청구서 발행</div><div class="fd">일시납</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">💰 입금 확인</div><div class="fd">494계좌</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">📝 홈버튼 등록</div><div class="fd">묵시/조건부</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>일시납 청구서 발행</b> — 갱신 수수료 청구서 발행.</li>
-        <li><b>입금 확인</b> — 494계좌 입금 확인.</li>
-        <li><b>홈버튼 등록</b> — 만기 -1M 전까지, 묵시적 갱신 / 조건부 승인 구분.</li>
-      </ol></div></details>
-  </div>
-
-  <!-- 06 중도퇴실 -->
-  <div class="area" id="sop06">
-    <div class="area-head"><span class="area-no">06</span><h3>중도퇴실관리</h3><span class="who">매니저 <b>오진선</b> · 실무 이지희·고송미(단순)·오진선(강제)</span></div>
-
-    <details class="sop"><summary><span class="tw">D 발생 시</span><span class="ttl">단순변심 처리 — 5종 책임 사항 안내</span><span class="aicc-tag" title="AICC 자동화 대상 · 2026.12 도입 목표">AICC 발신</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">❓ 이유 문의</div><div class="fd">통화</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">📢 Slack 공유</div><div class="fd">팀 인지</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">📋 5종 책임 안내</div><div class="fd">서면</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">💰 정산 진행</div><div class="fd">노션</div></div>
-        <div class="fstep"><div class="fn">05</div><div class="ft">✅ 종결 처리</div><div class="fd">홈버튼</div></div>
-      </div>
-      <div class="steps">
-        <div class="sub-h">단계별 절차 — 5종 책임 사항</div>
-        <ol>
-          <li><b>중도퇴실 이유 문의</b> — 임차인 통화 → 사유 청취, Slack #ops 한 줄 공유.</li>
-          <li><b>4개월 위약금 안내</b> — 계약서상 약정 위약금 적용.</li>
-          <li><b>계약기간 중 임대료 책임</b> — 새 임차인 입주 전까지 잔여 임대료 책임.</li>
-          <li><b>중개보수료 책임</b> — 책임 분담 안내.</li>
-          <li><b>원상복구 책임</b> — 의무 및 비용 책임 안내.</li>
-        </ol>
-      </div></details>
-
-    <details class="sop"><summary><span class="tw w">W 발생 시</span><span class="ttl">강제퇴실 처리 — 현장 대응 → 청소 → 계약해지</span><span class="caret">▶</span></summary>
-      <div class="metabar">
-        <div>인입 조건<b>연체 15~20일 경과자 (연체팀 선별)</b></div>
-        <div>현장 1차 대응<b>김영철</b></div>
-        <div>퇴실관리·해지<b>오진선</b></div>
-        <div>보고 라인<b>매니저·차장 → 김기성 본부장</b></div>
-      </div>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">🎯 대상자 선별</div><div class="fd">연체팀</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">🚪 현장 1차 대응</div><div class="fd">김영철 · 분기①</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">📊 퇴실관리 시트</div><div class="fd">오진선 · 개런티즈 7.0</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">🧹 청소 등록·지시</div><div class="fd">오진선 · 노션</div></div>
-        <div class="fstep"><div class="fn">05</div><div class="ft">💳 청소비 등록</div><div class="fd">홈버튼</div></div>
-        <div class="fstep"><div class="fn">06</div><div class="ft">📑 계약해지 확정</div><div class="fd">홈버튼 · 분기②</div></div>
-      </div>
-      <div class="steps">
-        <a class="linkbtn" href="https://app.notion.com/p/krggroup/36ba64b04451808b93dbe6c913e48d5b?source=copy_link#398a64b0445180bd94d8c70b92ddd983" target="_blank">📋 노션 상세 매뉴얼 — 강제퇴실 전체 절차 ↗</a>
-        <a class="linkbtn" href="https://www.notion.so/334a64b0445180c4b63efb0e41707f1d">🗂️ 현장관리 진척표 ↗</a>
-        <ol>
-          <li><b>[연체팀] 대상자 선별</b> — 연체 15~20일 경과자 중 강제퇴실 대상자 선별 → 담당자 전달.</li>
-          <li><b>[김영철] 현장 1차 대응</b> — 사전 현장 방문으로 (1) 실거주 여부 확인 (2) 자진퇴실 회유.
-            <div class="caution">⚠ <b>정산금액 문의 시 확정 금액을 현장에서 말하지 않는다.</b> "퇴실 전 임대료 + 공과금 + 퇴실정산이 있으며, 정확한 금액은 내부 산정 후 안내드린다"로만 대응. 원상회복비·잔여 서비스수수료·위약금 등 세부 항목은 계약자에게 직접 언급 금지.</div></li>
-          <li><b>[김영철] 비밀번호 입수 → 분기 ①</b> — <b>입수 성공</b>: 현장관리 진척표에 계약정보 등록 → 매니저·차장 Slack 보고. <b>입수 실패</b>(실거주 없음 + 임대인 마스터키 포함 미확보): 종료 후 매니저 Slack 보고 → 열쇠 출장 개문 → 출장 비용 홈버튼 등록.</li>
-          <li><b>[오진선] 퇴실관리 Sheet 등록</b> — 개런티즈 7.0 퇴실관리 SHEET에 (1) 계약번호 (2) 실제퇴실일 등록.</li>
-          <li><b>[오진선] 청소일 등록 · 작업 지시</b> — 노션 현장관리 진척표 확인 후 순서대로: (1) 최저 보증금 정보 확인 (2) 옵션 사항 진척표 등록 → <b>임을빈 팀장 멘션</b> (3) 작업지시서 전달 → <b>임을빈 팀장 멘션</b> (4) <b>김기성 본부장</b> Slack 보고.</li>
-          <li><b>[오진선] 청소비 등록</b> — 청소 완료 확인 후 청소비 홈버튼 등록.</li>
-          <li><b>[오진선] 계약해지 확정 → 분기 ②</b> — 두 경로 모두 홈버튼 <b>중도퇴실 확정 처리</b>: (1) 퇴실일 확정 등록 (2) 잔여 서비스수수료 등록 — <b>기존 잔여 청구서 삭제 필수</b> (3) 퇴실정산 4종(청소·도배·원상회복·부동산컨설팅[중개보수료]) 확인 (4) 임대인 정산금액 내부 Slack 결제요청.
-            <div class="caution">⚠ <b>합의 해지 경로는 김기성 본부장 Slack 확인 후에만 진행</b>하며, 위 4단계에 <b>계약해지증명서 발행</b>이 추가된다.</div></li>
-        </ol>
-        <div class="sub-h">분기 판단표 — 지금 어느 상황인가?</div>
-        <div class="swim" style="padding:0 0 6px"><table>
-          <tr><th>분기</th><th>상황</th><th>다음 액션</th><th>담당</th></tr>
-          <tr><td class="row-h">① 비밀번호</td><td>입수 성공</td><td class="on">진척표 계약정보 등록 → 매니저·차장 Slack 보고</td><td>김영철</td></tr>
-          <tr><td class="row-h">① 비밀번호</td><td>입수 실패 (마스터키 포함)</td><td class="on">매니저 Slack 보고 → 열쇠 출장 개문 → 비용 홈버튼 등록</td><td>김영철</td></tr>
-          <tr><td class="row-h">② 계약해지</td><td>후임 세입자 확정</td><td class="on">홈버튼 중도퇴실 확정 처리 4단계</td><td>오진선</td></tr>
-          <tr><td class="row-h">② 계약해지</td><td>합의 해지</td><td class="on">본부장 Slack 확인 → 확정 처리 4단계 + 계약해지증명서 발행</td><td>오진선</td></tr>
-        </table></div>
-        <div class="sub-h">완료 조건</div>
-        <ol>
-          <li><b>현장관리 진척표 기록 완료</b> — 계약정보·옵션 사항·작업지시서까지 등록.</li>
-          <li><b>퇴실관리 SHEET 등록</b> — 계약번호 + 실제퇴실일 2개 항목 입력.</li>
-          <li><b>홈버튼 반영 완료</b> — 중도퇴실 확정 + 기존 잔여 청구서 삭제 + 퇴실정산 4종 확인.</li>
-          <li><b>Slack 보고 3건</b> — ① 현장 결과(매니저·차장) ② 청소 지시·완료(김기성 본부장) ③ 임대인 정산금액 결제요청.</li>
-        </ol>
-      </div></details>
-  </div>
-
-  <!-- 07 퇴실 -->
-  <div class="area" id="sop07">
-    <div class="area-head"><span class="area-no">07</span><h3>퇴실관리</h3><span class="who">매니저 <b>오진선</b> · 실무 오진선(연체)·이지희(만기)</span></div>
-
-    <details class="sop"><summary><span class="tw w">W 발생 시</span><span class="ttl">연체퇴실 정산</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📄 정산비용 품의</div><div class="fd">노션</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">📨 청구품의 문자</div><div class="fd">임차인</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">📝 홈버튼 정산 반영</div><div class="fd">홈버튼</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>퇴실정산비용 정산 품의</b> — 연체액·위약금·원상복구비 산정 → 품의 작성 (노션).</li>
-        <li><b>퇴실정산청구 품의 문자</b> — 품의 승인 후 임차인에게 청구 문자.</li>
-        <li><b>홈버튼 퇴실정산 반영</b> — 최종 결과 반영 → 계약 종결.</li>
-      </ol></div></details>
-
-    <details class="sop"><summary><span class="tw">D 퇴실 시</span><span class="ttl">만기퇴실 처리</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📅 만기일 도래</div><div class="fd">홈버튼 알림</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">🤝 퇴실 일정 조율</div><div class="fd">임차인 협의</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">💰 정산 · 이슈 대응</div><div class="fd">노션</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">🧹 퇴실청소 진행</div><div class="fd">현장관리팀</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>만기일 도래</b> — 홈버튼 알림 확인.</li>
-        <li><b>퇴실 일정 조율</b> — 퇴실일·열쇠 반납·짐 정리 협의.</li>
-        <li><b>퇴실정산 이슈 대응</b> — 원상복구·관리비 정산 이슈 수집 후 대응, 분쟁 시 노션 상세 기록.</li>
-        <li><b>퇴실청소 진행 — 현장관리팀 연계 (신규 2026.10.12)</b> — 전차인: 퇴실일 확인 및 청소비 금액 청구 / 임대인: 청소진행 안내 및 후속 세입자 입주 일정 체크 → 현장관리팀 캘린더 등록.</li>
-      </ol></div></details>
-  </div>
-
-  <!-- 08 정산 -->
-  <div class="area" id="sop08">
-    <div class="area-head"><span class="area-no">08</span><h3>정산관리</h3><span class="who">매니저 <b>김준영</b> · 실무 강휘수·김준영·오진선·김영철·이지희</span></div>
-
-    <details class="sop"><summary><span class="tw m">M 파트너</span><span class="ttl">파트너 인센티브 정산</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">📄 위탁계약서 확인</div><div class="fd">원본 · 이지희</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">🔍 인센티브 체크·품의</div><div class="fd">강휘수</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">💰 지급금액 산정</div><div class="fd">노션</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">📧 계산서 안내</div><div class="fd">강휘수 → 파트너</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>업무위탁계약서 확인</b> — 이지희 원본 보관, 매월 약정 조건 확인.</li>
-        <li><b>계약서 원본 관리</b> — 보관 위치·버전 확인. 갱신·변경 시 최신본 업데이트, 구버전 분리 보관.</li>
-        <li><b>인센티브 체크 · 품의</b> — 강휘수가 본월 실적 기반 산정 → 품의 작성.</li>
-        <li><b>지급금액 산정</b> — 품의 승인 후 확정.</li>
-        <li><b>지급금액 · 계산서 안내</b> — 파트너에게 안내 + 계산서 발행 협조 요청.</li>
-      </ol></div></details>
-
-    <details class="sop"><summary><span class="tw">D 14:00</span><span class="ttl">임대인 정산 — 홈버튼 입금</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">🎯 정산 대상 추출</div><div class="fd">홈버튼</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">🧮 정산금액 계산</div><div class="fd">노션</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">✅ 검토 (2인)</div><div class="fd">김준영+강휘수</div></div>
-        <div class="fstep"><div class="fn">04</div><div class="ft">💳 홈버튼 입금 처리</div><div class="fd">14:00 정시</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>정산 대상 추출</b> — 본일 정산 대상 임대인 리스트업.</li>
-        <li><b>정산금액 계산</b> — 임대료·관리비·수수료 차감 후 산정, 노션 기록.</li>
-        <li><b>검토 (2인 체크)</b> — 김준영·강휘수 양측 검토, 오류 방지.</li>
-        <li><b>홈버튼 입금 처리</b> — 14:00 정시 입금 → 확인 후 종결.</li>
-      </ol></div></details>
-
-    <details class="sop"><summary><span class="tw">D ALL</span><span class="ttl">입금관리 — 494계좌 · 카드결제</span><span class="caret">▶</span></summary>
-      <div class="flow">
-        <div class="fstep"><div class="fn">01</div><div class="ft">🏦 494계좌 입금 확인</div><div class="fd">은행</div></div>
-        <div class="fstep"><div class="fn">02</div><div class="ft">💳 카드결제 입금 확인</div><div class="fd">PG사</div></div>
-        <div class="fstep"><div class="fn">03</div><div class="ft">🔗 매칭 · 미매칭 처리</div><div class="fd">홈버튼</div></div>
-      </div>
-      <div class="steps"><ol>
-        <li><b>카드결제 + 가상계좌 외 확인</b> — 개별 계좌 수동입금 포함 임대료·수수료·기타 입금 확인.</li>
-        <li><b>카드결제 입금 확인</b> — PG사 정산 내역 확인.</li>
-        <li><b>매칭 · 미매칭 처리</b> — 홈버튼 매칭, 미매칭 건은 Slack #ops 공유 → 추적.</li>
-      </ol></div></details>
-  </div>
 </div></section>
 
-<!-- ============ AICC ============ -->
-<section id="aicc" style="background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><div class="wrap">
-  <div class="sec-eyebrow">— AICC</div>
-  <h2>AICC 자동화 대상 맵 <span style="font-size:15px;font-weight:600;color:var(--sub)">AI 컨택센터 · 2026년 12월 도입 목표</span>
-    <a class="linkbtn" href="aicc-flowchart.html" target="_blank" style="float:right;font-size:12.5px">🗺️ AICC Flow Chart ↗</a></h2>
-  <p class="sec-desc">고객 접점(전화 · 문자 · 자료) 업무 중 <b>AICC로 이관 예정인 자동화 대상</b>을 표시합니다.
-  <b>도입 목표는 2026년 12월</b>이며, 도입 전까지는 기존 담당자가 수동 대응합니다. 본 맵은 벤더 협의 · 요건 정의의 기준 문서로 사용하며, 자동화 대상에 해당하는 L3 SOP 블록에는 <span class="aicc-tag">AICC 발신</span> <span class="aicc-tag">AICC 수신</span> 배지가 표시되어 있습니다.</p>
-
-  <div class="tbl-wrap"><table>
-    <tr><th>영역</th><th>방향</th><th>채널</th><th>자동화 대상</th><th>기준 · 주기</th></tr>
-    <tr><td><b>상담관리</b></td><td>수신</td><td>전화 · 문자</td><td>임대인 · 부동산 · 임(전)차인 · 업무협업 문의 1차 응대</td><td>상시</td></tr>
-    <tr><td><b>입주관리</b></td><td>수신</td><td>전화 · 자료</td><td>임대인 · 임차인 · 부동산 문의 접수 및 라우팅</td><td>상시</td></tr>
-    <tr><td><b>계약관리</b></td><td>발신</td><td>전화 · 문자</td><td>계약정보확인 — 정보입수 · 서비스 중요사항 설명 · 납기일 D-3 안내</td><td>Daily · 계약자 1인 기준</td></tr>
-    <tr><td><b>계약관리</b></td><td>발신</td><td>전화 · 자료</td><td>파트너계약안내 — 특약사항 안내(3분) · 임전대차 계약서 확인(5분)</td><td>건별</td></tr>
-    <tr><td><b>갱신관리</b></td><td>발신</td><td>전화 · 문자</td><td>갱신대상 연락 · 안내 · 청구서/계약서 발행 등 8단계</td><td>Weekly · 월 단위 갱신대상</td></tr>
-    <tr><td><b>수납/연체관리</b></td><td>발신</td><td>전화 · 문자</td><td>수납자대응(첫납부 · 전월/직전월 연체자) · 연체 통화(3분) · 문자(15분)</td><td>Daily</td></tr>
-    <tr><td><b>중도퇴실관리</b></td><td>발신</td><td>전화 · 문자</td><td>단순변심 중도퇴실안내(5분)</td><td>Weekly · 주 2회(수 · 금)</td></tr>
-  </table></div>
-
-  <div style="height:14px"></div>
-
-  <details class="sop"><summary><span class="tw">수신</span><span class="ttl">AICC 수신 — 문의 유형별 1차 응대 대상</span><span class="caret">▶</span></summary>
-    <div class="steps">
-      <div class="sub-h">상담관리 — 전화 · 문자</div>
-      <ol>
-        <li><b>임대인</b> — 단순서비스문의 · 공실관련문의.</li>
-        <li><b>부동산</b> — 단순서비스문의 · 서비스이용문의(설명 희망) · 첫 계약 진행 문의.</li>
-        <li><b>임(전)차인</b> — 단순서비스문의 · 심사관련문의 · 계약관련문의.</li>
-        <li><b>업무협업</b> — 상업용프랜차이즈 · 투자사 · 관공서.</li>
-      </ol>
-      <div class="sub-h">입주관리 — 전화 · 자료</div>
-      <ol>
-        <li><b>임대인</b> — 임대료정산 · 퇴실정산 · 갱신진행 · 중도퇴실 · 세금문의.</li>
-        <li><b>임차인</b> — 납기일변경 · 수납/연체문의 · 임대료수납 · 중도퇴실 · 퇴실문의 · 갱신문의.</li>
-        <li><b>부동산</b> — 심사 · 인센티브문의 · 임대인정산문의 · 중도퇴실문의 · 첫 계약자 대응.</li>
-      </ol>
-      <div class="caution">⚠ <b>도입 예정 표시</b> — 위 문의 유형은 AICC 1차 응대로 이관 예정인 대상 분류이며, 도입 전까지는 현행 담당자 응대 체계(상담관리 · 입주관리 SOP)를 따른다.</div>
-    </div></details>
-
-  <details class="sop"><summary><span class="tw">발신</span><span class="ttl">AICC 발신 — 업무별 자동화 대상 · 소요시간</span><span class="caret">▶</span></summary>
-    <div class="steps">
-      <div class="sub-h">계약관리 — 계약정보확인 (Daily, 계약자 1인 기준)</div>
-      <ol>
-        <li><b>계약정보입수</b> — 입주일 · 계약기간 등 필수 정보 확인.</li>
-        <li><b>서비스 중요사항 설명</b> — 서비스수수료(계약정보입수~입주 -1D) · 중도퇴실 중요사항 · 퇴실청소비 입금안내.</li>
-        <li><b>납기일 D-3 설명</b> — 안내 완료 여부 YES/NO 분기 기록.</li>
-      </ol>
-      <div class="sub-h">계약관리 — 파트너계약안내 (전화 · 자료)</div>
-      <ol>
-        <li><b>파트너특약사항안내</b> — 3분.</li>
-        <li><b>임전대차 계약서 확인</b> — 5분.</li>
-      </ol>
-      <div class="sub-h">갱신관리 (Weekly, 월 단위 갱신대상 관리 기준)</div>
-      <ol>
-        <li><b>갱신대상자 추출</b> 5분 → <b>갱신심사상신</b> 5분 → <b>1차 연락</b> 5분 → <b>최종안내</b> 5분.</li>
-        <li><b>갱신수수료청구서 발행</b> 15분 → <b>계약서발행</b> 15분 → <b>홈버튼등록</b> 10분 → <b>서류입수보관</b> 10분.</li>
-      </ol>
-      <div class="sub-h">수납/연체관리 (Daily)</div>
-      <ol>
-        <li><b>수납자대응</b> — 첫납부대상자(임대료+수수료 · 퇴실청소비) · 전월/직전월 연체자.</li>
-        <li><b>연체발생 후</b> — 통화대응 3분 · 문자대응 15분. (방문 · 법적대응은 담당자 수행 — SOP04 참조)</li>
-      </ol>
-      <div class="sub-h">중도퇴실관리 (Weekly, 주 2회 · 수 · 금)</div>
-      <ol>
-        <li><b>단순변심 중도퇴실안내</b> — 5분.</li>
-      </ol>
-      <div class="caution">⚠ <b>도입 예정 표시</b> — 소요시간(분)은 현행 수동 처리 기준 추정치로, AICC 자동화 효과 산정의 베이스라인이다. 실제 업무 수행은 각 SOP(02 계약 · 04 수납/연체 · 05 갱신 · 06 중도퇴실)를 따른다.</div>
-    </div></details>
+<!-- AICC -->
+<section id="aicc"><div class="wrap">
+<div class="sec-head"><div class="sec-num">SECTION 04</div><div class="sec-title">AICC — AI 콜센터</div><div class="sec-sub">AI가 전화·문자 업무를 대신해주는 시스템 (2026년 12월 도입 예정)</div></div>
+<div class="wb wb-info"><em>🤖</em><div>AICC가 도입되면 전화 수신·분류·1차 응대·문자 발송을 AI가 자동으로 처리합니다. 담당자는 복잡한 건만 직접 처리하면 됩니다.</div></div>
+<div style="overflow-x:auto;margin-top:16px">
+<table>
+<thead><tr><th>업무</th><th>AICC 자동</th><th>담당자 직접</th></tr></thead>
+<tbody>
+<tr><td>임대료 납기 안내 문자</td><td>✅ 자동 발송</td><td>–</td></tr>
+<tr><td>연체 1차 문자</td><td>✅ 자동 발송</td><td>–</td></tr>
+<tr><td>임차인 수신 분류</td><td>✅ 6종 자동 분류</td><td>–</td></tr>
+<tr><td>임대인 1차 응대</td><td>✅ D+1 자동 답변</td><td>–</td></tr>
+<tr><td>연체 전화 협상</td><td>–</td><td>✅ 김영철 직접</td></tr>
+<tr><td>법무 처리</td><td>–</td><td>✅ 오진선 직접</td></tr>
+<tr><td>중도퇴실 협의</td><td>–</td><td>✅ 이지희 직접</td></tr>
+</tbody>
+</table>
+</div>
 </div></section>
 
-<!-- ============ 담당연락 & Tool ============ -->
-<style>
-.contact-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
-.contact{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 15px}
-.contact .ic{font-size:20px}
-.contact .t{font-weight:800;font-size:13.5px;margin:7px 0 3px;line-height:1.4}
-.contact .d{font-size:11.5px;color:var(--sub);line-height:1.5}
-.contact .p{margin-top:9px;font-weight:800;font-size:13px;color:var(--navy)}
-.tool-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
-.tool{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:19px}
-.tool .badge{font-family:var(--mono);font-size:10px;font-weight:800;letter-spacing:.08em;padding:3px 9px;border-radius:99px}
-.tool.slack .badge{background:#FDECEC;color:#B03A3A}
-.tool.web .badge{background:var(--blue-soft);color:var(--navy)}
-.tool.notion .badge{background:var(--ok-soft);color:var(--ok)}
-.tool h4{font-size:17px;font-weight:800;margin:9px 0 2px}
-.tool .use{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:5px}
-.tool p{font-size:12.5px;color:var(--sub);margin-bottom:9px}
-.tool ul{list-style:none;display:grid;gap:4px;font-size:12.5px}
-.tool ul li::before{content:'·';font-weight:800;margin-right:7px;color:var(--blue)}
-.decide{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
-.decide>div{background:var(--soft);border-radius:11px;padding:11px 15px;font-size:13px}
-.decide b{color:var(--navy)}
-@media(max-width:860px){.contact-grid{grid-template-columns:1fr 1fr}.tool-grid,.decide{grid-template-columns:1fr}.kpi-row{grid-template-columns:1fr 1fr 1fr}}
-</style>
-<section id="tools" style="background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><div class="wrap">
-  <div class="sec-eyebrow">— ⚙ RULES</div>
-  <h2>담당연락 &amp; Tool 이용 기준</h2>
-  <p class="sec-desc">업무의 To와 Cc를 명확히 구분해 연락합니다. 3개 도구의 역할이 겹치지 않아야 검색·이력 추적이 가능합니다.
-  <b>"어디에 기록할지"</b>를 먼저 정한 뒤 작업합니다.</p>
-
-  <div class="contact-grid">
-    <div class="contact"><div class="ic">🏢</div><div class="t">신규 부동산 / 임대인</div><div class="d">상세 서비스 이용 희망 요청</div><div class="p">영업팀</div></div>
-    <div class="contact"><div class="ic">📄</div><div class="t">계약 관련</div><div class="d">기존 계약이력 부동산 · 심사완료 계약자 · 공동 계약자</div><div class="p">고송미</div></div>
-    <div class="contact"><div class="ic">🏠</div><div class="t">입주 이슈 관련</div><div class="d">계약자 클레임 · 중도퇴실 문의 · 임대인 정산 문의</div><div class="p">이지희</div></div>
-    <div class="contact"><div class="ic">💰</div><div class="t">임대료 납부 문의</div><div class="d">입금일 연기 · 변경 등</div><div class="p">김영철</div></div>
-    <div class="contact"><div class="ic">⚖️</div><div class="t">강제퇴실자 관련</div><div class="d">임대인 · 강제퇴실 관련자 · 법적 대응 문의</div><div class="p">오진선</div></div>
-  </div>
-
-  <div class="tool-grid">
-    <div class="tool slack"><span class="badge">REAL-TIME</span><h4>Slack</h4>
-      <div class="use">즉시 대응이 필요할 때</div>
-      <p>팀 누군가 지금 봐야 하는 일. 영구 기록보다 속도가 우선.</p>
-      <ul><li>긴급 이슈 · 장애 · 즉답 필요</li><li>가계약 체크, 부동산 응답 회수</li><li>현장 방문 중 공유</li><li>일일 마감 알림</li></ul></div>
-    <div class="tool web"><span class="badge">HISTORY</span><h4>운영관리 웹</h4>
-      <div class="use">간단한 이력이 필요할 때</div>
-      <p>계약자·임대인의 문의·클레임·성향 — 빠르게 조회 가능한 가벼운 기록.</p>
-      <ul><li>문의 내용 (전화·카톡 응대)</li><li>클레임 기록</li><li>성향 파악 메모</li><li>응대 시 참고할 이전 이력</li></ul></div>
-    <div class="tool notion"><span class="badge">FINANCIAL</span><h4>노션</h4>
-      <div class="use">금액 청구·정산이 발생할 때</div>
-      <p>돈이 오가는 모든 건의 단일 진실 — 첨부파일 포함, 장기 추적 가능.</p>
-      <ul><li>임대료·수수료 청구</li><li>퇴실 정산·환급</li><li>법무 비용 청구</li><li>첨부파일 필요한 건 · 장기 이슈</li></ul></div>
-  </div>
-
-  <div class="decide">
-    <div><b>지금 즉시?</b> → Slack 우선 (속도)</div>
-    <div><b>돈 얘기 들어감?</b> → 노션 (영구·첨부)</div>
-    <div><b>응대 이력만?</b> → 운영관리 웹</div>
-  </div>
+<!-- 도구안내 -->
+<section id="tools"><div class="wrap">
+<div class="sec-head"><div class="sec-num">SECTION 05</div><div class="sec-title">도구 안내</div><div class="sec-sub">어떤 도구를 언제 쓰는지 알면 업무 속도가 2배!</div></div>
+<div class="tool-grid">
+  <div class="tool-c"><div class="tool-icon">💬</div><div class="tool-name">Slack</div><div class="tool-desc">지금 당장 팀에 알려야 할 일이 생겼을 때</div>
+  <ul class="tool-use"><li><em>🚨</em><span>수수료 금액 이상</span></li><li><em>🚨</em><span>중도퇴실 발생</span></li><li><em>🚨</em><span>입금 매칭 안 될 때</span></li><li><em>🧹</em><span>청소 지시 (임을빈팀장 멘션)</span></li></ul></div>
+  <div class="tool-c"><div class="tool-icon">🖥️</div><div class="tool-name">홈버튼 (운영관리 웹)</div><div class="tool-desc">계약 정보 입력·수정·조회를 여기서 합니다</div>
+  <ul class="tool-use"><li><em>📝</em><span>계약 등록·수정</span></li><li><em>💳</em><span>수수료 설정</span></li><li><em>📊</em><span>응대 이력 기록</span></li><li><em>🧾</em><span>청구서 발행</span></li></ul></div>
+  <div class="tool-c"><div class="tool-icon">📓</div><div class="tool-name">노션</div><div class="tool-desc">돈·법무·증빙서류 관련 내용을 여기 기록합니다</div>
+  <ul class="tool-use"><li><em>💰</em><span>정산 내역·품의서</span></li><li><em>⚖️</em><span>법무 진행 현황</span></li><li><em>📎</em><span>계약서 첨부</span></li><li><em>📋</em><span>퇴실·이슈 이력</span></li></ul></div>
+</div>
+<div style="margin-top:20px"><div class="sec-sub" style="margin-bottom:12px;font-weight:700">📍 어디에 연락해야 할지 모를 때</div>
+<div class="step-flow">
+  <div class="step-c"><div class="step-ei" style="background:#F3F4F6">🏠</div><div class="step-t">임차인 수납·연체</div><div class="step-d">김영철 / 오진선</div></div>
+  <div class="step-c"><div class="step-ei" style="background:#F3F4F6">📄</div><div class="step-t">계약·입주·갱신</div><div class="step-d">이지희 / 고송미</div></div>
+  <div class="step-c"><div class="step-ei" style="background:#F3F4F6">⚖️</div><div class="step-t">법무·강제퇴실</div><div class="step-d">오진선</div></div>
+  <div class="step-c"><div class="step-ei" style="background:#F3F4F6">💰</div><div class="step-t">파트너·임대인 정산</div><div class="step-d">강휘수 / 김준영</div></div>
+  <div class="step-c"><div class="step-ei" style="background:#F3F4F6">🤖</div><div class="step-t">시스템·오류</div><div class="step-d">강휘수 (IT담당)</div></div>
+</div></div>
 </div></section>
 
-<!-- ============ KPI ============ -->
+<!-- KPI -->
 <section id="kpi"><div class="wrap">
-  <div class="sec-eyebrow">— KPI</div>
-  <h2>KPI 대시보드</h2>
-  <p class="sec-desc">개인별 핵심 KPI는 <b>최소 1개, 최대 3개</b>. 더 많으면 측정·관리가 안 됩니다.
-  KPI 한 개당 (1) 측정 가능 (2) 본인이 직접 영향 (3) 주 1회 이상 갱신 — 3가지를 모두 충족해야 하며,
-  미충족 시 KPI에서 빼고 'Monitoring 지표'로 분리합니다.</p>
-
-  <div class="tbl-wrap"><table>
-    <tr><th>영역</th><th>핵심 KPI #1</th><th>측정 방식</th><th>매니저</th><th>현재</th></tr>
-    <tr><td><b>01 심사관리</b></td><td>심사 처리 시간</td><td>신청 → 결과 통보 평균 D</td><td>이지희</td><td>베이스라인 수집</td></tr>
-    <tr><td><b>02 계약관리</b></td><td>계약등록 누락률</td><td>0건 / 월 (가계약→정식 미등록)</td><td>이지희</td><td><span class="s on" style="font-size:11px">● 0건 / 월</span></td></tr>
-    <tr><td><b>03 입주관리</b></td><td>임차인 1차 응답 시간</td><td>문의 → 응답 D+1 이내 %</td><td>이지희</td><td>베이스라인 수집</td></tr>
-    <tr><td><b>04 수납/연체관리</b></td><td>월말 연체율</td><td>미납 계약 수 / 전체 계약 수</td><td>오진선</td><td>베이스라인 수집</td></tr>
-    <tr><td><b>05 갱신관리</b></td><td>갱신율</td><td>만기 도래 계약 중 갱신 %</td><td>이지희</td><td>베이스라인 수집</td></tr>
-    <tr><td><b>06 중도퇴실관리</b></td><td>위약금 회수율</td><td>청구액 대비 회수액 %</td><td>오진선</td><td>베이스라인 수집</td></tr>
-    <tr><td><b>07 퇴실관리</b></td><td>정산 완료 리드타임</td><td>퇴실일 → 정산 완료 평균 D</td><td>오진선</td><td>베이스라인 수집</td></tr>
-    <tr><td><b>08 정산관리</b></td><td>정산일 준수율</td><td>매일 14:00 마감 준수 %</td><td>김준영</td><td>베이스라인 수집</td></tr>
-  </table></div>
-  <p style="font-size:12px;color:var(--sub);margin-top:10px">영역당 KPI #1 우선 · #2 #3은 베이스라인 수집 후 추가</p>
-
-  <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
-    <a class="linkbtn" href="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit#gid=554798125">KPI Sheet 열기 → (gid=554798125 자동 연동)</a>
-    <a class="linkbtn" href="#">월간 리포트 다운로드 ↓</a>
-  </div>
+<div class="sec-head"><div class="sec-num">SECTION 06</div><div class="sec-title">KPI 기준치</div><div class="sec-sub">이 숫자를 지키면 우리 팀은 잘 돌아가고 있습니다</div></div>
+<div class="kpi-grid">
+  <div class="kpi-c"><div class="kpi-top"><div class="kpi-dot" style="background:var(--c01)"></div><div class="kpi-area">01 심사</div></div><div class="kpi-val co1">D+1</div><div class="kpi-lbl">심사결과 처리 목표</div></div>
+  <div class="kpi-c"><div class="kpi-top"><div class="kpi-dot" style="background:var(--c02)"></div><div class="kpi-area">02 계약</div></div><div class="kpi-val co2">100%</div><div class="kpi-lbl">서류 누락 0건 목표</div></div>
+  <div class="kpi-c"><div class="kpi-top"><div class="kpi-dot" style="background:var(--c03)"></div><div class="kpi-area">03 입주</div></div><div class="kpi-val co3">D+1</div><div class="kpi-lbl">응대 처리 기준</div></div>
+  <div class="kpi-c"><div class="kpi-top"><div class="kpi-dot" style="background:var(--c04)"></div><div class="kpi-area">04 연체</div></div><div class="kpi-val co4">D+20</div><div class="kpi-lbl">지급명령 신청 마감</div></div>
+  <div class="kpi-c"><div class="kpi-top"><div class="kpi-dot" style="background:var(--c05)"></div><div class="kpi-area">05 갱신</div></div><div class="kpi-val co5">-1M</div><div class="kpi-lbl">만기 전 사전 처리</div></div>
+  <div class="kpi-c"><div class="kpi-top"><div class="kpi-dot" style="background:var(--c06)"></div><div class="kpi-area">06 중도퇴실</div></div><div class="kpi-val co6">100%</div><div class="kpi-lbl">5종 책임 안내율</div></div>
+  <div class="kpi-c"><div class="kpi-top"><div class="kpi-dot" style="background:var(--c07)"></div><div class="kpi-area">07 퇴실</div></div><div class="kpi-val co7">0건</div><div class="kpi-lbl">정산 누락 목표</div></div>
+  <div class="kpi-c"><div class="kpi-top"><div class="kpi-dot" style="background:var(--c08)"></div><div class="kpi-area">08 정산</div></div><div class="kpi-val co8">14:00</div><div class="kpi-lbl">임대인 정산 입금 시간</div></div>
+</div>
 </div></section>
 
-<!-- ============ 개선제안루프 ============ -->
-<style>
-.loop{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.loop>div{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:17px;text-align:center;position:relative}
-.loop .n{font-family:var(--mono);font-size:11px;font-weight:800;color:var(--blue)}
-.loop .t{font-weight:800;font-size:15px;margin:4px 0 2px}
-.loop .d{font-size:12px;color:var(--sub)}
-@media(max-width:860px){.loop{grid-template-columns:1fr 1fr}}
-</style>
-<section id="improve" style="background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><div class="wrap">
-  <div class="sec-eyebrow">— ∞ LOOP</div>
-  <h2>개선제안루프</h2>
-  <p class="sec-desc">자발적 개선이 작동하려면 <b>'아이디어 → 채택 → SOP 반영 → 보상'</b>의 사이클이 가시적이어야 합니다.</p>
-  <div class="loop">
-    <div><div class="n">01</div><div class="t">제안</div><div class="d">노션 DB</div></div>
-    <div><div class="n">02</div><div class="t">검토</div><div class="d">월간 회의</div></div>
-    <div><div class="n">03</div><div class="t">반영</div><div class="d">SOP 업데이트</div></div>
-    <div><div class="n">04</div><div class="t">보상</div><div class="d">Tier 02 지급</div></div>
-  </div>
-  <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
-    <a class="linkbtn" href="https://www.notion.so/krggroup/Database-1bda64b0445180e38b93c27b59c9c692">노션 DB에 제안하기 →</a>
-    <a class="linkbtn" href="https://www.notion.so/krggroup/Database-1bda64b0445180e38b93c27b59c9c692">최근 제안 보기 →</a>
-  </div>
+<!-- 개선루프 -->
+<section id="improve"><div class="wrap">
+<div class="sec-head"><div class="sec-num">SECTION 07</div><div class="sec-title">개선 루프</div><div class="sec-sub">불편한 게 있으면 바로 말하세요. 우리 팀은 빠르게 고칩니다</div></div>
+<div class="improve-flow">
+  <div class="imp-c"><div class="imp-icon">💡</div><div class="imp-num">STEP 1</div><div class="imp-t">제안</div><div class="imp-d">누구든 불편한 점을 Slack #개선제안에 올린다</div></div>
+  <div class="arr" style="align-self:center;font-size:24px">→</div>
+  <div class="imp-c"><div class="imp-icon">🔍</div><div class="imp-num">STEP 2</div><div class="imp-t">검토</div><div class="imp-d">매주 월요일 팀장이 우선순위 결정</div></div>
+  <div class="arr" style="align-self:center;font-size:24px">→</div>
+  <div class="imp-c"><div class="imp-icon">✅</div><div class="imp-num">STEP 3</div><div class="imp-t">반영</div><div class="imp-d">메뉴얼 + 홈버튼 + SOP에 즉시 업데이트</div></div>
+  <div class="arr" style="align-self:center;font-size:24px">→</div>
+  <div class="imp-c"><div class="imp-icon">🏆</div><div class="imp-num">STEP 4</div><div class="imp-t">보상</div><div class="imp-d">채택 제안은 월간 회의에서 공개 칭찬</div></div>
+</div>
 </div></section>
 
-<!-- ============ 수정이력 ============ -->
-<style>
-.hform{display:grid;grid-template-columns:repeat(6,1fr) auto;gap:8px;background:var(--panel);
-  border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:14px}
-.hform input,.hform select{font:inherit;font-size:12.5px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);min-width:0}
-.hform input:focus,.hform select:focus{outline:2px solid var(--blue-border);border-color:var(--blue)}
-.hform button{font:inherit;font-size:12.5px;font-weight:800;padding:8px 15px;border:none;border-radius:8px;
-  background:var(--navy);color:#fff;cursor:pointer;white-space:nowrap}
-.hform button:hover{background:var(--blue)}
-.hfilter{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
-.hfilter select{font:inherit;font-size:12px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
-.hfilter .cnt{font-family:var(--mono);font-size:11px;color:var(--sub);margin-left:auto}
-.empty-row td{color:var(--sub);font-size:13px;text-align:center;padding:22px}
-@media(max-width:860px){.hform{grid-template-columns:1fr 1fr}}
-</style>
+<!-- 수정이력 -->
 <section id="history"><div class="wrap">
-  <div class="sec-eyebrow">— LOG</div>
-  <h2>수정이력관리</h2>
-  <p class="sec-desc">프로세스별 변경·결재 이력을 기록합니다. 일자 · 작성자 · 결재자 · 구분 · 변경사항을 입력하면 아래 테이블에 누적됩니다.
-  <b>이 정적 페이지에서는 세션 내에서만 유지</b>되며, 영구 저장은 Excel 업로드/CSV 관리 방식과 연동합니다.</p>
-
-  <div class="hform">
-    <input type="date" id="h-date" aria-label="일자">
-    <input type="text" id="h-author" placeholder="작성자" aria-label="작성자">
-    <input type="text" id="h-approver" placeholder="결재자" aria-label="결재자">
-    <select id="h-type" aria-label="구분"><option>공통</option><option>상업용</option><option>주거용</option></select>
-    <select id="h-area" aria-label="영역">
-      <option>01 심사관리</option><option>02 계약관리</option><option>03 입주관리</option><option>04 수납/연체관리</option>
-      <option>05 갱신관리</option><option>06 중도퇴실관리</option><option>07 퇴실관리</option><option>08 정산관리</option><option>전체 (공통사항)</option>
-    </select>
-    <input type="text" id="h-desc" placeholder="변경사항" aria-label="변경사항">
-    <button id="h-add">이력 추가 →</button>
+<div class="sec-head"><div class="sec-num">SECTION 08</div><div class="sec-title">수정이력</div><div class="sec-sub">메뉴얼이 바뀌면 여기에 기록합니다</div></div>
+<div class="hist-form">
+  <div><label>일자</label><input type="date" id="hDate"></div>
+  <div><label>작성자</label><input type="text" id="hAuthor" placeholder="이름"></div>
+  <div><label>결재자</label><input type="text" id="hApprover" placeholder="이름"></div>
+  <div><label>구분</label><select id="hType"><option value="">선택</option><option>공통</option><option>상업용</option><option>주거용</option></select></div>
+  <div><label>영역</label><select id="hArea"><option value="">선택</option><option>01 심사관리</option><option>02 계약관리</option><option>03 입주관리</option><option>04 수납·연체관리</option><option>05 갱신관리</option><option>06 중도퇴실관리</option><option>07 퇴실관리</option><option>08 정산관리</option><option>전체</option></select></div>
+  <div class="full"><label>변경사항</label><textarea id="hDesc" placeholder="어떤 내용이 바뀌었나요?"></textarea></div>
+</div>
+<div class="hist-actions">
+  <button class="btn-pri" onclick="addHistRow()">+ 이력 추가</button>
+  <button class="btn-sec" onclick="toggleFilter()">🔍 필터</button>
+  <button class="btn-sec" onclick="exportCSV()">⬇️ CSV 다운로드</button>
+</div>
+<div id="filterArea" style="display:none;background:#F9FAFB;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <label style="font-size:12px;font-weight:700;color:var(--sub)">영역 필터:</label>
+    <select id="filterArea2" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit" onchange="renderTable()"><option value="">전체</option><option>01 심사관리</option><option>02 계약관리</option><option>03 입주관리</option><option>04 수납·연체관리</option><option>05 갱신관리</option><option>06 중도퇴실관리</option><option>07 퇴실관리</option><option>08 정산관리</option><option>전체</option></select>
+    <select id="filterType2" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit" onchange="renderTable()"><option value="">구분 전체</option><option>공통</option><option>상업용</option><option>주거용</option></select>
+    <button class="btn-sec" style="padding:6px 12px" onclick="clearFilter()">초기화</button>
   </div>
-
-  <div class="hfilter">
-    <select id="f-type"><option value="">구분: 전체</option><option>공통</option><option>상업용</option><option>주거용</option></select>
-    <select id="f-area"><option value="">영역: 전체</option>
-      <option>01 심사관리</option><option>02 계약관리</option><option>03 입주관리</option><option>04 수납/연체관리</option>
-      <option>05 갱신관리</option><option>06 중도퇴실관리</option><option>07 퇴실관리</option><option>08 정산관리</option><option>전체 (공통사항)</option>
-    </select>
-    <span class="cnt" id="h-count">0건</span>
-    <a class="linkbtn" href="#" id="h-csv">CSV 내보내기 ↓</a>
-  </div>
-
-  <div id="h-msg" style="display:none;margin-bottom:10px;padding:9px 13px;border-radius:9px;font-size:12.5px;
-    background:var(--amber-soft);border:1px solid var(--amber-border);color:var(--amber)"></div>
-
-  <div class="tbl-wrap"><table id="h-table">
-    <thead><tr><th>일자</th><th>작성자</th><th>결재자</th><th>구분</th><th>영역</th><th>변경사항</th></tr></thead>
-    <tbody id="h-tbody">
-      <tr class="empty-row"><td colspan="6">아직 이력이 없습니다. 위 폼에서 첫 이력을 추가해 주세요.</td></tr>
-    </tbody>
-  </table></div>
+</div>
+<div class="hist-table-wrap">
+<table id="histTable"><thead><tr><th>일자</th><th>작성자</th><th>결재자</th><th>구분</th><th>영역</th><th>변경사항</th><th></th></tr></thead>
+<tbody id="histTbody">
+  <tr><td>2026-10-22</td><td>강휘수</td><td>김준영</td><td>공통</td><td>전체</td><td>v0.2 시각 메뉴얼 전면 개편 (이모지 일러스트 기반)</td><td><button style="border:none;background:none;color:#9CA3AF;cursor:pointer;font-size:12px" onclick="delRow(this)">삭제</button></td></tr>
+  <tr><td>2026-09-23</td><td>강휘수</td><td>김준영</td><td>공통</td><td>전체</td><td>v0.1 초판 발행</td><td><button style="border:none;background:none;color:#9CA3AF;cursor:pointer;font-size:12px" onclick="delRow(this)">삭제</button></td></tr>
+</tbody></table>
+</div>
 </div></section>
 
-<footer style="border-top:1px solid var(--line);padding:32px 0 56px;color:var(--sub);font-size:13px">
-  <div class="wrap">KRG Operations Manual · v0.1 (Pilot) · Built with care · 2026</div>
-</footer>
+<div style="text-align:center;padding:32px 20px;color:#9CA3AF;font-size:12px;border-top:1px solid var(--line)">
+  KRG 운영 메뉴얼 v0.2 &nbsp;·&nbsp; 최종수정 2026-10-22 &nbsp;·&nbsp; 문의: 강휘수 (hskang@krggroup.co.kr)
+</div>
 
 <script>
-(function(){
-  var rows=[];
-  var tbody=document.getElementById('h-tbody');
-  var msg=document.getElementById('h-msg');
-  function g(id){return document.getElementById(id)}
-  function showMsg(text){msg.textContent=text;msg.style.display='block';
-    clearTimeout(showMsg._t);showMsg._t=setTimeout(function(){msg.style.display='none'},4000)}
-
-  // 일자 기본값: 오늘
-  (function(){var d=new Date(),p=function(n){return n<10?'0'+n:n};
-    g('h-date').value=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())})();
-
-  function render(){
-    var ft=g('f-type').value, fa=g('f-area').value;
-    var list=rows.filter(function(r){return (!ft||r.type===ft)&&(!fa||r.area===fa)});
-    // tbody를 DOM 메서드로 재구성 (innerHTML on <table> 회피)
-    while(tbody.firstChild) tbody.removeChild(tbody.firstChild);
-    if(!list.length){
-      var tr=document.createElement('tr');tr.className='empty-row';
-      var td=document.createElement('td');td.colSpan=6;
-      td.textContent=rows.length?'필터에 해당하는 이력이 없습니다.':'아직 이력이 없습니다. 위 폼에서 첫 이력을 추가해 주세요.';
-      tr.appendChild(td);tbody.appendChild(tr);
-    }else{
-      list.forEach(function(r){
-        var tr=document.createElement('tr');
-        [r.date,r.author,r.approver,r.type,r.area,r.desc].forEach(function(v){
-          var td=document.createElement('td');td.textContent=v;tr.appendChild(td)});
-        tbody.appendChild(tr);
-      });
-    }
-    g('h-count').textContent=list.length+'건';
-  }
-
-  g('h-add').addEventListener('click',function(){
-    var r={date:g('h-date').value,author:g('h-author').value.trim(),approver:g('h-approver').value.trim(),
-      type:g('h-type').value,area:g('h-area').value,desc:g('h-desc').value.trim()};
-    var missing=[];
-    if(!r.date)missing.push('일자');
-    if(!r.author)missing.push('작성자');
-    if(!r.desc)missing.push('변경사항');
-    if(missing.length){showMsg('⚠ 필수 입력: '+missing.join(', '));return}
-    rows.unshift(r);
-    g('h-author').value='';g('h-approver').value='';g('h-desc').value='';
-    render();
-    showMsg('✓ 이력이 추가되었습니다. (총 '+rows.length+'건)');
-  });
-  g('f-type').addEventListener('change',render);
-  g('f-area').addEventListener('change',render);
-  g('h-csv').addEventListener('click',function(e){
-    e.preventDefault();
-    if(!rows.length){showMsg('⚠ 내보낼 이력이 없습니다.');return}
-    try{
-      var csv='\uFEFF일자,작성자,결재자,구분,영역,변경사항\n'+rows.map(function(r){
-        return [r.date,r.author,r.approver,r.type,r.area,r.desc].map(function(v){
-          return '"'+String(v).replace(/"/g,'""')+'"'}).join(',')}).join('\n');
-      var a=document.createElement('a');
-      a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-      a.download='krg_수정이력.csv';document.body.appendChild(a);a.click();
-      document.body.removeChild(a);URL.revokeObjectURL(a.href);
-    }catch(err){showMsg('⚠ 이 환경에서는 다운로드가 차단되어 있습니다. 브라우저에서 열어 사용해 주세요.')}
-  });
-})();
+let histData = [
+  {date:'2026-10-22',author:'강휘수',approver:'김준영',type:'공통',area:'전체',desc:'v0.2 시각 메뉴얼 전면 개편 (이모지 일러스트 기반)'},
+  {date:'2026-09-23',author:'강휘수',approver:'김준영',type:'공통',area:'전체',desc:'v0.1 초판 발행'}
+];
+function addHistRow(){
+  const d={date:document.getElementById('hDate').value,author:document.getElementById('hAuthor').value.trim(),approver:document.getElementById('hApprover').value.trim(),type:document.getElementById('hType').value,area:document.getElementById('hArea').value,desc:document.getElementById('hDesc').value.trim()};
+  if(!d.date||!d.author||!d.desc){alert('일자·작성자·변경사항은 필수입니다');return;}
+  histData.unshift(d);renderTable();
+  ['hDate','hAuthor','hApprover','hDesc'].forEach(id=>document.getElementById(id).value='');
+  ['hType','hArea'].forEach(id=>document.getElementById(id).selectedIndex=0);
+}
+function renderTable(){
+  const fa=document.getElementById('filterArea2')?.value||'';
+  const ft=document.getElementById('filterType2')?.value||'';
+  const rows=histData.filter(r=>(!fa||r.area===fa)&&(!ft||r.type===ft));
+  document.getElementById('histTbody').innerHTML=rows.map((r,i)=>`<tr><td>${r.date}</td><td>${r.author}</td><td>${r.approver||'–'}</td><td>${r.type||'–'}</td><td>${r.area||'–'}</td><td>${r.desc}</td><td><button style="border:none;background:none;color:#9CA3AF;cursor:pointer;font-size:12px" onclick="delRow(this,${histData.indexOf(r)})">삭제</button></td></tr>`).join('');
+}
+function delRow(btn,idx){
+  if(idx===undefined){btn.closest('tr').remove();return;}
+  if(confirm('삭제할까요?')){histData.splice(idx,1);renderTable();}
+}
+function toggleFilter(){const el=document.getElementById('filterArea');el.style.display=el.style.display==='none'?'block':'none';}
+function clearFilter(){document.getElementById('filterArea2').value='';document.getElementById('filterType2').value='';renderTable();}
+function exportCSV(){
+  const hdr='일자,작성자,결재자,구분,영역,변경사항\n';
+  const rows=histData.map(r=>[r.date,r.author,r.approver,r.type,r.area,'"'+r.desc.replace(/"/g,'""')+'"'].join(',')).join('\n');
+  const blob=new Blob(['﻿'+hdr+rows],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='krg-manual-history.csv';a.click();
+}
 </script>
 </body>
 </html>
