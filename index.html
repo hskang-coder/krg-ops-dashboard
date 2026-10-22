@@ -6147,7 +6147,7 @@ async function renderSettlementView(){
     V.forEach(function(v){ var u=String(v.useType||'').trim(); if(u) useMap[String(v.no).trim()]=u; });
     var _useF=window._stlUse||'total';
     var _useOk=function(cno){ if(_useF==='total') return true; var u=useMap[String(cno||'').trim()]||''; return _useF==='res'? u.indexOf('주거')>=0 : (u.indexOf('상업')>=0||u.indexOf('상가')>=0); };
-    var tb={rows:0,ctr:{},amt:0,paid:0}, subro={amt:0,n:0}, sched={n:0,amt:0};
+    var tb={rows:0,ctr:{},amt:0,paid:0,on:0,sch:0}, subro={amt:0,n:0}, sched={n:0,amt:0};   /* [v715] on = 정상납부 · sch = 납부예정 */
     var firstD={n:0,amt:0,paid:0};   // [v532.1] 첫달 직납 (임차인→임대인 직접)
     var unpaidMap={};   // [v514] 계약번호|청구월 → 미납 합 (대위변제 매칭용)
     P.forEach(function(p){
@@ -6162,6 +6162,7 @@ async function renderSettlementView(){
       if(_inR(dueD) && tot>0){
         tb.rows++; tb.ctr[cno2]=1; tb.amt+=tot;
         if(st2!=='납부예정') tb.paid+=Math.max(0, tot-outA);   // [v508] 입금 = 청구 − 미납
+        if(st2==='정상납부') tb.on+=Math.max(0, tot-outA); else if(st2==='납부예정') tb.sch+=tot;   // [v715] 납부율 구성 — 정상납부(납기일까지) / 그 밖의 납부 = 연체납부
         if(isFirstMonth(p)){ firstD.n++; firstD.amt+=tot; if(st2!=='납부예정') firstD.paid+=Math.max(0, tot-outA); }   // [v532.1]
       }
       if(outA>0 && st2!=='납부예정'){ var k2=cno2+'|'+billMonth(p); unpaidMap[k2]=(unpaidMap[k2]||0)+outA; }
@@ -6179,6 +6180,13 @@ async function renderSettlementView(){
       if(u>0){ subro.amt+=Math.min(u, s.amt); subro.n++; }
     });
     var tbRate = tb.amt>0 ? Math.round(tb.paid/tb.amt*1000)/10 : 0;
+    /* [v715] 납부율 = 정상납부 + 연체납부 — 표시 합이 맞도록 연체납부 % = 납부율 − 정상납부 % · 나머지 = 미납 + 납부예정 */
+    var tbOnR = tb.amt>0 ? Math.min(tbRate, Math.round(tb.on/tb.amt*1000)/10) : 0;
+    var tbLateR = Math.max(0, Math.round((tbRate - tbOnR)*10)/10);
+    var tbSchR = tb.amt>0 ? Math.round(tb.sch/tb.amt*1000)/10 : 0;
+    var tbUnR = Math.max(0, Math.round((100 - tbRate - tbSchR)*10)/10);
+    var tbRateVal = tbRate+'%'+(tb.amt>0 ? '<span title="정상납부 = 납기일까지 낸 금액(납부상태 정상납부)&#10;연체납부 = 납기일이 지나 낸 금액(연체납부 · 분납 중 낸 금액 포함)" style="font-size:11px;font-weight:700;color:#475569;margin-left:4px;cursor:help">(정상납부 <b style="color:#0B7A45">'+tbOnR.toFixed(1)+'%</b> + 연체납부 <b style="color:#B45309">'+tbLateR.toFixed(1)+'%</b>)</span>' : '');
+    var tbRateSub = '납부금액 ÷ 청구금액'+(tb.amt>0 ? ' · 나머지: 미납 '+tbUnR.toFixed(1)+'%'+(tbSchR>0 ? ' · 납부예정 '+tbSchR.toFixed(1)+'%' : '') : '');
     // [v536] 기간 유형별 비교 구간 — 일=전일, 주=전주, 월(1일~말일)=전월, 임의=동일 길이 직전 구간
     var _rngDays = Math.round((re2-rs)/86400000)+1;
     var _monAligned = rs.getDate()===1 && rs.getFullYear()===re2.getFullYear() && rs.getMonth()===re2.getMonth() && re2.getDate()===new Date(re2.getFullYear(), re2.getMonth()+1, 0).getDate();
@@ -6339,7 +6347,7 @@ async function renderSettlementView(){
       + kpi('청구금액', won(tb.amt), '납기일 '+rlbl+' · 첫달 직납 포함', '#fff')
       + kpi('납부금액', won(tb.paid), '납부완료 (청구 − 미납) · 첫달 직납 포함', '#fff')
       + kpi('첫달 납부금액 <span style="font-weight:400">(직납)</span>', won(firstD.paid), '임(전)차인 → 임대인 직접 · '+firstD.n+'건', '#F5F3FF','#5B21B6')
-      + kpi('정상납부율', tbRate+'%', '납부금액 ÷ 청구금액', '#fff', rateCol)
+      + kpi('납부율', tbRateVal, tbRateSub, '#fff', rateCol).replace('min-width:150px;flex:1;', 'min-width:284px;flex:1.8;')   /* [v715] 00%(정상납부 00% + 연체납부 00%) — 한 줄에 들어가게 카드 폭 확대 */
       // [v533] 과거 기간 = 실행 실적(완료 기준) ↔ 현재/미래 기간 = 예정 기준 자동 전환
       + (isPast
         ? kpi('대위변제금액 <span style="font-weight:400">(실행)</span>', won(subroX.amt), subroX.n+'건 · 기간 내 실지급 정산 중 임차인 미납 → KRG 선지급', '#FEF2F2','#A32D2D')
