@@ -16441,7 +16441,7 @@ function openIncomeReceiptModal(contractNo) {
     +       '<label style="font-size:11.5px;font-weight:700;color:#9A3412;display:block;margin-bottom:5px">📅 퇴실일자 <span style="color:#C2845A;font-weight:500;font-size:10.5px">— ' + (settleExit.src ? settleExit.src + ' 자동 · 수정 가능' : '퇴실일 기록 없음 · 직접 입력') + '</span></label>'
     +       '<input type="date" id="crIncRcptSettleExitDate" value="' + settleExit.v + '" style="width:100%;padding:7px 9px;border:1px solid #FDBA74;border-radius:5px;font-size:12.5px;background:#fff">'
     /* [v710] 위약금 — 청구 내역의 위약 항목 합계 자동 · 수정 가능 (퇴실정산청구서 선택 시 cG_settlePrefill 이 채움) */
-    +       '<label style="font-size:11.5px;font-weight:700;color:#9A3412;display:block;margin:9px 0 5px">⚖️ 위약금 <span style="color:#C2845A;font-weight:500;font-size:10.5px">— 청구 내역의 위약 항목 자동 · 수정 가능 (0원 = 청구서에서 제외)</span></label>'
+    +       '<label style="font-size:11.5px;font-weight:700;color:#9A3412;display:block;margin:9px 0 5px">⚖️ 위약벌 <span style="color:#C2845A;font-weight:500;font-size:10.5px">— 서비스계약서 제13조② · 청구 내역의 위약 항목 자동 · 수정 가능 (0원 = 제외)</span></label>'
     +       '<div style="display:flex;gap:6px;align-items:center"><input type="text" inputmode="numeric" id="crIncRcptSettlePenalty" value="" data-orig="" oninput="cG_penaltyInput(this)" placeholder="0" style="flex:1;padding:7px 9px;border:1px solid #FDBA74;border-radius:5px;font-size:12.5px;background:#fff;text-align:right;font-weight:700;color:#7C2D12"><span style="font-size:12px;color:#9A3412;font-weight:700">원</span></div>'
     +       '<div id="crIncRcptSettlePenaltyHint" style="font-size:10.5px;color:#9A3412;margin-top:4px;line-height:1.55"></div>'
     +       '<label style="font-size:11.5px;font-weight:700;color:#9A3412;display:block;margin:9px 0 5px">📝 특약사항 <span style="color:#C2845A;font-weight:500;font-size:10.5px">(선택 — 청구서 본문에 삽입)</span></label>'
@@ -16816,7 +16816,7 @@ function cG_settlePrefill(cno){
     var btn = function(lb, v){ return '<button type="button" onclick="cG_penaltySet(' + Math.round(v) + ')" style="margin:4px 4px 0 0;background:#fff;border:1px solid #FDBA74;color:#9A3412;padding:3px 8px;border-radius:4px;font-size:10.5px;font-weight:700;cursor:pointer">' + lb + '</button>'; };
     hint.innerHTML = (pens.length
         ? '청구 내역: ' + pens.map(function(u){ return esc(u.name) + ' ₩' + (parseSafeMoney(u.amt) || 0).toLocaleString(); }).join(' · ')
-        : '청구 내역에 위약 항목 없음 — 금액을 넣으면 청구서에 「위약금」 항목으로 추가됩니다')
+        : '청구 내역에 위약 항목 없음 — 금액을 넣으면 청구서 맨 위에 「위약벌」 항목으로 추가됩니다')
       + '<br>' + (pens.length ? btn('청구 내역 금액 ₩' + orig.toLocaleString(), orig) : '') + (rule ? btn('월세 4개월분 ₩' + Math.round(rule).toLocaleString(), rule) : '') + btn('0원 (제외)', 0);
   } catch(e){ console.warn('[v710] settlePrefill', e); }
 }
@@ -16866,20 +16866,25 @@ async function generateIncomeReceipt(contractNo){
     if (!unpaidData || !unpaidData.length) { alert('미납·납부예정 항목이 없습니다. (퇴실정산청구서 발행 불가)'); return; }
     /* [v710] 위약금 — 모달에서 금액을 바꾼 경우에만 반영: 위약 항목들 → 한 줄(첫 위약 항목 자리) · 0원이면 제외 · 위약 항목이 없으면 '위약금' 줄 추가 */
     var _penEl = document.getElementById('crIncRcptSettlePenalty');
+    var _isPen = function(u){ return /위약/.test(String(u.name || '')); };
+    /* [v711] 퇴실일자가 오늘 이전이면 위약벌은 연체 (제13조② 즉시 지불) */
+    var _sxv = (document.getElementById('crIncRcptSettleExitDate') || {}).value || '';
+    var _sxd = _sxv ? new Date(_sxv + 'T00:00:00') : null, _td0 = new Date(); _td0.setHours(0, 0, 0, 0);
+    var _sxPast = !!(_sxd && !isNaN(_sxd.getTime()) && _sxd <= _td0);
     if (_penEl && _penEl.getAttribute('data-touched') === '1') {
-      var _isPen = function(u){ return /위약/.test(String(u.name || '')); };
       var _penV = parseInt(String(_penEl.value || '').replace(/[^0-9]/g, ''), 10) || 0;
       var _pens = unpaidData.filter(_isPen);
       var _penOrig = _pens.reduce(function(a, u){ return a + (parseSafeMoney(u.amt) || 0); }, 0);
       if (_penV !== _penOrig) {
-        var _line = _penV > 0 ? { name: _pens.length === 1 ? _pens[0].name : (_pens.length ? '위약금 (' + _pens.length + '건 합산)' : '위약금 (중도 해지 위약벌)'), amt: String(_penV), due: _pens.length ? _pens[0].due : '', status: _pens.length ? _pens[0].status : '예정' } : null;
-        var _out = [], _put = false;
-        unpaidData.forEach(function(u){ if (_isPen(u)) { if (!_put && _line) { _out.push(_line); _put = true; } return; } _out.push(u); });
-        if (_line && !_put) _out.push(_line);
-        unpaidData = _out;
-        if (!unpaidData.length) { alert('청구할 항목이 없습니다. (위약금 0원 · 다른 미납 없음)'); return; }
+        var _origOver = _pens.some(function(u){ return u.status === '연체' || u.status === '분납'; });
+        var _line = _penV > 0 ? { name: '위약벌 (서비스계약서 제13조②)' + (_pens.length > 1 ? ' — ' + _pens.length + '건 합산' : ''), amt: String(_penV), due: _sxv || (_pens.length ? _pens[0].due : ''), status: (_sxPast || _origOver) ? '연체' : '예정' } : null;
+        unpaidData = unpaidData.filter(function(u){ return !_isPen(u); });
+        if (_line) unpaidData.unshift(_line);
+        if (!unpaidData.length) { alert('청구할 항목이 없습니다. (위약벌 0원 · 다른 미납 없음)'); return; }
       }
     }
+    /* [v711] 위약 항목은 정산 청구 내역 맨 위로 */
+    unpaidData = unpaidData.filter(_isPen).concat(unpaidData.filter(function(u){ return !_isPen(u); }));
   }
 
   var contract = (contractRawData||[]).find(function(c){ return String(c['계약번호']||'').trim() === String(contractNo); });
@@ -17119,7 +17124,7 @@ async function generateIncomeReceipt(contractNo){
       var statusLabel = '●' + (u.status || '예정');
       return '<tr>'
         + '<td style="text-align:center;padding:7px 6px;border:1px solid #D1D5DB">' + (i+1) + '</td>'
-        + '<td style="padding:7px 6px;border:1px solid #D1D5DB">' + (u.name || '-') + '</td>'
+        + '<td style="padding:7px 6px;border:1px solid #D1D5DB">' + (u.name || '-') + ((isSettle && /위약/.test(String(u.name || ''))) ? ' <b style="color:#B45309">※</b>' : '') + '</td>'   /* [v711] 위약벌 각주 표시 */
         + '<td style="text-align:right;padding:7px 6px;border:1px solid #D1D5DB;color:#DC2626;font-weight:700">' + fmtMon(amt) + '</td>'
         + '<td style="text-align:center;padding:7px 6px;border:1px solid #D1D5DB;color:' + statusColor + ';font-weight:700;font-size:11px">' + statusLabel + '</td>'
         + '</tr>';
@@ -17142,6 +17147,19 @@ async function generateIncomeReceipt(contractNo){
       +     '</tr>'
       +   '</tbody>'
       + '</table>'
+      + (function(){   /* [v711] ※ 위약벌 각주 — 개런티즈 서비스계약서 제13조② (중요 조항) */
+          if (!isSettle) return '';
+          var _pl = unpaidData.filter(function(u){ return /위약/.test(String(u.name || '')); }); if (!_pl.length) return '';
+          var _pAmt = _pl.reduce(function(a, u){ return a + parseAmt(u.amt); }, 0);
+          var _rent = parseAmt((vac && vac.rent) || 0);
+          var _calc = (_rent > 0 && Math.abs(_pAmt - _rent * 4) < 1) ? '월세 ' + fmtMon(_rent) + ' × 4개월 = <b>' + fmtMon(_pAmt) + '</b>' : '청구 금액 <b>' + fmtMon(_pAmt) + '</b>';
+          var _over = _pl.some(function(u){ return u.status === '연체' || u.status === '분납'; });
+          return '<div style="margin:0 0 8px;padding:9px 12px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:5px;font-size:10.5px;color:#78350F;line-height:1.7">'
+            + '<b style="color:#92400E">※ 위약벌 — 개런티즈 서비스계약서 제13조(중도 해지 및 퇴거 시 책임) ②</b><br>'
+            + '「계약기간 중 &quot;을&quot;의 귀책사유로 전(임)대차계약을 해지하는 경우, 개런티즈 서비스 잔여 수수료, 미납 월세, 원상복구비용, 중개수수료, 소송선임비용, 철거비 등 중도 퇴실에 관하여 발생하는 모든 비용과 <b>위약벌로 4개월 해당하는 월세 상당 금원</b>을 &quot;을&quot;의 책임으로 <b>즉시 지불</b>한다.」<br>'
+            + '· 산정: ' + _calc + ' · 지급 시기: 퇴실 즉시' + (settleExitStr && settleExitStr !== '-' ? '(퇴실일자 ' + settleExitStr + ')' : '') + (_over ? ' — 지급 기한 경과로 <b>연체</b>' : '')
+            + '</div>';
+        })()
       + '</div>';
   }
 
