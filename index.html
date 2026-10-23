@@ -17500,9 +17500,9 @@ function openFullPayModal(contractNo){
   /* [v718] 단순 화면 — 필수 2가지(① 채무 선택 · ④ 입금)만 기본 표시, 나머지는 ⚙ 상세 설정 안 */
   var penBlock=''
     +'<div id="fpPenBox" style="margin-bottom:12px;padding:10px 12px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-    +  '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9A3412;font-weight:700;cursor:pointer"><input type="checkbox" id="fpPenOn" '+(pen>0?'checked':'')+' onchange="fpRecalc()" style="accent-color:#B45309"> ② 위약금 <span style="font-weight:500;font-size:10.5px">(서비스계약서 제13조 · 임대료×4개월 · 체크하면 채무에 더해짐)</span></label>'
+    +  '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9A3412;font-weight:700;cursor:pointer"><input type="checkbox" id="fpPenOn" onchange="fpRecalc()" style="accent-color:#B45309"> ② 위약금 <span style="font-weight:500;font-size:10.5px">(서비스계약서 제13조 · 임대료×4개월 · 받을 때만 체크 → 채무에 더해짐)</span></label>'
     +  '<input type="number" id="fpPenAmt" value="'+(pen>0?Math.round(pen):0)+'" oninput="fpRecalc()" style="width:130px;padding:5px 8px;border:1px solid #FDBA74;border-radius:4px;font-size:12px;text-align:right">'
-    +  '<span style="font-size:10.5px;color:#C2845A">'+(pen>0?'자동 산정 — 시작일 2025-06-01 이후 (임대료 × 4) · 받지 않으면 체크 해제':'대상 아님 — 시작일 2025-06-01 미만 (필요 시 금액 입력 후 체크)')+'</span>'
+    +  '<span style="font-size:10.5px;color:#C2845A">'+(pen>0?'자동 산정 ₩'+Math.round(pen).toLocaleString('ko-KR')+' (임대료 × 4 · 시작일 2025-06-01 이후) — 청구 내역에 위약벌 항목이 이미 있으면 체크하지 않음':'대상 아님 — 시작일 2025-06-01 미만 (필요 시 금액 입력 후 체크)')+'</span>'
     +'</div>';
   ov.innerHTML=''
     +'<div style="background:#fff;border-radius:10px;width:100%;max-width:760px;max-height:92vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.15)">'
@@ -17585,7 +17585,7 @@ function fpReloadDebt(){
   var now=Date.now(), pd=function(x){ var m=String(x||'').match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); return m?new Date(+m[1],+m[2]-1,+m[3]).getTime():null; };
   var esc=function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
   box.innerHTML=rows.map(function(r,i){
-    var on=(r.st!=='연체납부')||(pd(r.pay)&&(now-pd(r.pay))<=60*86400000);
+    var on=(r.amt>0)&&((r.st!=='연체납부')||(pd(r.pay)&&(now-pd(r.pay))<=60*86400000));   /* [v718.1] 금액 0원 항목은 기본 해제 */
     var sc={'연체중':'#DC2626','분납중':'#4F46E5','연체납부':'#F59E0B'}[r.st]||'#64748B';
     return '<div style="display:grid;grid-template-columns:22px 1fr 82px 118px 110px;gap:6px;align-items:center;padding:5px 8px;border-bottom:1px solid #FEE2E2;font-size:11px">'
       +'<input type="checkbox" class="fp-debt-on" data-i="'+i+'" '+(on?'checked':'')+' onchange="fpRecalc()" style="accent-color:#DC2626">'
