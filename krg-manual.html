@@ -67,6 +67,58 @@ nav::-webkit-scrollbar{display:none}
   .hero{padding:36px 16px 32px}
   .area-count{display:none}
 }
+/* ── clickable card ── */
+.task-card{cursor:pointer;position:relative}
+.task-card .hint{position:absolute;top:12px;right:12px;font-size:10px;font-weight:800;
+  padding:3px 8px;border-radius:99px;background:#111827;color:#fff;opacity:.85}
+.task-icon{transition:transform .15s}
+.task-card:hover .task-icon{transform:scale(1.08)}
+/* ── modal ── */
+.ov{position:fixed;inset:0;background:rgba(17,24,39,.55);backdrop-filter:blur(3px);
+  z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+.ov.on{display:flex}
+.md{background:#fff;border-radius:24px;max-width:640px;width:100%;max-height:88vh;
+  overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.3);
+  animation:pop .2s ease}
+@keyframes pop{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.md-h{padding:24px;color:#fff;display:flex;gap:16px;align-items:center;position:relative;flex-shrink:0}
+.md-h .big{font-size:52px;width:84px;height:84px;border-radius:22px;background:rgba(255,255,255,.2);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.md-h h3{font-size:20px;font-weight:900;line-height:1.3;padding-right:36px}
+.md-h .area{font-size:13px;opacity:.85;margin-bottom:4px}
+.md-x{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;
+  border:none;background:rgba(255,255,255,.25);color:#fff;font-size:22px;cursor:pointer;line-height:1}
+.md-x:hover{background:rgba(255,255,255,.4)}
+.md-b{padding:20px 24px 24px;overflow-y:auto}
+.md-badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
+.md-badges .badge{font-size:12px;padding:5px 11px}
+.sec{margin-bottom:18px}
+.sec h4{font-size:14px;font-weight:800;margin-bottom:10px}
+.steps{list-style:none;display:flex;flex-direction:column;gap:10px}
+.steps>li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.55}
+.steps .num{width:24px;height:24px;border-radius:50%;color:#fff;font-size:12px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.steps .st{font-weight:700}
+.sub{list-style:none;margin-top:6px;display:flex;flex-direction:column;gap:4px}
+.sub li{font-size:13px;color:#374151;padding-left:14px;position:relative;line-height:1.5}
+.sub li::before{content:'';position:absolute;left:2px;top:9px;width:5px;height:5px;border-radius:50%;background:#9CA3AF}
+.lnk{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:12px;
+  background:#EFF6FF;color:#1D4ED8;font-size:13px;font-weight:700;text-decoration:none;margin:0 6px 6px 0}
+.lnk:hover{background:#DBEAFE}
+.wb{border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:8px}
+.wb-warn{background:#FEF2F2;border:1px solid #FECACA;color:#991B1B}
+.wb-tip{background:#FFFBEB;border:1px solid #FCD34D;color:#92400E}
+.nodetail{background:#F9FAFB;border:1px dashed #D1D5DB;border-radius:14px;padding:18px;
+  text-align:center;color:#6B7280;font-size:13px;line-height:1.6}
+.md-f{padding:12px 24px;border-top:1px solid var(--line);font-size:12px;color:var(--sub);
+  display:flex;justify-content:space-between;align-items:center;gap:10px;flex-shrink:0}
+.md-f a{color:#1D4ED8;font-weight:700;text-decoration:none;white-space:nowrap}
+@media(max-width:600px){
+  .md{max-height:92vh;border-radius:20px}
+  .md-h{padding:18px}
+  .md-h .big{width:64px;height:64px;font-size:38px}
+  .md-b{padding:16px}
+}
 </style>
 </head>
 <body>
@@ -84,7 +136,7 @@ nav::-webkit-scrollbar{display:none}
 </nav>
 <div class="hero">
   <h1>🏢 KRG 업무 메뉴얼</h1>
-  <p>부동산 임대 관리의 모든 업무 과정을 한눈에 볼 수 있어요!<br>각 카드를 보면서 내가 무엇을, 언제, 어떻게 해야 하는지 확인하세요 📋</p>
+  <p>부동산 임대 관리의 모든 업무 과정을 한눈에 볼 수 있어요!<br>카드를 <b>클릭</b>하면 단계별 상세 가이드가 열려요 👆</p>
   <div class="hero-stats">
     <div class="hero-stat"><span class="num">99</span><span class="lbl">전체 Task</span></div>
     <div class="hero-stat"><span class="num">9</span><span class="lbl">업무 영역</span></div>
@@ -108,9 +160,28 @@ nav::-webkit-scrollbar{display:none}
   </div>
 </div>
 <div style="text-align:center;color:var(--sub);font-size:13px;padding:16px 24px 40px">
-  © KRG Group 운영팀 · 최종수정: 2026-10-22
+  © KRG Group 운영팀 · 최종수정: 2026-10-23
 </div>
+
+<!-- ── 상세 가이드 모달 ── -->
+<div class="ov" id="ov">
+  <div class="md" role="dialog" aria-modal="true" aria-labelledby="mdt">
+    <div class="md-h" id="mdh">
+      <div class="big" id="mdi"></div>
+      <div><div class="area" id="mda"></div><h3 id="mdt"></h3></div>
+      <button class="md-x" id="mdx" aria-label="닫기">×</button>
+    </div>
+    <div class="md-b" id="mdb"></div>
+    <div class="md-f">
+      <span>💡 실제 화면 캡처는 노션 원문에서 볼 수 있어요</span>
+      <a id="mdn" href="#" target="_blank" rel="noopener">노션 원문 ↗</a>
+    </div>
+  </div>
+</div>
+
 <script>
+const NOTION='https://app.notion.com/p/krggroup/36ba64b04451808b93dbe6c913e48d5b';
+const SHEET='https://docs.google.com/spreadsheets/d/1Z3w9ZhKwiLfL4JJhs-gfcU27QLKgZAWycyGFCK4iiMc/edit';
 const A=[
 {id:'a01',color:'#3B82F6',bg:'linear-gradient(135deg,#1D4ED8,#3B82F6)',
  emoji:'🔍',name:'01 심사관리',desc:'새로운 입주 신청이 들어오면 심사부터 시작해요! 시스템이 자동으로 처리하고 결과를 확인해요.',
@@ -244,6 +315,107 @@ const A=[
  ]},
 ];
 
+/* ── 노션 메뉴얼 기반 상세 가이드 (Task명 → 내용) ── */
+const D={
+'심사 실행':{
+ where:[{t:'개런티즈 심사 어드민',u:'https://admin.guaranteez.co.kr/evaluation/house#/evaluation/house'}],
+ steps:['임차인이 입주 신청서를 내면 시스템이 자동으로 심사를 시작해요.','담당자가 직접 할 일은 없어요. 결과가 나오면 다음 단계(크로스 체크)로 넘어가요.']},
+'심사결과 통지':{
+ steps:['심사가 끝나면 승인/거절 결과가 자동으로 통지돼요.','승인·거절 처리까지 모두 자동화가 완료된 상태예요.']},
+'심사결과 크로스 체크':{
+ where:[{t:'심사관리 Sheet',u:SHEET+'?gid=1762072805#gid=1762072805'}],
+ steps:['카카오톡으로 받은 계약필수정보를 기준으로, 자동심사 결과가 맞는지 다시 확인해요.','이상이 있으면 슬랙으로 심사 매니저에게 알려요.'],
+ tip:'매일 09:00에 전날 들어온 심사 건을 모아서 확인해요.'},
+'심사관리 Sheet 반영':{
+ where:[{t:'심사관리 Sheet',u:SHEET+'?gid=1762072805#gid=1762072805'}],
+ steps:['심사 결과가 시스템에서 심사관리 Sheet로 자동 반영돼요.','담당자는 반영이 잘 되었는지만 확인해요.']},
+'가계약 등록(일자·조건)':{
+ where:[{t:'심사관리 Sheet',u:SHEET+'?gid=1762072805#gid=1762072805'},{t:'계약관리 Sheet',u:SHEET+'?gid=1931755549#gid=1931755549'}],
+ steps:[
+  {t:'가계약일 확정',s:['카카오톡으로 계약담당자(부동산)에게 계약필수 정보를 받아요.','가계약일을 확정해요.']},
+  {t:'계약조건 입력 (심사관리 Sheet)',s:['단독계약 or 공동계약','계약심사 (공동계약이면 패턴 확인)','계약조건 (보증서·보증금·부속합의서 등)','계약구분 (전대차계약, New 개런티즈계약 등)','납부조건 (수수료 분할·일시납 등)','가계약일 & 계약체결일 등록']},
+  {t:'계약관리 Sheet 등록',s:['심사번호 등록','홈버튼 가계약번호 채번 (계약등록 8단계 포함)']}],
+ warn:'심사가 "승인"된 건만 진행해요!'},
+'임차인 계약정보 입수':{
+ steps:['카카오톡으로 계약담당자(부동산)에게 계약필수 정보를 요청해요.','받은 정보를 심사관리 Sheet에 입력해요.']},
+'계약정보 홈버튼 등록':{
+ where:[{t:'계약관리 Sheet',u:SHEET+'?gid=1931755549#gid=1931755549'}],
+ steps:['계약관리 Sheet에 심사번호를 등록해요.','홈버튼에서 가계약번호를 채번해요. (계약등록 8단계 모두 진행)']},
+'계약서 오타 점검':{
+ steps:['계약서 이미지를 받아요.','이름·주소·금액·날짜 등에 오타가 없는지 꼼꼼히 확인해요.']},
+'계약서 날인 체크':{
+ steps:['계약서 이미지에서 날인(도장·서명)이 모두 찍혀 있는지 확인해요.','빠진 곳이 있으면 계약담당자에게 바로 연락해요.']},
+'수수료 입금 확인':{
+ steps:['홈버튼 청구 내역과 신한은행 계좌 입금 내역을 대조해요.','입금이 확인되면 다음 단계로 진행해요.']},
+'계약서류 입수·정리':{
+ steps:['신분증, 첫달 임대료 입금증 등 서류를 받아요.','시놀로지(NAS)에 정리해서 저장해요.']},
+'가계약 체크(삼일·태양 전달·회수)':{
+ steps:['매일 10:00 삼일·태양 가계약 건을 확인해요.','전달할 것은 전달하고, 회수할 것은 회수해요.']},
+'전차인/공동계약자 확인·중요사항 설명':{
+ steps:[{t:'계약자에게 전화해서 아래 내용을 안내해요',s:['계약정보 (주소 등) 확인','퇴실청소비 안내','반려동물 여부 확인','중도퇴실 중요사항 설명','수수료 납기일(D-3) 설명']}],
+ tip:'매일 15:00에 진행해요. 공동계약자가 있으면 모두에게 설명해요.'},
+'부동산 계약안내(첫계약·기존계약)':{
+ steps:['매주 수요일 부동산(중개사)에 계약 안내를 해요.','첫 계약 부동산: 계약서 사전체크 방법을 안내해요.','기존 계약 부동산: 특약 사항을 전달해요.']},
+'임대차계약신고':{
+ steps:[
+  {t:'[고송미] 매주 화요일',s:['임대차계약서 이미지를 구글드라이브에 저장·공유해요.','파일명: 계약번호_임대인명 (필수!)','개런티즈 Dashboard V7.0에 계약번호 등록']},
+  {t:'[이영란] 신고 처리',s:['임대차신고관리 Sheet에 대응 내용을 기록해요.','KRG등록 여부와 사유를 남겨요.']},
+  {t:'흐름',s:['파일 전달 → 등록 → 정정사항 대응 → 재등록']}],
+ warn:'계약 체결 후 30일 안에 신고해야 해요!'},
+'임차인 응대(수신→분류→라우팅→회신)':{
+ steps:['수신: 문의를 접수해요.','분류: 어떤 종류의 문의인지 나눠요.','라우팅: 담당자에게 전달해요.','회신: 답변을 드려요.']},
+'갱신심사 분류(승인·조건부·거절)':{
+ steps:[{t:'자동화 흐름',s:['[D-60] 갱신 대상자 "거절" 처리','[D-60] 갱신 "조건부 승인" 처리','[D-45] 승인 → 자동 문자 발송']}]},
+'갱신 거절·조건부 연락':{
+ steps:['[D-60] 거절·조건부 승인 대상자를 확인해요.','임대인·전차인에게 결과를 연락해요.','[D-45] 승인 건은 자동 문자가 발송돼요.']},
+'CB조회(신용정보)':{
+ where:[{t:'한국신용정보(koreacb.biz)',u:'https://www.koreacb.biz/'}],
+ steps:[
+  'koreacb.biz 사이트에 접속해요.',
+  {t:'신용정보 조회',s:['KCB ID 또는 기타(생년월일 + 연락처)로 검색','신용정보 조회 실행']},
+  {t:'PDF 저장',s:['경로: KRGGROUP / D.심사-법무 / 03.신용정보조회 / 2.연체자 / 자동조회가능','파일명: 이름_계약NO']},
+  '파일이 잘 보관되었는지 확인해요.'],
+ tip:'법적 조치로 넘어갈 때 꼭 필요한 자료예요.'},
+'방문 리스트 작성':{
+ steps:[{t:'방문 전날 (D-1)',s:['대상자 추출: 연체 1~3일차 중 연락이 안 되는 사람 (긴급연락처 포함)','추출한 대상자를 슬랙 #심사_운영_연체 채널에 공유','동선 및 방문자 리스트 최종 체크']}]},
+'방문 동선 계획':{
+ steps:[
+  {t:'방문 전날 (D-1)',s:['[방문대응] → [엑셀]로 방문 동선 출력','동선 및 방문자 리스트 최종 체크']},
+  {t:'방문 당일 (D-0) · 쏘카 이용',s:['시작·종료 지점 = 방문 시작·종료 지점','관악구 방문 시 → 신림에서 시작·종료','신림 외 지역 → 동선 확인 후 시작·종료 지점 확정','서울 외 지역, 저녁 8시 이후 종료 등 예외는 개별 상의','쏘카 비용: 회사 법인카드 등록 후 이용']},
+  {t:'방문 후 Report',s:['슬랙에 현장 사진 및 현황 업로드','다음날까지 방문 Report 작성 (현재 현황, 차기 대응)']}]},
+'단순변심 중도퇴실 처리(5단계)':{
+ steps:[
+  {t:'5단계 처리',s:['이유 문의: 왜 나가려는지 확인하고 등록','Slack 공유','책임 안내: 중도퇴실 시 책임사항 안내','정산','종결']},
+  {t:'청소 진행',s:['[D-15] 전차인에게 연락','임대인에게 문자 발송','YES(무응답 포함) → 청구서 발행','NO(직접 청소) → 안내만, 별도 청구서 없음']},
+  '노션 현장관리에 등록 → 일정 준수','전차인 청구서 발행']},
+'강제퇴실 대상 선별':{
+ steps:['[연체팀] 연체 15~20일 경과자 중 강제퇴실 대상자를 선별해요.'],
+ warn:'삼일 · 송악 · 영종듀클래스 물건인지 먼저 확인!'},
+'강제퇴실 현장 1차 대응':{
+ steps:[
+  {t:'[김영철] 사전 현장 방문',s:['실거주 여부 확인','강제퇴실 회유']},
+  {t:'정산금액 문의 시 → 두리뭉실하게 대응',s:['퇴실 전 임대료, 공과금, 퇴실정산 정도만 언급','원상회복·잔여서비스수수료·위약금 등 구체 금액은 말하지 않아요']},
+  {t:'비밀번호 입수 — YES',s:['현장관리 진척표에 등록 (계약정보 등)','노션 현장 대응 페이지 등록','매니저·차장에게 보고 → 슬랙 #운영_중도퇴실관리']},
+  {t:'비밀번호 입수 — NO (미거주 + 마스터키도 없음)',s:['종료 후 매니저에게 슬랙 보고','열쇠 출장으로 개문 → 홈버튼에 비용 등록']},
+  {t:'중도퇴실 채널에 업무 요청 → 오진선 차장',s:['안건: 이름(계약번호)','비밀번호: 0000','퇴실일자: 00월 00일','소통 여부: 불통 / 전화수신 / 문자(카톡) / 공동계약자·긴급연락처 포함','강제퇴실 권한 위임 문자 발송 여부']}]},
+'강제퇴실 시트 등록·청소 지시·청소비 등록':{
+ steps:[
+  {t:'[오진선] 운영 WEB 등록',s:['실제퇴실일 등록 (임차인 퇴실 확인일)','참조: 입주관리 → 2차 → 진척사항']},
+  {t:'[오진선] 청소 지시',s:['노션 페이지 확인 → 청소일 등록','현장관리 진척표 옵션 사항 등록 → 임을빈 팀장 멘션','작업지시서 전달 → 임을빈 팀장 멘션']},
+  {t:'[오진선] 중도퇴실/대응 진척표',s:['진척표 등록','최저 보증금 정보 확인 (월세, 고정관리비)','김기성 본부장 보고 → 슬랙']},
+  '[오진선] 청소 완료 후 청소비 홈버튼 등록']},
+'강제퇴실 계약해지 처리':{
+ steps:[
+  {t:'경우 A · 후임 세입자 확정',s:['홈버튼 등록 → 중도퇴실 확정 처리','퇴실일 확정 등록','잔여 서비스수수료 등록 (기존 잔여 청구서 삭제)','퇴실정산 확인 (청소·도배·원상회복·중개보수료)','임대인 정산금액 → 내부 슬랙 결제요청']},
+  {t:'경우 B · 계약해지 합의 (김기성 본부장 슬랙 확인)',s:['홈버튼 등록 → 중도퇴실 확정 처리 (A와 동일)','계약해지증명서 발행 — 협의금 입금 후!','임대인 정산금액 → 내부 슬랙 결제요청']},
+  '슬랙에 결제요청 등록'],
+ warn:'계약해지증명서는 반드시 협의금 입금 확인 후 발행해요.'},
+'퇴실정산(주의사항) 알림':{
+ steps:[{t:'청소 진행 안내',s:['[D-15] 전차인에게 연락','임대인에게 문자 발송','YES(무응답 포함) → 청구서 발행','NO(직접 청소) → 안내만, 별도 청구서 없음']}]},
+'퇴실청소 일정 확인·캘린더 등록':{
+ steps:['노션 현장관리에 만기퇴실 등록 → 일정 준수','전차인 청구서 발행']},
+};
+
 function ac(a){
   if(a==='자동') return 'ba';
   if(a==='수동') return 'bm';
@@ -262,9 +434,10 @@ function pl(p){
 }
 
 const mc=document.getElementById('mc');
-A.forEach(area=>{
-  const cards=area.tasks.map(t=>`
-    <div class="task-card">
+A.forEach((area,ai)=>{
+  const cards=area.tasks.map((t,ti)=>`
+    <div class="task-card" data-a="${ai}" data-t="${ti}" role="button" tabindex="0" aria-label="${t.n} 상세 보기">
+      ${D[t.n]?'<span class="hint">📖 가이드</span>':''}
       <div class="task-icon" style="background:${area.color}22">${t.e}</div>
       <div class="task-name">${t.n}</div>
       <div class="task-badges">
@@ -289,6 +462,55 @@ A.forEach(area=>{
     <div class="task-grid">${cards}</div>`;
   mc.appendChild(sec);
 });
+
+/* ── 모달 ── */
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function renderSteps(steps,color){
+  return '<ol class="steps">'+steps.map((s,i)=>{
+    const t=typeof s==='string'?s:s.t;
+    const sub=(typeof s==='string'||!s.s)?'':'<ul class="sub">'+s.s.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';
+    return `<li><span class="num" style="background:${color}">${i+1}</span><div><div class="st">${esc(t)}</div>${sub}</div></li>`;
+  }).join('')+'</ol>';
+}
+function openModal(area,t){
+  const d=D[t.n];
+  document.getElementById('mdh').style.background=area.bg;
+  document.getElementById('mdi').textContent=t.e;
+  document.getElementById('mda').textContent=area.emoji+' '+area.name;
+  document.getElementById('mdt').textContent=t.n;
+  document.getElementById('mdn').href=NOTION;
+  let h=`<div class="md-badges">
+    <span class="badge bp">${pl(t.p)}</span><span class="badge bd">⏰ ${esc(t.d)}</span>
+    <span class="badge bo">👤 ${esc(t.o)}</span><span class="badge ${ac(t.a)}">${al(t.a)}</span></div>`;
+  if(d){
+    if(d.where) h+=`<div class="sec"><h4>📍 어디서 해요?</h4>${d.where.map(w=>`<a class="lnk" href="${w.u}" target="_blank" rel="noopener">🔗 ${esc(w.t)}</a>`).join('')}</div>`;
+    if(d.steps) h+=`<div class="sec"><h4>📝 이렇게 해요</h4>${renderSteps(d.steps,area.color)}</div>`;
+    if(d.warn) h+=`<div class="sec">${[].concat(d.warn).map(w=>`<div class="wb wb-warn">⚠️ ${esc(w)}</div>`).join('')}</div>`;
+    if(d.tip) h+=`<div class="sec">${[].concat(d.tip).map(w=>`<div class="wb wb-tip">💡 ${esc(w)}</div>`).join('')}</div>`;
+  }else{
+    h+=`<div class="nodetail">📚 이 업무의 단계별 가이드는 아직 준비 중이에요.<br>담당자 <b>${esc(t.o)}</b>에게 물어보거나 노션 원문을 확인해 주세요!</div>`;
+  }
+  document.getElementById('mdb').innerHTML=h;
+  document.getElementById('mdb').scrollTop=0;
+  document.getElementById('ov').classList.add('on');
+  document.body.style.overflow='hidden';
+}
+function closeModal(){
+  document.getElementById('ov').classList.remove('on');
+  document.body.style.overflow='';
+}
+mc.addEventListener('click',e=>{
+  const c=e.target.closest('.task-card'); if(!c) return;
+  openModal(A[c.dataset.a],A[c.dataset.a].tasks[c.dataset.t]);
+});
+mc.addEventListener('keydown',e=>{
+  if(e.key!=='Enter'&&e.key!==' ') return;
+  const c=e.target.closest('.task-card'); if(!c) return;
+  e.preventDefault(); openModal(A[c.dataset.a],A[c.dataset.a].tasks[c.dataset.t]);
+});
+document.getElementById('mdx').onclick=closeModal;
+document.getElementById('ov').onclick=e=>{ if(e.target.id==='ov') closeModal(); };
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 </script>
 </body>
 </html>
