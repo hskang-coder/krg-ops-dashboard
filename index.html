@@ -17527,9 +17527,13 @@ function openFullPayModal(contractNo){
     +        '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button type="button" onclick="fpParsePaste()" style="background:#1D4ED8;color:#fff;border:none;padding:6px 12px;border-radius:5px;font-size:11.5px;font-weight:700;cursor:pointer">📥 붙여넣기 인식 → 표에 추가</button><button type="button" onclick="fpAddDeposit()" style="background:#fff;border:1px solid #BFDBFE;color:#1E40AF;padding:6px 12px;border-radius:5px;font-size:11.5px;font-weight:600;cursor:pointer">➕ 행 직접 추가</button><button type="button" onclick="fpClearDeposits()" style="background:#fff;border:1px solid #E5E7EB;color:#6B7280;padding:6px 10px;border-radius:5px;font-size:11px;cursor:pointer">초기화</button></div>'
     +      '</div>'
     +    '</div>'
+    +    '<div style="margin-bottom:12px;padding:11px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px">'   /* [v719] 특약사항 */
+    +      '<label style="font-size:12.5px;font-weight:700;color:#92400E;display:block;margin-bottom:6px">📝 특약사항 <span style="color:#B45309;font-weight:500;font-size:10.5px">(선택 — 증명서 본문에 삽입 · 비워 두면 표시되지 않음)</span></label>'
+    +      '<textarea id="fpExtra" rows="3" placeholder="예: 본 완납으로 보증금 정산을 진행하며, 잔여 보증금은 7일 이내 반환합니다 등" style="width:100%;padding:8px 10px;border:1px solid #FDE68A;border-radius:5px;font-size:12px;background:#fff;resize:vertical;line-height:1.55;font-family:inherit;box-sizing:border-box"></textarea>'
+    +    '</div>'
     +    '<div id="fpSummary" style="margin-bottom:10px"></div>'
     /* ⚙ 상세 설정 */
-    +    '<a id="fpAdvToggle" href="javascript:void(0)" onclick="fpToggleAdv()" style="display:inline-block;margin-bottom:8px;font-size:11.5px;font-weight:700;color:#475569;text-decoration:none">⚙ 상세 설정 ▾ <span style="font-weight:500;color:#94A3B8">기간 · 위약금 · 협의 조정 · 입금 직접 입력 · 추가 기재</span></a>'
+    +    '<a id="fpAdvToggle" href="javascript:void(0)" onclick="fpToggleAdv()" style="display:inline-block;margin-bottom:8px;font-size:11.5px;font-weight:700;color:#475569;text-decoration:none">⚙ 상세 설정 ▾ <span style="font-weight:500;color:#94A3B8">기간 · 위약금 · 협의 조정 · 입금 직접 입력</span></a>'
     +    '<div id="fpAdvanced" style="display:none">'
     +      (pen>0?'':penBlock)
     +      '<div style="margin-bottom:12px;padding:10px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
@@ -17537,8 +17541,7 @@ function openFullPayModal(contractNo){
     +        '<input type="text" id="fpAdjNote" placeholder="사유 — 금액 입력 시 필수 (예: 위약금 일부 감면 합의)" oninput="fpRecalc()" style="flex:1;min-width:180px;padding:5px 8px;border:1px solid #CBD5E1;border-radius:4px;font-size:11.5px">'
     +        '<span style="width:100%;font-size:10.5px;color:#94A3B8">협의로 채무 일부를 감면한 경우에만 입력 (0이면 증명서에 표시되지 않음) · 금액을 입력하면 사유가 필수</span>'
     +      '</div>'
-    +      '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:5px">📝 추가 기재 사항 <span style="color:#9CA3AF;font-weight:500;font-size:10.5px">증명서 본문에 삽입 (선택)</span></label>'
-    +      '<textarea id="fpExtra" rows="2" style="width:100%;padding:8px 10px;border:1px solid #CBD5E1;border-radius:5px;font-size:12px;font-family:inherit;box-sizing:border-box;resize:vertical;margin-bottom:10px"></textarea>'
+
     +      '<div style="padding:9px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;color:#64748B;line-height:1.6">발행 조건: 확정 채무(① + ② − ③) = ④ 입금 합계 → <b style="color:#15803D">잔액 ₩0</b>일 때만 생성됩니다. 채무자가 납부한 금액을 증명해 <b>채무 소멸(완납)</b>을 확인하는 서류입니다. · 연체중·분납중은 기본 선택, 연체납부는 납부일이 최근 60일 이내인 항목만 기본 선택 · 연체 항목 없이 위약금만 남은 경우는 ② 체크만으로 발행 가능</div>'
     +    '</div>'
     +  '</div>'
@@ -17552,7 +17555,7 @@ function fpToggleAdv(){
   var S=window._fpState; if(!S) return; S.adv=!S.adv;
   var show=function(id,disp){ var e=document.getElementById(id); if(e) e.style.display=S.adv?disp:'none'; };
   show('fpAdvanced','block'); show('fpDebtTools','inline-flex'); show('fpDepTools','block');
-  var t=document.getElementById('fpAdvToggle'); if(t) t.innerHTML=S.adv?'⚙ 상세 설정 ▴ <span style="font-weight:500;color:#94A3B8">접기</span>':'⚙ 상세 설정 ▾ <span style="font-weight:500;color:#94A3B8">기간 · 위약금 · 협의 조정 · 입금 직접 입력 · 추가 기재</span>';
+  var t=document.getElementById('fpAdvToggle'); if(t) t.innerHTML=S.adv?'⚙ 상세 설정 ▴ <span style="font-weight:500;color:#94A3B8">접기</span>':'⚙ 상세 설정 ▾ <span style="font-weight:500;color:#94A3B8">기간 · 위약금 · 협의 조정 · 입금 직접 입력</span>';
   fpRecalc();
 }
 /* [v718] 입금 내역 자동 계산 — 선택한 채무 금액 그대로: 연체납부(이미 낸 항목)는 납부일별 1줄, 미납(연체중·분납 잔액)+위약금−조정은 오늘 1줄 · 입금자 = 계약자
@@ -17686,7 +17689,7 @@ function generateFullPayCert(){
     +'<tr style="background:#EFF6FF"><td colspan="4" style="text-align:right;font-weight:700">입금 합계</td><td style="text-align:right;font-weight:900;color:#1D4ED8">'+W(T.dep)+'</td></tr></tbody></table>';
   var totalBox='<div class="total-box"><div><div class="lbl">완납 확인 — 확정 채무 '+W(T.fixed)+' · 입금 '+W(T.dep)+(over>0?' <span style="font-weight:500">(초과 입금 '+W(over)+')</span>':'')+'</div><div class="kr">일금 '+_krWonText(T.fixed)+'원정 완납</div></div><div class="amt">잔액 ₩0</div></div>';
   var extra=(document.getElementById('fpExtra')||{}).value||'';
-  var extraHtml=extra.trim()?'<div style="margin:10px 0 0;padding:9px 12px;background:#FFFBEB;border-left:4px solid #F59E0B;border-radius:0 5px 5px 0;font-size:12px;color:#78350F;line-height:1.7"><b style="color:#92400E;margin-right:5px">📝</b>'+esc(extra).replace(/\n/g,'<br>')+'</div>':'';
+  var extraHtml=extra.trim()?'<div style="margin:10px 0 0;padding:9px 12px;background:#FFFBEB;border-left:4px solid #F59E0B;border-radius:0 5px 5px 0;font-size:12px;color:#78350F;line-height:1.7"><b style="color:#92400E;margin-right:5px">📝 특약사항</b><br>'+esc(extra).replace(/\n/g,'<br>')+'</div>':'';   /* [v719] 퇴실정산청구서와 같은 표기 */
   var decl='본 증명서는 위 계약(<b>#'+contractNo+'</b>)과 관련하여 임(전)차인 <b>'+esc(tenant)+'</b>이(가) 부담하던 연체 채무(연체금액'+(hasPen?' 및 위약금':'')+') 합계 <b>'+W(T.total)+'</b>'+(T.adj>0?'에서 협의 조정 <b>'+W(T.adj)+'</b>을(를) 감한 확정 채무 <b>'+W(T.fixed)+'</b>':'')+'을(를) 위 「입금 내역」과 같이 <b>'+W(T.dep)+'</b> 납부'+(lastDep?' (최종 입금일 '+fmtKr(lastDep)+')':'')+'하여 <b>전액 완납</b>하였음을 증명합니다.<br>'
     +'이로써 <b>임(전)차인 '+esc(tenant)+'</b>과(와) <b>임대인 '+esc(landlord)+'</b> 및 대리인 <b>케이알지그룹주식회사</b> 사이의 본 계약과 관련한 위 채무는 <b>소멸</b>하였으며, 본 증명서 발행일 이후 위 채무와 관련한 추가 납부 의무는 존재하지 않음을 확인합니다.<br>'
     +'이에 본 계약과 관련한 <b>채무 완납 증명서</b>를 발행합니다.'+extraHtml;
