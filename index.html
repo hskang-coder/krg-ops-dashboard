@@ -2289,6 +2289,32 @@ window._vacStatOk = function(f){
   }
   return false;
 };
+/* [v717] 관리자 지정 강제퇴실 — 시트(BO열·DR 중도퇴실관리)가 강제퇴실이 아닌 계약을 대시보드에서만 강제퇴실로 집계
+   · 운영총괄 지시 2026-10-23 (강제퇴실 대상자 명단 93명 중 시트 미반영 20명) · 사유 표기 '강제퇴실(관리자 지정)'
+   · 시트 공실상태가 강제퇴실·대위변제로 바뀌면 지정은 자동 해제(시트 값 우선) — 원본 시트는 손대지 않음 */
+window._GZ_ADMIN = {
+  '47837': '전재영', '47755': '정주영', '46758': '현장군', '48550': 'AKHROROV/PULATOV', '49987': '송다빈', '51177': '최희지', '45261': '김동홍', '51914': '신승훈',
+  '33692': '이민정', '45375': '진기만', '50192': '정다운', '51946': '조성희', '51234': '이정모', '51094': '변예희', '54231': '이성열', '47684': '하리안',
+  '54108': '강원희', '56193': '김경희', '47310': '김현진', '54558': '이명철'
+};
+window._GZ_ADMIN_ST = '강제퇴실(관리자 지정)';
+function _vacAdminOverride(vacArr){
+  try {
+    if (!Array.isArray(vacArr) || !vacArr.length) return;
+    var n = 0, done = 0, seen = {};
+    for (var i = 0; i < vacArr.length; i++) {
+      var v = vacArr[i], cno = String(v.no || '').trim();
+      if (!cno || !window._GZ_ADMIN[cno]) continue;
+      if (v._boStatus === undefined) v._boStatus = v.status;   /* 원본 BO열 값 보존(하이브리드와 동일) */
+      var cur = String(v.status || '').trim();
+      if (/강제퇴실|대위변제/.test(cur) && cur !== window._GZ_ADMIN_ST) { v._gzAdmin = false; v._sheetStatus = cur; if (!seen[cno]) { seen[cno] = 1; done++; } continue; }   /* 시트가 이미 강제퇴실 → 지정 불필요 */
+      if (cur !== window._GZ_ADMIN_ST) v._sheetStatus = cur;
+      v.status = window._GZ_ADMIN_ST; v._gzAdmin = true;
+      if (!seen[cno]) { seen[cno] = 1; n++; }
+    }
+    window.__gzAdminN = n; window.__gzAdminDone = done;
+  } catch(e){ console.warn('[v717] _vacAdminOverride:', e); }
+}
 function _vacDrOverride(vacArr, daeArr){
   try {
     if (!Array.isArray(vacArr) || !vacArr.length) return;
@@ -2320,8 +2346,8 @@ function _vacDrOverride(vacArr, daeArr){
 // [v540] 파서 래핑 — 두 데이터셋 중 어느 쪽이 나중에 로드되든 동기 적용 (모든 로드 경로 커버)
 (function(){
   var _pv = parseVacancySheet, _pd = parseDailyReport;
-  parseVacancySheet = function(r){ var out = _pv(r); try { _vacDrOverride(out, daeungRawData); } catch(_e){} return out; };
-  parseDailyReport  = function(r){ var out = _pd(r); try { _vacDrOverride(vacancyRawData, out); } catch(_e){} return out; };
+  parseVacancySheet = function(r){ var out = _pv(r); try { _vacDrOverride(out, daeungRawData); } catch(_e){} try { _vacAdminOverride(out); } catch(_e2){} return out; };   /* [v717] */
+  parseDailyReport  = function(r){ var out = _pd(r); try { _vacDrOverride(vacancyRawData, out); } catch(_e){} try { _vacAdminOverride(vacancyRawData); } catch(_e2){} return out; };   /* [v717] */
 })();
 
 // [v224] 대응 내역 정렬 — 날짜 내림차순, 동일 날짜면 시트 행 인덱스가 큰(최근 입력) 게 위
@@ -27647,13 +27673,14 @@ window.exmR_gzallModal = function(sp){
       all.push(window._exmZrow(c, { gst: e._prog ? '진행' : '완료', term: (String(v.terminateDate || '').trim() || '-'), dlq: exm_num(v.dlqAmt) || 0, vacD: null, cls: null })); });
     var W = null, DW = null;
     if (sp) { DW = exm_riskData({ span: sp }); W = {}; DW.gz.forEach(function(e){ W[e.cno] = 1; }); DW.progL.forEach(function(e){ W[e.cno] = 1; }); }
-    var S = { sp: sp, n: { '진행': 0, '대기': 0, '완료': 0 }, nD: 0, loss: 0, ra: 0, uAll: 0, cc: 0, ccB: 0, ccBu: 0, nP: 0, pLoss: 0, off: 0, noAmt: 0, payReady: DA.payReady };
+    var S = { sp: sp, adm: 0, n: { '진행': 0, '대기': 0, '완료': 0 }, nD: 0, loss: 0, ra: 0, uAll: 0, cc: 0, ccB: 0, ccBu: 0, nP: 0, pLoss: 0, off: 0, noAmt: 0, payReady: DA.payReady };
     var rows = [];
     all.forEach(function(r){
       var v = vM[r.cno] || {}, sd = krgPd(v.startDate), e = EA[r.cno];
       if (W && !W[r.cno]) { if (sd && sd >= DW.from && sd <= DW.to && sd <= T) S.off++; return; }
       var o = {}; for (var k in r) o[k] = r[k];
       o.sdt = sd ? exm_fmtDt(v.startDate) : '-';
+      var _ss = String(v._sheetStatus || '').trim(); o.adm = !!v._gzAdmin; o.sheetSt = v._gzAdmin ? ((!_ss || _ss === '-') ? '(공란)' : _ss) : '';   /* [v717] 관리자 지정 · 시트 공실상태 */
       o.amt = !!(e && DA.payReady);
       if (o.amt) { var c = e.c || {}, g = function(k2){ return c[k2] || { u: 0 }; };
         o.uRent = g('rent').u; o.uExit = g('exit').u; o.loss = e.unpaid; o.ra = e.recAfter; o.occ = e.recAfter + e.unpaid; o.uAll = e.unpaidAll; o.prog = !!e._prog;
@@ -27662,6 +27689,7 @@ window.exmR_gzallModal = function(sp){
         else { S.nD++; S.loss += e.unpaid; S.ra += e.recAfter; S.uAll += e.unpaidAll; S.cc += (r.dlq || 0); if (o.ccBlank) { S.ccB++; S.ccBu += e.unpaidAll; } }
       } else { o.loss = null; o.ra = null; if (!e) S.noAmt++; }
       if (S.n[o.gst] != null) S.n[o.gst]++;
+      if (o.adm) S.adm++;   /* [v717] */
       rows.push(o);
     });
     var fy = function(d){ return d.getFullYear() + '.' + (d.getMonth() + 1); };
@@ -27937,6 +27965,7 @@ window.exm_riskCard = function(){
       + '· 퇴실구분 = v667 단일 기준(강제 = 공실상태 강제퇴실 4종·대위변제) · 퇴실일 = 계약해지일 → 실퇴실일(DR D열·BP열) · 진행 중 = 강제 상태인데 해지일 미확정<br>'
       + '· <b>케이알지 피해액</b> = 임대료 + 퇴실정산비용(공과금·청소·도배·중개비 등) — 서비스 수수료·위약금·법비용은 제외 · 1인 평균 = 피해액 ÷ 강제퇴실 인원 · 구분 = 계약형태(N열) 주거용/상업용<br>'
       + '· 금액 = 입금내역(전체기간) — <b>피해액</b> = 현재 미납(연체·분납·납기 경과) · <b>회수</b> = 퇴실일 이후 납부된 금액(분납은 마지막 납부일 기준 추정) · <b>피해 발생</b> = 퇴실 시점에 남아 있던 피해 = 회수 + 피해액 · 거주 중 늦게라도 낸 연체는 피해가 아니어서 참고로만 표시 · 법적 단계 = Daily Report 연체관리·수납관리 업무하위의 최고 단계'
+      + (window.__gzAdminN ? '<br>· <b style="color:#B45309">관리자 지정 강제퇴실 ' + window.__gzAdminN + '건</b> 포함 — 시트 공실상태가 아직 강제퇴실이 아닌 계약(운영총괄 지정 2026-10-23 · 사유 「관리자 지정」 · 운영팀이 시트를 강제퇴실로 바꾸면 자동 해제)' : '')   /* [v717] */
       + '</div>' : '')
     + '</div>';
   return h;
@@ -28009,7 +28038,7 @@ function exm_leadModal(kind, ix){
       rows=G9.rows||[]; title=G9.title||'강제퇴실 전체 이력'; color='#9D174D';   /* [v552] 진행+대기+완료 전 기간 */
       var _w9=function(x){ return '₩'+Math.round(x||0).toLocaleString(); };
       cols=[{h:'상태',k:'gst',f:function(r){ var C={'진행':['#FDF2F8','#9D174D'],'대기':['#FFFBEB','#B45309'],'완료':['#F1F5F9','#64748B']}[r.gst]||['#F1F5F9','#64748B']; return '<span style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:'+C[0]+';color:'+C[1]+'">'+r.gst+'</span>'; }},
-            {h:'퇴실사유',k:'st',f:function(r){ return (!r.st||r.st==='-')?'<span style="color:#94A3B8">-</span>':r.st; }},
+            {h:'퇴실사유',k:'st',f:function(r){ var _s=(!r.st||r.st==='-')?'<span style="color:#94A3B8">-</span>':r.st; return r.adm?_s+' <span title="운영총괄 지정 — 시트 공실상태: '+String(r.sheetSt||'').replace(/"/g,'&quot;')+' (시트를 강제퇴실로 바꾸면 자동 해제)" style="display:inline-block;border-radius:6px;padding:1px 6px;font-size:9.5px;font-weight:800;background:#FFFBEB;color:#B45309;border:1px solid #FDE68A;cursor:help">시트: '+r.sheetSt+'</span>':_s; }},   /* [v717] */
             {h:'진척사항',k:'lp',f:function(r){ return r.lp?'<span title="대응일 '+exm_fmtD8(r.d)+'" style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;background:#EEF2FF;color:#4F46E5">'+r.lp+'</span>':'<span style="color:#94A3B8">-</span>'; }},
             {h:'입주일',k:'sdt',f:function(r){ return r.sdt||'-'; }},   /* [v713] W열 시작일 — 입주 기간 기준 */
             {h:'실퇴실일',k:'real',f:function(r){ return r.real; }},
@@ -28176,7 +28205,9 @@ function exm_leadModal(kind, ix){
         +'<span style="font-size:11px;font-weight:800;color:#64748B;margin-right:2px">입주 기간</span>'
         +_pl9(3,'3개월')+_pl9(6,'6개월')+_pl9(12,'1년')+_pl9(24,'2년')+_pl9(0,'전체')
         +(_sp9?'<span style="font-size:11.5px;color:#475569;font-weight:700;margin-left:4px">'+(S9.win||_wl9(_sp9))+' 입주'+(_sp9===(window._exmRiskSpan||12)?' <span style="color:#B91C1C">= 🚨 리스크 카드 기준</span>':'')+'</span>':'')
-        +'<span style="margin-left:auto;font-size:12.5px;color:#475569;font-weight:700">진행 <b style="color:#9D174D">'+(S9.n['진행']||0)+'건</b> · 대기 <b style="color:#B45309">'+(S9.n['대기']||0)+'건</b> · 완료 <b style="color:#64748B">'+(S9.n['완료']||0)+'건</b></span>'
+        +'<span style="margin-left:auto;font-size:12.5px;color:#475569;font-weight:700">진행 <b style="color:#9D174D">'+(S9.n['진행']||0)+'건</b> · 대기 <b style="color:#B45309">'+(S9.n['대기']||0)+'건</b> · 완료 <b style="color:#64748B">'+(S9.n['완료']||0)+'건</b>'
+          +(S9.adm?' · <span title="운영총괄 지정(2026-10-23) — 시트 공실상태는 아직 강제퇴실이 아님 · 운영팀이 시트(공실상태 또는 빠른 메모 중도퇴실관리 상태)를 강제퇴실로 바꾸면 자동 해제" style="display:inline-block;border-radius:6px;padding:1px 8px;font-size:10.5px;background:#FFFBEB;color:#B45309;border:1px solid #FDE68A;cursor:help">관리자 지정 '+S9.adm+'건 · 시트 미반영</span>':'')
+          +'</span>'   /* [v717] */
         +'</div>'
         +(S9.payReady?'<div style="display:flex;flex-wrap:wrap;gap:4px 18px;align-items:baseline;padding:4px 16px 2px;font-size:12px;color:#475569;font-weight:700">'
           +'<span>퇴실 완료 <b style="color:#1A3A5C">'+(S9.nD||0)+'명</b> 기준</span>'
@@ -28232,7 +28263,7 @@ function exm_leadModal(kind, ix){
       if(kind==='def') return [r.cno,r.nm,r.addr,exm_fmtD8(r.fd),r.age+'일',r.f||'-',exm_fmtD8(r.d),r.real,r.st||'-'];   /* [v549] */
       if(kind==='loss') return [r.cno,r.nm,r.addr,(r.use||'-'),r.st||'-',r.sdt,r.xdt,Math.round(r.occ||0),Math.round(r.ra||0),Math.round(r.loss||0),Math.round(r.uRent||0),Math.round(r.uExit||0),Math.round(r.before||0),Math.round(r.xFee||0),Math.round(r.xPen||0),Math.round(r.xLaw||0),r.lb];   /* [v709] · [v712] */
       if(kind==='cohort') return [r.cno,r.nm,r.addr,r.gst,(r.use||'-'),r.st||'-',r.partner||'-',r.sdt,r.xdt,(r.liv!=null?r.liv:'-'),Math.round(r.tot||0),Math.round(r.rec||0),Math.round(r.unpaid||0),Math.round(r.recBefore||0),({full:'완전회수',part:'일부 회수',none:'미회수',clean:'피해 없음',prog:'진행 중'}[r.rs]||'-'),r.lb];   /* [v707] · [v709] 구분·피해액 */
-      if(kind==='gzall'){ var _a9=function(x){ return r.amt?Math.round(x||0):''; }; return [r.cno,r.nm,r.addr,r.gst,r.st||'-',(r.lp||'-'),r.sdt||'-',r.real,r.term||'-',(r.vacD!=null?r.vacD+'일':'-'),_a9(r.occ),_a9(r.ra),_a9(r.loss),_a9(r.uRent),_a9(r.uExit),_a9(r.uAll),(r.dlq||0)]; }   /* [v552] · [v713] 입주일·피해액 */
+      if(kind==='gzall'){ var _a9=function(x){ return r.amt?Math.round(x||0):''; }; return [r.cno,r.nm,r.addr,r.gst,r.st||'-',(r.lp||'-'),r.sdt||'-',r.real,r.term||'-',(r.vacD!=null?r.vacD+'일':'-'),_a9(r.occ),_a9(r.ra),_a9(r.loss),_a9(r.uRent),_a9(r.uExit),_a9(r.uAll),(r.dlq||0),(r.adm?'관리자 지정 · 시트: '+(r.sheetSt||'-'):'')]; }   /* [v552] · [v713] 입주일·피해액 · [v717] */
       return [r.cno,r.nm,r.addr,r.end,(r.dday>=0?'D-'+r.dday:'경과 '+(-r.dday)+'일'),({app:'승인',cond:'조건부승인',deny:'거절',none:'이력없음'}[r.judge]||'-'),(r.dlq||0)];   /* [v550] sched */
     });
     window._exmLeadRows.hdr=(kind==='stage')?['계약번호','계약자','물건지','계약상태','최신 기록','기록일','실퇴실일']
@@ -28245,7 +28276,7 @@ function exm_leadModal(kind, ix){
       :(kind==='def')?['계약번호','계약자','물건지','문의일','경과일','최신 기록','기록일','실퇴실일','퇴실사유']   /* [v549] */
       :(kind==='loss')?['계약번호','계약자','물건지','구분','사유','입주일','퇴실일','피해 발생','퇴실 후 회수','피해액','피해액-임대료','피해액-퇴실정산비용','거주 중 납부(참고)','제외-서비스 수수료','제외-위약금','제외-법비용','법적 단계']   /* [v709] · [v712] */
       :(kind==='cohort')?['계약번호','계약자','물건지','상태','구분','사유','부동산','입주일','퇴실일','거주(M)','피해 발생','퇴실 후 회수','피해액(미회수)','거주 중 납부(참고)','회수 상태','법적 단계']   /* [v707] */
-      :(kind==='gzall')?['계약번호','계약자','물건지','상태','퇴실사유','진척사항','입주일','실퇴실일','계약해지일','공실 경과','피해 발생','퇴실 후 회수','피해액','피해액-임대료','피해액-퇴실정산비용','전체 미납(입금내역)','연체금액(시트 CC열)']   /* [v552] · [v713] */
+      :(kind==='gzall')?['계약번호','계약자','물건지','상태','퇴실사유','진척사항','입주일','실퇴실일','계약해지일','공실 경과','피해 발생','퇴실 후 회수','피해액','피해액-임대료','피해액-퇴실정산비용','전체 미납(입금내역)','연체금액(시트 CC열)','관리자 지정']   /* [v552] · [v713] · [v717] */
       :['계약번호','계약자','물건지','만기일','D-DAY','갱신심사','연체금액'];   /* [v550] sched */
   }catch(e){ console.warn('[exm] leadModal:', e); }
 }
@@ -28712,7 +28743,7 @@ function renderExitMgmtView(){
            '강제퇴실 상태 + 계약중 + 계약해지일 미확정. 공실 부담 = 실퇴실 완료(집 비움)인데 해지 미확정 — KRG가 월세 부담 중인 건. 경과 31일+ 주황 / 61일+ 빨강. 컨설팅 구분은 빠른 메모 진척사항(부동산컨설팅확정=컨설팅중 · 부동산컨설팅제외=만기확정 · 그 외=컨설팅전)으로 자동 분류. 해지일 확정 시 퇴실대기로 이동')   /* [v551] */
     +  '</div>'
     +  '<div style="font-size:10.5px;font-weight:800;color:#64748B;margin-bottom:6px">🚧 강제퇴실 진척사항 <span style="font-weight:400;font-size:9.5px;color:#94A3B8">강제퇴실 진행 '+zForced.length+'건 · 빠른 메모 진척사항(I열) 기준 · 클릭 시 명단</span>'
-    +    '<span onclick="exmR_gzallModal()" title="입주 기간(3개월·6개월·1년·2년·전체)별 명단 · 케이알지 피해액" style="float:right;font-size:10.5px;color:#4F46E5;cursor:pointer;font-weight:800;text-decoration:underline">강제퇴실 전체 이력 보기 (진행+대기+완료 '+zGzAll.length+'건) →</span></div>'   /* [v551.3/552] */
+    +    '<span onclick="exmR_gzallModal()" title="입주 기간(3개월·6개월·1년·2년·전체)별 명단 · 케이알지 피해액" style="float:right;font-size:10.5px;color:#4F46E5;cursor:pointer;font-weight:800;text-decoration:underline">강제퇴실 전체 이력 보기 (진행+대기+완료 '+zGzAll.length+'건'+(window.__gzAdminN?' · 관리자 지정 '+window.__gzAdminN:'')+') →</span></div>'   /* [v551.3/552] */
     +  (function(){
          var b9=function(i9,no9,nm9,n9,bg9,bd9,cl9){ return '<div onclick="exm_leadModal(\'forced\','+i9+')" title="클릭 시 이 단계 명단만 표시" style="flex:1;min-width:0;cursor:pointer;background:'+(n9?bg9:'#F8FAFC')+';border:1px solid '+(n9?bd9:'#E2EAF5')+';border-radius:9px;padding:8px 10px;text-align:center">'
            +'<div style="font-size:10px;color:'+(n9?cl9:'#94A3B8')+';font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+no9+' '+nm9+'</div>'
