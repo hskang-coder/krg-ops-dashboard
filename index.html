@@ -27559,6 +27559,7 @@ function okpi_respSection(all, range, period){
 //   · 열은 헤더 이름으로 찾는다(번호·회의일·담당·대상 (계약)·할 일·완료·중요도·긴급도·기한·구분·기한일·완료일·비고) — 열 순서가 바뀌어도 동작
 //   · 색: 기한=오늘 → 노랑 · 기한 경과+미완료 → 빨강 · 완료 → 회색 (시트의 조건부 서식과 같은 규칙)
 //   · 시트는 '링크가 있는 모든 사용자 보기'여야 gviz로 읽힌다 (Operations Dashboard 미러와 같은 방식)
+//   · [v722] 연기일정 열 — 날짜가 있으면 그 날짜를 기한으로 본다 (오늘/지연 판정·정렬·일자 집계) · 목록에는 '원래 기한 → 새 기한 · 연기' 표시 (관리자 요청 2026-10-26)
 // ════════════════════════════════════════════════
 var YTD_SHEET_ID  = '1B476orgglgpiKwiykhJi8RTyKwiZUZdp-h4Fw3T-ax4';
 var YTD_SHEET_GID = '1896596494';
@@ -27576,6 +27577,7 @@ function ytd_injectCss(){
     + '.ytd-chip.done{background:#D1FAE5;color:#065F46}.ytd-chip.open{background:#EEF2FF;color:#3730A3}'
     + '.ytd-chip.today{background:#FEF3C7;color:#92400E}.ytd-chip.late{background:#FEE2E2;color:#991B1B}'
     + '.ytd-chip.meet{background:#fff;border:1px solid #E5E7EB;color:#6B7280;font-weight:600}'
+    + '.ytd-chip.post{background:#DBEAFE;color:#1E40AF}'   /* [v722] 연기 */
     + '.ytd-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}'
     + '@media(max-width:900px){.ytd-grid{grid-template-columns:1fr}}'
     + '.ytd-card{border:1px solid #F3F4F6;border-radius:6px;padding:8px 10px;background:#FAFAFA}'
@@ -27598,6 +27600,7 @@ function ytd_injectCss(){
     + '.ytd-tbl tr.done td{background:#F3F4F6;color:#9CA3AF;text-decoration:line-through}'
     + '.ytd-tag{display:inline-block;padding:0 5px;border-radius:3px;font-size:10px;font-weight:700}'
     + '.ytd-tag.hi{background:#FEE2E2;color:#991B1B}.ytd-tag.mid{background:#FEF3C7;color:#92400E}.ytd-tag.lo{background:#F3F4F6;color:#6B7280}'
+    + '.ytd-tag.post{background:#DBEAFE;color:#1E40AF}.ytd-due-old{color:#9CA3AF;text-decoration:line-through}'   /* [v722] */
     + '.ytd-sheet-link{margin-left:auto;font-size:11px;font-weight:600;color:#4F46E5;text-decoration:none;border:1px solid #C7D2FE;padding:2px 8px;border-radius:4px;background:#fff}'
     + '.ytd-sheet-link:hover{background:#EEF2FF}'
     + '.ytd-foot{font-size:10.5px;color:#9CA3AF;margin-top:6px}';
@@ -27626,17 +27629,19 @@ function ytd_parse(resp){
   var cols = (resp.table.cols || []).map(function(c){ return String(c.label || '').trim(); });
   var ix = function(){ for (var i = 0; i < arguments.length; i++){ var k = cols.indexOf(arguments[i]); if (k >= 0) return k; } return -1; };
   var I = { no: ix('번호'), meet: ix('회의일', '작성일'), who: ix('담당', '담당자'), tgt: ix('대상 (계약)', '대상'), task: ix('할 일', '할일', '업무내용'),
-            done: ix('완료'), imp: ix('중요도'), urg: ix('긴급도'), due: ix('기한'), kind: ix('구분'), dueD: ix('기한일'), doneAt: ix('완료일'), memo: ix('비고') };
+            done: ix('완료'), imp: ix('중요도'), urg: ix('긴급도'), due: ix('기한'), kind: ix('구분'), dueD: ix('기한일'), doneAt: ix('완료일'), memo: ix('비고'),
+            post: ix('연기일정', '연기일', '연기') };   /* [v722] */
   var t0 = new Date(); t0.setHours(0, 0, 0, 0);
   return (resp.table.rows || []).map(function(r){
     var c = r.c || [], g = function(i){ return (i >= 0) ? c[i] : null; };
     var task = ytd_str(g(I.task)); if (!task) return null;
-    var dueD = ytd_date(g(I.dueD)) || ytd_date(g(I.due));
+    var post = ytd_date(g(I.post));   /* [v722] 연기일정이 있으면 그 날짜가 기한 */
+    var dueD = post || ytd_date(g(I.dueD)) || ytd_date(g(I.due));
     var done = ytd_bool(g(I.done));
     var diff = dueD ? Math.round((dueD - t0) / 864e5) : null;
     return { no: ytd_str(g(I.no)), meet: ytd_date(g(I.meet)), meetS: ytd_str(g(I.meet)), who: ytd_str(g(I.who)), tgt: ytd_str(g(I.tgt)), task: task,
              done: done, imp: ytd_str(g(I.imp)), urg: ytd_str(g(I.urg)), due: ytd_str(g(I.due)), kind: ytd_str(g(I.kind)) || '기타', dueD: dueD,
-             doneAt: ytd_str(g(I.doneAt)), memo: ytd_str(g(I.memo)),
+             doneAt: ytd_str(g(I.doneAt)), memo: ytd_str(g(I.memo)), post: post,
              st: done ? 'done' : (diff === 0 ? 'today' : ((diff != null && diff < 0) ? 'late' : 'open')) };
   }).filter(Boolean);
 }
@@ -27652,6 +27657,7 @@ function ytd_html(rows){
   var all = rows.length, done = rows.filter(function(r){ return r.done; }).length;
   var open = all - done, today = rows.filter(function(r){ return r.st === 'today'; }).length, late = rows.filter(function(r){ return r.st === 'late'; }).length;
   var pct = all ? Math.round(done / all * 100) : 0;
+  var postN = rows.filter(function(r){ return r.post && !r.done; }).length;   /* [v722] 연기 중(미완료) */
   /* 최근 회의 · 누적 회의 수 */
   var meets = rows.map(function(r){ return r.meet ? r.meet.getTime() : 0; }).filter(Boolean);
   var lastM = meets.length ? new Date(Math.max.apply(null, meets)) : null;
@@ -27676,10 +27682,11 @@ function ytd_html(rows){
   });
   var trs = list.map(function(r){
     var dueTxt = r.due || (r.dueD ? ytd_md(r.dueD) : '-');
+    var dueHtml = r.post ? ((r.due ? ('<span class="ytd-due-old">' + ytd_esc(r.due) + '</span> → ') : '') + ytd_md(r.post) + ' <span class="ytd-tag post">연기</span>') : ytd_esc(dueTxt);   /* [v722] 원래 기한 → 새 기한 */
     var mark = (r.st === 'late') ? '⚠️ ' : (r.st === 'today') ? '📍 ' : '';
     return '<tr class="' + r.st + '"><td class="c">' + ytd_esc(r.no) + '</td><td class="c">' + ytd_esc(r.meetS || ytd_md(r.meet)) + '</td><td class="c">' + ytd_esc(r.who) + '</td>'
       + '<td>' + ytd_esc(r.tgt) + '</td><td>' + ytd_esc(r.task) + (r.memo ? (' <span style="color:#9CA3AF">· ' + ytd_esc(r.memo) + '</span>') : '') + '</td>'
-      + '<td class="c">' + ytd_tag(r.imp) + ' ' + ytd_tag(r.urg) + '</td><td class="c">' + mark + ytd_esc(dueTxt) + '</td><td class="c">' + ytd_esc(r.kind) + '</td></tr>';
+      + '<td class="c">' + ytd_tag(r.imp) + ' ' + ytd_tag(r.urg) + '</td><td class="c">' + mark + dueHtml + '</td><td class="c">' + ytd_esc(r.kind) + '</td></tr>';
   }).join('');
   var at = (window._ytd && window._ytd.at) ? new Date(window._ytd.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
   return '<div class="ytd-wrap">'
@@ -27689,6 +27696,7 @@ function ytd_html(rows){
     +   '<span class="ytd-chip open">미완료 <b>' + open + '</b></span>'
     +   '<span class="ytd-chip today">📍 오늘 마감 <b>' + today + '</b></span>'
     +   '<span class="ytd-chip late">⚠️ 지연 <b>' + late + '</b></span>'
+    +   (postN ? ('<span class="ytd-chip post">🔁 연기 <b>' + postN + '</b></span>') : '')   /* [v722] */
     +   (lastM ? ('<span class="ytd-chip meet">최근 회의 ' + ytd_md(lastM) + ' · 신규 ' + lastN + '건 · 누적 회의 ' + meetCnt + '회</span>') : '')
     + '</div>'
     + '<div class="ytd-grid">'
@@ -27700,7 +27708,7 @@ function ytd_html(rows){
     + '<div class="ytd-tbl-wrap"><table class="ytd-tbl"><thead><tr><th>No</th><th>회의일</th><th>담당</th><th>대상 (계약)</th><th>할 일</th><th>중요·긴급</th><th>기한</th><th>구분</th></tr></thead><tbody>'
     +   (trs || '<tr><td colspan="8" style="text-align:center;color:#9CA3AF;padding:14px">미완료 항목이 없습니다 🎉</td></tr>')
     + '</tbody></table></div>'
-    + '<div class="ytd-foot">노랑 = 기한이 오늘 · 빨강 = 기한 경과(미완료) · 회색 = 완료 · 담당자가 시트에서 완료 체크 → 새로고침 시 바로 반영 · 갱신 ' + at + '</div>'
+    + '<div class="ytd-foot">노랑 = 기한이 오늘 · 빨강 = 기한 경과(미완료) · 회색 = 완료 · 파랑 = 연기(새 기한으로 집계) · 담당자가 시트에서 완료 체크 → 새로고침 시 바로 반영 · 갱신 ' + at + '</div>'
     + '</div>';
 }
 function ytd_toggleDone(){ window._ytd.showDone = !window._ytd.showDone; var box = document.getElementById('ytdBox'); if (box && window._ytd.rows) box.innerHTML = ytd_html(window._ytd.rows); }
