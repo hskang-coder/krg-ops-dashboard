@@ -27553,6 +27553,173 @@ function okpi_respSection(all, range, period){
     + tipBox;
 }
 
+// ════════════════════════════════════════════════
+// ▶ [v721] 운영관리 › 📝 연체회의 To-do 진척 — 연체회의 녹취에서 뽑은 To-do 시트(별도 파일)를 실시간으로 읽어 진척을 보여준다 (관리자 요청 2026-10-26)
+//   · 원본: '연체회의 To-do (담당자 체크)' 스프레드시트 To-do 탭 — 담당자가 시트에서 완료 체크 → 대시보드 새로고침/자동갱신 시 바로 반영
+//   · 열은 헤더 이름으로 찾는다(번호·회의일·담당·대상 (계약)·할 일·완료·중요도·긴급도·기한·구분·기한일·완료일·비고) — 열 순서가 바뀌어도 동작
+//   · 색: 기한=오늘 → 노랑 · 기한 경과+미완료 → 빨강 · 완료 → 회색 (시트의 조건부 서식과 같은 규칙)
+//   · 시트는 '링크가 있는 모든 사용자 보기'여야 gviz로 읽힌다 (Operations Dashboard 미러와 같은 방식)
+// ════════════════════════════════════════════════
+var YTD_SHEET_ID  = '1B476orgglgpiKwiykhJi8RTyKwiZUZdp-h4Fw3T-ax4';
+var YTD_SHEET_GID = '1896596494';
+var YTD_SHEET_URL = 'https://docs.google.com/spreadsheets/d/' + YTD_SHEET_ID + '/edit#gid=' + YTD_SHEET_GID;
+window._ytd = window._ytd || { showDone: false, rows: null, at: 0 };
+
+function ytd_injectCss(){
+  if (document.getElementById('ytd-style')) return;
+  var s = document.createElement('style'); s.id = 'ytd-style';
+  s.textContent = ''
+    + '.ytd-wrap{background:#fff;border:1.5px solid #E5E7EB;border-radius:8px;padding:10px 12px;margin-bottom:12px}'
+    + '.ytd-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}'
+    + '.ytd-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;background:#F3F4F6;color:#374151}'
+    + '.ytd-chip b{font-size:13px;font-variant-numeric:tabular-nums}'
+    + '.ytd-chip.done{background:#D1FAE5;color:#065F46}.ytd-chip.open{background:#EEF2FF;color:#3730A3}'
+    + '.ytd-chip.today{background:#FEF3C7;color:#92400E}.ytd-chip.late{background:#FEE2E2;color:#991B1B}'
+    + '.ytd-chip.meet{background:#fff;border:1px solid #E5E7EB;color:#6B7280;font-weight:600}'
+    + '.ytd-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}'
+    + '@media(max-width:900px){.ytd-grid{grid-template-columns:1fr}}'
+    + '.ytd-card{border:1px solid #F3F4F6;border-radius:6px;padding:8px 10px;background:#FAFAFA}'
+    + '.ytd-card-t{font-size:11px;font-weight:700;color:#6B7280;margin-bottom:6px}'
+    + '.ytd-bar-row{display:grid;grid-template-columns:86px 1fr 74px;gap:8px;align-items:center;padding:3px 0;font-size:11.5px}'
+    + '.ytd-bar-row .nm{font-weight:700;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    + '.ytd-bar-row .num{text-align:right;font-variant-numeric:tabular-nums;color:#4B5563;font-weight:600;white-space:nowrap}'
+    + '.ytd-bar{height:8px;background:#E5E7EB;border-radius:4px;overflow:hidden}'
+    + '.ytd-bar>i{display:block;height:100%;background:#10B981;border-radius:4px;transition:width .4s}'
+    + '.ytd-tools{display:flex;gap:6px;align-items:center;justify-content:space-between;margin:4px 0 6px;flex-wrap:wrap}'
+    + '.ytd-tools .l{font-size:11px;font-weight:700;color:#6B7280}'
+    + '.ytd-btn{padding:3px 10px;border:1.5px solid #D1D5DB;background:#fff;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;color:#374151}'
+    + '.ytd-btn.active{background:#4F46E5;color:#fff;border-color:#4F46E5}'
+    + '.ytd-tbl-wrap{max-height:440px;overflow:auto;border:1px solid #F3F4F6;border-radius:6px}'
+    + '.ytd-tbl{width:100%;border-collapse:collapse;font-size:11.5px}'
+    + '.ytd-tbl th{position:sticky;top:0;background:#F9FAFB;color:#6B7280;font-weight:700;text-align:left;padding:6px 8px;border-bottom:1px solid #E5E7EB;white-space:nowrap;z-index:1}'
+    + '.ytd-tbl td{padding:5px 8px;border-bottom:1px solid #F3F4F6;vertical-align:top;color:#1F2937}'
+    + '.ytd-tbl td.c{text-align:center;white-space:nowrap}'
+    + '.ytd-tbl tr.today td{background:#FEF3C7}.ytd-tbl tr.late td{background:#FEE2E2}'
+    + '.ytd-tbl tr.done td{background:#F3F4F6;color:#9CA3AF;text-decoration:line-through}'
+    + '.ytd-tag{display:inline-block;padding:0 5px;border-radius:3px;font-size:10px;font-weight:700}'
+    + '.ytd-tag.hi{background:#FEE2E2;color:#991B1B}.ytd-tag.mid{background:#FEF3C7;color:#92400E}.ytd-tag.lo{background:#F3F4F6;color:#6B7280}'
+    + '.ytd-sheet-link{margin-left:auto;font-size:11px;font-weight:600;color:#4F46E5;text-decoration:none;border:1px solid #C7D2FE;padding:2px 8px;border-radius:4px;background:#fff}'
+    + '.ytd-sheet-link:hover{background:#EEF2FF}'
+    + '.ytd-foot{font-size:10.5px;color:#9CA3AF;margin-top:6px}';
+  document.head.appendChild(s);
+}
+async function ytd_fetch(){
+  var url = 'https://docs.google.com/spreadsheets/d/' + YTD_SHEET_ID + '/gviz/tq?tqx=out:json'
+          + '&gid=' + YTD_SHEET_GID + '&range=A:Z' + '&tq=' + encodeURIComponent('SELECT *') + '&headers=1' + '&_t=' + Date.now();
+  var res = await fetch(url, { cache: 'no-store' });
+  var text = await res.text();
+  var m = text.match(/setResponse\((\{[\s\S]+\})\)/);
+  if (!m) throw new Error('parse error (시트 공개 설정 확인)');
+  return JSON.parse(m[1]);
+}
+function ytd_date(cell){   /* gviz 셀 → Date(00:00) · 날짜가 아니면 null */
+  if (!cell || cell.v == null) return null;
+  var v = cell.v, m;
+  if (typeof v === 'string' && (m = v.match(/^Date\((\d+),(\d+),(\d+)/))) return new Date(+m[1], +m[2], +m[3]);
+  if (v instanceof Date) return new Date(v.getFullYear(), v.getMonth(), v.getDate());
+  return null;
+}
+function ytd_str(cell){ if (!cell) return ''; var v = (cell.f != null) ? cell.f : cell.v; return (v == null) ? '' : String(v).trim(); }
+function ytd_bool(cell){ if (!cell) return false; var v = cell.v; return v === true || String(v).trim().toUpperCase() === 'TRUE'; }
+function ytd_parse(resp){
+  if (!resp || !resp.table) return [];
+  var cols = (resp.table.cols || []).map(function(c){ return String(c.label || '').trim(); });
+  var ix = function(){ for (var i = 0; i < arguments.length; i++){ var k = cols.indexOf(arguments[i]); if (k >= 0) return k; } return -1; };
+  var I = { no: ix('번호'), meet: ix('회의일', '작성일'), who: ix('담당', '담당자'), tgt: ix('대상 (계약)', '대상'), task: ix('할 일', '할일', '업무내용'),
+            done: ix('완료'), imp: ix('중요도'), urg: ix('긴급도'), due: ix('기한'), kind: ix('구분'), dueD: ix('기한일'), doneAt: ix('완료일'), memo: ix('비고') };
+  var t0 = new Date(); t0.setHours(0, 0, 0, 0);
+  return (resp.table.rows || []).map(function(r){
+    var c = r.c || [], g = function(i){ return (i >= 0) ? c[i] : null; };
+    var task = ytd_str(g(I.task)); if (!task) return null;
+    var dueD = ytd_date(g(I.dueD)) || ytd_date(g(I.due));
+    var done = ytd_bool(g(I.done));
+    var diff = dueD ? Math.round((dueD - t0) / 864e5) : null;
+    return { no: ytd_str(g(I.no)), meet: ytd_date(g(I.meet)), meetS: ytd_str(g(I.meet)), who: ytd_str(g(I.who)), tgt: ytd_str(g(I.tgt)), task: task,
+             done: done, imp: ytd_str(g(I.imp)), urg: ytd_str(g(I.urg)), due: ytd_str(g(I.due)), kind: ytd_str(g(I.kind)) || '기타', dueD: dueD,
+             doneAt: ytd_str(g(I.doneAt)), memo: ytd_str(g(I.memo)),
+             st: done ? 'done' : (diff === 0 ? 'today' : ((diff != null && diff < 0) ? 'late' : 'open')) };
+  }).filter(Boolean);
+}
+function ytd_esc(t){ return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function ytd_md(d){ return d ? ((d.getMonth() + 1) + '/' + d.getDate()) : ''; }
+function ytd_tag(v){ var c = (v === '상') ? 'hi' : (v === '중') ? 'mid' : 'lo'; return v ? ('<span class="ytd-tag ' + c + '">' + ytd_esc(v) + '</span>') : ''; }
+function ytd_barRow(nm, done, total){
+  var p = total ? Math.round(done / total * 100) : 0;
+  return '<div class="ytd-bar-row"><span class="nm" title="' + ytd_esc(nm) + '">' + ytd_esc(nm) + '</span><div class="ytd-bar"><i style="width:' + p + '%"></i></div><span class="num">' + done + '/' + total + ' · ' + p + '%</span></div>';
+}
+function ytd_html(rows){
+  rows = rows || [];
+  var all = rows.length, done = rows.filter(function(r){ return r.done; }).length;
+  var open = all - done, today = rows.filter(function(r){ return r.st === 'today'; }).length, late = rows.filter(function(r){ return r.st === 'late'; }).length;
+  var pct = all ? Math.round(done / all * 100) : 0;
+  /* 최근 회의 · 누적 회의 수 */
+  var meets = rows.map(function(r){ return r.meet ? r.meet.getTime() : 0; }).filter(Boolean);
+  var lastM = meets.length ? new Date(Math.max.apply(null, meets)) : null;
+  var lastN = lastM ? rows.filter(function(r){ return r.meet && r.meet.getTime() === lastM.getTime(); }).length : 0;
+  var seenM = {}; meets.forEach(function(t){ seenM[t] = 1; }); var meetCnt = Object.keys(seenM).length;
+  /* 구분별 (일자별 · 주간 · 기타) */
+  var kinds = ['일자별', '주간', '기타'];
+  var kHtml = kinds.map(function(k){ var g = rows.filter(function(r){ return r.kind === k; }); return ytd_barRow(k, g.filter(function(r){ return r.done; }).length, g.length); }).join('');
+  /* 담당자별 — '오진선 차장·강휘수 이사'처럼 공동 담당은 각자에게 집계 (시트 현황 탭과 동일 규칙) */
+  var people = [], seen = {};
+  rows.forEach(function(r){ String(r.who || '').split(/[·,\/]/).forEach(function(p){ p = p.trim(); if (p && !seen[p]) { seen[p] = 1; people.push(p); } }); });
+  var pHtml = people.map(function(p){ var g = rows.filter(function(r){ return String(r.who || '').indexOf(p) >= 0; }); return ytd_barRow(p, g.filter(function(r){ return r.done; }).length, g.length); }).join('');
+  /* 목록 — 기본 미완료만 · 지연 → 오늘 → 기한 가까운 순 → 긴급도 → 중요도 → 번호 */
+  var showDone = !!(window._ytd && window._ytd.showDone);
+  var U = { '상': 0, '중': 1, '하': 2 }, ST = { late: 0, today: 1, open: 2, done: 3 };
+  var list = rows.filter(function(r){ return showDone || !r.done; }).slice().sort(function(a, b){
+    if (ST[a.st] !== ST[b.st]) return ST[a.st] - ST[b.st];
+    var da = a.dueD ? a.dueD.getTime() : 9e15, db = b.dueD ? b.dueD.getTime() : 9e15; if (da !== db) return da - db;
+    var ua = (U[a.urg] != null) ? U[a.urg] : 9, ub = (U[b.urg] != null) ? U[b.urg] : 9; if (ua !== ub) return ua - ub;
+    var ia = (U[a.imp] != null) ? U[a.imp] : 9, ib = (U[b.imp] != null) ? U[b.imp] : 9; if (ia !== ib) return ia - ib;
+    return (parseFloat(a.no) || 0) - (parseFloat(b.no) || 0);
+  });
+  var trs = list.map(function(r){
+    var dueTxt = r.due || (r.dueD ? ytd_md(r.dueD) : '-');
+    var mark = (r.st === 'late') ? '⚠️ ' : (r.st === 'today') ? '📍 ' : '';
+    return '<tr class="' + r.st + '"><td class="c">' + ytd_esc(r.no) + '</td><td class="c">' + ytd_esc(r.meetS || ytd_md(r.meet)) + '</td><td class="c">' + ytd_esc(r.who) + '</td>'
+      + '<td>' + ytd_esc(r.tgt) + '</td><td>' + ytd_esc(r.task) + (r.memo ? (' <span style="color:#9CA3AF">· ' + ytd_esc(r.memo) + '</span>') : '') + '</td>'
+      + '<td class="c">' + ytd_tag(r.imp) + ' ' + ytd_tag(r.urg) + '</td><td class="c">' + mark + ytd_esc(dueTxt) + '</td><td class="c">' + ytd_esc(r.kind) + '</td></tr>';
+  }).join('');
+  var at = (window._ytd && window._ytd.at) ? new Date(window._ytd.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
+  return '<div class="ytd-wrap">'
+    + '<div class="ytd-chips">'
+    +   '<span class="ytd-chip">전체 <b>' + all + '</b></span>'
+    +   '<span class="ytd-chip done">완료 <b>' + done + '</b> (' + pct + '%)</span>'
+    +   '<span class="ytd-chip open">미완료 <b>' + open + '</b></span>'
+    +   '<span class="ytd-chip today">📍 오늘 마감 <b>' + today + '</b></span>'
+    +   '<span class="ytd-chip late">⚠️ 지연 <b>' + late + '</b></span>'
+    +   (lastM ? ('<span class="ytd-chip meet">최근 회의 ' + ytd_md(lastM) + ' · 신규 ' + lastN + '건 · 누적 회의 ' + meetCnt + '회</span>') : '')
+    + '</div>'
+    + '<div class="ytd-grid">'
+    +   '<div class="ytd-card"><div class="ytd-card-t">구분별 진척 (완료/전체)</div>' + kHtml + '</div>'
+    +   '<div class="ytd-card"><div class="ytd-card-t">담당자별 진척 (완료/전체)</div>' + (pHtml || '<div class="ytd-foot">담당 없음</div>') + '</div>'
+    + '</div>'
+    + '<div class="ytd-tools"><span class="l">' + (showDone ? '전체 목록' : '미완료 목록') + ' ' + list.length + '건 — 지연 → 오늘 → 기한순</span>'
+    +   '<span><button class="ytd-btn' + (showDone ? ' active' : '') + '" onclick="ytd_toggleDone()">완료 포함</button> <button class="ytd-btn" onclick="ytd_render(true)">↻ 새로고침</button></span></div>'
+    + '<div class="ytd-tbl-wrap"><table class="ytd-tbl"><thead><tr><th>No</th><th>회의일</th><th>담당</th><th>대상 (계약)</th><th>할 일</th><th>중요·긴급</th><th>기한</th><th>구분</th></tr></thead><tbody>'
+    +   (trs || '<tr><td colspan="8" style="text-align:center;color:#9CA3AF;padding:14px">미완료 항목이 없습니다 🎉</td></tr>')
+    + '</tbody></table></div>'
+    + '<div class="ytd-foot">노랑 = 기한이 오늘 · 빨강 = 기한 경과(미완료) · 회색 = 완료 · 담당자가 시트에서 완료 체크 → 새로고침 시 바로 반영 · 갱신 ' + at + '</div>'
+    + '</div>';
+}
+function ytd_toggleDone(){ window._ytd.showDone = !window._ytd.showDone; var box = document.getElementById('ytdBox'); if (box && window._ytd.rows) box.innerHTML = ytd_html(window._ytd.rows); }
+async function ytd_render(force){
+  var box = document.getElementById('ytdBox'); if (!box) return;
+  ytd_injectCss();
+  if (window._ytd.rows && !force) { try { box.innerHTML = ytd_html(window._ytd.rows); } catch(_e){} }   /* 자동갱신 재렌더 시 깜빡임 방지 — 캐시를 먼저 그리고 새로 읽는다 */
+  try {
+    var resp = await ytd_fetch();
+    window._ytd.rows = ytd_parse(resp); window._ytd.at = Date.now();
+    box = document.getElementById('ytdBox'); if (!box) return;
+    box.innerHTML = ytd_html(window._ytd.rows);
+  } catch(e){
+    console.warn('[v721] ytd fetch 실패:', e);
+    box = document.getElementById('ytdBox'); if (!box) return;
+    if (!window._ytd.rows) box.innerHTML = '<div class="okpi-empty">❌ 연체회의 To-do 시트를 읽지 못했습니다 — 시트 공유가 "링크가 있는 모든 사용자 보기"인지 확인하세요 (' + ytd_esc((e && e.message) || e) + ')</div>';
+  }
+}
+
 async function okpi_render(){
   try {
     okpi_injectCss();
@@ -27591,11 +27758,14 @@ async function okpi_render(){
       + '<div id="odtOpsBox">' + (typeof odt_opsHtml === 'function' ? odt_opsHtml() : '') + '</div>'   /* [v673] 연체 해소 흐름(입금내역 기준 · 전수) — 연체추이 Raw DATA */
       + '<div id="dresBox">' + dpay_resBlock() + '</div>'
       + okpi_respSection(_callRows, _callRange, _callPeriod)   /* [v557] 담당자별 대응 KPI */
+      + '<div class="okpi-section-title">📝 연체회의 To-do 진척 <span class="pill">녹취 → 시트 · 담당자 체크 → 실시간</span><a class="ytd-sheet-link" href="' + YTD_SHEET_URL + '" target="_blank" rel="noopener">시트에서 체크 ↗</a></div>'   /* [v721] 연체회의 To-do 진척 — 별도 시트(연체회의 To-do) 실시간 */
+      + '<div id="ytdBox"><div class="okpi-empty">📡 연체회의 To-do 로딩 중...</div></div>'
       + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
       + okpi_renderChart(k)
       + okpi_renderPersonCards(k)
       + okpi_imdaeSection()   /* [v652] 📋 임대차신고 기한 알람 — 📌 관리자 확인 중요사항(okpi_importantSection) 대체 (요청으로 제거 · 코드는 보존) */
       + '</div>';
+    try { ytd_render(); } catch(_ye){ console.warn('[v721] ytd render', _ye); }   /* [v721] 연체회의 To-do 진척 — 별도 fetch (KPI 렌더를 막지 않음) */
   } catch(e) {
     console.error('[okpi] render fatal:', e);
     var host = document.querySelector('#opskpiView .okpi-inner');
