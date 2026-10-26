@@ -6173,7 +6173,7 @@ async function renderSettlementView(){
     V.forEach(function(v){ var u=String(v.useType||'').trim(); if(u) useMap[String(v.no).trim()]=u; });
     var _useF=window._stlUse||'total';
     var _useOk=function(cno){ if(_useF==='total') return true; var u=useMap[String(cno||'').trim()]||''; return _useF==='res'? u.indexOf('주거')>=0 : (u.indexOf('상업')>=0||u.indexOf('상가')>=0); };
-    var tb={rows:0,ctr:{},amt:0,paid:0,on:0,sch:0}, subro={amt:0,n:0}, sched={n:0,amt:0};   /* [v715] on = 정상납부 · sch = 납부예정 */
+    var tb={rows:0,ctr:{},amt:0,paid:0,on:0,sch:0}, subro={amt:0,n:0}, sched={n:0,amt:0,rsvN:0,rsvAmt:0,lateN:0,lateAmt:0};   /* [v720] rsv = 이체예약 포함분 · late = 예정일 경과 미지급(기간 무관) */   /* [v715] on = 정상납부 · sch = 납부예정 */
     var firstD={n:0,amt:0,paid:0};   // [v532.1] 첫달 직납 (임차인→임대인 직접)
     var unpaidMap={};   // [v514] 계약번호|청구월 → 미납 합 (대위변제 매칭용)
     P.forEach(function(p){
@@ -6196,9 +6196,13 @@ async function renderSettlementView(){
     // [v514] 정산예정·대위변제 — 정산내역(Raw DATA) V열(정산예정일) 실데이터 기준 (납부일+3 추정 폐기)
     (window.__stlSchedRows||[]).forEach(function(s){
       if(!_useOk(s.cno)) return;   // [v537] 주거/상업 필터
-      var vd=_bfPd(s.v); if(!_inR(vd)) return;
-      var done = s.state==='완료' || String(s.state||'').indexOf('예약')>=0 || s.state==='제외' || !!s.paidAt;   // [v531.2/3] N열 완료·예약(이체예약)·제외(무효 정산서) 또는 X열 실지급일 → 집계 제외
+      var vd=_bfPd(s.v);
+      var done = s.state==='완료' || s.state==='제외' || !!s.paidAt;   // [v531.2/3] N열 완료·제외(무효 정산서) 또는 X열 실지급일 → 집계 제외 · [v720] 예약(이체예약)은 아직 미지급이므로 포함
       if(done || !(s.amt>0)) return;
+      var rsv=String(s.state||'').indexOf('예약')>=0;
+      if(vd && vd<today && !_inR(vd) && !rsv){ sched.lateN++; sched.lateAmt+=s.amt; }   /* [v720] 예정일 경과 미지급(미실행·실패) — 기간 밖(이전) 건 · 기간 무관 표시 · 이체예약은 제외 */
+      if(!_inR(vd)) return;
+      if(rsv){ sched.rsvN++; sched.rsvAmt+=s.amt; }
       sched.n++; sched.amt+=s.amt;                             // 임대인 지급 예정 (T열)
       // [v518] 대위변제 = 정산예정(미지급) 건 중 임차인이 미납인 건 → 정산예정건수/금액의 부분집합
       //   지급액 상한은 정산금액(T열)이므로 min(미납, T) — 미납에 연체료가 섞여 T를 넘는 케이스 방어
@@ -6380,8 +6384,9 @@ async function renderSettlementView(){
         + kpi('정산완료건수', doneS.n+'건', '기간 내 임대인 실지급(X열) 완료', '#F0FDF4','#166534')
         + kpi('정산완료금액', won(doneS.amt), '기간 내 임대인 지급 완료 (정산내역 T열)', '#F0FDF4','#166534')
         : kpi('대위변제금액 <span style="font-weight:400">(예정)</span>', won(subro.amt), subro.n+'건 · 정산예정 중 임차인 미납 → KRG 선지급 예정', '#FEF2F2','#A32D2D')
-        + kpi('정산예정건수', sched.n+'건', '정산예정일 도래 · 미지급'+(smOk?'':' · 판별불가'), '#F0FDF4','#166534')
-        + kpi('정산예정금액', won(sched.amt), '임대인 지급 예정 (정산내역 T열)', '#F0FDF4','#166534'))
+        + kpi('정산예정건수', sched.n+'건', '기간 내 정산예정일 · 미지급(미실행·실패·이체예약)'+(sched.rsvN?' · 이체예약 '+sched.rsvN+'건 포함':'')+(smOk?'':' · 판별불가')
+            +(sched.lateN?'<br><span title="정산예정일이 오늘 이전인데 아직 미지급(미실행·실패)인 건 — 선택 기간과 무관" style="color:#B91C1C;font-weight:700">⚠ 예정일 경과 미지급 '+sched.lateN+'건 · '+won(sched.lateAmt)+'</span>':''), '#F0FDF4','#166534')   /* [v720] */
+        + kpi('정산예정금액', won(sched.amt), '임대인 지급 예정 (정산내역 T열)'+(sched.rsvN?'<br>이체예약 '+won(sched.rsvAmt)+' 포함 · 미실행 '+won(sched.amt-sched.rsvAmt):''), '#F0FDF4','#166534'))   /* [v720] */
       +'</div>';
     // [v532] ② 자금 현황 — A안 그룹 박스 (기간유보금 카드·청구총액 카드·유보금 파이프라인 박스·청구 구성 막대 통합/삭제)
     html+=secHd('②','자금 현황','보관 · 채권 · 유보');
