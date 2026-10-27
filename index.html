@@ -1194,6 +1194,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .dlq-days-badge { display:inline-block; padding:2px 7px; border-radius:10px; font-size:11px; font-weight:600; }
 .dlq-days-low  { background:#dcfce7; color:#166534; }
 .dlq-days-mid  { background:#fef9c3; color:#854d0e; }
+.dlq-alt-tag   { display:inline-block; margin-left:4px; padding:1px 5px; border-radius:4px; background:#EEF2FF; color:#3730A3; font-size:10px; font-weight:700; white-space:nowrap; vertical-align:middle; }   /* [v725] 임대료 외 항목 연체 표시 */
 .dlq-days-high { background:#ffedd5; color:#9a3412; }
 .dlq-days-crit { background:#fee2e2; color:#991b1b; }
 .dlq-pay-date-badge { font-size:11px; font-weight:600; white-space:nowrap; }   /* [v663] 날짜·시각은 한 줄 유지(경과 배지만 다음 줄로) */
@@ -8278,6 +8279,7 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
   const contractDetails = {}; // cno → { group, 연체구분, days, amt }
   const amtSumMap = {};
   const delinqDaysMap = {}; // cno → max ad29 where t19=연체중/분납중
+  const altDaysMap = {};    // [v725] cno → 임대료 외 항목(변동관리비·기타 등) 연체중/분납중 { days, type, 연체구분, group, active } — 목록 표시 전용
   rows.forEach(row => {
     const c = row.c || [];
     const tipo  = c[_iTipo]  ? String(c[_iTipo].v  ?? '') : '';
@@ -8301,6 +8303,13 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
         contractDetails[cno] = { group: tipo, 연체구분: t19, days: ad29, active: _act };
       }
     }
+    // [v725] 임대료 외 항목(변동관리비·기타 등) 연체중/분납중 — 임대료 연체가 없는 계약의 목록 표시용. 계약중 행 우선, 같은 급이면 ad열 최대 (contractDetails와 같은 규칙)
+    if (f5 !== '임대료' && (t19 === '연체중' || t19 === '분납중') && n13 !== '삭제' && n13 !== '계약 철회' && ad29 > 0) {
+      const _ca = altDaysMap[cno], _aa = (n13 === '계약중');
+      if (!_ca || (_aa && !_ca.active) || (_aa === !!_ca.active && ad29 > _ca.days)) {
+        altDaysMap[cno] = { days: ad29, type: f5, 연체구분: t19, group: tipo, active: _aa };
+      }
+    }
     if (n13 === '계약중') allActiveSet.add(cno);
     if (ad29 <= 0) return;
     const key = cno;
@@ -8319,6 +8328,12 @@ function parseIncomeForDlqV2(resp, extDlqCnoSet) {
   Object.keys(amtSumMap).forEach(cno => {
     if (!contractDetails[cno]) contractDetails[cno] = { group: '-', 연체구분: '-', days: 0 };
     contractDetails[cno].amt = amtSumMap[cno] || 0;
+  });
+  // [v725] 임대료 외 항목 연체일수를 부가 정보로만 저장 — 기존 항목이 있을 때만(ad>0 행은 위 amtSumMap 루프에서 항상 생성됨). days/group/연체구분·KPI 버킷·유형 분포 불변
+  Object.keys(altDaysMap).forEach(cno => {
+    const _d = contractDetails[cno]; if (!_d) return;
+    const _a = altDaysMap[cno];
+    _d.altDays = _a.days; _d.altType = _a.type; _d.alt연체구분 = _a.연체구분; _d.altGroup = _a.group;
   });
   totalContracts = allActiveSet.size;
   // [v263] KPI 버킷 산출을 목록 표시값(contractDetails.days, 임대료 연체일수)과 일치시킴
@@ -10494,9 +10509,10 @@ function buildDlqUI(d1, d2, d3, d4) {
       info:       d1r.info  || '-',
       tel:        d1r.tel   || d4r.tel   || '-',
       delinqType: d4r.delinqType || '-',
-      group:      det.group,
+      group:      (det.group && det.group !== '-') ? det.group : (det.altGroup || det.group),   /* [v725] 임대료 행이 없으면 다른 항목 행의 구분(같은 계약) */
       연체구분:    det.연체구분,
       days:       det.days,
+      rentDays:   det.days || 0, altDays: det.altDays || 0, altType: det.altType || '', alt연체구분: det.alt연체구분 || '',   /* [v725] 임대료 연체 없을 때 표시용 — days는 그대로 */
       dateStr:    pay.dateStr, payStatus: pay.payStatus, content: pay.content, actionDateStr: pay.actionDateStr || '-',
       contractStatus: '계약중',
       vacancyStatus: ((Array.isArray(vacancyRawData)?vacancyRawData.find(v=>String(v.no).trim()===cno):null)||{}).status || ''
@@ -10521,9 +10537,10 @@ function buildDlqUI(d1, d2, d3, d4) {
       info:       r.info  || '-',
       tel:        r.tel   || '-',
       delinqType: '-',
-      group:      det.group || r.grade || '-',
+      group:      (det.group && det.group !== '-') ? det.group : (det.altGroup || det.group || r.grade || '-'),   /* [v725] */
       연체구분:    det.연체구분 || '-',
       days:       dlqDays,
+      rentDays:   det.days || 0, altDays: det.altDays || 0, altType: det.altType || '', alt연체구분: det.alt연체구분 || '',   /* [v725] */
       dateStr:    pay.dateStr, payStatus: pay.payStatus, content: pay.content, actionDateStr: pay.actionDateStr || '-',
       contractStatus,
       vacancyStatus: ((Array.isArray(vacancyRawData)?vacancyRawData.find(v=>String(v.no).trim()===cno):null)||{}).status || ''
@@ -10565,6 +10582,29 @@ function dlqApplyFilter(type, val, btn) {
   dlqRenderTableRows();
 }
 
+/* [v725] 연체관리 목록 — 임대료 연체가 없고(임대료 연체일수 0) 다른 항목(변동관리비·기타 등)만 연체중/분납중인 계약:
+   연체일수·납부구분 칸에 그 항목의 값을 항목명 태그와 함께 표시(예: 4일 · 변동관리비).
+   표시 전용 — r.days(필터·정렬·KPI 버킷·문서 템플릿·엑셀)는 그대로. 연체일수 구간 집계(1~3일 등)는 종전대로 임대료 기준. */
+function _dlqAltOf(r){
+  if (!r) return null;
+  var rd = Number(r.rentDays != null ? r.rentDays : r.days) || 0, ad = Number(r.altDays) || 0;
+  if (rd > 0 || ad <= 0) return null;
+  var e = function(s){ return String(s == null ? '' : s).replace(/[<>&"]/g, function(c){ return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]; }); };
+  return { days: ad, type: e(r.altType || '기타'), gb: String(r.alt연체구분 || '연체중') };
+}
+function _dlqDaysCell(r){
+  var a = _dlqAltOf(r), d = a ? a.days : (r.days || 0);
+  var dc = d <= 3 ? 'low' : d <= 15 ? 'mid' : d <= 30 ? 'high' : 'crit';
+  var h = '<span class="dlq-days-badge dlq-days-' + dc + '"' + (a ? ' title="임대료 연체 없음 — ' + a.type + ' 연체일수"' : '') + '>' + d + '일</span>';
+  if (a) h += '<span class="dlq-alt-tag" title="임대료 연체 없음 — ' + a.type + ' 기준 연체일수 (연체일수 구간 집계는 임대료 기준)">' + a.type + '</span>';
+  return h;
+}
+function _dlqGubunCell(r){
+  var a = _dlqAltOf(r), g = a ? a.gb : r.연체구분;
+  var ok = (g === '연체중' || g === '분납중');
+  var col = g === '연체중' ? '#ef4444' : g === '분납중' ? '#f59e0b' : '#9ca3af';
+  return '<span style="font-size:11px;font-weight:600;color:' + col + '"' + (a ? ' title="' + a.type + ' ' + (ok ? g : '') + ' (임대료 연체 없음)"' : '') + '>' + (ok ? g : '-') + '</span>';
+}
 function dlqRenderTableRows() {
   const container = document.getElementById('dlqTableContainer');
   if (!container || !window._dlqTableRows) return;
@@ -10703,10 +10743,8 @@ function dlqRenderTableRows() {
             <td><span class="dlq-tbl-cno">${r.cno}</span></td>
             <td><span class="dlq-tbl-group">${r.group||'-'}</span></td>
             <td><span class="dlq-tbl-info">${r.info||'-'}</span></td>
-            <td><span class="dlq-days-badge dlq-days-${dc}">${r.days||0}일</span></td>
-            <td><span style="font-size:11px;font-weight:600;color:${
-              r.연체구분==='연체중'?'#ef4444':r.연체구분==='분납중'?'#f59e0b':'#9ca3af'
-            }">${(r.연체구분==='연체중'||r.연체구분==='분납중')?r.연체구분:'-'}</span></td>
+            <td>${_dlqDaysCell(r)}</td>   ${''/* [v725] 임대료 연체 없음 + 다른 항목 연체 → 그 항목 연체일수 · 항목명 */}
+            <td>${_dlqGubunCell(r)}</td>
             <td><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:${(r.contractStatus||'계약중')==='계약중'?'#dbeafe':(r.contractStatus==='종료(3개월이내)'?'#fef3c7':'#f3f4f6')};color:${(r.contractStatus||'계약중')==='계약중'?'#1d4ed8':(r.contractStatus==='종료(3개월이내)'?'#d97706':'#6b7280')}">${r.contractStatus||'계약중'}</span></td>
             <td>${_dlqVacDisp(r.vacancyStatus)}</td>
             <td class="dlq-tbl-nm" title="${String(r.nm||'').replace(/"/g,'&quot;')}">${_dlqNmCell(r.nm, r.cno)}</td>   ${''/* [v668] 계약심사 거절 칩 */}
@@ -11727,7 +11765,7 @@ function dlqRenderLegalTableRows(rows, container){
       +'<td><span class="dlq-tbl-cno">'+cno+'</span></td>'
       +'<td><span class="dlq-tbl-group">'+(r.group||'-')+'</span></td>'
       +'<td><span class="dlq-tbl-info">'+(r.info||'-')+'</span></td>'
-      +'<td><span class="dlq-days-badge dlq-days-'+(r.days<=3?'low':r.days<=15?'mid':r.days<=30?'high':'crit')+'">'+(r.days||0)+'일</span></td>'
+      +'<td>'+_dlqDaysCell(r)+'</td>'   /* [v725] 임대료 연체 없음 + 다른 항목 연체 → 그 항목 연체일수 · 항목명 */
       +'<td><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:'+csBg+';color:'+csFg+'">'+cs+'</span></td>'
       +'<td>'+_dlqVacDisp(r.vacancyStatus)+'</td>'
       +'<td class="dlq-tbl-nm" title="'+String(r.nm||'').replace(/"/g,'&quot;')+'">'+_dlqNmCell(r.nm, r.cno)+'</td>'   /* [v668] */
