@@ -27560,6 +27560,7 @@ function okpi_respSection(all, range, period){
 //   · 색: 기한=오늘 → 노랑 · 기한 경과+미완료 → 빨강 · 완료 → 회색 (시트의 조건부 서식과 같은 규칙)
 //   · 시트는 '링크가 있는 모든 사용자 보기'여야 gviz로 읽힌다 (Operations Dashboard 미러와 같은 방식)
 //   · [v722] 연기일정 열 — 날짜가 있으면 그 날짜를 기한으로 본다 (오늘/지연 판정·정렬·일자 집계) · 목록에는 '원래 기한 → 새 기한 · 연기' 표시 (관리자 요청 2026-10-26)
+//   · [v723] 담당자별 진척을 '기준일 당일 지정 업무 / 연기된 업무 / 전체'로 구분 · 기준일 = 최근 회의일(날짜 버튼으로 변경) · 연기 = 연기일정이 계획일과 다르거나 기한일을 원래 기한과 다르게 바꾼 경우만 · 담당은 오진선 차장·김영철 과장 기준 (관리자 요청 2026-10-27)
 // ════════════════════════════════════════════════
 var YTD_SHEET_ID  = '1B476orgglgpiKwiykhJi8RTyKwiZUZdp-h4Fw3T-ax4';
 var YTD_SHEET_GID = '1896596494';
@@ -27601,6 +27602,19 @@ function ytd_injectCss(){
     + '.ytd-tag{display:inline-block;padding:0 5px;border-radius:3px;font-size:10px;font-weight:700}'
     + '.ytd-tag.hi{background:#FEE2E2;color:#991B1B}.ytd-tag.mid{background:#FEF3C7;color:#92400E}.ytd-tag.lo{background:#F3F4F6;color:#6B7280}'
     + '.ytd-tag.post{background:#DBEAFE;color:#1E40AF}.ytd-due-old{color:#9CA3AF;text-decoration:line-through}'   /* [v722] */
+    + '.ytd-grid.v723{grid-template-columns:1fr 1.5fr}'   /* [v723] */
+    + '.ytd-days{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}'
+    + '.ytd-day{padding:2px 8px;border:1px solid #D1D5DB;background:#fff;border-radius:999px;cursor:pointer;font-size:10.5px;font-weight:600;color:#4B5563}'
+    + '.ytd-day b{color:#4F46E5;margin-left:2px}.ytd-day.td{border-color:#F59E0B}'
+    + '.ytd-day.on{background:#4F46E5;border-color:#4F46E5;color:#fff}.ytd-day.on b{color:#fff}'
+    + '.ytd-ptbl{width:100%;border-collapse:collapse;font-size:11.5px}'
+    + '.ytd-ptbl th{font-weight:700;color:#6B7280;text-align:left;padding:4px 6px;white-space:nowrap;font-size:11px}'
+    + '.ytd-ptbl tbody th{color:#1F2937;font-size:11.5px}'
+    + '.ytd-ptbl td{padding:4px 6px;vertical-align:middle;min-width:120px}'
+    + '.ytd-pc .ytd-bar{margin-bottom:2px}.ytd-pc .num{font-size:11px;font-weight:600;color:#4B5563;font-variant-numeric:tabular-nums}'
+    + '.ytd-pc.low .ytd-bar>i{background:#F59E0B}.ytd-pc.none{color:#9CA3AF;text-align:center}'
+    + '.ytd-note{font-size:10px;color:#9CA3AF;margin-top:4px}'
+    + '.ytd-due-hint{color:#9CA3AF;font-size:10.5px}'
     + '.ytd-sheet-link{margin-left:auto;font-size:11px;font-weight:600;color:#4F46E5;text-decoration:none;border:1px solid #C7D2FE;padding:2px 8px;border-radius:4px;background:#fff}'
     + '.ytd-sheet-link:hover{background:#EEF2FF}'
     + '.ytd-foot{font-size:10.5px;color:#9CA3AF;margin-top:6px}';
@@ -27624,6 +27638,13 @@ function ytd_date(cell){   /* gviz 셀 → Date(00:00) · 날짜가 아니면 nu
 }
 function ytd_str(cell){ if (!cell) return ''; var v = (cell.f != null) ? cell.f : cell.v; return (v == null) ? '' : String(v).trim(); }
 function ytd_bool(cell){ if (!cell) return false; var v = cell.v; return v === true || String(v).trim().toUpperCase() === 'TRUE'; }
+function ytd_txtDate(s, yRef){   /* [v723] '10/26' · '10/26부터' · '11/1 전후' → Date (연도는 회의일 기준) · 아니면 null */
+  var m = String(s || '').match(/^\s*(\d{1,2})\/(\d{1,2})/); if (!m) return null;
+  var y = (yRef instanceof Date) ? yRef.getFullYear() : new Date().getFullYear();
+  var d = new Date(y, +m[1] - 1, +m[2]);
+  return isNaN(d.getTime()) ? null : d;
+}
+function ytd_same(a, b){ return !!(a && b && a.getTime() === b.getTime()); }
 function ytd_parse(resp){
   if (!resp || !resp.table) return [];
   var cols = (resp.table.cols || []).map(function(c){ return String(c.label || '').trim(); });
@@ -27635,13 +27656,20 @@ function ytd_parse(resp){
   return (resp.table.rows || []).map(function(r){
     var c = r.c || [], g = function(i){ return (i >= 0) ? c[i] : null; };
     var task = ytd_str(g(I.task)); if (!task) return null;
-    var post = ytd_date(g(I.post));   /* [v722] 연기일정이 있으면 그 날짜가 기한 */
-    var dueD = post || ytd_date(g(I.dueD)) || ytd_date(g(I.due));
+    var meet = ytd_date(g(I.meet));
+    /* [v723] 원래 기한(기한 열) · 계획일(기한일 열 — 비어 있으면 원래 기한) · 연기일(연기일정 열)
+       실제 기한 = 연기일 → 계획일 · 연기 = 연기일이 계획일과 다르거나, 기한일을 원래 기한과 다른 날로 바꾼 경우 */
+    var origD = ytd_date(g(I.due)) || ytd_txtDate(ytd_str(g(I.due)), meet);
+    var planD = ytd_date(g(I.dueD)) || origD;
+    var postD = ytd_date(g(I.post));
+    var effD = postD || planD;
+    var moved = !!((postD && !ytd_same(postD, planD)) || (origD && planD && !ytd_same(planD, origD)));
     var done = ytd_bool(g(I.done));
-    var diff = dueD ? Math.round((dueD - t0) / 864e5) : null;
-    return { no: ytd_str(g(I.no)), meet: ytd_date(g(I.meet)), meetS: ytd_str(g(I.meet)), who: ytd_str(g(I.who)), tgt: ytd_str(g(I.tgt)), task: task,
-             done: done, imp: ytd_str(g(I.imp)), urg: ytd_str(g(I.urg)), due: ytd_str(g(I.due)), kind: ytd_str(g(I.kind)) || '기타', dueD: dueD,
-             doneAt: ytd_str(g(I.doneAt)), memo: ytd_str(g(I.memo)), post: post,
+    var diff = effD ? Math.round((effD - t0) / 864e5) : null;
+    return { no: ytd_str(g(I.no)), meet: meet, meetS: ytd_str(g(I.meet)), who: ytd_str(g(I.who)), tgt: ytd_str(g(I.tgt)), task: task,
+             done: done, imp: ytd_str(g(I.imp)), urg: ytd_str(g(I.urg)), due: ytd_str(g(I.due)), kind: ytd_str(g(I.kind)) || '기타',
+             origD: origD, planD: planD, post: postD, dueD: effD, moved: moved,
+             doneAt: ytd_str(g(I.doneAt)), memo: ytd_str(g(I.memo)),
              st: done ? 'done' : (diff === 0 ? 'today' : ((diff != null && diff < 0) ? 'late' : 'open')) };
   }).filter(Boolean);
 }
@@ -27652,12 +27680,33 @@ function ytd_barRow(nm, done, total){
   var p = total ? Math.round(done / total * 100) : 0;
   return '<div class="ytd-bar-row"><span class="nm" title="' + ytd_esc(nm) + '">' + ytd_esc(nm) + '</span><div class="ytd-bar"><i style="width:' + p + '%"></i></div><span class="num">' + done + '/' + total + ' · ' + p + '%</span></div>';
 }
+function ytd_wd(d){ return d ? (ytd_md(d) + '(' + '일월화수목금토'.charAt(d.getDay()) + ')') : ''; }
+function ytd_has(r, p){ return String(r.who || '').indexOf(p) >= 0; }
+function ytd_cell(list){   /* [v723] 담당자 표 칸 — 미니 막대 + 완료/전체 */
+  var t = list.length; if (!t) return '<td class="ytd-pc none">—</td>';
+  var d = list.filter(function(r){ return r.done; }).length, p = Math.round(d / t * 100);
+  var cls = (p === 100) ? 'full' : (p >= 50 ? 'mid' : 'low');
+  return '<td class="ytd-pc ' + cls + '"><div class="ytd-bar"><i style="width:' + p + '%"></i></div><span class="num">' + d + '/' + t + ' · ' + p + '%</span></td>';
+}
+function ytd_dayList(rows){   /* [v723] 당일 지정 업무가 있는 날짜(연기 제외) + 회의일 */
+  var s = {};
+  rows.forEach(function(r){ if (r.dueD && !r.moved) s[r.dueD.getTime()] = 1; if (r.meet) s[r.meet.getTime()] = 1; });
+  return Object.keys(s).map(Number).sort(function(a, b){ return a - b; });
+}
+function ytd_pickDay(rows){   /* 기준일 — 사용자가 고른 날 → 없으면 최근 회의일 → 없으면 오늘 */
+  var sel = window._ytd && window._ytd.day;
+  if (sel) return new Date(sel);
+  var ms = rows.map(function(r){ return r.meet ? r.meet.getTime() : 0; }).filter(Boolean);
+  if (ms.length) return new Date(Math.max.apply(null, ms));
+  var t = new Date(); t.setHours(0, 0, 0, 0); return t;
+}
+function ytd_setDay(ts){ window._ytd.day = ts || null; var box = document.getElementById('ytdBox'); if (box && window._ytd.rows) box.innerHTML = ytd_html(window._ytd.rows); }
 function ytd_html(rows){
   rows = rows || [];
   var all = rows.length, done = rows.filter(function(r){ return r.done; }).length;
   var open = all - done, today = rows.filter(function(r){ return r.st === 'today'; }).length, late = rows.filter(function(r){ return r.st === 'late'; }).length;
   var pct = all ? Math.round(done / all * 100) : 0;
-  var postN = rows.filter(function(r){ return r.post && !r.done; }).length;   /* [v722] 연기 중(미완료) */
+  var postN = rows.filter(function(r){ return r.moved && !r.done; }).length;   /* [v723] 연기 중(미완료) — 날짜가 실제로 바뀐 건만 */
   /* 최근 회의 · 누적 회의 수 */
   var meets = rows.map(function(r){ return r.meet ? r.meet.getTime() : 0; }).filter(Boolean);
   var lastM = meets.length ? new Date(Math.max.apply(null, meets)) : null;
@@ -27666,10 +27715,27 @@ function ytd_html(rows){
   /* 구분별 (일자별 · 주간 · 기타) */
   var kinds = ['일자별', '주간', '기타'];
   var kHtml = kinds.map(function(k){ var g = rows.filter(function(r){ return r.kind === k; }); return ytd_barRow(k, g.filter(function(r){ return r.done; }).length, g.length); }).join('');
-  /* 담당자별 — '오진선 차장·강휘수 이사'처럼 공동 담당은 각자에게 집계 (시트 현황 탭과 동일 규칙) */
-  var people = [], seen = {};
+  /* [v723] 담당자별 — 기준일 당일 지정 업무 / 연기된 업무 / 전체 구분 · 담당은 오진선 차장 · 김영철 과장 기준 */
+  var people = ['오진선 차장', '김영철 과장'], seen = { '오진선 차장': 1, '김영철 과장': 1 };
   rows.forEach(function(r){ String(r.who || '').split(/[·,\/]/).forEach(function(p){ p = p.trim(); if (p && !seen[p]) { seen[p] = 1; people.push(p); } }); });
-  var pHtml = people.map(function(p){ var g = rows.filter(function(r){ return String(r.who || '').indexOf(p) >= 0; }); return ytd_barRow(p, g.filter(function(r){ return r.done; }).length, g.length); }).join('');
+  people = people.filter(function(p){ return rows.some(function(r){ return ytd_has(r, p); }); });
+  var D = ytd_pickDay(rows), dKey = D.getTime();
+  var days = ytd_dayList(rows);
+  var tKey = (function(){ var t = new Date(); t.setHours(0, 0, 0, 0); return t.getTime(); })();
+  var pills = days.map(function(ts){
+    var d = new Date(ts), n = rows.filter(function(r){ return !r.moved && r.dueD && r.dueD.getTime() === ts; }).length;
+    return '<button class="ytd-day' + (ts === dKey ? ' on' : '') + (ts === tKey ? ' td' : '') + '" onclick="ytd_setDay(' + ts + ')">' + ytd_wd(d) + (n ? ' <b>' + n + '</b>' : '') + '</button>';
+  }).join('');
+  var pRows = people.map(function(p){
+    var mine = rows.filter(function(r){ return ytd_has(r, p); });
+    var dayL = mine.filter(function(r){ return !r.moved && r.dueD && r.dueD.getTime() === dKey; });
+    var postL = mine.filter(function(r){ return r.moved; });
+    return '<tr><th>' + ytd_esc(p) + '</th>' + ytd_cell(dayL) + ytd_cell(postL) + ytd_cell(mine) + '</tr>';
+  }).join('');
+  var pHtml = '<div class="ytd-days">' + pills + '</div>'
+    + '<table class="ytd-ptbl"><thead><tr><th></th><th>📅 ' + ytd_wd(D) + ' 마감 업무</th><th>🔁 연기된 업무</th><th>전체</th></tr></thead><tbody>'
+    + (pRows || '<tr><td colspan="4" class="ytd-pc none">담당 없음</td></tr>') + '</tbody></table>'
+    + '<div class="ytd-note">마감 업무 = 기한이 그날로 지정된 일(연기 제외) · 연기 = 연기일정을 넣었거나 기한일을 원래 기한과 다르게 바꾼 일 · 날짜를 누르면 그날 기준으로 바뀝니다</div>';
   /* 목록 — 기본 미완료만 · 지연 → 오늘 → 기한 가까운 순 → 긴급도 → 중요도 → 번호 */
   var showDone = !!(window._ytd && window._ytd.showDone);
   var U = { '상': 0, '중': 1, '하': 2 }, ST = { late: 0, today: 1, open: 2, done: 3 };
@@ -27681,8 +27747,17 @@ function ytd_html(rows){
     return (parseFloat(a.no) || 0) - (parseFloat(b.no) || 0);
   });
   var trs = list.map(function(r){
-    var dueTxt = r.due || (r.dueD ? ytd_md(r.dueD) : '-');
-    var dueHtml = r.post ? ((r.due ? ('<span class="ytd-due-old">' + ytd_esc(r.due) + '</span> → ') : '') + ytd_md(r.post) + ' <span class="ytd-tag post">연기</span>') : ytd_esc(dueTxt);   /* [v722] 원래 기한 → 새 기한 */
+    var dueHtml;
+    if (r.moved) {   /* [v723] 원래 기한 → 새 기한 · 연기 */
+      var was = r.origD ? ytd_md(r.origD) : (r.due || (r.planD ? ytd_md(r.planD) : ''));
+      if (r.post && r.planD && !ytd_same(r.planD, r.origD) && r.origD) was = ytd_md(r.origD);
+      dueHtml = (was ? ('<span class="ytd-due-old">' + ytd_esc(was) + '</span> → ') : '') + ytd_md(r.dueD) + ' <span class="ytd-tag post">연기</span>';
+    } else if (r.dueD) {
+      var hint = (r.due && !/^\s*\d{1,2}\/\d{1,2}\s*$/.test(r.due) && r.due !== ytd_md(r.dueD)) ? (' <span class="ytd-due-hint">' + ytd_esc(r.due) + '</span>') : '';
+      dueHtml = ytd_esc(ytd_md(r.dueD)) + hint;
+    } else {
+      dueHtml = ytd_esc(r.due || '-');
+    }
     var mark = (r.st === 'late') ? '⚠️ ' : (r.st === 'today') ? '📍 ' : '';
     return '<tr class="' + r.st + '"><td class="c">' + ytd_esc(r.no) + '</td><td class="c">' + ytd_esc(r.meetS || ytd_md(r.meet)) + '</td><td class="c">' + ytd_esc(r.who) + '</td>'
       + '<td>' + ytd_esc(r.tgt) + '</td><td>' + ytd_esc(r.task) + (r.memo ? (' <span style="color:#9CA3AF">· ' + ytd_esc(r.memo) + '</span>') : '') + '</td>'
@@ -27696,12 +27771,12 @@ function ytd_html(rows){
     +   '<span class="ytd-chip open">미완료 <b>' + open + '</b></span>'
     +   '<span class="ytd-chip today">📍 오늘 마감 <b>' + today + '</b></span>'
     +   '<span class="ytd-chip late">⚠️ 지연 <b>' + late + '</b></span>'
-    +   (postN ? ('<span class="ytd-chip post">🔁 연기 <b>' + postN + '</b></span>') : '')   /* [v722] */
+    +   (postN ? ('<span class="ytd-chip post">🔁 연기 <b>' + postN + '</b></span>') : '')
     +   (lastM ? ('<span class="ytd-chip meet">최근 회의 ' + ytd_md(lastM) + ' · 신규 ' + lastN + '건 · 누적 회의 ' + meetCnt + '회</span>') : '')
     + '</div>'
-    + '<div class="ytd-grid">'
+    + '<div class="ytd-grid v723">'
     +   '<div class="ytd-card"><div class="ytd-card-t">구분별 진척 (완료/전체)</div>' + kHtml + '</div>'
-    +   '<div class="ytd-card"><div class="ytd-card-t">담당자별 진척 (완료/전체)</div>' + (pHtml || '<div class="ytd-foot">담당 없음</div>') + '</div>'
+    +   '<div class="ytd-card"><div class="ytd-card-t">담당자별 진척 — 당일 지정 업무 · 연기된 업무 구분</div>' + pHtml + '</div>'
     + '</div>'
     + '<div class="ytd-tools"><span class="l">' + (showDone ? '전체 목록' : '미완료 목록') + ' ' + list.length + '건 — 지연 → 오늘 → 기한순</span>'
     +   '<span><button class="ytd-btn' + (showDone ? ' active' : '') + '" onclick="ytd_toggleDone()">완료 포함</button> <button class="ytd-btn" onclick="ytd_render(true)">↻ 새로고침</button></span></div>'
