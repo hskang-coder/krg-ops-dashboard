@@ -27561,6 +27561,7 @@ function okpi_respSection(all, range, period){
 //   · 시트는 '링크가 있는 모든 사용자 보기'여야 gviz로 읽힌다 (Operations Dashboard 미러와 같은 방식)
 //   · [v722] 연기일정 열 — 날짜가 있으면 그 날짜를 기한으로 본다 (오늘/지연 판정·정렬·일자 집계) · 목록에는 '원래 기한 → 새 기한 · 연기' 표시 (관리자 요청 2026-10-26)
 //   · [v723] 담당자별 진척을 '기준일 당일 지정 업무 / 연기된 업무 / 전체'로 구분 · 기준일 = 최근 회의일(날짜 버튼으로 변경) · 연기 = 연기일정이 계획일과 다르거나 기한일을 원래 기한과 다르게 바꾼 경우만 · 담당은 오진선 차장·김영철 과장 기준 (관리자 요청 2026-10-27)
+//   · [v724] 담당자 버튼(전체·김영철·오진선·이지희·강휘수)으로 화면 전체 필터 · 기준일 하루 처리 현황(그날 할 일·완료·연기·늦게 완료·미처리·그날 완료·기한 지남 — 시트 '오늘 체크'와 같은 규칙) · 📈 일자별 진척 표(날짜 클릭 → 기준일) · 목록 '그날 할 일(결과)' / '미완료 전체' 전환 · 기준일 기본 = 오늘 (관리자 요청 2026-10-27)
 // ════════════════════════════════════════════════
 var YTD_SHEET_ID  = '1B476orgglgpiKwiykhJi8RTyKwiZUZdp-h4Fw3T-ax4';
 var YTD_SHEET_GID = '1896596494';
@@ -27617,6 +27618,35 @@ function ytd_injectCss(){
     + '.ytd-due-hint{color:#9CA3AF;font-size:10.5px}'
     + '.ytd-sheet-link{margin-left:auto;font-size:11px;font-weight:600;color:#4F46E5;text-decoration:none;border:1px solid #C7D2FE;padding:2px 8px;border-radius:4px;background:#fff}'
     + '.ytd-sheet-link:hover{background:#EEF2FF}'
+    + '.ytd-grid.v724{grid-template-columns:1.05fr 1fr}'   /* [v724] 담당자별 · 일자별 */
+    + '.ytd-whos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}'
+    + '.ytd-who{padding:4px 12px;border:1.5px solid #D1D5DB;background:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;color:#374151}'
+    + '.ytd-who b{margin-left:3px;color:#DC2626;font-variant-numeric:tabular-nums}'
+    + '.ytd-who.on{background:#1F3864;border-color:#1F3864;color:#fff}.ytd-who.on b{color:#FDE68A}'
+    + '.ytd-dtbl{width:100%;border-collapse:collapse;font-size:11.5px}'
+    + '.ytd-dtbl th,.ytd-dtbl td{padding:4px 6px;border-bottom:1px solid #F3F4F6;white-space:nowrap}'
+    + '.ytd-dtbl thead th{font-size:10.5px;color:#6B7280;font-weight:700;text-align:center;background:#F9FAFB;position:sticky;top:0;z-index:1;line-height:1.25}'
+    + '.ytd-dtbl tbody th{text-align:left;color:#1F2937;font-weight:700}'
+    + '.ytd-dtbl td.c{text-align:center;font-variant-numeric:tabular-nums;font-weight:700;color:#374151}'
+    + '.ytd-dtbl td.g{color:#047857}.ytd-dtbl td.b{color:#1D4ED8}.ytd-dtbl td.y{color:#B45309}.ytd-dtbl td.r{color:#DC2626;background:#FEF2F2}'
+    + '.ytd-dtbl .z{color:#D1D5DB;font-weight:500}.ytd-dtbl thead .z{color:#9CA3AF;font-size:9.5px}'
+    + '.ytd-dtbl tr.tot th,.ytd-dtbl tr.tot td{background:#F9FAFB;border-bottom:1.5px solid #E5E7EB}'
+    + '.ytd-dtbl td.ytd-pc{min-width:70px}'
+    + '.ytd-trend-wrap{max-height:300px;overflow:auto;border:1px solid #F3F4F6;border-radius:6px}'
+    + '.ytd-trend tbody tr{cursor:pointer}.ytd-trend tbody tr:hover td,.ytd-trend tbody tr:hover th{background:#EEF2FF}'
+    + '.ytd-trend tbody tr.on th,.ytd-trend tbody tr.on td{background:#E0E7FF}'
+    + '.ytd-trend tbody tr.fut th,.ytd-trend tbody tr.fut td{color:#9CA3AF}'
+    + '.ytd-today{font-size:9.5px;background:#F59E0B;color:#fff;border-radius:3px;padding:0 4px;margin-left:2px}'
+    + '.ytd-trend td.st{min-width:90px}'
+    + '.ytd-stack{display:flex;height:9px;border-radius:4px;overflow:hidden;background:#F3F4F6}'
+    + '.ytd-stack i{display:block;height:100%}'
+    + '.ytd-stack i.g,.lg.g{background:#10B981}.ytd-stack i.y,.lg.y{background:#F59E0B}.ytd-stack i.b,.lg.b{background:#60A5FA}.ytd-stack i.r,.lg.r{background:#F87171}.ytd-stack i.p,.lg.p{background:#D1D5DB}'
+    + '.lg{display:inline-block;width:9px;height:9px;border-radius:2px;margin:0 3px 0 6px;vertical-align:-1px}'
+    + '.ytd-btn.sm{padding:1px 7px;font-size:10px;margin-left:6px}'
+    + '.ytd-res{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;white-space:nowrap;background:#F3F4F6;color:#4B5563}'
+    + '.ytd-res.g{background:#D1FAE5;color:#065F46}.ytd-res.b{background:#DBEAFE;color:#1E40AF}.ytd-res.y{background:#FEF3C7;color:#92400E}.ytd-res.r{background:#FEE2E2;color:#991B1B}'
+    + '.ytd-tbl tr.postr td{background:#EFF6FF}.ytd-tbl tr.laterow td{background:#FFFBEB}'
+    + '.ytd-memo{color:#9CA3AF}'
     + '.ytd-foot{font-size:10.5px;color:#9CA3AF;margin-top:6px}';
   document.head.appendChild(s);
 }
@@ -27669,7 +27699,7 @@ function ytd_parse(resp){
     return { no: ytd_str(g(I.no)), meet: meet, meetS: ytd_str(g(I.meet)), who: ytd_str(g(I.who)), tgt: ytd_str(g(I.tgt)), task: task,
              done: done, imp: ytd_str(g(I.imp)), urg: ytd_str(g(I.urg)), due: ytd_str(g(I.due)), kind: ytd_str(g(I.kind)) || '기타',
              origD: origD, planD: planD, post: postD, dueD: effD, moved: moved,
-             doneAt: ytd_str(g(I.doneAt)), memo: ytd_str(g(I.memo)),
+             doneAt: ytd_str(g(I.doneAt)), doneAtD: ytd_date(g(I.doneAt)) || ytd_txtDate(ytd_str(g(I.doneAt)), meet), memo: ytd_str(g(I.memo)),   /* [v724] 완료일 → Date */
              st: done ? 'done' : (diff === 0 ? 'today' : ((diff != null && diff < 0) ? 'late' : 'open')) };
   }).filter(Boolean);
 }
@@ -27701,89 +27731,146 @@ function ytd_pickDay(rows){   /* 기준일 — 사용자가 고른 날 → 없�
   var t = new Date(); t.setHours(0, 0, 0, 0); return t;
 }
 function ytd_setDay(ts){ window._ytd.day = ts || null; var box = document.getElementById('ytdBox'); if (box && window._ytd.rows) box.innerHTML = ytd_html(window._ytd.rows); }
+/* ▶ [v724] 담당자별 · 일자별 진척 (관리자 요청 2026-10-27) */
+function ytd_dd(s, yRef){   /* [v724] 완료일 '10/27' · Date 셀 문자열 → Date */
+  return ytd_txtDate(s, yRef);
+}
+var YTD_PEOPLE = ['김영철 과장', '오진선 차장', '이지희', '강휘수 이사'];   /* [v724] 담당 버튼 기본 순서 — 시트 '오늘 체크'와 동일 */
+function ytd_people(rows){
+  var list = YTD_PEOPLE.slice(), seen = {}; list.forEach(function(p){ seen[p] = 1; });
+  rows.forEach(function(r){ String(r.who || '').split(/[·,\/]/).forEach(function(p){ p = p.trim(); if (p && !seen[p] && !YTD_PEOPLE.some(function(q){ return q.indexOf(p) >= 0 || p.indexOf(q.split(' ')[0]) >= 0; })) { seen[p] = 1; list.push(p); } }); });
+  return list;
+}
+function ytd_mine(rows, who){ return (!who || who === '전체') ? rows : rows.filter(function(r){ return ytd_has(r, who.split(' ')[0]); }); }
+/* [v724] 기준일 D 하루 판정 — 시트 '오늘 체크'와 같은 규칙
+   그날 할 일 = 원래 기한·기한일·연기일정 중 하나가 D · 완료 = D까지 완료 · 연기 = 다른 날로 미룸 · 늦게 완료 = 미루지 않고 D 뒤에 완료 · 미처리 = 아직 안 함 */
+function ytd_dayStat(rows, D){
+  var k = D.getTime(), out = { day: [], ok: [], post: [], late: [], none: [], doneOn: [], over: [] };
+  rows.forEach(function(r){
+    var dAt = r.doneAtD, effK = r.dueD ? r.dueD.getTime() : null;
+    if (r.done && dAt && dAt.getTime() === k) out.doneOn.push(r);
+    if (effK != null && effK < k && (!r.done || (dAt && dAt.getTime() > k))) out.over.push(r);
+    var inDay = [r.origD, r.planD, r.post].some(function(x){ return x && x.getTime() === k; });
+    if (!inDay) return;
+    out.day.push(r);
+    if (r.done && (!dAt || dAt.getTime() <= k)) { r._res = '완료'; out.ok.push(r); }
+    else if (effK != null && effK !== k) { r._res = '연기 → ' + ytd_md(r.dueD); out.post.push(r); }
+    else if (r.done) { r._res = '늦게 완료 (' + ytd_md(dAt) + ')'; out.late.push(r); }
+    else { r._res = '미처리'; out.none.push(r); }
+  });
+  return out;
+}
+function ytd_n(arr, cls){ var n = arr.length; return '<td class="c' + (n && cls ? ' ' + cls : '') + '">' + (n || '<span class="z">0</span>') + '</td>'; }
+function ytd_rate(s){ var t = s.day.length; if (!t) return '<td class="c"><span class="z">—</span></td>'; var p = Math.round(s.ok.length / t * 100);
+  return '<td class="ytd-pc ' + (p === 100 ? 'full' : (p >= 50 ? 'mid' : 'low')) + '"><div class="ytd-bar"><i style="width:' + p + '%"></i></div><span class="num">' + p + '%</span></td>'; }
+function ytd_setWho(w){ window._ytd.who = w || '전체'; var box = document.getElementById('ytdBox'); if (box && window._ytd.rows) box.innerHTML = ytd_html(window._ytd.rows); }
+function ytd_setMode(m){ window._ytd.mode = m; var box = document.getElementById('ytdBox'); if (box && window._ytd.rows) box.innerHTML = ytd_html(window._ytd.rows); }
 function ytd_html(rows){
   rows = rows || [];
-  var all = rows.length, done = rows.filter(function(r){ return r.done; }).length;
-  var open = all - done, today = rows.filter(function(r){ return r.st === 'today'; }).length, late = rows.filter(function(r){ return r.st === 'late'; }).length;
+  rows.forEach(function(r){ if (r.doneAtD === undefined) r.doneAtD = ytd_dd(r.doneAt, r.meet); });
+  var who = (window._ytd && window._ytd.who) || '전체';
+  var people = ytd_people(rows);
+  var mine = ytd_mine(rows, who);
+  var all = mine.length, done = mine.filter(function(r){ return r.done; }).length;
+  var open = all - done, today = mine.filter(function(r){ return r.st === 'today'; }).length, late = mine.filter(function(r){ return r.st === 'late'; }).length;
   var pct = all ? Math.round(done / all * 100) : 0;
-  var postN = rows.filter(function(r){ return r.moved && !r.done; }).length;   /* [v723] 연기 중(미완료) — 날짜가 실제로 바뀐 건만 */
-  /* 최근 회의 · 누적 회의 수 */
+  var postN = mine.filter(function(r){ return r.moved && !r.done; }).length;
   var meets = rows.map(function(r){ return r.meet ? r.meet.getTime() : 0; }).filter(Boolean);
   var lastM = meets.length ? new Date(Math.max.apply(null, meets)) : null;
-  var lastN = lastM ? rows.filter(function(r){ return r.meet && r.meet.getTime() === lastM.getTime(); }).length : 0;
-  var seenM = {}; meets.forEach(function(t){ seenM[t] = 1; }); var meetCnt = Object.keys(seenM).length;
-  /* 구분별 (일자별 · 주간 · 기타) */
-  var kinds = ['일자별', '주간', '기타'];
-  var kHtml = kinds.map(function(k){ var g = rows.filter(function(r){ return r.kind === k; }); return ytd_barRow(k, g.filter(function(r){ return r.done; }).length, g.length); }).join('');
-  /* [v723] 담당자별 — 기준일 당일 지정 업무 / 연기된 업무 / 전체 구분 · 담당은 오진선 차장 · 김영철 과장 기준 */
-  var people = ['오진선 차장', '김영철 과장'], seen = { '오진선 차장': 1, '김영철 과장': 1 };
-  rows.forEach(function(r){ String(r.who || '').split(/[·,\/]/).forEach(function(p){ p = p.trim(); if (p && !seen[p]) { seen[p] = 1; people.push(p); } }); });
-  people = people.filter(function(p){ return rows.some(function(r){ return ytd_has(r, p); }); });
-  var D = ytd_pickDay(rows), dKey = D.getTime();
-  var days = ytd_dayList(rows);
+  var lastN = lastM ? mine.filter(function(r){ return r.meet && r.meet.getTime() === lastM.getTime(); }).length : 0;
   var tKey = (function(){ var t = new Date(); t.setHours(0, 0, 0, 0); return t.getTime(); })();
-  var pills = days.map(function(ts){
-    var d = new Date(ts), n = rows.filter(function(r){ return !r.moved && r.dueD && r.dueD.getTime() === ts; }).length;
-    return '<button class="ytd-day' + (ts === dKey ? ' on' : '') + (ts === tKey ? ' td' : '') + '" onclick="ytd_setDay(' + ts + ')">' + ytd_wd(d) + (n ? ' <b>' + n + '</b>' : '') + '</button>';
+  /* 기준일 — 고른 날 → 없으면 오늘 */
+  var D = (window._ytd && window._ytd.day) ? new Date(window._ytd.day) : new Date(tKey), dKey = D.getTime();
+  /* ① 담당자 버튼 */
+  var whoBtns = ['전체'].concat(people).map(function(p){
+    var n = ytd_mine(rows, p).filter(function(r){ return !r.done; }).length;
+    return '<button class="ytd-who' + (p === who ? ' on' : '') + '" onclick="ytd_setWho(\'' + ytd_esc(p) + '\')">' + ytd_esc(p) + ' <b>' + n + '</b></button>';
   }).join('');
-  var pRows = people.map(function(p){
-    var mine = rows.filter(function(r){ return ytd_has(r, p); });
-    var dayL = mine.filter(function(r){ return !r.moved && r.dueD && r.dueD.getTime() === dKey; });
-    var postL = mine.filter(function(r){ return r.moved; });
-    return '<tr><th>' + ytd_esc(p) + '</th>' + ytd_cell(dayL) + ytd_cell(postL) + ytd_cell(mine) + '</tr>';
+  /* ② 기준일 하루 — 담당자별 처리 현황 (시트 '오늘 체크'와 같은 표) */
+  var shown = (who === '전체') ? ['전체'].concat(people.filter(function(p){ return ytd_mine(rows, p).length; })) : [who];
+  var head = '<tr><th>담당</th><th>그날 할 일</th><th>완료</th><th>연기</th><th>늦게 완료</th><th>미처리</th><th>달성률</th><th>그날 완료한 일<br><span class="z">(기한 무관)</span></th><th>기한 지남<br><span class="z">(미완료)</span></th></tr>';
+  var dRows = shown.map(function(p){
+    var s = ytd_dayStat(ytd_mine(rows, p), D);
+    return '<tr' + (p === '전체' ? ' class="tot"' : '') + '><th>' + ytd_esc(p) + '</th>' + ytd_n(s.day) + ytd_n(s.ok, 'g') + ytd_n(s.post, 'b') + ytd_n(s.late, 'y') + ytd_n(s.none, 'r')
+      + ytd_rate(s) + ytd_n(s.doneOn, 'g') + ytd_n(s.over, 'r') + '</tr>';
   }).join('');
-  var pHtml = '<div class="ytd-days">' + pills + '</div>'
-    + '<table class="ytd-ptbl"><thead><tr><th></th><th>📅 ' + ytd_wd(D) + ' 마감 업무</th><th>🔁 연기된 업무</th><th>전체</th></tr></thead><tbody>'
-    + (pRows || '<tr><td colspan="4" class="ytd-pc none">담당 없음</td></tr>') + '</tbody></table>'
-    + '<div class="ytd-note">마감 업무 = 기한이 그날로 지정된 일(연기 제외) · 연기 = 연기일정을 넣었거나 기한일을 원래 기한과 다르게 바꾼 일 · 날짜를 누르면 그날 기준으로 바뀝니다</div>';
-  /* 목록 — 기본 미완료만 · 지연 → 오늘 → 기한 가까운 순 → 긴급도 → 중요도 → 번호 */
+  /* ③ 일자별 진척 — 선택 담당 기준 · 회의일~오늘+7일 사이 할 일이 있는 날 */
+  var dset = {};
+  mine.forEach(function(r){ [r.origD, r.planD, r.post, r.doneAtD].forEach(function(x){ if (x) dset[x.getTime()] = 1; }); });
+  var dkeys = Object.keys(dset).map(Number).filter(function(t){ return t <= tKey + 7 * 864e5; }).sort(function(a, b){ return b - a; });
+  var tRows = dkeys.map(function(ts){
+    var s = ytd_dayStat(mine, new Date(ts)), d = new Date(ts);
+    var t = s.day.length, w = function(a){ return t ? (a.length / t * 100) : 0; };
+    var future = ts > tKey;
+    var stack = t ? ('<div class="ytd-stack" title="완료 ' + s.ok.length + ' · 연기 ' + s.post.length + ' · 늦게 완료 ' + s.late.length + ' · 미처리 ' + s.none.length + '">'
+      + '<i class="g" style="width:' + w(s.ok) + '%"></i><i class="y" style="width:' + w(s.late) + '%"></i><i class="b" style="width:' + w(s.post) + '%"></i><i class="' + (future ? 'p' : 'r') + '" style="width:' + w(s.none) + '%"></i></div>') : '';
+    return '<tr class="' + (ts === dKey ? 'on' : '') + (ts === tKey ? ' td' : '') + (future ? ' fut' : '') + '" onclick="ytd_setDay(' + ts + ')"><th>' + ytd_wd(d) + (ts === tKey ? ' <span class="ytd-today">오늘</span>' : '') + '</th>'
+      + ytd_n(s.day) + ytd_n(s.ok, 'g') + ytd_n(s.post, 'b') + ytd_n(s.late, 'y') + ytd_n(s.none, future ? '' : 'r') + ytd_rate(s) + '<td class="st">' + stack + '</td>' + ytd_n(s.doneOn, 'g') + '</tr>';
+  }).join('');
+  var trend = '<div class="ytd-trend-wrap"><table class="ytd-dtbl ytd-trend"><thead><tr><th>날짜</th><th>할 일</th><th>완료</th><th>연기</th><th>늦게 완료</th><th>미처리</th><th>달성률</th><th>구성</th><th>그날 완료</th></tr></thead><tbody>'
+    + (tRows || '<tr><td colspan="9" class="c z">기록 없음</td></tr>') + '</tbody></table></div>';
+  /* ④ 목록 — 기본: 기준일 할 일(결과 표시) · 전환: 미완료 전체 */
+  var mode = (window._ytd && window._ytd.mode) || 'day';
   var showDone = !!(window._ytd && window._ytd.showDone);
   var U = { '상': 0, '중': 1, '하': 2 }, ST = { late: 0, today: 1, open: 2, done: 3 };
-  var list = rows.filter(function(r){ return showDone || !r.done; }).slice().sort(function(a, b){
-    if (ST[a.st] !== ST[b.st]) return ST[a.st] - ST[b.st];
-    var da = a.dueD ? a.dueD.getTime() : 9e15, db = b.dueD ? b.dueD.getTime() : 9e15; if (da !== db) return da - db;
-    var ua = (U[a.urg] != null) ? U[a.urg] : 9, ub = (U[b.urg] != null) ? U[b.urg] : 9; if (ua !== ub) return ua - ub;
-    var ia = (U[a.imp] != null) ? U[a.imp] : 9, ib = (U[b.imp] != null) ? U[b.imp] : 9; if (ia !== ib) return ia - ib;
-    return (parseFloat(a.no) || 0) - (parseFloat(b.no) || 0);
-  });
+  var RS = { '미처리': 0 };
+  var list;
+  if (mode === 'day') {
+    var sd = ytd_dayStat(mine, D);
+    list = sd.none.concat(sd.post, sd.late, sd.ok);
+  } else {
+    list = mine.filter(function(r){ return showDone || !r.done; }).slice().sort(function(a, b){
+      if (ST[a.st] !== ST[b.st]) return ST[a.st] - ST[b.st];
+      var da = a.dueD ? a.dueD.getTime() : 9e15, db = b.dueD ? b.dueD.getTime() : 9e15; if (da !== db) return da - db;
+      var ua = (U[a.urg] != null) ? U[a.urg] : 9, ub = (U[b.urg] != null) ? U[b.urg] : 9; if (ua !== ub) return ua - ub;
+      return (parseFloat(a.no) || 0) - (parseFloat(b.no) || 0);
+    });
+  }
   var trs = list.map(function(r){
     var dueHtml;
-    if (r.moved) {   /* [v723] 원래 기한 → 새 기한 · 연기 */
+    if (r.moved) {
       var was = r.origD ? ytd_md(r.origD) : (r.due || (r.planD ? ytd_md(r.planD) : ''));
-      if (r.post && r.planD && !ytd_same(r.planD, r.origD) && r.origD) was = ytd_md(r.origD);
       dueHtml = (was ? ('<span class="ytd-due-old">' + ytd_esc(was) + '</span> → ') : '') + ytd_md(r.dueD) + ' <span class="ytd-tag post">연기</span>';
     } else if (r.dueD) {
       var hint = (r.due && !/^\s*\d{1,2}\/\d{1,2}\s*$/.test(r.due) && r.due !== ytd_md(r.dueD)) ? (' <span class="ytd-due-hint">' + ytd_esc(r.due) + '</span>') : '';
       dueHtml = ytd_esc(ytd_md(r.dueD)) + hint;
-    } else {
-      dueHtml = ytd_esc(r.due || '-');
-    }
-    var mark = (r.st === 'late') ? '⚠️ ' : (r.st === 'today') ? '📍 ' : '';
-    return '<tr class="' + r.st + '"><td class="c">' + ytd_esc(r.no) + '</td><td class="c">' + ytd_esc(r.meetS || ytd_md(r.meet)) + '</td><td class="c">' + ytd_esc(r.who) + '</td>'
-      + '<td>' + ytd_esc(r.tgt) + '</td><td>' + ytd_esc(r.task) + (r.memo ? (' <span style="color:#9CA3AF">· ' + ytd_esc(r.memo) + '</span>') : '') + '</td>'
-      + '<td class="c">' + ytd_tag(r.imp) + ' ' + ytd_tag(r.urg) + '</td><td class="c">' + mark + dueHtml + '</td><td class="c">' + ytd_esc(r.kind) + '</td></tr>';
+    } else { dueHtml = ytd_esc(r.due || '-'); }
+    var res = (mode === 'day') ? (r._res || '') : (r.done ? ('완료' + (r.doneAt ? ' ' + ytd_esc(r.doneAt) : '')) : (r.st === 'late' ? '⚠️ 지연' : (r.st === 'today' ? '📍 오늘' : '진행')));
+    var rc = /^완료/.test(res) ? 'g' : (/^연기/.test(res) ? 'b' : (/^늦게/.test(res) ? 'y' : (/미처리|지연/.test(res) ? 'r' : '')));
+    var trc = (mode === 'day') ? ({ g: 'done', r: 'late', b: 'postr', y: 'laterow' }[rc] || '') : r.st;
+    return '<tr class="' + trc + '"><td class="c">' + ytd_esc(r.no) + '</td><td class="c">' + ytd_esc(r.who) + '</td>'
+      + '<td>' + ytd_esc(r.tgt) + '</td><td>' + ytd_esc(r.task) + (r.memo ? (' <span class="ytd-memo">· ' + ytd_esc(r.memo) + '</span>') : '') + '</td>'
+      + '<td class="c">' + ytd_tag(r.imp) + ' ' + ytd_tag(r.urg) + '</td><td class="c">' + dueHtml + '</td><td class="c"><span class="ytd-res ' + rc + '">' + res + '</span></td></tr>';
   }).join('');
   var at = (window._ytd && window._ytd.at) ? new Date(window._ytd.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
+  var dayLbl = ytd_wd(D) + (dKey === tKey ? ' (오늘)' : '');
   return '<div class="ytd-wrap">'
+    + '<div class="ytd-whos">' + whoBtns + '</div>'
     + '<div class="ytd-chips">'
-    +   '<span class="ytd-chip">전체 <b>' + all + '</b></span>'
+    +   '<span class="ytd-chip">' + ytd_esc(who) + ' 전체 <b>' + all + '</b></span>'
     +   '<span class="ytd-chip done">완료 <b>' + done + '</b> (' + pct + '%)</span>'
     +   '<span class="ytd-chip open">미완료 <b>' + open + '</b></span>'
     +   '<span class="ytd-chip today">📍 오늘 마감 <b>' + today + '</b></span>'
     +   '<span class="ytd-chip late">⚠️ 지연 <b>' + late + '</b></span>'
-    +   (postN ? ('<span class="ytd-chip post">🔁 연기 <b>' + postN + '</b></span>') : '')
-    +   (lastM ? ('<span class="ytd-chip meet">최근 회의 ' + ytd_md(lastM) + ' · 신규 ' + lastN + '건 · 누적 회의 ' + meetCnt + '회</span>') : '')
+    +   (postN ? ('<span class="ytd-chip post">🔁 연기 중 <b>' + postN + '</b></span>') : '')
+    +   (lastM ? ('<span class="ytd-chip meet">최근 회의 ' + ytd_md(lastM) + ' · 신규 ' + lastN + '건</span>') : '')
     + '</div>'
-    + '<div class="ytd-grid v723">'
-    +   '<div class="ytd-card"><div class="ytd-card-t">구분별 진척 (완료/전체)</div>' + kHtml + '</div>'
-    +   '<div class="ytd-card"><div class="ytd-card-t">담당자별 진척 — 당일 지정 업무 · 연기된 업무 구분</div>' + pHtml + '</div>'
+    + '<div class="ytd-grid v724">'
+    +   '<div class="ytd-card"><div class="ytd-card-t">📅 ' + dayLbl + ' 처리 현황 — 담당자별 <button class="ytd-btn sm" onclick="ytd_setDay(' + tKey + ')">오늘로</button></div>'
+    +     '<table class="ytd-dtbl"><thead>' + head + '</thead><tbody>' + dRows + '</tbody></table>'
+    +     '<div class="ytd-note">그날 할 일 = 원래 기한·기한일·연기일정 중 하나가 그날 · 완료 = 그날까지 완료 · 연기 = 다른 날로 미룸 · 늦게 완료 = 미루지 않고 그날 뒤에 완료 · 미처리 = 아직 안 함 · 완료 시점은 시트 \'완료일\'</div></div>'
+    +   '<div class="ytd-card"><div class="ytd-card-t">📈 일자별 진척 — ' + ytd_esc(who) + ' (날짜를 누르면 그날 기준으로 바뀝니다)</div>' + trend
+    +     '<div class="ytd-note"><i class="lg g"></i>완료 <i class="lg y"></i>늦게 완료 <i class="lg b"></i>연기 <i class="lg r"></i>미처리 <i class="lg p"></i>예정(미래) · 그날 완료 = 그날 완료 체크한 일(기한 무관)</div></div>'
     + '</div>'
-    + '<div class="ytd-tools"><span class="l">' + (showDone ? '전체 목록' : '미완료 목록') + ' ' + list.length + '건 — 지연 → 오늘 → 기한순</span>'
-    +   '<span><button class="ytd-btn' + (showDone ? ' active' : '') + '" onclick="ytd_toggleDone()">완료 포함</button> <button class="ytd-btn" onclick="ytd_render(true)">↻ 새로고침</button></span></div>'
-    + '<div class="ytd-tbl-wrap"><table class="ytd-tbl"><thead><tr><th>No</th><th>회의일</th><th>담당</th><th>대상 (계약)</th><th>할 일</th><th>중요·긴급</th><th>기한</th><th>구분</th></tr></thead><tbody>'
-    +   (trs || '<tr><td colspan="8" style="text-align:center;color:#9CA3AF;padding:14px">미완료 항목이 없습니다 🎉</td></tr>')
+    + '<div class="ytd-tools"><span class="l">' + (mode === 'day' ? ('📅 ' + dayLbl + ' 할 일 · ' + ytd_esc(who) + ' ' + list.length + '건 — 미처리 → 연기 → 늦게 완료 → 완료') : ((showDone ? '전체 목록 ' : '미완료 목록 ') + list.length + '건 — 지연 → 오늘 → 기한순')) + '</span>'
+    +   '<span><button class="ytd-btn' + (mode === 'day' ? ' active' : '') + '" onclick="ytd_setMode(\'day\')">그날 할 일</button> '
+    +   '<button class="ytd-btn' + (mode === 'all' ? ' active' : '') + '" onclick="ytd_setMode(\'all\')">미완료 전체</button> '
+    +   (mode === 'all' ? ('<button class="ytd-btn' + (showDone ? ' active' : '') + '" onclick="ytd_toggleDone()">완료 포함</button> ') : '')
+    +   '<button class="ytd-btn" onclick="ytd_render(true)">↻ 새로고침</button></span></div>'
+    + '<div class="ytd-tbl-wrap"><table class="ytd-tbl"><thead><tr><th>No</th><th>담당</th><th>대상 (계약)</th><th>할 일</th><th>중요·긴급</th><th>기한</th><th>결과</th></tr></thead><tbody>'
+    +   (trs || '<tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:14px">' + (mode === 'day' ? '그날 할 일이 없습니다' : '미완료 항목이 없습니다 🎉') + '</td></tr>')
     + '</tbody></table></div>'
-    + '<div class="ytd-foot">노랑 = 기한이 오늘 · 빨강 = 기한 경과(미완료) · 회색 = 완료 · 파랑 = 연기(새 기한으로 집계) · 담당자가 시트에서 완료 체크 → 새로고침 시 바로 반영 · 갱신 ' + at + '</div>'
+    + '<div class="ytd-foot">담당자가 시트에서 완료 체크·완료일 입력 → 새로고침 시 바로 반영 · 갱신 ' + at + '</div>'
     + '</div>';
 }
 function ytd_toggleDone(){ window._ytd.showDone = !window._ytd.showDone; var box = document.getElementById('ytdBox'); if (box && window._ytd.rows) box.innerHTML = ytd_html(window._ytd.rows); }
@@ -27841,7 +27928,7 @@ async function okpi_render(){
       + '<div id="odtOpsBox">' + (typeof odt_opsHtml === 'function' ? odt_opsHtml() : '') + '</div>'   /* [v673] 연체 해소 흐름(입금내역 기준 · 전수) — 연체추이 Raw DATA */
       + '<div id="dresBox">' + dpay_resBlock() + '</div>'
       + okpi_respSection(_callRows, _callRange, _callPeriod)   /* [v557] 담당자별 대응 KPI */
-      + '<div class="okpi-section-title">📝 연체회의 To-do 진척 <span class="pill">녹취 → 시트 · 담당자 체크 → 실시간</span><a class="ytd-sheet-link" href="' + YTD_SHEET_URL + '" target="_blank" rel="noopener">시트에서 체크 ↗</a></div>'   /* [v721] 연체회의 To-do 진척 — 별도 시트(연체회의 To-do) 실시간 */
+      + '<div class="okpi-section-title">📝 연체회의 To-do 진척 <span class="pill">담당자별 · 일자별 · 시트 체크 실시간</span><a class="ytd-sheet-link" href="' + YTD_SHEET_URL + '" target="_blank" rel="noopener">시트에서 체크 ↗</a></div>'   /* [v721] 연체회의 To-do 진척 — 별도 시트(연체회의 To-do) 실시간 */
       + '<div id="ytdBox"><div class="okpi-empty">📡 연체회의 To-do 로딩 중...</div></div>'
       + '<div class="okpi-section-title">🎯 4명 핵심 KPI <span class="pill">기간 내</span></div>'
       + okpi_renderChart(k)
