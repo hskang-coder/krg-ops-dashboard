@@ -2413,11 +2413,13 @@ async function loadLandlordAccounts() {
     const acctIdx  = findColIdx(labels, ['수분양자 전대업 지정수익 정산계좌','전대업 지정수익 정산계좌','전대업 지정수익'], -1);
     const acctIdx2 = findColIdx(labels, ['수분양자 숙박업 운영수익 정산계좌','숙박업 운영수익 정산계좌','숙박업 운영수익'], -1);
     const cvIdx    = findColIdx(labels, ['중도퇴실상태','중도퇴실'], 99);
-    const map = {}, mxMap = {};
+    const telIdx   = findColIdx(labels, ['연락처','휴대폰'], 15);   /* [v727] P열 임차인 연락처 — 계약관리 시트 임차인휴대폰 공란 대체용 */
+    const map = {}, mxMap = {}, telMap = {};
     rows.forEach(row => {
       const c = row.c || [];
       const gv = i => (i < 0 || !c[i]) ? '' : String(c[i].f != null ? c[i].f : c[i].v != null ? c[i].v : '').trim();
       const no = gv(noIdx);
+      const tel9 = gv(telIdx); if (no && tel9 && tel9 !== '-' && !telMap[no]) telMap[no] = tel9;   /* [v727] */
       let acct = gv(acctIdx) || gv(acctIdx2);
       // [v380] 라벨 매칭 실패(헤더 누락 등) 대비 — '은행/계좌번호/예금주' 형식 셀을 직접 탐지 (임대인 정산계좌는 3개 컬럼 분리라 '/' 없어 안 걸림)
       if (!acct) { for (let k = 0; k < c.length; k++) { const vv = gv(k); if (/^[^\/\s][^\/]*\/\s*[0-9-]{6,}\s*\/[^\/]/.test(vv)) { acct = vv; break; } } }
@@ -2428,6 +2430,7 @@ async function loadLandlordAccounts() {
     });
     landlordAccountMap = map;
     midExitStatusMap   = mxMap;
+    window._dlqTelMap  = telMap;   /* [v727] 계약번호 → 연체자 시트 연락처 */
   } catch(e) { console.warn('loadLandlordAccounts failed:', e); }
 }
 
@@ -7374,7 +7377,13 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="cr-info-title">계약자 정보</div>
         <div class="cr-field"><span class="cr-field-label">임대인(갑)</span><span class="cr-field-val">${fmt(c['임대인명'])} ${c['임대인연락처']?'<span style="color:#6B7280">('+fmtPhone(c['임대인연락처'])+')</span>':''}</span></div>
         <div class="cr-field"><span class="cr-field-label">수분양자 정산계좌</span><span class="cr-field-val" style="font-family:monospace;font-size:11px">${fmt(landlordAccountMap[String(c['계약번호']||'').trim()])}</span></div>
-        <div class="cr-field"><span class="cr-field-label">계약자1(을)</span><span class="cr-field-val">${fmt(__vacRow.tenant1Name || c['임차인'])} ${c['임차인휴대폰']?'<span style="color:#6B7280">('+fmtPhone(c['임차인휴대폰'])+')</span>':''}${__vacRow.tenantRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.tenantRrn)+'</span>':''}</span></div>
+        <div class="cr-field"><span class="cr-field-label">계약자1(을)</span><span class="cr-field-val">${fmt(__vacRow.tenant1Name || c['임차인'])} ${(() => {   /* [v727] 연락처: 계약관리 시트(AV열) → 연체자 시트(P열) → 미입력 표시 */
+          var t1 = String(c['임차인휴대폰'] || __vacRow.tenantPhone || '').trim();
+          if (t1 && t1 !== '-') return '<span style="color:#6B7280">(' + fmtPhone(t1) + ')</span>';
+          var t2 = String((window._dlqTelMap || {})[String(c['계약번호'] || '').trim()] || '').trim();
+          if (t2 && t2 !== '-') return '<span style="color:#6B7280" title="계약관리 시트 임차인휴대폰(AV열)이 비어 있어 연체자 시트 연락처로 표시 — 계약관리 시트에 채워 주세요">(' + fmtPhone(t2) + ' <span style="color:#B45309;font-weight:700">※</span>)</span>';
+          return '<span style="color:#B45309;font-size:11px;font-weight:700;cursor:help" title="계약관리 시트 임차인휴대폰(AV열)이 비어 있음 — 시트에 입력하면 자동 표시">연락처 미입력</span>';
+        })()}${__vacRow.tenantRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.tenantRrn)+'</span>':''}</span></div>
         ${(() => {
           // [v316] 라벨 결정 — 다중 소스 우선순위 + 키워드 우세 매칭 + 진단 로그
           // 1) vacancyRawData O열 (gid=1953907648) 우선
