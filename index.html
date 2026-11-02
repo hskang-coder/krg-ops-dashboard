@@ -3871,11 +3871,14 @@ function _dlqRevXLegend(rows){
   }catch(_){ return ''; }
 }
 /* [v668] 이름 셀 — 거절 칩이 있으면 이름만 말줄임(…)하고 칩은 항상 보이도록 flex 래핑 */
-function _dlqNmCell(nm, cno){
+function _dlqNmCell(nm, cno, tel){
   var name = String(nm == null || nm === '' ? '-' : nm);
   var tag = _dlqRevXTag(cno);
-  if (!tag) return name;
-  return '<span style="display:flex;align-items:center;gap:3px;max-width:108px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">' + name + '</span>' + tag.replace('class="dlq-revx', 'style="flex:none;margin-left:0" class="dlq-revx') + '</span>';
+  /* [v726] 이름 아래 연락처 — 010-0000-0000 형식 · 탭하면 전화 (v631 열 정리로 빠졌던 연락처 복원) */
+  var t = (typeof dlqFmtPhone === 'function') ? dlqFmtPhone(tel || '') : String(tel || '').trim();
+  var telHtml = t ? '<div class="dlq-tbl-tel" style="line-height:1.15;margin-top:1px"><a href="tel:' + t.replace(/-/g, '') + '" title="전화 걸기" style="color:#6b7280;text-decoration:none">' + t + '</a></div>' : '';
+  if (!tag) return name + telHtml;
+  return '<span style="display:flex;align-items:center;gap:3px;max-width:108px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">' + name + '</span>' + tag.replace('class="dlq-revx', 'style="flex:none;margin-left:0" class="dlq-revx') + '</span>' + telHtml;
 }
 function _dlqVacDisp(v){
   var t = String(v == null ? '' : v).trim() || '-';
@@ -10747,7 +10750,7 @@ function dlqRenderTableRows() {
             <td>${_dlqGubunCell(r)}</td>
             <td><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:${(r.contractStatus||'계약중')==='계약중'?'#dbeafe':(r.contractStatus==='종료(3개월이내)'?'#fef3c7':'#f3f4f6')};color:${(r.contractStatus||'계약중')==='계약중'?'#1d4ed8':(r.contractStatus==='종료(3개월이내)'?'#d97706':'#6b7280')}">${r.contractStatus||'계약중'}</span></td>
             <td>${_dlqVacDisp(r.vacancyStatus)}</td>
-            <td class="dlq-tbl-nm" title="${String(r.nm||'').replace(/"/g,'&quot;')}">${_dlqNmCell(r.nm, r.cno)}</td>   ${''/* [v668] 계약심사 거절 칩 */}
+            <td class="dlq-tbl-nm" title="${String(r.nm||'').replace(/"/g,'&quot;')}">${_dlqNmCell(r.nm, r.cno, r.tel)}</td>   ${''/* [v668] 계약심사 거절 칩 · [v726] 연락처 */}
             <td style="white-space:nowrap;text-align:center;font-size:11.5px">${(function(){
               var m=_dlqRateOf(r.cno);
               if(!m||!m.bill) return '<span style="color:#D1D5DB">-</span>';
@@ -11769,7 +11772,7 @@ function dlqRenderLegalTableRows(rows, container){
       +'<td><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:'+csBg+';color:'+csFg+'">'+cs+'</span></td>'
       +'<td>'+_dlqVacDisp(r.vacancyStatus)+'</td>'
       +'<td class="dlq-tbl-nm" title="'+String(r.nm||'').replace(/"/g,'&quot;')+'">'+_dlqNmCell(r.nm, r.cno)+'</td>'   /* [v668] */
-      +'<td class="dlq-tbl-tel">'+(r.tel||'-')+'</td>'
+      +'<td class="dlq-tbl-tel">'+((typeof dlqFmtPhone==='function'&&dlqFmtPhone(r.tel))||r.tel||'-')+'</td>'   /* [v726] 형식 통일 */
       +'<td class="dlq-tbl-amt">'+(r.amt>0?'₩'+r.amt.toLocaleString():'-')+'</td>'
       +'<td style="white-space:nowrap;font-size:11px">'+(pen?'<span style="color:#B91C1C;font-weight:700">₩'+pen.toLocaleString()+'</span>':'<span style="color:#D1D5DB">-</span>')+'</td>'
       +'<td style="text-align:center;font-weight:700;font-size:12px">'+(sc?'<span style="color:#DC2626">'+sc+'</span>':'<span style="color:#D1D5DB">-</span>')+'</td>'
