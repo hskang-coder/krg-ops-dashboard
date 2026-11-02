@@ -7381,8 +7381,8 @@ function renderContractRecord(c, payments, responses = []) {
           var t1 = String(c['임차인휴대폰'] || __vacRow.tenantPhone || '').trim();
           if (t1 && t1 !== '-') return '<span style="color:#6B7280">(' + fmtPhone(t1) + ')</span>';
           var t2 = String((window._dlqTelMap || {})[String(c['계약번호'] || '').trim()] || '').trim();
-          if (t2 && t2 !== '-') return '<span style="color:#6B7280" title="계약관리 시트 임차인휴대폰(AV열)이 비어 있어 연체자 시트 연락처로 표시 — 계약관리 시트에 채워 주세요">(' + fmtPhone(t2) + ' <span style="color:#B45309;font-weight:700">※</span>)</span>';
-          return '<span style="color:#B45309;font-size:11px;font-weight:700;cursor:help" title="계약관리 시트 임차인휴대폰(AV열)이 비어 있음 — 시트에 입력하면 자동 표시">연락처 미입력</span>';
+          if (t2 && t2 !== '-') return '<span style="color:#6B7280" title="공개 미러 계약관리 시트의 임차인휴대폰(AV열)이 비어 있어 연체자 시트 연락처로 표시 — 원본에는 있어도 미러 동기화에서 빠진 경우(텍스트 입력분)">(' + fmtPhone(t2) + ' <span style="color:#B45309;font-weight:700">※</span>)</span>';
+          return '<span style="color:#B45309;font-size:11px;font-weight:700;cursor:help" title="공개 미러 계약관리 시트의 임차인휴대폰(AV열)이 비어 있음 — 원본 시트에는 있어도 미러 동기화(Apps Script)가 하이픈·공백이 든 텍스트 번호를 옮기지 못해 비는 경우가 대부분(2026-11-02 확인: 최근 계약 326건 중 255건) · 원본에서 숫자(셀 서식 000-0000-0000)로 입력하거나 동기화 스크립트를 고치면 표시됨">연락처 없음(미러)</span>';
         })()}${__vacRow.tenantRrn?'<span style="color:#6B7280;margin-left:6px;font-family:monospace;font-size:11.5px">, '+maskRrn(__vacRow.tenantRrn)+'</span>':''}</span></div>
         ${(() => {
           // [v316] 라벨 결정 — 다중 소스 우선순위 + 키워드 우세 매칭 + 진단 로그
