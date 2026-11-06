@@ -1,5 +1,11 @@
 /**
  * 개런티즈 계약서 — 마스터 시트 자동 입력 Apps Script Web App
+ * v364 (2026-11-06) 헤더 검증 완화 + 요청별 DRY_RUN + ping 기능 플래그
+ *   ★ A1 헤더가 공백이면 A열을 '계약번호'로 간주 — 2026-05-21(v324)·2026-11-02 마스터 시트 A1 헤더 삭제 사고로
+ *     "헤더 검증 실패 — 필수 키워드 \"계약번호\" 없음" 거부가 반복됨(11/2~11/5 체결 16건 미입력) → 재발 방지
+ *   ★ '임차인명' 요구는 실제 AU열 헤더 '임차인'도 허용 (그룹 중 하나만 있으면 통과)
+ *   ★ 요청 본문 dryRun:true 이면 CFG_DRY_RUN=false 여도 쓰지 않고 planned 만 응답 → 대시보드 '사전 확인' 버튼 전용
+ *   ★ ping/doGet 응답에 version + features {dryRunFlag, a1Fallback} 포함 → 대시보드(v728)가 기능 지원 여부를 판단
  * v362 (퇴실청소비 AM열 자동 입력 추가)
  * v357 (계약번호 A열 매칭 1순위 + 매칭 실패 시 append 거부 — 데이터 무결성 강화)
  * v356 (AU/AV 자동 입력 추가 — append 모드 임차인명/휴대폰 빈값 방지)
@@ -47,7 +53,11 @@ const CFG_API_TOKEN = 'KRG-OPS-2026-CHANGE-ME-hskang'; // 운영팀이 변경한
 const CFG_DRY_RUN = true; // 검증 완료 후 false 로 변경
 
 // 헤더 검증 — 시트 잘못 지정 방지
-const CFG_REQUIRED_HEADER_KEYWORDS = ['계약번호', '임차인명'];
+// [v364] 그룹별 "하나만 있으면 통과" — A1 공백이면 A열을 CFG_A1_FALLBACK_LABEL 로 간주한 뒤 검사 (대시보드 v324 A열 컨벤션과 동일)
+const CFG_REQUIRED_HEADER_GROUPS = [ ['계약번호'], ['임차인명', '임차인'] ];
+const CFG_A1_FALLBACK_LABEL = '계약번호';
+const CFG_VERSION = 'v364';
+const CFG_FEATURES = { dryRunFlag: true, a1Fallback: true }; // 대시보드 기능 감지용 (ping/doGet 응답)
 
 // [v357] 1순위 매칭 키 — 계약번호 (A열) — 가장 안전 (unique 식별자)
 const CFG_MATCH_CONTRACT_NO = {
@@ -175,7 +185,9 @@ function doPost(e) {
     }
 
     if (data.action === 'ping') {
-      return jsonResp({ status: 'ok', message: 'pong', dryRun: CFG_DRY_RUN, time: new Date().toISOString() });
+      // [v364] version + features — 대시보드가 요청별 dryRun / A열 폴백 지원 여부를 판단
+      return jsonResp({ status: 'ok', message: 'pong', dryRun: CFG_DRY_RUN, version: CFG_VERSION,
+                        dryRunFlag: true, a1Fallback: true, features: CFG_FEATURES, time: new Date().toISOString() });
     }
     if (data.action === 'upsertContract') {
       return upsertContract(data);
@@ -187,7 +199,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return jsonResp({ status: 'ok', message: 'API ready', dryRun: CFG_DRY_RUN, version: 'v362' });
+  return jsonResp({ status: 'ok', message: 'API ready', dryRun: CFG_DRY_RUN, version: CFG_VERSION, features: CFG_FEATURES });
 }
 
 function upsertContract(data) {
@@ -204,6 +216,8 @@ function upsertContract(data) {
 
 function upsertContractInner(data) {
   var fields = data.fields || {};
+  // [v364] 요청별 DRY_RUN — 대시보드 '사전 확인' 버튼은 dryRun:true 로 호출 → 실제 쓰기 없이 planned 만 응답
+  var dry = !!CFG_DRY_RUN || data.dryRun === true;
   // [v357] 계약번호 — 시트 A열 매칭 키 (가장 우선)
   var contractNo = String(fields.contractNo || '').trim();
   var tenantName = String(fields.tenantName || '').trim();
@@ -230,13 +244,23 @@ function upsertContractInner(data) {
 
   // 헤더 읽기 + 검증
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var hdrWarnings = [];
+  // [v364] A1 헤더 공백 → A열을 '계약번호'로 간주 (마스터 시트 A1 삭제 사고 재발 방지 · 응답 warnings 로 운영팀에 알림)
+  if (!String(headers[0] == null ? '' : headers[0]).trim()) {
+    headers = headers.slice();
+    headers[0] = CFG_A1_FALLBACK_LABEL;
+    hdrWarnings.push('A1 헤더 공백 — A열을 ' + CFG_A1_FALLBACK_LABEL + ' 로 간주하고 진행 (마스터 시트 A1 에 "' + CFG_A1_FALLBACK_LABEL + '" 를 다시 입력해 주세요)');
+  }
   var headerJoin = headers.map(function(x){ return String(x||''); }).join('|');
-  for (var k = 0; k < CFG_REQUIRED_HEADER_KEYWORDS.length; k++) {
-    if (headerJoin.indexOf(CFG_REQUIRED_HEADER_KEYWORDS[k]) < 0) {
+  for (var k = 0; k < CFG_REQUIRED_HEADER_GROUPS.length; k++) {
+    var grp = CFG_REQUIRED_HEADER_GROUPS[k];
+    var hit = grp.some(function(kw){ return headerJoin.indexOf(kw) >= 0; });
+    if (!hit) {
       return jsonResp({
         status: 'error',
-        message: '헤더 검증 실패 — 필수 키워드 "' + CFG_REQUIRED_HEADER_KEYWORDS[k] + '" 없음. 시트 ID/GID 확인 필요.',
-        sheetName: sheet.getName()
+        message: '헤더 검증 실패 — 필수 키워드 "' + grp.join('/') + '" 없음. 시트 ID/GID 확인 필요.',
+        sheetName: sheet.getName(),
+        warnings: hdrWarnings
       });
     }
   }
@@ -314,7 +338,7 @@ function upsertContractInner(data) {
 
   // 쓰기 컬럼 결정 — 헤더 매칭 + fallback 정책 + [v350] 공동전차인 분기
   var writes = [];
-  var warnings = [];
+  var warnings = hdrWarnings.slice(); // [v364] 헤더 경고 포함
   var skippedCoFields = []; // [v350] 단독계약 SKIP 추적
   CFG_FIELDS_MAP.forEach(function(spec){
     // [v350] 단독계약 보호 — onlyIfCoName 필드는 공동전차인 없으면 SKIP
@@ -378,7 +402,7 @@ function upsertContractInner(data) {
     if (writes.length === 0) {
       return jsonResp({
         status: 'ok',
-        dryRun: CFG_DRY_RUN,
+        dryRun: dry,
         mode: 'noop',
         row: targetRow,
         sheet: sheet.getName(),
@@ -395,7 +419,7 @@ function upsertContractInner(data) {
   // 응답 빌더 (공통)
   var resp = {
     status: 'ok',
-    dryRun: CFG_DRY_RUN,
+    dryRun: dry,
     mode: mode,
     row: targetRow,
     sheet: sheet.getName(),
@@ -417,9 +441,11 @@ function upsertContractInner(data) {
     warnings: warnings
   };
 
-  // DRY_RUN
-  if (CFG_DRY_RUN) {
-    resp.message = 'DRY_RUN — 실제 쓰지 않음. 검증 완료 후 CFG_DRY_RUN=false 변경.';
+  // DRY_RUN — 전역(CFG_DRY_RUN) 또는 [v364] 요청별(data.dryRun)
+  if (dry) {
+    resp.message = CFG_DRY_RUN
+      ? 'DRY_RUN — 실제 쓰지 않음. 검증 완료 후 CFG_DRY_RUN=false 변경.'
+      : '사전 확인(요청별 DRY_RUN) — 실제 쓰지 않음. 「계약서 생성」으로 발행하면 위 내용이 입력됩니다.';
     return jsonResp(resp);
   }
 
