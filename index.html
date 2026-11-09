@@ -380,8 +380,13 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .crx-tab.active { color:#4F46E5; font-weight:700; border-bottom-color:#4F46E5; }
 .crx-cnt { font-size:10px; background:#F1F5F9; color:#64748B; padding:1px 7px; border-radius:999px; font-weight:700; }
 .crx-cnt.red { background:#FCEBEB; color:#A32D2D; }
-.crx-cond-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; padding:12px 16px; }
+.crx-cond-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; padding:12px 16px; }   /* [v729] 체크(G열) 카드 추가로 6열 */
+@media(max-width:1100px){ .crx-cond-grid { grid-template-columns:repeat(3,1fr); } }
 @media(max-width:700px){ .crx-cond-grid { grid-template-columns:repeat(2,1fr); } }
+/* [v729] 계약관리 시트 G열 '체크' 값별 색 — CMS대상(기본 남색) · 과거계약(회색) · Check(주황, 확인 필요) */
+.crx-cond-cell.chk-past .v { color:#64748B; }
+.crx-cond-cell.chk-check { background:#FEF3C7; } .crx-cond-cell.chk-check .l { color:#B45309; } .crx-cond-cell.chk-check .v { color:#92400E; }
+.crx-cond-cell.chk-cms { background:#EEF2FF; }
 .crx-cond-cell { background:#F8FAFC; border-radius:8px; padding:9px 12px; }
 .crx-cond-cell .l { font-size:10px; color:#94A3B8; font-weight:600; margin-bottom:3px; }
 .crx-cond-cell .v { font-size:13.5px; font-weight:700; color:#4338CA; }
@@ -7317,6 +7322,15 @@ function renderContractRecord(c, payments, responses = []) {
       <div class="crx-cond-cell"><div class="l">전대계약확인</div><div class="v">${fmt(c['전대전환'])}</div></div>
       <div class="crx-cond-cell"><div class="l">납부조건</div><div class="v">${fmt(c['납부조건'])}</div></div>
       <div class="crx-cond-cell${(function(){var v=String(__vacRow.imdaeShingo==null?'':__vacRow.imdaeShingo).trim();return (!v||v==='-'||v==='—'||v.indexOf('미')===0)?' warn':'';})()}"><div class="l">임대차신고</div><div class="v">${fmt(__vacRow.imdaeShingo)}</div></div>
+      ${(function(){
+        /* [v729] 계약관리 시트 G열 '체크' (CMS대상 · 과거계약 · Check) — 헤더 키 우선, 없으면 G열 절대 위치 */
+        var raw = c['체크'] != null && String(c['체크']).trim() !== '' ? c['체크'] : (c['_col_G'] != null ? c['_col_G'] : '');
+        var v = String(raw == null ? '' : raw).trim();
+        if (v === '-' || v === '—') v = '';
+        var cls = /CMS/i.test(v) ? ' chk-cms' : /과거/.test(v) ? ' chk-past' : /check/i.test(v) ? ' chk-check' : '';
+        var esc = function(x){ return String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+        return '<div class="crx-cond-cell' + cls + '" title="계약관리 시트 G열(체크) 값' + (v ? ': ' + esc(v) : ' — 비어 있음') + '"><div class="l">체크 <span style="font-weight:500;color:#CBD5E1">· 시트 G열</span></div><div class="v">' + (v ? esc(v) : '—') + '</div></div>';
+      })()}
     </div>
   </div>
 
