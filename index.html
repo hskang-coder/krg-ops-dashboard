@@ -2125,10 +2125,20 @@ function gvizToObjects(gviz) {
     do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
     return s;
   };
-  return (gviz.table.rows || []).map(row => {
+  const _cnoDateHits = [];   // [v730] 날짜 서식으로 들어온 계약번호 셀 (배너용)
+  const out = (gviz.table.rows || []).map(row => {
     const obj = {};
     (row.c || []).forEach((cell, i) => {
-      const v = cell ? (cell.f ?? cell.v ?? '') : '';
+      let v = cell ? (cell.f ?? cell.v ?? '') : '';
+      // [v730] 계약번호 열(A열 또는 라벨 '계약번호')이 숫자인데 표시 서식이 날짜·통화·콤마면 표시값(f) 대신 원래 숫자(v) 사용
+      //   예) 마스터 A열에 날짜 서식이 걸려 f='2077. 12. 9', v=64993 → '64993' (2026-11-09 13건 확인)
+      if (cell && typeof cell.v === 'number' && isFinite(cell.v) && (i === 0 || cols[i] === '계약번호')) {
+        const f = String(cell.f == null ? '' : cell.f).trim();
+        if (f && !/^\d+$/.test(f)) {
+          v = String(Math.round(cell.v));
+          if (/^\d{4}\s*[.\-\/]\s*\d{1,2}\s*[.\-\/]\s*\d{1,2}/.test(f)) _cnoDateHits.push({ cno: v, f: f });
+        }
+      }
       if (cols[i]) obj[cols[i]] = v;          // 기존 라벨 키 (있을 때만)
       obj['_col_' + colLetter(i)] = v;        // 절대 위치 폴백 키 (항상)
     });
@@ -2138,6 +2148,18 @@ function gvizToObjects(gviz) {
     if (obj['계약번호']) obj['계약번호'] = String(obj['계약번호']).replace(/[₩,\s]/g,'').replace(/\.0+$/,'');
     return obj;
   });
+  // [v730] 날짜 서식 계약번호 감지 → 상단 데이터 점검 배너 (대시보드는 자동 보정, 시트 서식 수정 권장)
+  if (_cnoDateHits.length) {
+    try {
+      const label0 = cols[0] || '(A열)';
+      const seen = {}; const uniq = _cnoDateHits.filter(h => (seen[h.cno] ? false : (seen[h.cno] = true)));
+      const msg = '계약번호 열(' + label0 + ') ' + uniq.length + '건이 날짜 서식으로 입력됨(예: ' + uniq[0].f + ' → ' + uniq[0].cno + ') — 마스터 시트 계약관리 A열 서식을 "숫자/자동"으로 변경 권장 (대시보드는 자동 보정 중)';
+      window._sheetIssues = (window._sheetIssues || []).filter(x => x.indexOf('계약번호 열(') !== 0).concat([msg]);
+      if (typeof _renderSheetBanner === 'function') _renderSheetBanner();
+      console.warn('[v730 cnoDate]', uniq.map(h => h.cno + '←' + h.f).join(', '));
+    } catch(_) {}
+  }
+  return out;
 }
 
 let crMode = 'no';
@@ -2516,7 +2538,9 @@ let outsourceIdx = findColIdx(labels, ['연체외주','연체 외주'], 71);
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
-    const no = cell(noIdx);
+    // [v730] 계약번호가 숫자인데 날짜/통화 서식(f='2077. 12. 9')이면 원래 숫자(v) 사용
+    const noRaw = c[noIdx];
+    const no = (noRaw && typeof noRaw.v === 'number' && isFinite(noRaw.v)) ? String(Math.round(noRaw.v)) : cell(noIdx);
     if (!no) return null;
     return {
       no,
@@ -3652,7 +3676,9 @@ function parseIncomeSheet(resp) {
   return (rows||[]).map(row => {
     const c = row.c || [];
     const cell = i => (i < 0 || !c[i]) ? '' : String(c[i].f ?? c[i].v ?? '').trim();
-    const no = cell(noIdx);
+    // [v730] 계약번호가 숫자인데 날짜/통화 서식(f='2077. 12. 9')이면 원래 숫자(v) 사용
+    const noRaw = c[noIdx];
+    const no = (noRaw && typeof noRaw.v === 'number' && isFinite(noRaw.v)) ? String(Math.round(noRaw.v)) : cell(noIdx);
     if (!no) return null;
     return {
       no,
