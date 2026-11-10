@@ -6211,7 +6211,7 @@ async function renderSettlementView(){
     V.forEach(function(v){ var u=String(v.useType||'').trim(); if(u) useMap[String(v.no).trim()]=u; });
     var _useF=window._stlUse||'total';
     var _useOk=function(cno){ if(_useF==='total') return true; var u=useMap[String(cno||'').trim()]||''; return _useF==='res'? u.indexOf('주거')>=0 : (u.indexOf('상업')>=0||u.indexOf('상가')>=0); };
-    var tb={rows:0,ctr:{},amt:0,paid:0,on:0,sch:0}, subro={amt:0,n:0}, sched={n:0,amt:0,rsvN:0,rsvAmt:0,lateN:0,lateAmt:0};   /* [v720] rsv = 이체예약 포함분 · late = 예정일 경과 미지급(기간 무관) */   /* [v715] on = 정상납부 · sch = 납부예정 */
+    var tb={rows:0,ctr:{},amt:0,paid:0,on:0,sch:0,by7:0,by30:0,fin7:true,fin30:true}, subro={amt:0,n:0}, sched={n:0,amt:0,rsvN:0,rsvAmt:0,lateN:0,lateAmt:0};   /* [v720] rsv = 이체예약 포함분 · late = 예정일 경과 미지급(기간 무관) */   /* [v715] on = 정상납부 · sch = 납부예정 */
     var firstD={n:0,amt:0,paid:0};   // [v532.1] 첫달 직납 (임차인→임대인 직접)
     var unpaidMap={};   // [v514] 계약번호|청구월 → 미납 합 (대위변제 매칭용)
     P.forEach(function(p){
@@ -6227,6 +6227,10 @@ async function renderSettlementView(){
         tb.rows++; tb.ctr[cno2]=1; tb.amt+=tot;
         if(st2!=='납부예정') tb.paid+=Math.max(0, tot-outA);   // [v508] 입금 = 청구 − 미납
         if(st2==='정상납부') tb.on+=Math.max(0, tot-outA); else if(st2==='납부예정') tb.sch+=tot;   // [v715] 납부율 구성 — 정상납부(납기일까지) / 그 밖의 납부 = 연체납부
+        /* [v731] 납기+N일 납부율 — 납부일이 납기일+N일 이내인 납부액(청구−미납). 납부일 없는 건·분납 중은 0 · 납기일+N이 오늘을 넘는 청구가 있으면 '확정 전'(fin=false) */
+        var payD2=_bfPd(p['납부일']), pdAmt=(st2==='납부예정')?0:Math.max(0, tot-outA), due7=dueD.getTime()+7*86400000, due30=dueD.getTime()+30*86400000;
+        if(payD2 && pdAmt>0){ if(payD2.getTime()<=due7) tb.by7+=pdAmt; if(payD2.getTime()<=due30) tb.by30+=pdAmt; }
+        if(due7>today.getTime()) tb.fin7=false; if(due30>today.getTime()) tb.fin30=false;
         if(isFirstMonth(p)){ firstD.n++; firstD.amt+=tot; if(st2!=='납부예정') firstD.paid+=Math.max(0, tot-outA); }   // [v532.1]
       }
       if(outA>0 && st2!=='납부예정'){ var k2=cno2+'|'+billMonth(p); unpaidMap[k2]=(unpaidMap[k2]||0)+outA; }
@@ -6255,6 +6259,9 @@ async function renderSettlementView(){
     var tbUnR = Math.max(0, Math.round((100 - tbRate - tbSchR)*10)/10);
     var tbRateVal = tbRate+'%'+(tb.amt>0 ? '<span title="정상납부 = 납기일까지 낸 금액(납부상태 정상납부)&#10;연체납부 = 납기일이 지나 낸 금액(연체납부 · 분납 중 낸 금액 포함)" style="font-size:11px;font-weight:700;color:#475569;margin-left:4px;cursor:help">(정상납부 <b style="color:#0B7A45">'+tbOnR.toFixed(1)+'%</b> + 연체납부 <b style="color:#B45309">'+tbLateR.toFixed(1)+'%</b>)</span>' : '');
     var tbRateSub = '납부금액 ÷ 청구금액'+(tb.amt>0 ? ' · 나머지: 미납 '+tbUnR.toFixed(1)+'%'+(tbSchR>0 ? ' · 납부예정 '+tbSchR.toFixed(1)+'%' : '') : '');
+    /* [v731] 기준일 고정 납부율 — 납기+7일(다음 달 7일 확정, 비교·목표용) · 납기+30일(월 마감치). 현재 값은 매일 변하는 '오늘 스냅샷' */
+    var tbBy7R = tb.amt>0 ? Math.round(tb.by7/tb.amt*1000)/10 : 0, tbBy30R = tb.amt>0 ? Math.round(tb.by30/tb.amt*1000)/10 : 0;
+    if(tb.amt>0) tbRateSub += '<br><span title="납기+7일 = 납기일에서 7일 안에 낸 금액 ÷ 청구금액 — 납기일+7일이 지나면 고정되는 값(월 비교·목표용)&#10;+30일 = 월 마감치&#10;* = 아직 지나지 않은 납기가 있어 확정 전&#10;납부일이 비어 있는 입금(0원 처리·수동 반영)과 분납 중 금액은 제외 — 위 납부율(오늘 기준)보다 조금 낮게 나올 수 있음" style="cursor:help;white-space:nowrap">기준일 고정: <b style="color:#1A3A5C">납기+7일 '+tbBy7R.toFixed(1)+'%'+(tb.fin7?'':'*')+'</b> · +30일 <b style="color:#1A3A5C">'+tbBy30R.toFixed(1)+'%'+(tb.fin30?'':'*')+'</b></span>';
     // [v536] 기간 유형별 비교 구간 — 일=전일, 주=전주, 월(1일~말일)=전월, 임의=동일 길이 직전 구간
     var _rngDays = Math.round((re2-rs)/86400000)+1;
     var _monAligned = rs.getDate()===1 && rs.getFullYear()===re2.getFullYear() && rs.getMonth()===re2.getMonth() && re2.getDate()===new Date(re2.getFullYear(), re2.getMonth()+1, 0).getDate();
