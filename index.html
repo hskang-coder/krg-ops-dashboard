@@ -18644,8 +18644,32 @@ function buildSubAgreementHtml(d) {
     + '</body></html>';
 }
 
+// ── [v732] 보증채무 최고액 각주 ──────────────────────────────
+//   민법 제428조의3(근보증): 보증채무 최고액을 서면으로 특정하지 않으면 보증의 효력이 없음 → 공동계약인(병) 란에 명시 (관리자 지시 2026-11-12)
+//   금액 = 1면 '월납부금액'(monthlyTotal · 원 단위 반올림 = 1면 표시값) × 24개월 — 제14조③ "공동계약인 란에 기재한 보증채무 최고액"
+//   · 공동계약인(병)이 등록된 경우에만 그 란의 표 아래에 출력 (기본·계약인2(을)은 미출력) — 출력 여부는 buildGuaranteezContractHtml 에서 결정
+//   · 기타 공동계약자 '연대보증인'(계약서 표기 '공동계약인(병)') 카드에도 같은 각주
+//   · 월납부금액이 0/누락이면 금액 칸을 비워 수기 기재하도록 함 ('금 0원'·'-' 오표기 방지)
+var CG_GUAR_MONTHS = 24;
+function cG_guarMaxAmount(monthlyTotal) {
+  var m = Number(monthlyTotal);
+  m = isFinite(m) ? Math.round(m) : 0;
+  return (m > 0) ? m * CG_GUAR_MONTHS : 0;
+}
+function cG_guarMaxNote(monthlyTotal) {
+  var max = cG_guarMaxAmount(monthlyTotal);
+  var amt = (max > 0)
+    ? cG_fmtKRW(max)
+    : '금 <span style="padding:0 52px;border-bottom:1px solid #1a1a1a">&nbsp;</span>원';   // 수기 기재용 밑줄 (inline 이라 줄 높이 불변)
+  return '<div class="cG-guar-max" style="margin-top:4px;padding:3px 7px 0;border-top:1px dashed #c0c0c0;font-size:8pt;line-height:1.5;color:#1a1a1a">'
+    + '<span style="font-weight:700">※ 보증채무 최고액: <span style="color:#1B3976">' + amt + '</span></span>'
+    + ' <span style="color:#6b7280">(월납부총액 × ' + CG_GUAR_MONTHS + '개월)</span>'
+    + '</div>';
+}
+
 // ── 공동계약인(병) 섹션 ───────────────────────────────────
-function cG_buildCoParty(hasCoParty, coTitle, d) {
+// [v732] guarNote(보증채무 최고액 각주 HTML · 없으면 '') 추가 — 표 아래에 그대로 붙임
+function cG_buildCoParty(hasCoParty, coTitle, d, guarNote) {
 
   // [v230] 관계,이름 결합 표시 — 구분자: 쉼표/슬래시/공백 모두 허용
   var coEmergRel = '', coEmergName = '', coEmergCombo = '';
@@ -18683,10 +18707,13 @@ function cG_buildCoParty(hasCoParty, coTitle, d) {
     + rows
     + '</table>'
     + '<div style="text-align:center;font-size:7.5pt;color:#6b7280;padding-top:4px;border-left:1px dashed #c0c0c0;margin-left:4px">서명<br>혹은 인</div>'
-    + '</div></div>';
+    + '</div>'
+    + (guarNote || '')
+    + '</div>';
 }
 
 // ── 서비스 계약 조항 (제1조~제17조) ───────────────────────────────────
+// [v732] 2026-11-12 개정: 제14조 ③ 신설(보증채무 최고액 한도) · 제17조 (합의관할)→(분쟁의 해결) 민사소송법상 관할. 그 외 조항 원문 유지
 function cG_buildTerms() {
   var arts = [
     ['제1조','(계약의 목적)','본 계약은 "갑"이 전(임)대인(또는 전(임)대인의 위임을 받은 자) "을"이 전(임)차인으로서 본 계약서 1면 전(임)대차계약부분에 따른 부동산을 전(임)대목적물로 하여 전(임)대차계약을 체결하고, 입주 중 발생할 수 있는 사항 및 "병", "정"이 "을"의 채무를 연대보증하는데 있어 당사자들간 권리와 의무 및 관련 제반사항을 규정하는데 목적이 있다.'],
@@ -18702,10 +18729,10 @@ function cG_buildTerms() {
     ['제11조','(체납 및 연체 처리 절차)','① "을"의 연체 발생 시 "갑"은 문자·전화 및 기타의 방법으로 체납 사실을 통지하며, 필요시 을이 제공한 긴급연락처(연대보증인 등)에 체납 사실을 통보할 수 있다.\n② "을"의 체납이 지속될 경우, "을"의 자택·직장 방문, 긴급연락처 및 직장에 통보 등의 절차를 따르며, 법적 조치 및 채무불이행정보 등록이 가능하다.\n③ 강제 퇴실(명도소송 포함) 시 발생한 유류물에 대해서 "갑"은 물품보관 의무가 없다.\n④ 유류물 처분에 대해 "을"은 어떠한 민·형사상 이의를 제기하지 않으며, 처분 권한을 "갑"에게 위임한다.\n⑤ 장기 연체 발생 시 "갑"은 채권추심을 위탁하거나 채권을 양도할 수 있고, 연체 정보는 위탁자 또는 채권양수인에게 제공될 수 있으며, "을"은 이에 동의한다.'],
     ['제12조','(연락처 등 변경사항 통지 의무)','"을"은 전화번호, 긴급연락처, 소속 회사 등 개인정보가 변경된 경우 즉시 갑에게 고지하여야 하며, 미고지로 인한 불이익은 전적으로 "을"의 책임이다.'],
     ['제13조','(중도 해지 및 퇴거 시 책임)','① "을"이 중도 퇴거를 원하는 경우, 반드시 사전에 "갑"에게 고지하고 별도의 해지 합의 절차를 거쳐야 한다.\n② 계약기간 중 "을"의 귀책사유로 전(임)대차계약을 해지하는 경우, 개런티즈 서비스 잔여 수수료, 미납 월세, 원상복구비용, 중개수수료, 소송선임비용, 철거비 등 중도 퇴실에 관하여 발생하는 모든 비용과 위약벌로 4개월 해당하는 월세 상당 금원을 "을"의 책임으로 즉시 지불한다.\n③ 중도 퇴거 시 "을"은 "갑"과 전(임)대차계약의 해지를 협의할 수 있고, 협의를 통해 전(임)대차계약이 해지되지 않는 경우 잔여 전(임)대차 기간 동안 "갑"의 손실에 대해 책임을 지며, 새로운 전차인(임(전)차인)의 입주 전까지 발생하는 전(임)대료 및 신규계약을 진행함에 따라 발생하는 비용은 "을"의 부담이다.\n④ 해지 완료 기준은 다음 입주자의 계약이 완료되고 모든 정산이 종료된 시점으로 본다.'],
-    ['제14조','(공동계약자 책임)','① "병", "정"(공동계약자)은 전(임)대차계약 및 본계약에 따라 "을"이 현재 부담하고 있거나 장래 부담하게 될 각종 금전채무(피담보채무)를 연대하여 책임을 진다.\n② "병"과 "정"은 "갑"이 "을"로부터 피담보채무 전액을 변제 받기 전까지 "을"에 대해 구상권을 행사하지 않는다.'],
+    ['제14조','(공동계약자 책임)','① "병", "정"(공동계약자)은 전(임)대차계약 및 본계약에 따라 "을"이 현재 부담하고 있거나 장래 부담하게 될 각종 금전채무(피담보채무)를 연대하여 책임을 진다.\n② "병"과 "정"은 "갑"이 "을"로부터 피담보채무 전액을 변제 받기 전까지 "을"에 대해 구상권을 행사하지 않는다.\n③ 본 조에 따른 "병", "정"의 보증책임은 본 계약서 1면 공동계약인 란에 기재한 보증채무 최고액을 한도로 한다.'],
     ['제15조','(본 계약 종료에 따른 효력)','① 본 계약기간의 만료, 본 계약의 해제, 해지 및 본 계약에 따른 계약종료는, 계약 종료 시점 이전에 발생한 당사자들 간의 채권, 채무 및 각종 청구권에 영향을 미치지 아니한다.\n② 본 계약이 종료되더라도 본 계약서에서 명시적으로 또는 그 성질상 계약 종료 이후에도 존속하는 것으로 예정된 조항들은 본 계약의 종료에도 불구하고 계속 그 효력을 유지한다.'],
     ['제16조','(손해배상)','일방 당사자는 자신의 책임 있는 사유로 본 계약의 의무사항을 준수하지 못하여 상대방에게 손해가 발생한 경우, 상대방에 대하여 그 손해 일체를 배상할 책임이 있다.'],
-    ['제17조','(합의관할)','본 계약에 따른 분쟁이 발생할 경우 당사자들 간 합의에 의해 해결하되, 합의에 의한 해결이 불가능할 경우 "갑"의 본점소재지 관할법원을 전속적 합의관할법원으로 하여 소송으로 해결한다.']
+    ['제17조','(분쟁의 해결)','본 계약에 따른 분쟁이 발생할 경우 당사자들 간 합의에 의해 해결하되, 합의에 의한 해결이 불가능할 경우 민사소송법상의 관할법원에 소를 제기하여 해결한다.']
   ];
   // 조항: 자연스러운 페이지 흐름 (강제 분할 없음, 조항 단위로 분리 유지)
   var html = '<div class="cG-page">'
@@ -18726,11 +18753,14 @@ function cG_buildTerms() {
 
 // ── 메인 HTML 빌더 ────────────────────────────────────────
 // [v360] 추가 계약자 카드 — 3번째 이상의 서명란이 누락되지 않도록 구조 개선
-function cG_buildExtraPartyCard(party, fontSize) {
+// [v732] 기타 공동계약자 '연대보증인'은 계약서에 '공동계약인(병)'으로 표기하고 표 아래에 보증채무 최고액 각주(guarNote)를 붙임 (관리자 지시 2026-11-12)
+//        '공동명의계약인'은 그대로 (각주 없음). 입력 화면의 유형 값('연대보증인')은 바꾸지 않음
+function cG_buildExtraPartyCard(party, fontSize, guarNote) {
   fontSize = fontSize || '8pt';
   var esc = function(s){ return String(s||'').replace(/[<>]/g, function(m){ return m==='<'?'&lt;':'&gt;'; }); };
-  var typeLabel = party.type || '공동명의계약인';
-  var bg = party.type === '연대보증인' ? '#4F46E5' : '#4b5563';
+  var isGuar = (party.type === '연대보증인');   // [v732]
+  var typeLabel = isGuar ? '공동계약인(병)' : (party.type || '공동명의계약인');
+  var bg = isGuar ? '#4F46E5' : '#4b5563';
   return '<div style="border:2px solid '+bg+';border-radius:6px;padding:7px 10px;margin-top:8px;break-inside:avoid;page-break-inside:avoid">'
     + '<div class="sig-ttl" style="background:'+bg+'">'+esc(typeLabel)+'</div>'
     + '<div style="display:flex;gap:8px;margin-top:4px">'
@@ -18746,7 +18776,9 @@ function cG_buildExtraPartyCard(party, fontSize) {
     + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-width:60px;padding-top:6px">'
     + '<div style="text-align:center;font-size:8pt;color:#6b7280;border-left:1px dashed #c0c0c0;padding-left:5px;height:80px;display:flex;align-items:center">서명<br>혹은 인</div>'
     + '</div>'
-    + '</div></div>';
+    + '</div>'
+    + (isGuar ? (guarNote || '') : '')   /* [v732] */
+    + '</div>';
 }
 
 function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
@@ -18950,16 +18982,32 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
 
   // ── Page 2: 을 + 기타공동계약자 + 병 + 체크리스트 ──────
   // [v362-v363] 기타공동계약자를 계약인2 아래, 체크리스트 위에 배치
+  // [v732] 보증채무 최고액 각주 — 공동계약인(병)이 등록된 경우에만 출력, 기본(빈 칸)·공동계약자(을)(계약인2(을))는 미출력 (관리자 지시 2026-11-12)
+  //   각주(24px)가 들어가도 2면의 체크박스 위치(전자서명 체크 위치)·2면 높이·면 넘김이 종전과 같도록 주변 빈 여백에서 흡수한다
+  //   · 기타 공동계약자 없음 + 병 각주: 체크리스트 제목 박스 — 위 여백 14→8 · 안쪽 위/아래 14→8 · 아래 13→7  (-6 -12 -6 = -24)
+  //   · 기타 공동계약자 있음: 병 각주는 그 구역 위쪽 여백에서(16+1+12 → 6+1+6, 제목 아래 10→8, 체크리스트 위 16→10 = -24),
+  //                         기타 병(연대보증인) 카드 각주는 체크리스트 쪽에서(체크리스트 위 16→10, 제목 박스 안쪽 14→8 · 아래 13→7 = -24),
+  //                         둘 다 있으면 16+1+12 → 4+1+4, 10→8, 16→8, 제목 박스 -18 = -48.  기타 병 카드가 2장 이상이면 넘는 만큼 2면이 길어짐
+  var guarMain  = hasCoParty && coTitle === '공동계약인(병)';
+  var guarNote  = cG_guarMaxNote(monthlyTotal);
+  var hasEx     = extraParties.length > 0;
+  var gE        = extraParties.some(function(p){ return !!p && p.type === '연대보증인'; });
+  var gM        = guarMain && hasEx;
+  var gapA      = gM ? (gE ? ['4px', '4px'] : ['6px', '6px']) : ['16px', '12px'];   // 기타 공동계약자 구역 위: [margin-top, padding-top]
+  var gapB      = gM ? '8px' : '10px';                                              // '기타 공동계약자' 제목 아래
+  var gapC      = (gM && gE) ? '8px' : ((gM || gE) ? '10px' : '');                  // 구역 아래 = 체크리스트 위 ('' = 원래 값)
+  var ckCompact = hasEx ? gE : guarMain;                                            // 체크리스트 제목 박스 안쪽 여백 축소
+  var ckHdrGap  = 'margin-top:' + (hasEx ? (gapC || '14px') : (guarMain ? '8px' : '14px')) + (ckCompact ? ';padding:8px 18px;margin-bottom:7px' : '');
   var p_parties = '<div class="cG-page">'
     // 병 (계약인2)
-    + cG_buildCoParty(hasCoParty, coTitle, d)
+    + cG_buildCoParty(hasCoParty, coTitle, d, guarMain ? guarNote : '')   /* [v732] 보증채무 최고액 = 월납부금액 × 24 */
     // 기타공동계약자 (계약인2 바로 아래)
-    + (extraParties.length > 0 ? '<div style="margin-top:16px;margin-bottom:16px;border-top:1px solid #e5e7eb;padding-top:12px;page-break-inside:avoid">'
-      + '<div style="font-size:10pt;font-weight:700;margin-bottom:10px;color:#1B3976">기타 공동계약자</div>'
-      + extraParties.map(function(p){ return cG_buildExtraPartyCard(p, '7.5pt'); }).join('')
+    + (hasEx ? '<div style="margin-top:' + gapA[0] + ';margin-bottom:' + (gapC || '16px') + ';border-top:1px solid #e5e7eb;padding-top:' + gapA[1] + ';page-break-inside:avoid">'
+      + '<div style="font-size:10pt;font-weight:700;margin-bottom:' + gapB + ';color:#1B3976">기타 공동계약자</div>'
+      + extraParties.map(function(p){ return cG_buildExtraPartyCard(p, '7.5pt', guarNote); }).join('')
       + '</div>' : '')
     // 체크리스트
-    + '<div class="ck-hdr" style="margin-top:14px">'
+    + '<div class="ck-hdr" style="' + ckHdrGap + '">'
     + '<div style="display:flex;align-items:center"><span style="font-size:8.5pt;opacity:.8">KRG GROUP · GUARANTEEZ SERVICE</span><span style="margin-left:auto;font-size:8pt;opacity:.8">버전 1.0 / 2026년 기준</span></div>'
     + '<div style="font-size:13pt;font-weight:700;margin-top:4px">개런티즈 서비스</div>'
     + '<div style="font-size:13pt;font-weight:700">계약 확인 체크리스트</div>'
@@ -18977,7 +19025,7 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
   // [v285] 추가 계약자 페이지 분리로 페이지 오버플로우 방지
   var p_extra_parties = '';
   if (extraParties.length > 0) {
-    var extraBlocksHtml = extraParties.map(function(p){ return cG_buildExtraPartyCard(p, '8pt'); }).join('');
+    var extraBlocksHtml = extraParties.map(function(p){ return cG_buildExtraPartyCard(p, '8pt', cG_guarMaxNote(monthlyTotal)); }).join('');
     p_extra_parties = '<div class="cG-page">'
       + '<div style="margin-top:12px;font-size:11pt;font-weight:700;text-align:center;color:#1B3976">기타 공동계약자</div>'
       + extraBlocksHtml
