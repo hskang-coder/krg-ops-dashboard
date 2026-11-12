@@ -12905,6 +12905,43 @@ function cG_fmtKRW(n) {
   return '금 ' + v.toLocaleString('ko-KR') + '원';
 }
 
+// ── [v731.1] 임대차계약기간 괄호 표기: "(24개월)" ─────────────────────
+//   · 시트값(검색 발행)이 숫자만 오면 '개월'을 붙임: "24" → "24개월"   (기존: "(24)")
+//   · 값이 없으면(수동 입력 발행 · 기존: 빈 괄호 "()") 시작일~종료일이 N개월로 떨어질 때만 "N개월"로 계산
+//       ① 종료일 다음 날 = 시작일 + N개월  (예: 11/10 ~ 2년 뒤 11/9)
+//       ② 종료일        = 시작일 + N개월  (예: 10/1 ~ 1년 뒤 10/1 — 시트 계약의 14%가 이 형태)   ※ 말일 보정
+//     두 경우 모두 시트 '계약기간' 열 값과 같음 (2026-11-12 미러 전 행 대조)
+//   · 그 외(개월로 안 떨어지는 기간)·계산 불가면 '' → 괄호 자체를 찍지 않음 (틀린 숫자·빈 괄호 방지)
+function cG_leaseMonths(startStr, endStr) {
+  var P = function (x) { var m = String(x == null ? '' : x).match(/(\d{4})[.\-\/\s]+(\d{1,2})[.\-\/\s]+(\d{1,2})/); return m ? [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)] : null; };
+  var a = P(startStr), b = P(endStr);
+  if (!a || !b) return 0;
+  var s = new Date(a[0], a[1] - 1, a[2]), e = new Date(b[0], b[1] - 1, b[2]);
+  // 존재하지 않는 날짜(예: 2월 31일)는 계산하지 않음
+  if (s.getFullYear() !== a[0] || s.getMonth() !== a[1] - 1 || s.getDate() !== a[2]) return 0;
+  if (e.getFullYear() !== b[0] || e.getMonth() !== b[1] - 1 || e.getDate() !== b[2]) return 0;
+  var same = function (p, q) { return p.getFullYear() === q.getFullYear() && p.getMonth() === q.getMonth() && p.getDate() === q.getDate(); };
+  var add  = function (n) {   // 시작일 + n개월 (대상 월에 그 날짜가 없으면 말일)
+    var mo = s.getMonth() + n, y = s.getFullYear() + Math.floor(mo / 12); mo = mo % 12;
+    return new Date(y, mo, Math.min(s.getDate(), new Date(y, mo + 1, 0).getDate()));
+  };
+  var e1 = new Date(b[0], b[1] - 1, b[2] + 1);   // 종료일 다음 날
+  var n1 = (e1.getFullYear() - s.getFullYear()) * 12 + (e1.getMonth() - s.getMonth());
+  if (n1 > 0 && same(add(n1), e1)) return n1;   // ①
+  var n2 = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+  if (n2 > 0 && same(add(n2), e)) return n2;    // ②
+  return 0;
+}
+function cG_durationText(d) {
+  var v = String((d && d.duration != null) ? d.duration : '').trim();
+  if (v && v !== '-') {
+    if (!/^\d+(\.\d+)?$/.test(v)) return v;                                   // 이미 단위가 있는 값("24개월" 등)은 그대로
+    if (/^\d+(\.0+)?$/.test(v) && parseInt(v, 10) > 0) return parseInt(v, 10) + '개월';   // 정수 → N개월
+  }
+  var n = cG_leaseMonths(d && d.startDate, d && d.endDate);   // 값이 없거나 0·소수면 날짜로 계산
+  return n > 0 ? (n + '개월') : '';
+}
+
 // ── 증빙번호: YYYYMMDD-HHmm + 계약번호 ────────────────────
 function cG_refNo(contractNo) {
   var n = new Date();
@@ -15176,7 +15213,8 @@ function fetchContractForPdf(contractNo) {
         roomNo:       g(['호수','호실'], 21),
         startDate:    g(['시작일','계약시작일'], 22),
         endDate:      g(['종료일','계약종료일'], 23),
-        duration:     g(['계약기간'], 26),
+        // [v731.1] 계약기간(개월) — 표시값 대신 숫자값 사용 (셀 서식이 깨져 "1200%"로 내려오는 행 대응). 비어 있으면 '' → 계약서에서 날짜로 계산
+        duration:     (function(n){ return (n > 0 && Math.round(n) === n) ? String(n) : ''; })(gn(['계약기간'], 26)),
         depositRecov: gn(['원상회복담보금'], 31),
         deposit:      gn(['보증금'], 32),
         rent:         gn(['월세'], 33),
@@ -15185,7 +15223,9 @@ function fetchContractForPdf(contractNo) {
         totalRent:    gn(['임대료'], 36),
         serviceFee:   gn(['수수료'], 37),
         payDay:       g(['납기일'], 38),
-        payMethod:    g(['납부방법'], 39),
+        // [v731.1] 월세 납입형태(선불/후불) — 시트 헤더가 '임대료 납부조건'(AO)이라 기존 키워드 '납부방법'으로는 못 찾고 폴백 39('납기일' 열)를 읽어
+        //          1면 월세납입일이 "매월 7일 7"로 찍히던 문제 정정 → "매월 7일 선불". 시트값이 '-'·빈칸이면 납입형태는 표기하지 않음
+        payMethod:    (function(v){ v = String(v == null ? '' : v).trim(); return (v === '-') ? '' : v; })(g(['임대료 납부조건','월세납입형태','납부방법','납입형태','선후불'], 40)),
         // [v232] 컬럼 +1 시프트 보정 — 시트에 AT/AU 사이 컬럼 추가됨 (사용자 확인: AY=긴급연락처, AZ=관계이름)
         tenantPhone:  gNth(['임차인휴대폰','임차인 휴대폰','휴대폰','연락처'], 0, 47),  // AV
         tenantIdNo:   gNth(['주민번호','주민등록번호'], 0, 48),                          // AW
@@ -18822,7 +18862,7 @@ function buildGuaranteezContractHtml(d, specialNotes, extraParties) {
     + '</tr>'
     + '<tr>'
     +   '<td style="background:#f0f4ff;font-weight:600;padding:5px 8px;border:1px solid #d1d5db;color:#374151">임대차계약기간</td>'
-    +   '<td style="border:1px solid #d1d5db;padding:5px 8px">' + startDate + ' 부터 ~ ' + endDate + ' 까지 (' + (d.duration||'') + ')</td>'
+    +   '<td style="border:1px solid #d1d5db;padding:5px 8px">' + startDate + ' 부터 ~ ' + endDate + ' 까지' + (function(){ var t = ''; try { t = cG_durationText(d); } catch (e) { t = String(d.duration || '').trim(); } return t ? ' (' + t + ')' : ''; })() + '</td>'   /* [v731.1] 빈 괄호 "()" 정정 */
     + '</tr>'
     + '</table></div>'
     // ② 계약 정보 별도 박스
