@@ -16757,6 +16757,19 @@ function openIncomeReceiptModal(contractNo) {
     +         '</label>'
     +       '</div>'
     +     '</div>'
+    /* [v734] 계약해지증명서 발행 대상 — 임(전)차인용 / 임대인용 (계약해지증명서 선택 시에만 표시) */
+    +     '<div id="crIncRcptVerWrap" style="display:none;margin-bottom:12px">'
+    +       '<label style="font-size:11.5px;font-weight:600;color:#475569;display:block;margin-bottom:6px">발행 대상 <span style="color:#94A3B8;font-weight:500;font-size:10.5px">— 계약해지증명서 서식</span></label>'
+    +       '<div style="display:flex;gap:4px">'
+    +         '<label style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;padding:7px 4px;border:1.5px solid #DC2626;border-radius:6px;background:#FEF2F2;cursor:pointer;font-weight:700;color:#991B1B;font-size:11.5px;white-space:nowrap">'
+    +           '<input type="radio" name="crIncRcptVer" id="crIncRcptV1" value="tenant" checked onchange="cG_setDocVer(\'tenant\')" style="accent-color:#DC2626;margin:0"> 📥 임(전)차인용'
+    +         '</label>'
+    +         '<label style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;padding:7px 4px;border:1.5px solid #E5E7EB;border-radius:6px;background:#fff;cursor:pointer;font-weight:700;color:#6B7280;font-size:11.5px;white-space:nowrap">'
+    +           '<input type="radio" name="crIncRcptVer" id="crIncRcptV2" value="landlord" onchange="cG_setDocVer(\'landlord\')" style="accent-color:#DC2626;margin:0"> 📤 임대인용'
+    +         '</label>'
+    +       '</div>'
+    +       '<div id="crIncRcptVerHint" style="font-size:10.5px;color:#64748B;margin-top:5px;line-height:1.55">' + CG_DOCVER_HINT.tenant + '</div>'
+    +     '</div>'
     /* [v396] 퇴실정산청구서 안내 + 계약 종료일(퇴실일) 입력 (디폴트 hidden) */
     +     '<div id="crIncRcptSettleNote" style="display:none;margin-bottom:12px;padding:11px 12px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:6px">'
     +       '<div style="font-size:11.5px;color:#9A3412;line-height:1.5;margin-bottom:9px">🧾 <b>퇴실정산청구서</b> — 현재 <b>미납·납부예정</b> 항목이 자동 집계되어 청구서로 발행됩니다. (발행 기간·납부 종류 설정은 적용되지 않습니다)</div>'
@@ -16816,11 +16829,10 @@ function openIncomeReceiptModal(contractNo) {
     +       '<div style="margin-top:10px">'
     +         '<label style="font-size:11.5px;font-weight:600;color:#991B1B;display:block;margin-bottom:5px">📝 추가 기재 사항 <span style="color:#9CA3AF;font-weight:500;font-size:10.5px">(선택 — 증명서 본문에 삽입됨 · 자유 편집 가능)</span></label>'
     +         '<div style="display:flex;gap:5px;margin-bottom:5px">'
-    +           '<button type="button" onclick="cG_setExtraNoteTemplate(\'tenant\')" style="flex:1;background:#fff;border:1px solid #FCA5A5;color:#991B1B;padding:5px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600">📥 임차인 요청용</button>'
-    +           '<button type="button" onclick="cG_setExtraNoteTemplate(\'landlord\')" style="flex:1;background:#fff;border:1px solid #FCA5A5;color:#991B1B;padding:5px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600">📤 임대인 발송용</button>'
+    +           '<button type="button" onclick="cG_setExtraNoteTemplate(cG_docVerMode())" style="flex:1;background:#fff;border:1px solid #FCA5A5;color:#991B1B;padding:5px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600">↺ 기본 문구 (발행 대상에 맞춤)</button>'   /* [v734] '임차인 요청용 / 임대인 발송용' 버튼 → 위 '발행 대상' 선택으로 통합 */
     +           '<button type="button" onclick="cG_setExtraNoteTemplate(\'\')" style="background:#fff;border:1px solid #CBD5E1;color:#64748B;padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600">비우기</button>'
     +         '</div>'
-    +         '<textarea id="crIncRcptExtraNote" rows="4" placeholder="자유 입력 또는 위 버튼으로 템플릿 채우기" style="width:100%;padding:8px 10px;border:1px solid #FCA5A5;border-radius:5px;font-size:12px;background:#fff;resize:vertical;line-height:1.55;font-family:inherit">본 증명서는 임(전)차인의 요청에 따라 발행되었으며, 임대차 계약 관련 정산 내역 확인 및 향후 분쟁 발생 시 증빙 자료로 활용하기 위한 목적입니다.</textarea>'
+    +         '<textarea id="crIncRcptExtraNote" rows="4" placeholder="자유 입력 또는 위 버튼으로 템플릿 채우기" style="width:100%;padding:8px 10px;border:1px solid #FCA5A5;border-radius:5px;font-size:12px;background:#fff;resize:vertical;line-height:1.55;font-family:inherit">' + CG_DOCVER_NOTE.tenant + '</textarea>'
     +       '</div>'
     +     '</div>'
     +     '<div style="font-size:10.5px;color:#94A3B8">※ 납기일 기준 기간 내 납부 완료된 건만 발행됩니다 (납부상태: 정상납부, 연체납부)</div>'
@@ -16900,18 +16912,51 @@ function cG_getUnpaidData(){
   return data;
 }
 
+// ── [v734] 계약해지증명서 발행 대상 — 임(전)차인용(납부일·납부금액) / 임대인용(정산일·정산금액) ──────────
+//   추가 기재 사항 기본 문구 ([v344] 임차인 요청용 / 임대인 발송용 문구 그대로)
+var CG_DOCVER_NOTE = {
+  tenant: '본 증명서는 임(전)차인의 요청에 따라 발행되었으며, 임대차 계약 관련 정산 내역 확인 및 향후 분쟁 발생 시 증빙 자료로 활용하기 위한 목적입니다.',
+  landlord: '본 증명서는 임대인 측 정산 처리 및 관계 기관 제출용으로 발행되었으며, 임차인의 임대료·관리비 등 납부 내역과 계약 종결 상태를 객관적으로 증명합니다. 향후 임대차 계약 종결에 따른 정산 협의 시 본 문서를 기준 자료로 활용 가능합니다.'
+};
+var CG_DOCVER_HINT = {
+  tenant: '임(전)차인에게 드리는 서식 — <b>납부일·납부금액</b>(임(전)차인 납부 내역) 기준 · 미납 항목 표시',
+  landlord: '임대인에게 보내는 서식 — <b>정산일·정산금액</b>(임대인 정산 내역) 기준 · 미납 임대료는 대위납부로 표시 · 미납 항목 표 없음'
+};
+// 현재 발행 대상 — 모달의 선택(라디오)이 기준, 모달이 없으면 [v440] 전역 플래그
+function cG_docVerMode(){
+  var v2 = document.getElementById('crIncRcptV2');
+  if (v2) return v2.checked ? 'landlord' : 'tenant';
+  return (window.__crDocVerMode === 'landlord') ? 'landlord' : 'tenant';
+}
+// 발행 대상 변경 — 선택 표시·안내·생성 버튼 갱신. 추가 기재 사항이 기본 문구 그대로면 대상에 맞는 기본 문구로 교체 (직접 고친 문구·비운 칸은 그대로 둠)
+function cG_setDocVer(mode){
+  mode = (mode === 'landlord') ? 'landlord' : 'tenant';
+  window.__crDocVerMode = mode;
+  var v1 = document.getElementById('crIncRcptV1'), v2 = document.getElementById('crIncRcptV2');
+  if (v1) v1.checked = (mode === 'tenant');
+  if (v2) v2.checked = (mode === 'landlord');
+  var sty = function(p, on){
+    if (p && p.parentElement) { var l = p.parentElement; l.style.borderColor = on ? '#DC2626' : '#E5E7EB'; l.style.background = on ? '#FEF2F2' : '#fff'; l.style.color = on ? '#991B1B' : '#6B7280'; }
+  };
+  sty(v1, mode === 'tenant'); sty(v2, mode === 'landlord');
+  var hint = document.getElementById('crIncRcptVerHint');
+  if (hint) hint.innerHTML = CG_DOCVER_HINT[mode];
+  var el = document.getElementById('crIncRcptExtraNote');
+  if (el) {
+    var cur = String(el.value || '').trim();
+    if (cur === CG_DOCVER_NOTE.tenant || cur === CG_DOCVER_NOTE.landlord) el.value = CG_DOCVER_NOTE[mode];
+  }
+  try { cG_togglePurposeOptions(); } catch(_){}
+}
+
 // [v344] 추가 기재 사항 템플릿 — 임차인 요청용 / 임대인 발송용 / 비우기
 function cG_setExtraNoteTemplate(type){
   var el = document.getElementById('crIncRcptExtraNote');
   if (!el) return;
-  var templates = {
-    tenant: '본 증명서는 임(전)차인의 요청에 따라 발행되었으며, 임대차 계약 관련 정산 내역 확인 및 향후 분쟁 발생 시 증빙 자료로 활용하기 위한 목적입니다.',
-    landlord: '본 증명서는 임대인 측 정산 처리 및 관계 기관 제출용으로 발행되었으며, 임차인의 임대료·관리비 등 납부 내역과 계약 종결 상태를 객관적으로 증명합니다. 향후 임대차 계약 종결에 따른 정산 협의 시 본 문서를 기준 자료로 활용 가능합니다.'
-  };
-  el.value = templates[type] || '';
-  // [v440] 발송 대상 모드 — 임대인 발송용/임차인 요청용 (비우기는 모드 유지)
-  if (type === 'landlord') window.__crDocVerMode = 'landlord';
-  else if (type === 'tenant') window.__crDocVerMode = 'tenant';
+  var isVer = (type === 'landlord' || type === 'tenant');
+  el.value = isVer ? CG_DOCVER_NOTE[type] : '';
+  // [v440] 발송 대상 모드 — 임대인 발송용/임차인 요청용 (비우기는 모드 유지) · [v734] 모달의 '발행 대상' 선택과 함께 움직임
+  if (isVer) cG_setDocVer(type);
   try { el.focus(); el.scrollTop = 0; } catch(_){}
 }
 
@@ -17103,17 +17148,19 @@ function cG_togglePurposeOptions(){
   var periodWrap = document.getElementById('crIncRcptPeriodWrap');
   var typeWrap = document.getElementById('crIncRcptTypeWrap');
   var settleNote = document.getElementById('crIncRcptSettleNote');
+  var verWrap = document.getElementById('crIncRcptVerWrap');   // [v734] 발행 대상 (계약해지증명서 전용)
   var btn = document.getElementById('crIncRcptGenBtn');
   if (!btn) return;
   var isClose  = !!(p2 && p2.checked);
   var isSettle = !!(p3 && p3.checked);
   if (opts) opts.style.display = isClose ? 'block' : 'none';
+  if (verWrap) verWrap.style.display = isClose ? 'block' : 'none';
   if (unpaidDiv) unpaidDiv.style.display = isClose ? 'block' : 'none';
   if (periodWrap) periodWrap.style.display = isSettle ? 'none' : 'block';
   if (typeWrap) typeWrap.style.display = isSettle ? 'none' : 'block';
   if (settleNote) settleNote.style.display = isSettle ? 'block' : 'none';
   if (isSettle) { var _cn7 = (document.getElementById('crIncRcptContractNo') || {}).value; if (_cn7) cG_settlePrefill(_cn7); }   /* [v710] 위약금 자동 */
-  btn.textContent = isClose ? '📋 계약해지증명서 생성' : (isSettle ? '🧾 퇴실정산청구서 생성' : '📄 납부확인서 생성');
+  btn.textContent = isClose ? ('📋 계약해지증명서 (' + (cG_docVerMode() === 'landlord' ? '임대인용' : '임(전)차인용') + ') 생성') : (isSettle ? '🧾 퇴실정산청구서 생성' : '📄 납부확인서 생성');   /* [v734] 발행 대상 표기 */
   btn.style.background = isClose ? '#DC2626' : (isSettle ? '#B45309' : '#10B981');
   // 라디오 라벨 active 스타일 토글
   function _styleLbl(p, on, color, bg, fg){
@@ -17235,21 +17282,33 @@ async function generateIncomeReceipt(contractNo){
   });
 
   // [v440] 임대인 발송용 — 정산일(V열) 매칭 · 미납 임대료 대위납부 완납 처리 · 예정 제외 · 미납표 숨김
-  var isLandlord = (window.__crDocVerMode === 'landlord') && (purpose === 'contract_close');
-  var settleMap = {};            // { 'YYYY-MM': 정산일 }
+  // [v734] 발행 대상 = 임대인용(모달 선택) — 표의 납부일·납부금액 → 정산일·정산금액. 임대료 행은 그 납기월 정산내역의 정산 예정일(V열)·정산금(T열)
+  var isLandlord = (cG_docVerMode() === 'landlord') && (purpose === 'contract_close');
+  var stlRecs = {};              // [v734] { 'YYYY-MM': [ { st: 정산상태(N열), amt: 정산금(T열), v: 정산 예정일(V열 · 종전 정산일과 같은 열), x: 정산완료일(X열) } ] }
   var missedSet = new WeakSet(); // 대위납부(완납 처리)로 편입된 미납 임대료 행
   if (isLandlord) {
+    var _stlOk = false;
     try {
       var _sResp = await okpi_fetchRaw('1253974103');
-      (_sResp.table.rows||[]).forEach(function(r){
+      var _sRows = (_sResp.table.rows||[]);
+      var _cnoKey = _normCno(contractNo);
+      _sRows.forEach(function(r){
         var c=r.c||[]; var gg=function(i){ return c[i]?String(c[i].f!=null?c[i].f:(c[i].v!=null?c[i].v:'')).trim():''; };
-        if (gg(9) !== String(contractNo)) return;              // 계약번호 = index 9
+        if (_normCno(gg(9)) !== _cnoKey) return;               // 계약번호 = index 9 · [v734] 통화·콤마 서식 방어
         var mm = gg(3).match(/(\d{4})\s*년\s*(\d{1,2})\s*월/);  // 정산서월 = index 3
         var sv = gg(21);                                        // 정산일(V열) = index 21
         if (!mm || !sv) return;
-        settleMap[mm[1] + '-' + String(+mm[2]).padStart(2,'0')] = sv;
+        var _mk = mm[1] + '-' + String(+mm[2]).padStart(2,'0');
+        // [v734] 정산금(T열) = index 19 · 정산상태(N열) = index 13 · 정산완료일(X열) = index 23. 날짜는 표시 서식과 무관하게 셀 값(Date(y,m,d)) 우선
+        var _tc = c[19];
+        var _dm = (c[21] && typeof c[21].v === 'string') ? c[21].v.match(/^Date\((\d+),\s*(\d+),\s*(\d+)/) : null;
+        var _sd = _dm ? (_dm[1] + '-' + String(+_dm[2] + 1).padStart(2,'0') + '-' + String(+_dm[3]).padStart(2,'0')) : sv;
+        (stlRecs[_mk] = stlRecs[_mk] || []).push({ st: gg(13), amt: _tc ? ((typeof _tc.v === 'number') ? _tc.v : parseAmt(_tc.f != null ? _tc.f : _tc.v)) : 0, v: _sd, x: gg(23) });
       });
+      _stlOk = _sRows.length > 0;
     } catch(_e){ console.warn('[정산일] fetch 실패', _e); }
+    // [v734] 정산내역을 못 읽으면 발행 중단 — 정산일·정산금액 없이(납부 기준 금액으로) 임대인용이 나가는 것을 막음
+    if (!_stlOk) { alert('임대인 정산 내역(정산일·정산금액)을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.'); return; }
     var _missedRows = (paymentRawData||[]).filter(function(p){
       if (String(p['계약번호']||'').trim() !== String(contractNo)) return false;
       if (types.indexOf(String(p['납부종류']||'').trim()) < 0) return false;
@@ -17277,8 +17336,50 @@ async function generateIncomeReceipt(contractNo){
     return _paid > 0 ? _paid : parseAmt(r['최종 청구금액(원)(①+②+③-④-⑤+⑥)'] || 0); // [v452] 납부금액(원) 0(원본 공란)이면 최종 청구금액으로 보정
   };
 
+  // [v734] 임대인용 — 임대료 행 ↔ 그 납기월의 정산 기록 연결
+  //   · 제외(무효 정산서)는 정산으로 보지 않음
+  //   · 완료가 있으면 완료분 합계(임대료·관리비 정산서가 따로 나간 달 포함) + 그중 가장 늦은 정산일
+  //   · 완료가 없으면 지급 전(미실행·실패 등) 기록 — 날짜 옆에 (예정)/(미정산)
+  //   · 같은 달 임대료 청구가 2건 이상(드묾): 정산금이 그 달 청구 전체를 덮으면 첫 행에 정산금·나머지는 '위 정산에 포함', 아니면 금액이 가장 가까운 1건에만 연결
+  var rowStl = new Map();
+  if (isLandlord) {
+    var _stlToday = new Date(); _stlToday.setHours(0, 0, 0, 0);
+    var _stlPick = function(list){ var b = list[list.length - 1], bt = parseDate(b.v) || 0; list.forEach(function(x){ var t = parseDate(x.v) || 0; if (t > bt) { b = x; bt = t; } }); return b; };
+    var _stlOf = function(key){
+      var a = (stlRecs[key] || []).filter(function(x){ return x.st !== '제외'; });
+      if (!a.length) return null;
+      var done = a.filter(function(x){ return x.st === '완료' || !!x.x; });
+      if (done.length) return { amt: done.reduce(function(t, x){ return t + x.amt; }, 0), date: _stlPick(done).v, pending: false, note: '' };
+      var last = _stlPick(a);
+      return { amt: last.amt, date: last.v, pending: true, note: ((parseDate(last.v) || 0) >= _stlToday.getTime()) ? '예정' : '미정산' };
+    };
+    var _invAmt = function(r){ return Math.max(0, parseAmt(r['최종 청구금액(원)(①+②+③-④-⑤+⑥)']) - parseAmt(r['연체료(원)(⑥)'])); };   // 청구액(연체료 제외)
+    var _byMon = {};
+    rows.forEach(function(r){
+      if (String(r['납부종류']||'').trim() !== '임대료') return;
+      var k = monthKey(r['납기일']); if (!k) return;
+      (_byMon[k] = _byMon[k] || []).push(r);
+    });
+    Object.keys(_byMon).forEach(function(k){
+      var st = _stlOf(k); if (!st) return;
+      var rr = _byMon[k];
+      if (rr.length === 1) { rowStl.set(rr[0], st); return; }
+      var sum = rr.reduce(function(t, r){ return t + _invAmt(r); }, 0);
+      if (sum > 0 && st.amt >= sum * 0.85) {
+        rowStl.set(rr[0], st);
+        rr.slice(1).forEach(function(r){ rowStl.set(r, { amt: 0, date: st.date, pending: st.pending, note: st.note, incl: true }); });
+      } else {
+        var best = rr[0], bd = Infinity;
+        rr.forEach(function(r){ var d = Math.abs(_invAmt(r) - st.amt); if (d < bd) { bd = d; best = r; } });
+        rowStl.set(best, st);
+      }
+    });
+  }
+  // [v734] 표에 찍는 금액 — 임대인용에서 정산 기록이 연결된 임대료 행은 정산금, 그 외(임(전)차인용 포함)는 종전 납부금액
+  var rowShowAmt = function(r){ var st = rowStl.get(r); return st ? (st.incl ? 0 : st.amt) : rowPaidAmt(r); };
+
   // 합계
-  var totalPaid = rows.reduce(function(s, r){ return s + rowPaidAmt(r); }, 0);
+  var totalPaid = rows.reduce(function(s, r){ return s + rowShowAmt(r); }, 0);
 
   // 한글 금액 (간단 변환)
   var krWon = _krWonText;   /* [v644] 공용 */
@@ -17319,11 +17420,14 @@ async function generateIncomeReceipt(contractNo){
     var _missed = isLandlord && missedSet.has(r);
     // 납부일: 임대인용 → 정산일(정산서월 매칭, 없으면 '-'), 대위납부 완납행은 '-'
     var payDateCell;
+    var _stl = isLandlord ? rowStl.get(r) : null;   // [v734] 연결된 정산 기록 (임대인용 · 임대료 행)
     if (isLandlord) {
-      payDateCell = _missed ? '-' : (function(){ var sv = settleMap[monthKey(r['납기일'])]; return sv ? fmtKr(sv) : '-'; })();
+      // [v734] 정산일 — 정산 기록의 정산 예정일(V열) · 대위납부 행 포함 · 정산 기록이 없는 행(첫 달 직납·변동관리비 등)은 '-' · 지급 전이면 (예정)/(미정산)
+      payDateCell = (_stl && _stl.date) ? (fmtKr(_stl.date) + (_stl.pending ? '<br><span style="font-size:.86em;font-weight:700;color:#B45309">(' + _stl.note + ')</span>' : '')) : '-';
     } else {
       payDateCell = fmtKr(r['납부일']);
     }
+    var amtCell = (_stl && _stl.incl) ? '<span style="font-weight:500;color:#6B7280">위 정산에 포함</span>' : fmtMon(rowShowAmt(r));   // [v734]
     var methodCell = _missed ? '대위납부' : (r['납부방법']||'-');
     return '<tr>'
       + '<td style="text-align:center">' + (i+1) + '</td>'
@@ -17331,7 +17435,7 @@ async function generateIncomeReceipt(contractNo){
       + '<td style="text-align:center">' + (r['납부종류']||'-') + '</td>'
       + '<td style="text-align:center">' + fmtKr(r['납기일']) + '</td>'
       + '<td style="text-align:center">' + payDateCell + '</td>'
-      + '<td style="text-align:right;font-weight:700;color:#065F46">' + fmtMon(rowPaidAmt(r)) + '</td>'
+      + '<td style="text-align:right;font-weight:700;color:#065F46">' + amtCell + '</td>'
       + '<td style="text-align:center">' + methodCell + '</td>'
       + '</tr>';
   }).join('');
@@ -17343,12 +17447,18 @@ async function generateIncomeReceipt(contractNo){
   var isSettle = (purpose === 'exit_settlement');
   var isTerminated = /종료/.test(contractStatusStr);
   var docTitle = isClose ? '계 약 해 지 증 명 서' : (isSettle ? '퇴 실 정 산 청 구 서' : '납 부 확 인 서');
-  var docFileName = isClose ? '계약해지증명서' : (isSettle ? '퇴실정산청구서' : '납부확인서');
+  var docFileName = isClose ? ('계약해지증명서' + (isLandlord ? '(임대인용)' : '')) : (isSettle ? '퇴실정산청구서' : '납부확인서');   /* [v734] 임대인용은 파일명에 표기 */
   // 마지막 납부일 (정산 완료일 추정)
   var lastPaidDateStr = '';
   if (rows.length > 0) {
     var lastRow = rows[rows.length-1];
     lastPaidDateStr = fmtKr(lastRow['납부일'] || lastRow['납기일']);
+  }
+  // [v734] 임대인용 — 마지막 정산일 (연결된 정산 기록 중 가장 늦은 날)
+  var lastStlStr = '', lastStlPending = false;
+  if (isLandlord) {
+    var _lastT = -1;
+    rows.forEach(function(r){ var st = rowStl.get(r); if (!st || !st.date) return; var t = parseDate(st.date) || 0; if (t >= _lastT) { _lastT = t; lastStlStr = fmtKr(st.date); lastStlPending = !!st.pending; } });
   }
   // [v277] 종료일 — 사용자 수동 입력값 우선, 없으면 vacancy.exitDate, 없으면 contract['종료일']
   var exitDateStr = manualExitDate
@@ -17395,7 +17505,7 @@ async function generateIncomeReceipt(contractNo){
     // 📋 계약해지증명서
     var settleItems = [];
     settleItems.push('<li><b>계약 종료일</b>: ' + (exitDateStr || '-') + '</li>');
-    settleItems.push('<li><b>임대료·관리비·정산금 전액 납부</b>: ' + fmtMon(totalPaid) + ' 완납 확인 (납부 완료일: ' + lastPaidDateStr + ')</li>');
+    settleItems.push('<li><b>임대료·관리비·정산금 전액 납부</b>: ' + fmtMon(totalPaid) + ' 완납 확인 (' + ((isLandlord && lastStlStr) ? ((lastStlPending ? '최종 정산 예정일: ' : '최종 정산일: ') + lastStlStr) : ('납부 완료일: ' + lastPaidDateStr)) + ')</li>');   /* [v734] 임대인용은 마지막 정산일 */
     settleItems.push('<li><b>보증금 반환</b>: ' + (closeOpts.deposit ? '완료' : '별도 합의 / 미해당') + '</li>');
     settleItems.push('<li><b>원상회복</b>: ' + (closeOpts.restore ? '합의 완료' : '별도 합의 / 미해당') + '</li>');
     settleItems.push('<li><b>위약금/정산금 처리</b>: ' + (closeOpts.penalty ? '완료' : '별도 합의 / 미해당') + '</li>');
@@ -17508,8 +17618,8 @@ async function generateIncomeReceipt(contractNo){
       + '<table class="detail">'
       +   '<thead><tr>'
       +     '<th style="width:38px">No</th><th>청구서명</th><th style="width:80px">납부종류</th>'
-      +     '<th style="width:90px">납기일</th><th style="width:90px">납부일</th>'
-      +     '<th style="width:110px">납부금액</th><th style="width:80px">납부방법</th>'
+      +     '<th style="width:90px">납기일</th><th style="width:90px">' + (isLandlord ? '정산일' : '납부일') + '</th>'   /* [v734] 임대인용: 정산일 · 정산금액 */
+      +     '<th style="width:110px">' + (isLandlord ? '정산금액' : '납부금액') + '</th><th style="width:80px">납부방법</th>'
       +   '</tr></thead>'
       +   '<tbody>' + rowsHtml + '</tbody>'
       + '</table>'
