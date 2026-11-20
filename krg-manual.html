@@ -1299,5 +1299,228 @@ details.sop[open]{box-shadow:0 2px 12px rgba(20,20,20,.06)}
   });
 })();
 </script>
+
+<!-- ═══════════ 작업지시서 모달 (add-on · 2026-10-27) ═══════════
+     기존 마크업은 건드리지 않고, L3 SOP 각 항목 제목 옆에 📋 작업지시서 버튼을 주입합니다.
+     체크리스트는 SOP 본문 단계에서 자동 생성되며, WI 객체에 보강 내용(왜·캡처·완료 기준 등)을 둡니다. -->
+<style>
+.wi-btn{font-family:var(--mono);font-size:10px;font-weight:800;letter-spacing:.02em;padding:3px 9px;border-radius:99px;
+  background:var(--navy);color:#fff;border:1px solid var(--navy);cursor:pointer;white-space:nowrap;margin-left:6px;line-height:1.5}
+.wi-btn:hover{background:var(--blue);border-color:var(--blue)}
+.wi-btn.has{box-shadow:0 0 0 2px var(--blue-soft)}
+.wi-ov{position:fixed;inset:0;background:rgba(27,30,36,.55);backdrop-filter:blur(3px);z-index:1000;display:none;
+  align-items:center;justify-content:center;padding:16px}
+.wi-ov.on{display:flex}
+.wi-md{background:var(--panel);border-radius:18px;max-width:720px;width:100%;max-height:92vh;overflow:hidden;display:flex;
+  flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.28);animation:wiPop .18s ease}
+@keyframes wiPop{from{transform:scale(.97);opacity:0}to{transform:scale(1);opacity:1}}
+.wi-h{background:var(--navy);color:#fff;padding:18px 22px;position:relative;flex:none}
+.wi-h .wi-area{font-family:var(--mono);font-size:11px;letter-spacing:.1em;opacity:.8}
+.wi-h h3{font-size:19px;font-weight:800;letter-spacing:-.01em;line-height:1.35;margin:4px 36px 8px 0}
+.wi-h .wi-tags{display:flex;flex-wrap:wrap;gap:5px}
+.wi-h .wi-tags span{font-family:var(--mono);font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;background:rgba(255,255,255,.16);color:#fff}
+.wi-x{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;border:none;background:rgba(255,255,255,.18);
+  color:#fff;font-size:20px;cursor:pointer;line-height:1}
+.wi-x:hover{background:rgba(255,255,255,.3)}
+.wi-b{padding:16px 22px 20px;overflow-y:auto;font-size:13.5px}
+.wi-why{background:var(--soft);border-left:4px solid var(--navy);border-radius:0 10px 10px 0;padding:10px 13px;line-height:1.55;margin-bottom:16px}
+.wi-sec{margin-bottom:16px}
+.wi-sec h4{font-size:13px;font-weight:800;color:var(--navy);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.wi-sec h4 .wi-pct{font-family:var(--mono);font-size:11px;color:var(--sub);font-weight:700}
+.wi-prog{height:7px;background:var(--soft);border-radius:4px;overflow:hidden;margin-bottom:8px}
+.wi-prog i{display:block;height:100%;width:0;background:var(--ok);transition:width .2s}
+.wi-ck{display:grid;gap:2px}
+.wi-ck .wi-g{font-weight:800;font-size:12.5px;color:var(--navy);margin:8px 0 2px;display:flex;align-items:center;gap:8px}
+.wi-ck .wi-g .wi-n{font-family:var(--mono);font-size:10px;width:20px;height:20px;border-radius:50%;background:var(--navy);color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;flex:none}
+.wi-ck label{display:flex;gap:9px;align-items:flex-start;padding:6px 8px;border-radius:8px;cursor:pointer;line-height:1.5}
+.wi-ck label:hover{background:var(--soft)}
+.wi-ck label.sub{margin-left:24px}
+.wi-ck input{margin-top:3.5px;accent-color:var(--blue);width:16px;height:16px;flex:none}
+.wi-ck input:checked+div{color:var(--sub)}
+.wi-ck input:checked+div b{text-decoration:line-through}
+.wi-ck label div b{font-weight:700;display:block}
+.wi-ck label div small{display:block;font-size:12px;color:var(--sub);line-height:1.5}
+.wi-lnk{display:inline-block;font-size:12px;font-weight:700;text-decoration:none;color:var(--navy);background:var(--blue-soft);
+  border:1px solid var(--blue-border);border-radius:8px;padding:5px 11px;margin:0 6px 6px 0}
+.wi-lnk:hover{background:#E0EAF9}
+.wi-imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.wi-img{cursor:zoom-in;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--soft);margin:0}
+.wi-img img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+.wi-img figcaption{font-size:11px;color:var(--sub);padding:6px 8px;line-height:1.4}
+.wi-box{border-radius:9px;padding:9px 13px;font-size:12.5px;line-height:1.55;margin-bottom:8px}
+.wi-done{background:var(--ok-soft);border:1px solid #BFE3CE;color:var(--ok)}
+.wi-done ol{padding-left:18px;display:grid;gap:3px}
+.wi-warn{background:var(--amber-soft);border:1px solid var(--amber-border);color:var(--amber)}
+.wi-tip{background:var(--blue-soft);border:1px solid var(--blue-border);color:var(--navy)}
+.wi-help{font-size:12.5px;color:var(--sub);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.wi-help b{background:var(--soft);border-radius:7px;padding:3px 9px;color:var(--ink)}
+.wi-next{width:100%;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:800;color:#fff;background:var(--blue);cursor:pointer;margin-top:6px}
+.wi-next:hover{background:var(--navy)}
+.wi-f{padding:10px 22px;border-top:1px solid var(--line);font-size:12px;color:var(--sub);display:flex;justify-content:space-between;align-items:center;gap:10px;flex:none}
+.wi-f a,.wi-f button{color:var(--blue);font-weight:700;text-decoration:none;background:none;border:none;cursor:pointer;font-size:12px;font-family:inherit}
+.wi-lb{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1100;display:none;align-items:center;justify-content:center;flex-direction:column;padding:20px;cursor:zoom-out}
+.wi-lb.on{display:flex}
+.wi-lb img{max-width:96vw;max-height:84vh;border-radius:8px}
+.wi-lb p{color:#fff;font-size:13px;margin-top:10px;text-align:center}
+@media(max-width:600px){.wi-md{max-height:94vh;border-radius:14px}.wi-h{padding:14px 16px}.wi-b{padding:14px 16px}.wi-btn{font-size:9.5px;padding:2px 7px}}
+</style>
+
+<div class="wi-ov" id="wi-ov">
+  <div class="wi-md" role="dialog" aria-modal="true" aria-labelledby="wi-t">
+    <div class="wi-h">
+      <div class="wi-area" id="wi-area"></div>
+      <h3 id="wi-t"></h3>
+      <div class="wi-tags" id="wi-tags"></div>
+      <button class="wi-x" id="wi-x" aria-label="닫기">×</button>
+    </div>
+    <div class="wi-b" id="wi-b"></div>
+    <div class="wi-f">
+      <button id="wi-reset" type="button">↺ 오늘 체크 초기화</button>
+      <span id="wi-date"></span>
+      <a id="wi-notion" href="https://app.notion.com/p/krggroup/36ba64b04451808b93dbe6c913e48d5b" target="_blank" rel="noopener">노션 원문 ↗</a>
+    </div>
+  </div>
+</div>
+<div class="wi-lb" id="wi-lb"><img id="wi-lbi" alt=""><p id="wi-lbc"></p></div>
+<script>
+(function(){
+  var IMG='img/manual/';
+  /* 보강 내용 — SOP 제목 앞부분으로 매칭. why=왜 · done=완료 기준 · img=[[파일,설명]] · next=다음 SOP 제목 앞부분 */
+  var WI={
+   '심사결과 처리':{why:'입주 신청자가 믿을 만한지 확인해 계약 진행 여부를 정해요. 지금은 시스템이 자동 처리하고, 사람은 예외 건만 봐요.',
+     done:'계약관리 Sheet에 결과·일자·사유가 기록되어 있으면 끝.',next:'가계약 등록',
+     img:[['01_simsa_result.jpg','심사 어드민 — 심사 결과 목록'],['04_recheck_slack.jpg','Slack 심사 알림 — 자동심사 결과']]},
+   '가계약 등록':{why:'승인된 신청을 계약으로 넘기려면 시트와 홈버튼에 조건과 번호를 만들어야 해요.',
+     done:'계약관리 Sheet에 심사번호 + 홈버튼 가계약번호가 둘 다 보이면 끝.',
+     img:[['03_kakao_info2.jpg','카카오톡으로 받는 계약필수정보 양식'],['05_sheet_terms.jpg','심사관리 Sheet — 계약조건 입력 열'],['06_contract_sheet.jpg','계약관리 Sheet — 심사번호 · 가계약번호']]},
+   '입주전 관리':{why:'입주 전 마지막 점검이에요. 서류·돈·서명 중 하나라도 빠지면 입주 당일 문제가 생겨요.'},
+   '가계약 체크':{why:'삼일·태양 물건은 가계약 건을 매일 전달하고 회수해야 계약이 끊기지 않아요.',done:'양 부동산 응답을 14:00까지 회수하면 끝.'},
+   '계약정보 확인':{why:'중요사항을 미리 설명하고 동의를 받아 둬야 나중에 "몰랐다"는 분쟁이 없어요.',done:'3건 설명 완료 + 납기일 -3D 동의 여부(YES/NO)가 기록되면 끝.',next:'퇴실청소비 청구'},
+   '계약등록':{why:'홈버튼에 계약이 등록돼야 전자계약서·청구서·NAS 보관이 이어져요.',done:'날인 완료 + NAS 등록 + 첨부파일 입수까지 되면 끝.'},
+   '부동산계약안내':{why:'부동산이 계약서를 제대로 쓰도록 미리 안내해야 오타·누락이 줄어요.',done:'기존계약 부동산은 수요일 오전까지 계약서 입수가 되면 끝.'},
+   '임(전)대차 계약서 확인':{why:'계약서에 문제가 없는지 확인하고, 법정 임대차신고가 빠지지 않게 해요.',done:'5점 체크 완료 + 신고 파일 업로드 + 미신고 건 follow-up이 정리되면 끝.'},
+   '퇴실청소비 청구':{why:'입주 때 미리 안내하고 청구서를 만들어 둬야 퇴실 때 청소비 분쟁이 없어요.',done:'홈버튼에 청구서가 생성되어 있으면 끝.'},
+   '임대인 응대':{why:'임대인은 돈(정산) 문의가 많아요. 정확하고 빠른 답이 신뢰를 지켜요.',done:'회신 후 노션/웹에 종결 표시가 되면 끝.'},
+   '임차인 응대':{why:'문의 종류를 잘 나눠야 맞는 담당자가 빨리 답할 수 있어요.',done:'담당 라우팅 + 회신 + 기록(운영웹/노션)이 되면 끝.'},
+   '부동산 1차 응대':{why:'부동산은 영업 파트너예요. 첫 응대가 빠르고 친절해야 계약이 계속 들어와요.',done:'1차 응답 완료, 필요한 건은 영업담당에게 Slack 인계까지 되면 끝.'},
+   '수납 대응':{why:'첫 납부와 연체 이력자를 미리 챙기면 연체 자체가 줄어요.',done:'대상자 전원에게 안내 문자 발송 + 반복 패턴은 노션에 기록되면 끝.'},
+   '연체 대응 분류':{why:'연체 일수와 상황에 따라 대응이 달라요. 이 분류가 그날 연체 업무의 출발점이에요.',done:'전일 미납 건 전원에 분류(연락/방문/법적)와 담당이 정해지면 끝.',next:'연체 대응 실행'},
+   '법무관리':{why:'연락·방문으로 해결되지 않는 건을 법적 절차로 회수해요.',done:'진행 단계와 결과가 노션에 기록되면 끝.',
+     img:[['07_cb_site.jpg','CB 조회 ① koreacb.biz 접속'],['08_cb_search.jpg','CB 조회 ② 단건조회 — KCB ID 또는 기타'],['09_cb_result.jpg','CB 조회 ③ 유의사항 확인 → 조회'],['10_cb_pdf.jpg','CB 조회 ④ 보고서 → PDF로 저장'],['11_cb_file.jpg','CB 조회 ⑤ NAS 폴더에 보관']]},
+   '연체 대응 실행':{why:'빠른 연락이 연체를 길어지지 않게 하는 가장 효과적인 방법이에요.',done:'모든 접촉 결과가 노션에 기록되고, 방문 건은 Report와 차회 일정까지 등록되면 끝.',
+     img:[['12_visit_route1.jpg','연체관리 화면 — [방문대응] 버튼'],['13_visit_route2.jpg','방문대응 — 동선 길찾기 → 엑셀'],['14_visit_slack.jpg','Slack — 방문 동선 공유'],['15_visit_report.jpg','노션 방문 Report 양식']]},
+   '갱신대상 선정':{why:'만기 한 달 전에 갱신 가능 여부를 정해야 임차인·임대인 모두 준비할 시간이 있어요.',done:'대상 전원이 승인/조건부/불가로 분류되면 끝.',next:'갱신불가'},
+   '갱신불가':{why:'불가·조건부는 사유를 직접 설명해야 분쟁이 없어요.',done:'계약자·임대인 모두 연락 완료면 끝.',next:'갱신 수수료 청구'},
+   '갱신 수수료 청구':{why:'수수료 입금과 홈버튼 등록이 끝나야 갱신이 확정돼요.',done:'입금 확인 + 만기 -1M 전까지 홈버튼 등록이 되면 끝.'},
+   '단순변심 처리':{why:'이유를 정확히 듣고 책임 사항을 빠짐없이 안내해야 정산 분쟁이 없어요.',done:'5종 책임 안내 + 정산 + 홈버튼 종결 처리까지 되면 끝.'},
+   '강제퇴실 처리':{why:'연체가 길어진 집은 빨리 정리해야 손실이 줄고 재임대가 가능해요.',
+     img:[['16_web_reg1.jpg','운영 WEB 입주관리 — 빠른 메모 입력'],['17_web_reg2.jpg','2차 상태 — 강제퇴실 유형 선택'],['18_web_reg3.jpg','진척사항 — 실제퇴실완료 → 종료']]},
+   '연체퇴실 정산':{why:'연체로 퇴실한 건의 받을 돈을 확정해서 청구해요.',done:'홈버튼에 퇴실정산이 반영되고 계약이 종결되면 끝.'},
+   '만기퇴실 처리':{why:'만기 퇴실을 정산·청소까지 빠짐없이 마무리해야 다음 세입자가 바로 들어와요.',done:'정산 이슈 정리 + 현장관리팀 캘린더에 청소 일정이 등록되면 끝.'},
+   '파트너 인센티브 정산':{why:'파트너 부동산이 제때 인센티브를 받아야 계약이 계속 들어와요.',done:'지급금액 안내 + 계산서 발행 요청까지 되면 끝.'},
+   '임대인 정산':{why:'임대인에게 줄 돈은 매일 14시 정시에 정확히 나가야 해요.',done:'2인 검토 후 14:00 입금 처리 + 확인이 되면 끝.'},
+   '입금관리':{why:'들어온 돈을 계약과 정확히 맞춰야 수납·연체 판단이 틀리지 않아요.',done:'홈버튼 매칭 완료, 미매칭 건은 Slack #ops에 공유되면 끝.'}
+  };
+  function wiOf(title){for(var k in WI){if(title.indexOf(k)===0)return WI[k]}return {}}
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+  function g(id){return document.getElementById(id)}
+  function today(){var d=new Date(),p=function(n){return n<10?'0'+n:n};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}
+  function load(){try{return JSON.parse(localStorage.getItem('krg_wi_'+today())||'{}')}catch(e){return {}}}
+  function save(o){try{localStorage.setItem('krg_wi_'+today(),JSON.stringify(o))}catch(e){}}
+
+  var sops=[].slice.call(document.querySelectorAll('#l3 details.sop'));
+  var cur=null;
+
+  /* SOP 본문 → 작업지시서 데이터 */
+  function parse(det){
+    var title=det.querySelector('summary .ttl').textContent.trim();
+    var area=det.closest('.area'), o={title:title,groups:[],done:[],warn:[],links:[],meta:[],notice:''};
+    o.area=area?(area.querySelector('.area-no').textContent+' '+area.querySelector('h3').textContent):'';
+    var who=area&&area.querySelector('.who b'); o.mgr=who?who.textContent:'';
+    o.tw=det.querySelector('summary .tw').textContent.trim();
+    [].forEach.call(det.querySelectorAll('.metabar>div'),function(d){var b=d.querySelector('b');o.meta.push(d.firstChild.textContent.trim()+' · '+(b?b.textContent:''))});
+    var n=det.querySelector('.notice'); if(n)o.notice=n.textContent.trim();
+    [].forEach.call(det.querySelectorAll('a.linkbtn'),function(a){o.links.push([a.textContent.replace(/↗/g,'').trim(),a.href])});
+    var st=det.querySelector('.steps'); if(!st)return o;
+    var grp={h:'',items:[]};
+    function push(){if(grp.items.length){(/완료 조건/.test(grp.h)?o.done:o.groups).push(grp)}}
+    [].forEach.call(st.children,function(el){
+      if(el.classList.contains('sub-h')){push();grp={h:el.textContent.trim(),items:[]}}
+      else if(el.tagName==='OL'){[].forEach.call(el.children,function(li){
+        var c=li.cloneNode(true);
+        [].forEach.call(c.querySelectorAll('.caution'),function(x){o.warn.push(x.textContent.replace(/^⚠\s*/,'').trim());x.remove()});
+        [].forEach.call(c.querySelectorAll('.linkbtn,.aicc-tag'),function(x){x.remove()});
+        var b=c.querySelector('b'),t='',d='';
+        if(b&&c.textContent.trim().indexOf(b.textContent.trim())===0){t=b.textContent.trim();b.remove();d=c.textContent.replace(/^\s*[—-]\s*/,'').trim()}
+        else{t=c.textContent.trim()}
+        grp.items.push([t,d]);
+      })}
+      else if(el.classList.contains('caution')){o.warn.push(el.textContent.replace(/^⚠\s*/,'').trim())}
+      else if(el.classList.contains('memo')){o.memo=el.textContent.trim()}
+    });
+    push();
+    return o;
+  }
+
+  function open(det){
+    cur=det; var o=parse(det), w=wiOf(o.title), stt=load()[o.title]||{}, h='', k=0;
+    g('wi-area').textContent='작업지시서 · '+o.area;
+    g('wi-t').textContent=o.title;
+    g('wi-tags').innerHTML=[o.tw].concat(o.meta).map(function(x){return '<span>'+esc(x)+'</span>'}).join('');
+    g('wi-date').textContent=today();
+    if(w.why)h+='<div class="wi-why">🎯 <b>왜 하나요?</b> '+esc(w.why)+'</div>';
+    if(o.notice)h+='<div class="wi-box wi-done">'+esc(o.notice)+'</div>';
+    if(o.links.length)h+='<div class="wi-sec"><h4>📍 바로가기</h4>'+o.links.map(function(l){return '<a class="wi-lnk" href="'+esc(l[1])+'" target="_blank" rel="noopener">🔗 '+esc(l[0])+' ↗</a>'}).join('')+'</div>';
+    h+='<div class="wi-sec"><h4>☑️ 이렇게 해요 — 하면서 체크<span class="wi-pct" id="wi-pct"></span></h4><div class="wi-prog"><i id="wi-bar"></i></div><div class="wi-ck" id="wi-ck">';
+    o.groups.forEach(function(gr,gi){
+      if(gr.h)h+='<div class="wi-g"><span class="wi-n">'+(gi+1)+'</span>'+esc(gr.h)+'</div>';
+      gr.items.forEach(function(it){h+='<label'+(gr.h?' class="sub"':'')+'><input type="checkbox" data-k="'+k+'"'+(stt[k]?' checked':'')+'><div><b>'+esc(it[0])+'</b>'+(it[1]?'<small>'+esc(it[1])+'</small>':'')+'</div></label>';k++});
+    });
+    if(!k)h+='<label><input type="checkbox" data-k="0"'+(stt[0]?' checked':'')+'><div><b>'+esc(o.title)+' 완료</b></div></label>';
+    h+='</div></div>';
+    if(w.img)h+='<div class="wi-sec"><h4>🖼️ 실제 화면 (클릭하면 크게)</h4><div class="wi-imgs">'+w.img.map(function(m){return '<figure class="wi-img" data-f="'+m[0]+'" data-c="'+esc(m[1])+'"><img src="'+IMG+m[0]+'" alt="'+esc(m[1])+'" loading="lazy"><figcaption>'+esc(m[1])+'</figcaption></figure>'}).join('')+'</div></div>';
+    h+='<div class="wi-sec">';
+    if(o.done.length)h+='<div class="wi-box wi-done"><b>✅ 이게 되면 끝</b><ol>'+o.done[0].items.map(function(it){return '<li><b>'+esc(it[0])+'</b>'+(it[1]?' — '+esc(it[1]):'')+'</li>'}).join('')+'</ol></div>';
+    else if(w.done)h+='<div class="wi-box wi-done"><b>✅ 이게 되면 끝:</b> '+esc(w.done)+'</div>';
+    o.warn.forEach(function(x){h+='<div class="wi-box wi-warn">⚠️ '+esc(x)+'</div>'});
+    if(o.memo)h+='<div class="wi-box wi-tip">'+esc(o.memo)+'</div>';
+    h+='</div>';
+    if(o.mgr)h+='<div class="wi-sec wi-help">🆘 막히면 → <b>'+esc(o.mgr)+' 매니저</b> 또는 <b>Slack #ops</b></div>';
+    if(w.next){var nx=sops.filter(function(d){return d.querySelector('summary .ttl').textContent.trim().indexOf(w.next)===0})[0];
+      if(nx)h+='<button class="wi-next" type="button" data-i="'+sops.indexOf(nx)+'">⏭ 다음 단계: '+esc(nx.querySelector('summary .ttl').textContent.trim())+' →</button>'}
+    var b=g('wi-b'); b.innerHTML=h; b.scrollTop=0; prog();
+    g('wi-ov').classList.add('on'); document.body.style.overflow='hidden';
+  }
+  function prog(){
+    var bx=[].slice.call(document.querySelectorAll('#wi-ck input')), n=bx.filter(function(x){return x.checked}).length;
+    g('wi-pct').textContent=n+' / '+bx.length+(bx.length&&n===bx.length?' 🎉 완료':'');
+    g('wi-bar').style.width=(bx.length?n/bx.length*100:0)+'%';
+  }
+  function close(){g('wi-ov').classList.remove('on');document.body.style.overflow='';cur=null}
+
+  /* 버튼 주입 — 기존 summary의 caret 앞에 */
+  sops.forEach(function(det){
+    var s=det.querySelector('summary'), c=s.querySelector('.caret'), b=document.createElement('button');
+    b.type='button'; b.className='wi-btn'; b.textContent='📋 작업지시서'; b.title='체크하며 따라하는 작업지시서 열기';
+    b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();open(det)});
+    s.insertBefore(b,c);
+  });
+  g('wi-b').addEventListener('change',function(e){
+    if(e.target.type!=='checkbox'||!cur)return;
+    var t=cur.querySelector('summary .ttl').textContent.trim(), all=load(), s=all[t]||{};
+    s[e.target.dataset.k]=e.target.checked; all[t]=s; save(all); prog();
+  });
+  g('wi-b').addEventListener('click',function(e){
+    var nb=e.target.closest('.wi-next'); if(nb){open(sops[+nb.dataset.i]);return}
+    var f=e.target.closest('.wi-img'); if(f){g('wi-lbi').src=IMG+f.dataset.f;g('wi-lbc').textContent=f.dataset.c;g('wi-lb').classList.add('on')}
+  });
+  g('wi-reset').addEventListener('click',function(){if(!cur)return;var all=load();delete all[cur.querySelector('summary .ttl').textContent.trim()];save(all);open(cur)});
+  g('wi-x').addEventListener('click',close);
+  g('wi-ov').addEventListener('click',function(e){if(e.target.id==='wi-ov')close()});
+  g('wi-lb').addEventListener('click',function(){g('wi-lb').classList.remove('on')});
+  document.addEventListener('keydown',function(e){if(e.key!=='Escape')return;if(g('wi-lb').classList.contains('on'))g('wi-lb').classList.remove('on');else close()});
+})();
+</script>
 </body>
 </html>
