@@ -20325,11 +20325,15 @@ function renderRenewalView(){
     cohortHtml = '<div class="rnw-empty">코호트 데이터 없음</div>';
   } else {
     cohortHtml = '<table class="rnw-cohort-tbl">'
-      + '<thead><tr><th>입주월</th><th>계약자</th><th>갱신완료</th><th>중도퇴실</th><th>만기퇴실</th><th>강제퇴실</th><th>갱신율</th></tr></thead>'
+      + '<thead><tr><th>입주월</th><th>계약자</th><th>갱신완료</th><th>중도퇴실</th><th>만기퇴실</th><th>강제퇴실</th><th>갱신율</th><th title="갱신완료 ÷ (계약자 − 중도퇴실 − 강제퇴실)">순수 갱신율</th></tr></thead>'   /* [v736] 순수 갱신율 */
       + '<tbody>'
       + cohorts.map(function(c){
           var rate = c.계약자 > 0 ? Math.round(c.갱신완료 / c.계약자 * 100) : 0;
-          return '<tr><td>' + c.month + '</td><td>' + c.계약자 + '명</td><td>' + c.갱신완료 + '명</td><td>' + c.중도퇴실 + '명</td><td>' + c.만기퇴실 + '명</td><td>' + (c.강제퇴실||0) + '명</td><td><b>' + rate + '%</b></td></tr>';   /* [v667] 강제퇴실 열 */
+          /* [v736] 순수 갱신율 = 갱신완료 ÷ (계약자 − 중도퇴실 − 강제퇴실) — 분모 0 이하면 '-' (관리자 지시 2026-11-24) */
+          var _pb = (c.계약자 || 0) - (c.중도퇴실 || 0) - (c.강제퇴실 || 0);
+          var _pr = _pb > 0 ? Math.round((c.갱신완료 || 0) / _pb * 100) + '%' : '-';
+          var _pt = '갱신완료 ' + (c.갱신완료 || 0) + ' ÷ (계약자 ' + (c.계약자 || 0) + ' − 중도 ' + (c.중도퇴실 || 0) + ' − 강제 ' + (c.강제퇴실 || 0) + ' = ' + _pb + ')';
+          return '<tr><td>' + c.month + '</td><td>' + c.계약자 + '명</td><td>' + c.갱신완료 + '명</td><td>' + c.중도퇴실 + '명</td><td>' + c.만기퇴실 + '명</td><td>' + (c.강제퇴실||0) + '명</td><td><b>' + rate + '%</b></td><td title="' + _pt + '"><b style="color:#0E7490">' + _pr + '</b></td></tr>';   /* [v667] 강제퇴실 열 · [v736] 순수 갱신율 열 */
         }).join('')
       + '</tbody></table>';
   }
@@ -20422,6 +20426,12 @@ function rnwCohortFormulaCard(){
     + '<td style="text-align:left;color:#374151"><code>(갱신완료 ÷ 계약자) × 100%</code><br>'
     + '<span style="font-size:10.5px;color:#6B7280">└ 소수점 반올림</span></td>'
     + '<td style="text-align:left;color:#6B7280;font-size:11px">파생값 (계약자=0이면 0%)</td>'
+    + '</tr>'
+    + '<tr>'   /* [v736] */
+    + '<td style="color:#0E7490"><b>순수 갱신율</b></td>'
+    + '<td style="text-align:left;color:#374151"><code>갱신완료 ÷ (계약자 − 중도퇴실 − 강제퇴실) × 100%</code><br>'
+    + '<span style="font-size:10.5px;color:#6B7280">└ 중도·강제 퇴실을 모수에서 뺀 갱신율 (분모 = 갱신완료 + 만기퇴실 + 진행중) · 소수점 반올림</span></td>'
+    + '<td style="text-align:left;color:#6B7280;font-size:11px">파생값 (분모가 0 이하이면 -)</td>'
     + '</tr>'
     + '</tbody></table>'
     + '<div style="margin-top:10px;padding:10px 12px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;font-size:11px;color:#92400E;line-height:1.7">'
