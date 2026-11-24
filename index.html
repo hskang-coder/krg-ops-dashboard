@@ -19502,16 +19502,22 @@ function rnwBuildSheetMap(){
     var cno = String(r.no||'').replace(/\.0$/,'').trim();
     if (!cno) return;
     var d = rnwParseDate(r.date);
-    if (!map[cno] || (d && d > map[cno].date)) {
+    /* [v737] 같은 날 기록은 시트에서 나중에 적힌 행(_idx 큰 값)이 최신 — 진행상태는 그날의 마지막 상태값 기록 (관리자 지시 2026-11-24)
+       종전: 날짜가 '더 클 때만' 교체 → 같은 날 여러 건이면 맨 앞 행(상태값 없는 '종료' 등)이 남아 수동 상태가 무시됨 (50917 만기퇴실예정 → 묵시적갱신대상) */
+    var ix = r._idx || 0, st = (r.renewalStatus || '').trim(), m = map[cno];
+    var same = !!(m && d && m.date && +d === +m.date);
+    if (!m || (d && (!m.date || d > m.date || (same && ix >= m._i)))) {
       map[cno] = {
         date: d,                                              // 대응일
+        _i: ix,                                               // [v737] 시트 행 인덱스
         // [v47] D열(입금예정) → A열(대응일)로 변경 — 갱신관리 시트의 대응일을 사용
         confirmDate: (r.date && r.date !== '-') ? r.date : '',          // A열 → 대응일
-        status: (r.renewalStatus || '').trim(),               // G열 → 갱신상태
+        status: st || (same ? m.status : ''),                 // G열 → 갱신상태 · [v737] 같은 날 앞선 상태 기록 유지
+        _si: st ? ix : (same ? m._si : -1),                   // [v737] 상태값 기록 행 인덱스
         content: r.content || '',                             // F열 → 대응 내용
         memo: r.content || ''
       };
-    }
+    } else if (same && st && ix > m._si) { m.status = st; m._si = ix; }   /* [v737] 같은 날 앞 행이어도 그날 더 늦은 상태 기록이면 반영 */
   });
   return map;
 }
@@ -19523,7 +19529,7 @@ function rnwLatestRenewalContent(cno){
     return (r.jobType||'').trim() === '갱신관리';
   });
   if (!matches.length) return '';
-  matches.sort(function(a,b){ return (rnwParseDate(b.date)||0) - (rnwParseDate(a.date)||0); });
+  matches.sort(function(a,b){ return ((rnwParseDate(b.date)||0) - (rnwParseDate(a.date)||0)) || ((b._idx||0) - (a._idx||0)); });   /* [v737] 같은 날이면 나중에 적힌 행 */
   return matches[0].content || '';
 }
 
