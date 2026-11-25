@@ -515,6 +515,7 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .cr-badge-unpaid { background: #FEE2E2; color: #DC2626; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
 .cr-badge-partial { background: #FEF3C7; color: #D97706; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
 .cr-badge-purple { background: #F3E8FF; color: #4F46E5; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+.cr-badge-samil { display: inline-block; background: #E0F2FE; color: #0369A1; border: 1px solid #BAE6FD; padding: 0 7px; border-radius: 20px; font-size: 10px; font-weight: 800; line-height: 16px; margin-left: 4px; vertical-align: 1px; white-space: nowrap; }   /* [v740] 삼일 관리 물건 */
 .cr-card { background: #fff; border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 2px 8px rgba(30,50,100,0.05); overflow: hidden; }
 .cr-card-title { font-size: 12px; font-weight: 700; color: #64748B; padding: 12px 20px; border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; gap: 6px; }
 
@@ -7028,6 +7029,21 @@ function stl_shiftMonth(delta){
 // [v521] ③ 연체 표 — 전체 / 계약중 / 계약종료(퇴실) 전환
 function stl_setDlq(k){ window._stlDlqK = k; renderSettlementView(); }
 
+/* ▶ [v740] 삼일 관리 물건 — 임대인 연락처로 판별 (관리자 지시 2026-11-25)
+   · 공개 소스에 전화번호를 두지 않도록 숫자만 남긴 번호의 해시(cyrb53)로만 비교 · 번호를 더하려면 해시를 SAMIL_PHONE_H 에 추가
+   · 연락처 칸에 번호가 여러 개면(공동 임대인 등) 하나라도 맞으면 배지 · +82 국가번호·빠진 앞자리 0은 보정해 비교 */
+var SAMIL_PHONE_H = ['p8t7c8j3pp'];
+function _samilH(str){ var h1 = 0xdeadbeef, h2 = 0x41c6ce57; for (var i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909); return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36); }
+function crIsSamil(){
+  for (var a = 0; a < arguments.length; a++) {
+    var toks = String(arguments[a] == null ? '' : arguments[a]).replace(/\+82\s*/g, '+82').replace(/[\-\.\(\)]/g, '').split(/[^0-9+]+/);
+    for (var i = 0; i < toks.length; i++) {
+      var d = toks[i].replace(/\D/g, ''); if (d.indexOf('82') === 0 && d.length >= 11) d = '0' + d.slice(2); if (/^1[016789]\d{7,8}$/.test(d)) d = '0' + d;   /* 시트가 숫자로 바꿔 앞자리 0이 빠진 휴대폰 번호(102…) 보정 */
+      if (d.length >= 9 && SAMIL_PHONE_H.indexOf(_samilH(d)) >= 0) return true;
+    }
+  }
+  return false;
+}
 function renderContractRecord(c, payments, responses = []) {
   // vacancyRawData에서 매칭 행 찾기 (없으면 빈 객체)
   const __vacRow = (Array.isArray(vacancyRawData) ? vacancyRawData.find(v => String(v.no).trim() === String(c['계약번호']||'').trim()) : null) || {};
@@ -7426,7 +7442,7 @@ function renderContractRecord(c, payments, responses = []) {
       </div>
       <div class="cr-info-section">
         <div class="cr-info-title">계약자 정보</div>
-        <div class="cr-field"><span class="cr-field-label">임대인(갑)</span><span class="cr-field-val">${fmt(c['임대인명'])} ${c['임대인연락처']?'<span style="color:#6B7280">('+fmtPhone(c['임대인연락처'])+')</span>':''}</span></div>
+        <div class="cr-field"><span class="cr-field-label">임대인(갑)</span><span class="cr-field-val">${fmt(c['임대인명'])}${crIsSamil(c['임대인연락처'], __vacRow.landlordPhone) ? ' <span class="cr-badge-samil" title="임대인 연락처 기준 — 삼일 관리 물건">삼일관리물건</span>' : ''} ${c['임대인연락처']?'<span style="color:#6B7280">('+fmtPhone(c['임대인연락처'])+')</span>':''}</span></div>
         <div class="cr-field"><span class="cr-field-label">수분양자 정산계좌</span><span class="cr-field-val" style="font-family:monospace;font-size:11px">${fmt(landlordAccountMap[String(c['계약번호']||'').trim()])}</span></div>
         <div class="cr-field"><span class="cr-field-label">계약자1(을)</span><span class="cr-field-val">${fmt(__vacRow.tenant1Name || c['임차인'])} ${(() => {   /* [v727] 연락처: 계약관리 시트(AV열) → 연체자 시트(P열) → 미입력 표시 */
           var t1 = String(c['임차인휴대폰'] || __vacRow.tenantPhone || '').trim();
