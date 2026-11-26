@@ -1209,6 +1209,26 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 /* [v632] 긴급대응필요 — 솔리드 빨강 배지 (대응 기록은 있으나 입금예정일 미등록) */
 .dlq-urgent-badge { display:inline-block; background:#DC2626; color:#fff; font-size:10px; font-weight:800; border-radius:5px; padding:2px 8px; white-space:nowrap; letter-spacing:-.2px; }
 .dlq-tbl-count { padding:8px 14px; font-size:12px; color:#9ca3af; text-align:right; }
+/* [v741] 대응등급(A~D) 자동 판정 배지 — 연체 SOP v1.4 1-2장 등급 색(A·B 파랑 계열 = 팀원A, C·D 황갈 계열 = 팀원B) · 구 .dlq-grade(S~F)와 이름 분리 */
+.dlq-rg { display:inline-flex; align-items:center; justify-content:center; min-width:19px; height:18px; padding:0 3px; box-sizing:border-box; border-radius:5px; font-size:11px; font-weight:800; color:#fff; cursor:pointer; }
+.dlq-rg-A { background:#6a95dc; } .dlq-rg-B { background:#2a5db0; } .dlq-rg-C { background:#c9962a; } .dlq-rg-D { background:#8a5a05; }
+.dlq-rg-rec { margin-left:3px; font-size:9px; font-weight:700; color:#475569; border:1px dashed #94a3b8; border-radius:4px; padding:0 3px; cursor:help; }
+/* [v741] 등급 내역 팝업 */
+.gp-ov{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:100000;display:flex;align-items:center;justify-content:center}
+.gp-card{background:#fff;border-radius:12px;width:min(660px,94vw);max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);font-size:12px;color:#1f2937}
+.gp-hd{color:#fff;padding:14px 18px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.gp-ttl{font-size:18px;font-weight:800;margin:2px 0}.gp-sub{font-size:12px;opacity:.92}.gp-big{font-size:42px;font-weight:900;line-height:1}
+.gp-bd{padding:14px 18px 16px}.gp-scale{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.gp-band{border:1.5px solid #e5e7eb;border-radius:8px;padding:6px 8px;display:flex;align-items:center;gap:7px;font-size:10.5px;color:#6b7280;line-height:1.35}
+.gp-band b{display:inline-flex;align-items:center;justify-content:center;flex:none;width:22px;height:22px;border-radius:6px;background:var(--c);color:#fff;font-size:12px}
+.gp-band.on{border-color:var(--c);box-shadow:0 0 0 1px var(--c);color:#111827;font-weight:700}
+.gp-rule{background:#fef3c7;border:1px solid #fcd34d;color:#92400e;border-radius:6px;padding:5px 9px;font-weight:700;margin-bottom:8px}
+.gp-tbl{width:100%;border-collapse:collapse}.gp-tbl th{background:#f8fafc;color:#64748b;font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:11px}
+.gp-tbl td{padding:6px 8px;border-bottom:1px solid #f1f5f9;vertical-align:top}.gp-tbl td.k{font-weight:700;white-space:nowrap;width:86px}.gp-tbl td.s{color:#94a3b8;font-size:10.5px;width:180px}
+.gp-tbl td.p{text-align:right;white-space:nowrap;width:56px}.gp-tbl tr.gp-0 td{color:#9ca3af}.gp-tbl tr.gp-0 td.k{color:#6b7280}
+.gp-m{color:#b45309}.gp-pl{color:#047857}.gp-z{color:#cbd5e1}.gp-sec{margin:12px 0 4px;font-size:11px;font-weight:700;color:#64748b}
+.gp-sum{margin-top:10px;padding:7px 10px;background:#f8fafc;border-radius:6px;font-size:12.5px}.gp-note{margin-top:8px;font-size:10.5px;color:#94a3b8;line-height:1.5}
+.gp-ft{text-align:right;margin-top:10px}.gp-ft button{background:#1f2937;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer}
 
 </style>
 <!-- v1776817031 -->
@@ -2482,6 +2502,7 @@ function parseVacancySheet(resp) {
   const useTypeIdx     = 13;  // [v464] N열(계약형태) 위치 고정 = 주거용/상업용 — housingType은 라벨매칭으로 12(전대전환)를 가리켜 별도 필드로 분리
   const contractInfoIdx= findColIdx(labels, ['계약정보','계약형태','계약구분'], 14); // O
   const reviewResultIdx= findColIdx(labels, ['계약심사','계약심사결과','심사결과','계약심사 결과'], 17); // R (v313/v315 라벨 매칭 보강)
+  const natTypeIdx     = findColIdx(labels, ['국적구분'], 7);   // [v741] H열: 내국인/외국인 — 대응등급 국적 감점
   const reviewTypeIdx  = findColIdx(labels, ['심사구분'], 58);  // [v569] BG열(미러) — 자동/수동 심사 구분
   const terminateDateIdx= findColIdx(labels, ['계약해지일자','해지일자','해지일','퇴실일'], 25); // [v329/v331] Z열 절대위치 폴백 (사용자 지정 gid=1953907648, Z열)
   const payConditionIdx= findColIdx(labels, ['납부조건'],          18);  // S
@@ -2583,6 +2604,7 @@ let outsourceIdx = findColIdx(labels, ['연체외주','연체 외주'], 71);
       coRrn:        cell(coRrnIdx),     // BB열: 계약자2/연대보증인 생년월일/주민번호 [v65]
       payCondition: cell(payConditionIdx), // S열: 납부조건 [v71]
       reviewResult: cell(reviewResultIdx), // R열: 계약심사 결과 (v313)
+      natType:      cell(natTypeIdx),      // [v741] H열: 국적구분(내국인/외국인)
       reviewType:   cell(reviewTypeIdx),   // [v569] 심사구분: 자동/수동
       terminateDate: cell(terminateDateIdx), // 계약해지일자 (라벨 매칭) (v329)
       // [v74] 입주 전 진척 5개 (Boolean 변환)
@@ -5186,7 +5208,7 @@ function downloadDlqExcel() {
   };
   const data = filtered.map(r => ({
     '계약번호':r.cno,
-    '대응패턴':r.grade||'-',
+    '대응등급':_dlqGradeLetter(r),   /* [v741] 구 '대응패턴'(계약관리 등급 S~F 표기) → 대응등급 A~D */
     '연체외주':_outsourceStr(r.cno),
     '그룹':r.group||'-',
     '계약정보':r.info||'-',
@@ -10684,6 +10706,168 @@ function _dlqGubunCell(r){
   var col = g === '연체중' ? '#ef4444' : g === '분납중' ? '#f59e0b' : '#9ca3af';
   return '<span style="font-size:11px;font-weight:600;color:' + col + '"' + (a ? ' title="' + a.type + ' ' + (ok ? g : '') + ' (임대료 연체 없음)"' : '') + '>' + (ok ? g : '-') + '</span>';
 }
+/* ▶ [v741] 대응등급(A~D) 자동 판정 — 기존 '대응패턴(A~E, 연체일수 구간)'을 대체 (관리자 지시 2026-11-26)
+   · 기준표(관리자 지정 7개): 심사결과 · 연체일수 · 약속 이행(이행률·약속일 거리) · 수신율 · KCB · 태도 [성실]·[회피]·[거부] · 국적(외국인)
+     — 나쁠수록 감점이 커지고, 감점 합계가 클수록 C·D
+   · 보조 신호(연체 SOP v1.4 1-2장): 연체 이력 · 만기 3개월 미만 · 법적절차 진행 · 분납 중(가점) · 출국·체류 언급
+   · 등급: 감점 A 0~1 · B 2~4 · C 5~8 · D 9 이상 / 첫 납부 연체·강제퇴실 진행은 D, 태도 [거부]는 최소 C
+   · 12월은 참고 등급 — 09:30 등급 회의에서 팀장이 확정(대응 상세내용 맨 앞 [A]~[D]) · 표시 전용, 원본 시트는 손대지 않음 */
+function _dlqGradeCtx(){
+  var t0 = new Date(); t0.setHours(0,0,0,0); var T = t0.getTime();
+  var D = (typeof daeungRawData !== 'undefined' && Array.isArray(daeungRawData)) ? daeungRawData : [];
+  var V = (typeof vacancyRawData !== 'undefined' && Array.isArray(vacancyRawData)) ? vacancyRawData : [];
+  var P = (typeof paymentRawData !== 'undefined' && Array.isArray(paymentRawData)) ? paymentRawData.length : 0;
+  var key = T + '|' + D.length + '|' + V.length + '|' + P;
+  if (window._dlqGradeC && window._dlqGradeC.key === key) return window._dlqGradeC;
+  var byNo = {}, vac = {}, pm = {};
+  D.forEach(function(x){ if (!x) return; var k = String(x.no == null ? '' : x.no).trim(); if (k) (byNo[k] || (byNo[k] = [])).push(x); });
+  Object.keys(byNo).forEach(function(k){ byNo[k].sort(function(a, b){ return (b._idx || 0) - (a._idx || 0); }); });
+  V.forEach(function(v){ var k = String((v && v.no) || '').trim(); if (k && !vac[k]) vac[k] = v; });
+  try { pm = dpay_promiseMap(T) || {}; } catch(_){ pm = {}; }
+  window._dlqGradeC = { key: key, T: T, byNo: byNo, vac: vac, pm: pm };
+  return window._dlqGradeC;
+}
+var DLQ_GRADE_CUT = { B: 2, C: 5, D: 9 };   /* 감점 합계 경계 — A 0~1 · B 2~4 · C 5~8 · D 9 이상 (12월 운영 후 v1.5에서 조정) */
+function _dlqGradeOf(r){
+  var C = _dlqGradeCtx(), cno = String((r && r.cno) || '').trim();
+  var nk = (typeof _normCno === 'function') ? _normCno(cno) : cno;
+  var items = [], pts = 0, forceD = '', floorC = '';
+  var it = function(grp, k, src, val, p){ items.push({ grp: grp, k: k, src: src, val: val, p: p }); pts += p; };
+  var pd = function(x){ try { return _parseAnyDateCell(x); } catch(_){ return null; } };
+  var alt = (typeof _dlqAltOf === 'function') ? _dlqAltOf(r) : null;
+  var d = alt ? alt.days : (Number(r.days) || 0);
+  var v = C.vac[cno], recs = C.byNo[cno] || [];
+  var win = Math.min(Math.max(d, 7), 30), from = C.T - win * 86400000;
+  var recent = recs.filter(function(x){ var t = pd(x.date); return t && t.getTime() >= from; });
+  /* ① 심사결과 — 거절일수록 감점 */
+  var rx = null; try { rx = v ? _dlqRevXInfo(v.reviewResult) : null; } catch(_){}
+  var p1 = 0, v1 = v ? '승인' : '계약 정보 없음';
+  if (rx) {
+    v1 = rx.kindNm + ' · ' + rx.txt;
+    if (rx.kind === 'deny') p1 = 2; else if (rx.kind === 'co' || rx.kind === 'skip' || (rx.kind === 'ok' && /금액초과/.test(rx.raw))) p1 = 1;
+  }
+  it('core', '심사결과', "계약관리 '계약심사'", v1, p1);
+  /* ② 연체일수 — 길수록 감점(최대 3) */
+  it('core', '연체일수', "입금내역 '연체일수'", d + '일' + (alt ? ' · ' + alt.type : ''), d >= 31 ? 3 : d >= 16 ? 2 : d >= 6 ? 1 : 0);
+  /* ③ 약속 이행 — 이행률이 낮을수록 · 약속일이 납기에서 멀수록 감점 */
+  var pm = C.pm[nk] || C.pm[cno], p3 = 0, v3 = [];
+  if (pm && pm.n) {
+    v3.push('이행률 ' + Math.round((1 - pm.miss / pm.n) * 100) + '% (' + (pm.n - pm.miss) + '/' + pm.n + '회)');
+    if (pm.n >= 2 && pm.miss / pm.n >= 0.5) p3 += 2; else if (pm.miss >= 1 && pm.miss / pm.n >= 0.2) p3 += 1;
+  } else v3.push('지난 약속 없음');
+  if (r.payStatus === 'past') { p3 += 2; v3.push('이번 약속일 지남·미입금'); }
+  else if (r.payStatus === 'urgent') { p3 += 1; v3.push('약속일 미등록'); }
+  else {
+    var mm = String(r.dateStr || '').match(/^(\d{4})\.(\d{2})\.(\d{2})/);
+    if (mm) {
+      var gap = Math.round((new Date(+mm[1], +mm[2] - 1, +mm[3]).getTime() - (C.T - d * 86400000)) / 86400000);
+      v3.push('약속일 납기+' + gap + '일');
+      if (gap > 14) p3 += 2; else if (gap > 7) p3 += 1;
+    }
+  }
+  it('core', '약속 이행', "Daily Report '입금예정일' ↔ 입금내역 '납부일'", v3.join(' · '), p3);
+  /* ④ 수신율 — 미수신 비율이 높을수록 감점 */
+  var tot = recent.length, miss = recent.filter(function(x){ return String(x.progress || '').indexOf('미수신') >= 0; }).length;
+  var lastMiss = tot > 0 && String(recent[0].progress || '').indexOf('미수신') >= 0;
+  var p4 = 0, v4 = tot ? ('미수신 ' + miss + '/' + tot + '건 (' + Math.round(miss / tot * 100) + '%)') : '최근 기록 없음';
+  if (miss >= 3 && lastMiss) { p4 = 3; v4 += ' · 최근 연락 안 됨'; }
+  else if (tot >= 2 && miss / tot >= 0.6) p4 = 2;
+  else if (miss >= 1 && miss / tot >= 0.3) p4 = 1;
+  it('core', '수신율', "Daily Report 진척사항 '미수신' (최근 " + win + "일)", v4, p4);
+  /* ⑤ KCB — 낮을수록 감점 (점수 열과 같은 'KCB ###' 기록) */
+  var kcb = null;
+  for (var i = 0; i < recs.length && kcb == null; i++) {
+    var tx = String(recs[i].content || ''); if (!/KCB/i.test(tx)) continue;
+    var m = tx.match(/(\d{3})(?!\d)\s*KCB/i) || tx.match(/KCB\s*(?:ID|조회|점수?)?\s*(\d{3})(?!\d)/i);
+    if (m) kcb = +m[1];
+  }
+  it('core', 'KCB', "팀장 조회 (대응 상세내용 'KCB ###')", kcb == null ? '조회 기록 없음' : kcb + '점', kcb == null ? 0 : kcb < 530 ? 3 : kcb < 630 ? 2 : kcb < 768 ? 1 : 0);
+  /* ⑥ 태도 — [거부] 3 · [회피] 1 · [성실] 가점 1 ([협조]도 성실로 읽음) */
+  var tg = '';
+  recent.some(function(x){ var m2 = String(x.content || '').match(/\[(성실|협조|회피|거부)\]/); if (m2) { tg = (m2[1] === '협조') ? '성실' : m2[1]; return true; } return false; });
+  if (tg === '거부') floorC = '태도 [거부]';
+  it('core', '태도', "대응 상세내용 [성실]·[회피]·[거부]", tg ? '[' + tg + ']' : '기록 없음', tg === '거부' ? 3 : tg === '회피' ? 1 : tg === '성실' ? -1 : 0);
+  /* ⑦ 국적 — 외국인 감점 2 (관리자 지시 2026-11-26) */
+  var nat = v ? String(v.natType || '').trim() : '';
+  it('core', '국적', "계약관리 '국적구분'", nat || '정보 없음', nat === '외국인' ? 2 : 0);
+  /* 보조 — 연체 이력 · 계약 유지 기간 · 법적절차 · 분납 · 출국 언급 */
+  var rt = null; try { rt = _dlqRateOf(cno); } catch(_){}
+  if (rt && rt.bill) {
+    if (rt.bill <= 1 && rt.late >= 1) forceD = '첫 납부 연체';
+    else { var p8 = (rt.late >= 2 && rt.rate >= 50) ? 2 : (rt.late >= 2 && rt.rate >= 25) ? 1 : 0; if (p8) it('aux', '연체 이력', '입금내역 연체 횟수/청구 수', rt.late + '/' + rt.bill + '회 (' + rt.rate + '%)', p8); }
+  }
+  if ((r.contractStatus || '계약중') === '계약중' && v && v.endDate) {
+    var ed = pd(v.endDate);
+    if (ed) { var left = Math.round((ed.getTime() - C.T) / 86400000); if (left >= 0 && left < 90) it('aux', '계약 유지 기간', "계약관리 '종료일'", '만기 D-' + left, 1); }
+  }
+  var lg = recs.filter(function(x){ try { return x.jobSub && _dlqAfterCut(cno, x.date, x._idx); } catch(_){ return !!x.jobSub; } })
+               .map(function(x){ return String(x.jobSub).replace(/\s/g, ''); });
+  if (lg.some(function(s){ return /지급명령|기타집행|기타조치/.test(s); })) it('aux', '법적절차', '대응내역 업무하위', '지급명령·집행 진행', 2);
+  else if (lg.some(function(s){ return s.indexOf('내용증명발송') >= 0; })) it('aux', '법적절차', '대응내역 업무하위', '내용증명 발송', 1);
+  if ((alt ? alt.gb : r.연체구분) === '분납중') it('aux', '분납', '납부구분', '분납 중', -1);
+  var exitR = recent.some(function(x){
+    var s = String(x.content || '');
+    if (/\[출국\]/.test(s)) return true;
+    if (/(출국|귀국)[^.\n]{0,8}(없|안\s*함|안\s*한다|아님|아니)/.test(s)) return false;
+    return /(출국|귀국)\s*(예정|준비|했|함|한다|하겠|할\s*거|할\s*예정)|본국\s*(으로|귀국)|체류\s*기간\s*(만료|끝)|비자\s*(만료|연장\s*불가)/.test(s);
+  });
+  if (exitR) it('aux', '출국·체류 언급', '대응 상세내용', '출국·귀국·체류 만료 언급', 1);
+  if (/강제퇴실/.test(String(r.vacancyStatus || ''))) forceD = forceD || '강제퇴실 진행';
+  /* 회의 확정 등급 — 최근 기록 대응 상세내용 맨 앞 [A]~[D] */
+  var rec = '', recD = '';
+  for (var j = 0; j < recent.length; j++) { var m3 = String(recent[j].content || '').match(/^\s*\[([ABCD])\]/); if (m3) { rec = m3[1]; recD = String(recent[j].date || '').slice(5).replace('-', '/'); break; } }
+  var g = forceD ? 'D' : pts >= DLQ_GRADE_CUT.D ? 'D' : pts >= DLQ_GRADE_CUT.C ? 'C' : pts >= DLQ_GRADE_CUT.B ? 'B' : 'A';
+  if (floorC && (g === 'A' || g === 'B')) g = 'C';
+  var why = [];
+  if (forceD) why.push('D 고정 — ' + forceD);
+  if (floorC) why.push('최소 C — ' + floorC);
+  items.forEach(function(x){ if (x.p) why.push((x.p > 0 ? '감점 ' + x.p : '가점 ' + (-x.p)) + ' · ' + x.k + ' ' + x.val); });
+  return { g: g, pts: pts, items: items, why: why, rec: rec, recD: recD, forceD: forceD, floorC: floorC, cno: cno };
+}
+var DLQ_GRADE_NM = { A: '잠재 고객', B: '관심 필요', C: '위험', D: '다시 거래하지 않을 상대' };
+var DLQ_GRADE_COL = { A: '#6a95dc', B: '#2a5db0', C: '#c9962a', D: '#8a5a05' };
+function _dlqGradeWho(r, g){ return (r.contractStatus || '계약중') !== '계약중' ? '종료 채권 — 4장 기준(종료 3개월 이내 팀원A · 초과 팀원B)' : ((g === 'A' || g === 'B') ? '팀원A' : '팀원B'); }
+function _dlqEsc(s){ return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+/* [v741] 대응등급 칸 — 배지(A~D)를 누르면 등급 내역 팝업 · 회의 확정 등급이 자동과 다르면 '회의 X' 칩 */
+function _dlqGradeCell(r){
+  var x; try { x = _dlqGradeOf(r); } catch(_){ return '<span style="color:#D1D5DB">-</span>'; }
+  var tip = '대응등급(자동) ' + x.g + ' · ' + DLQ_GRADE_NM[x.g] + ' · 감점 ' + x.pts + '점 — 누르면 내역\n담당: ' + _dlqGradeWho(r, x.g) + '\n' + (x.why.length ? x.why.join('\n') : '감점 없음')
+    + (x.rec ? '\n회의 기록: ' + x.rec + ' (' + x.recD + ')' : '');
+  var c = _dlqEsc(x.cno).replace(/'/g, '');
+  var h = '<span class="dlq-rg dlq-rg-' + x.g + '" title="' + _dlqEsc(tip).replace(/\n/g, '&#10;') + '" onclick="event.stopPropagation();dlqGradePopup(\'' + c + '\')">' + x.g + '</span>';
+  if (x.rec && x.rec !== x.g) h += '<span class="dlq-rg-rec" title="' + _dlqEsc('회의 확정 ' + x.rec + ' (' + x.recD + ' Daily Report 기록) — 자동 판정 ' + x.g + '와 다름') + '">회의 ' + x.rec + '</span>';
+  return h;
+}
+function _dlqGradeLetter(r){ try { return _dlqGradeOf(r).g; } catch(_){ return '-'; } }
+/* [v741] 등급 내역 팝업 — 기준별 데이터 위치 · 이 계약의 값 · 감점, 등급 구간, 고정 규칙, 회의 기록 */
+function dlqGradePopup(cno){
+  cno = String(cno == null ? '' : cno).trim();
+  var r = (window._dlqTableRows || []).find(function(x){ return String(x.cno).trim() === cno; }) || { cno: cno };
+  var x; try { x = _dlqGradeOf(r); } catch(e){ alert('대응등급을 계산하지 못했습니다: ' + e.message); return; }
+  var pc = function(p){ return p > 0 ? '<b class="gp-m">감점 ' + p + '</b>' : p < 0 ? '<b class="gp-pl">가점 ' + (-p) + '</b>' : '<span class="gp-z">0</span>'; };
+  var row = function(i){ return '<tr' + (i.p ? '' : ' class="gp-0"') + '><td class="k">' + _dlqEsc(i.k) + '</td><td class="s">' + _dlqEsc(i.src) + '</td><td>' + _dlqEsc(i.val) + '</td><td class="p">' + pc(i.p) + '</td></tr>'; };
+  var core = x.items.filter(function(i){ return i.grp === 'core'; }), aux = x.items.filter(function(i){ return i.grp === 'aux'; });
+  var cut = DLQ_GRADE_CUT, bands = [['A', 0, cut.B - 1], ['B', cut.B, cut.C - 1], ['C', cut.C, cut.D - 1], ['D', cut.D, null]];
+  var scale = bands.map(function(b){ return '<div class="gp-band' + (b[0] === x.g ? ' on' : '') + '" style="--c:' + DLQ_GRADE_COL[b[0]] + '"><b>' + b[0] + '</b><span>' + DLQ_GRADE_NM[b[0]] + '<br>감점 ' + (b[2] == null ? b[1] + ' 이상' : b[1] + '~' + b[2]) + '</span></div>'; }).join('');
+  var html = '<div class="gp-card" role="dialog" aria-label="대응등급 내역">'
+    + '<div class="gp-hd" style="background:' + DLQ_GRADE_COL[x.g] + '"><div><div class="gp-sub">대응등급 내역 · ' + _dlqEsc(x.cno) + (r.nm && r.nm !== '-' ? ' · ' + _dlqEsc(r.nm) : '') + '</div>'
+    + '<div class="gp-ttl">' + x.g + ' · ' + DLQ_GRADE_NM[x.g] + '</div><div class="gp-sub">감점 합계 ' + x.pts + '점 · 담당 ' + _dlqEsc(_dlqGradeWho(r, x.g)) + '</div></div><div class="gp-big">' + x.g + '</div></div>'
+    + '<div class="gp-bd"><div class="gp-scale">' + scale + '</div>'
+    + (x.forceD ? '<div class="gp-rule">D 고정 — ' + _dlqEsc(x.forceD) + ' (감점과 관계없이 D)</div>' : '')
+    + (x.floorC ? '<div class="gp-rule">최소 C — ' + _dlqEsc(x.floorC) + '</div>' : '')
+    + '<table class="gp-tbl"><thead><tr><th>기준</th><th>데이터 위치</th><th>이 계약</th><th>점수</th></tr></thead><tbody>' + core.map(row).join('') + '</tbody></table>'
+    + (aux.length ? '<div class="gp-sec">보조 신호 · 연체 SOP 1-2장</div><table class="gp-tbl"><tbody>' + aux.map(row).join('') + '</tbody></table>' : '')
+    + '<div class="gp-sum">감점 합계 <b>' + x.pts + '점</b> → <b style="color:' + DLQ_GRADE_COL[x.g] + '">' + x.g + '</b>' + (x.rec ? ' · 회의 기록 <b>' + x.rec + '</b> (' + _dlqEsc(x.recD) + ')' + (x.rec !== x.g ? ' — 자동과 다름' : '') : '') + '</div>'
+    + '<div class="gp-note">12월은 참고 등급이며 09:30 등급 회의에서 팀장이 확정한다. 확정 등급은 대응 상세내용 맨 앞 [A]~[D], 태도는 [성실]·[회피]·[거부]로 적는다. 어느 등급이든 공통 규칙(08~21시, 협박·모욕·제3자 고지 금지)은 같다.</div>'
+    + '<div class="gp-ft"><button type="button" class="gp-x">닫기</button></div></div></div>';
+  var old = document.getElementById('dlqGradeModal'); if (old) old.remove();
+  var ov = document.createElement('div'); ov.id = 'dlqGradeModal'; ov.className = 'gp-ov'; ov.innerHTML = html;
+  var close = function(){ ov.remove(); document.removeEventListener('keydown', onKey); };
+  var onKey = function(e){ if (e.key === 'Escape') close(); };
+  ov.addEventListener('click', function(e){ if (e.target === ov || (e.target.classList && e.target.classList.contains('gp-x'))) close(); });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(ov);
+}
 function dlqRenderTableRows() {
   const container = document.getElementById('dlqTableContainer');
   if (!container || !window._dlqTableRows) return;
@@ -10777,7 +10961,7 @@ function dlqRenderTableRows() {
         <th style="width:34px;text-align:center" title="표시 순번">No</th>
         <th style="width:32px"><input type="checkbox" class="dlq-cb" id="dlqChkAll" onchange="dlqSelectAll(this.checked)" title="전체 선택"></th>
         <th>계약번호</th><th>그룹</th><th>계약정보</th>
-        <th>연체일수</th><th>납부구분</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th>
+        <th>연체일수</th><th title="연체 SOP v1.4 1-2장 채점 기준(감점)으로 자동 계산한 참고 등급 — A·B 팀원A / C·D 팀원B. 12월은 09:30 등급 회의에서 팀장이 확정하고, 확정 등급은 Daily Report 대응 상세내용 맨 앞 [A]~[D]로 기록 (배지를 누르면 기준별 감점 내역)">대응등급</th><th>납부구분</th><th>계약상태</th><th>공실상태</th><th>임(전)차인</th>
         <th title="입금내역(gid=131074722) 임대료 청구 중 연체(연체납부·연체중·분납중) 발생 비율">연체율</th>
         <th>연체금액</th><th title="시작일 25.6.1 이후 계약자: 임대료 × 4개월 (gid=1953907648 W열 ≥ 2025-06-01, AK열 × 4)">위약금</th><th>대응일</th><th title="계약중 = 계약종료일(만기일, gid=1953907648 X열) · 종료 = 퇴실일(Z열 계약해지일자/퇴실일, 없으면 BP열 실제퇴실일) — 퇴실 3개월 이내는 주황 칩, 3개월 초과는 회색">종료/퇴실일</th><th>입금예정일</th><th title="gid=554798125 F열='법적조치 검토' 행의 H열 점수 (숫자)">점수</th><th title="gid=554798125 F열 기재 유무 (내용증명/지급명령/기타집행)">법적진행</th><th>최근 대응 내용</th>
       </tr></thead>
@@ -10823,6 +11007,7 @@ function dlqRenderTableRows() {
             <td><span class="dlq-tbl-group">${r.group||'-'}</span></td>
             <td><span class="dlq-tbl-info">${r.info||'-'}</span></td>
             <td>${_dlqDaysCell(r)}</td>   ${''/* [v725] 임대료 연체 없음 + 다른 항목 연체 → 그 항목 연체일수 · 항목명 */}
+            <td style="text-align:center;white-space:nowrap">${_dlqGradeCell(r)}</td>   ${''/* [v741] 대응등급(A~D) — 구 대응패턴 대체 */}
             <td>${_dlqGubunCell(r)}</td>
             <td><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;background:${(r.contractStatus||'계약중')==='계약중'?'#dbeafe':(r.contractStatus==='종료(3개월이내)'?'#fef3c7':'#f3f4f6')};color:${(r.contractStatus||'계약중')==='계약중'?'#1d4ed8':(r.contractStatus==='종료(3개월이내)'?'#d97706':'#6b7280')}">${r.contractStatus||'계약중'}</span></td>
             <td>${_dlqVacDisp(r.vacancyStatus)}</td>
@@ -28040,9 +28225,16 @@ function okpi_respSection(all, range, period){
 //   · [v723] 담당자별 진척을 '기준일 당일 지정 업무 / 연기된 업무 / 전체'로 구분 · 기준일 = 최근 회의일(날짜 버튼으로 변경) · 연기 = 연기일정이 계획일과 다르거나 기한일을 원래 기한과 다르게 바꾼 경우만 · 담당은 오진선 차장·김영철 과장 기준 (관리자 요청 2026-10-27)
 //   · [v724] 담당자 버튼(전체·김영철·오진선·이지희·강휘수)으로 화면 전체 필터 · 기준일 하루 처리 현황(그날 할 일·완료·연기·늦게 완료·미처리·그날 완료·기한 지남 — 시트 '오늘 체크'와 같은 규칙) · 📈 일자별 진척 표(날짜 클릭 → 기준일) · 목록 '그날 할 일(결과)' / '미완료 전체' 전환 · 기준일 기본 = 오늘 (관리자 요청 2026-10-27)
 // ════════════════════════════════════════════════
+//   · [v733] 목록 'No' 왼쪽 완료 체크박스 — Apps Script 웹앱(YTD_WRITE_URL)으로 시트 '완료'·'완료일' 두 칸에 바로 기록 · URL이 비면 체크박스 없음(이전 동작 그대로) (관리자 요청 2026-11-16)
 var YTD_SHEET_ID  = '1B476orgglgpiKwiykhJi8RTyKwiZUZdp-h4Fw3T-ax4';
 var YTD_SHEET_GID = '1896596494';
 var YTD_SHEET_URL = 'https://docs.google.com/spreadsheets/d/' + YTD_SHEET_ID + '/edit#gid=' + YTD_SHEET_GID;
+/* ▶ [v733] 대시보드에서 완료 체크 → To-do 시트 반영 (Apps Script 웹앱 · JSONP GET — 체크리스트 CK_API와 같은 방식) — 관리자 요청 2026-11-16
+   · YTD_WRITE_URL 이 비어 있으면 체크박스를 그리지 않는다(이전 동작 그대로) · 배포 후 /exec URL 입력 (AppsScript_To-do완료체크_적용안내.md)
+   · PIN: 처음 한 번 입력 → 이 브라우저(localStorage 'ytd_pin')에만 저장 · 서버(스크립트 속성 YTD_PIN)와 대조, 틀리면 지우고 다음에 다시 묻는다
+   · 쓰기: 번호(고유 키)로 행을 찾아 '완료'·'완료일' 두 칸만 변경 · 10초 안에 응답 없거나 실패면 체크를 되돌리고 시트 링크 안내
+   · 성공 후 2.5초 뒤 시트를 새로 읽어 재확인(_fresh) · gviz가 옛 값을 주는 동안(최대 90초)은 방금 쓴 값을 유지(pend) */
+var YTD_WRITE_URL = '';
 window._ytd = window._ytd || { showDone: false, rows: null, at: 0 };
 
 function ytd_injectCss(){
@@ -28124,12 +28316,18 @@ function ytd_injectCss(){
     + '.ytd-res.g{background:#D1FAE5;color:#065F46}.ytd-res.b{background:#DBEAFE;color:#1E40AF}.ytd-res.y{background:#FEF3C7;color:#92400E}.ytd-res.r{background:#FEE2E2;color:#991B1B}'
     + '.ytd-tbl tr.postr td{background:#EFF6FF}.ytd-tbl tr.laterow td{background:#FFFBEB}'
     + '.ytd-memo{color:#9CA3AF}'
-    + '.ytd-foot{font-size:10.5px;color:#9CA3AF;margin-top:6px}';
+    + '.ytd-foot{font-size:10.5px;color:#9CA3AF;margin-top:6px}'
+    + '.ytd-tbl th.ytd-ck,.ytd-tbl td.ytd-ck{width:24px;text-align:center;padding-left:6px;padding-right:2px}'   /* [v733] 완료 체크 */
+    + '.ytd-cb{width:15px;height:15px;cursor:pointer;accent-color:#4F46E5;vertical-align:-2px;margin:0}'
+    + '.ytd-cb:disabled{cursor:progress;opacity:.5}'
+    + '.ytd-tbl tr.saving td{opacity:.55}'
+    + '.ytd-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1F2937;color:#fff;padding:9px 16px;border-radius:8px;font-size:12.5px;font-weight:600;z-index:99999;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:92vw;line-height:1.45}'
+    + '.ytd-toast.err{background:#B91C1C}.ytd-toast a{color:#FDE68A;font-weight:700}';
   document.head.appendChild(s);
 }
-async function ytd_fetch(){
+async function ytd_fetch(fresh){   /* [v733] fresh: 쓰기 후 재확인 — gviz 캐시(v595) 무시 */
   var url = 'https://docs.google.com/spreadsheets/d/' + YTD_SHEET_ID + '/gviz/tq?tqx=out:json'
-          + '&gid=' + YTD_SHEET_GID + '&range=A:Z' + '&tq=' + encodeURIComponent('SELECT *') + '&headers=1' + '&_t=' + Date.now();
+          + '&gid=' + YTD_SHEET_GID + '&range=A:Z' + '&tq=' + encodeURIComponent('SELECT *') + '&headers=1' + '&_t=' + Date.now() + (fresh ? '&_fresh=1' : '');
   var res = await fetch(url, { cache: 'no-store' });
   var text = await res.text();
   var m = text.match(/setResponse\((\{[\s\S]+\})\)/);
@@ -28212,7 +28410,7 @@ function ytd_setDay(ts){ window._ytd.day = ts || null; var box = document.getEle
 function ytd_dd(s, yRef){   /* [v724] 완료일 '10/27' · Date 셀 문자열 → Date */
   return ytd_txtDate(s, yRef);
 }
-var YTD_PEOPLE = ['김영철 과장', '오진선 차장', '이지희', '강휘수 이사'];   /* [v724] 담당 버튼 기본 순서 — 시트 '오늘 체크'와 동일 */
+var YTD_PEOPLE = ['박억대 팀장', '이원표', '김영철 과장', '강휘수 이사'];   /* [v724] 담당 버튼 기본 순서 — 시트 '오늘 체크'와 동일 · [v734] 연체 3인 체제(2026-11-25): 팀장·팀원A·팀원B + 운영 이사 */
 function ytd_people(rows){
   var list = YTD_PEOPLE.slice(), seen = {}; list.forEach(function(p){ seen[p] = 1; });
   rows.forEach(function(r){ String(r.who || '').split(/[·,\/]/).forEach(function(p){ p = p.trim(); if (p && !seen[p] && !YTD_PEOPLE.some(function(q){ return q.indexOf(p) >= 0 || p.indexOf(q.split(' ')[0]) >= 0; })) { seen[p] = 1; list.push(p); } }); });
@@ -28287,6 +28485,7 @@ function ytd_html(rows){
   var trend = '<div class="ytd-trend-wrap"><table class="ytd-dtbl ytd-trend"><thead><tr><th>날짜</th><th>할 일</th><th>완료</th><th>연기</th><th>늦게 완료</th><th>미처리</th><th>달성률</th><th>구성</th><th>그날 완료</th></tr></thead><tbody>'
     + (tRows || '<tr><td colspan="9" class="c z">기록 없음</td></tr>') + '</tbody></table></div>';
   /* ④ 목록 — 기본: 기준일 할 일(결과 표시) · 전환: 미완료 전체 */
+  var wr = ytd_canWrite();   /* [v733] 쓰기 URL이 있을 때만 체크박스 열 */
   var mode = (window._ytd && window._ytd.mode) || 'day';
   var showDone = !!(window._ytd && window._ytd.showDone);
   var U = { '상': 0, '중': 1, '하': 2 }, ST = { late: 0, today: 1, open: 2, done: 3 };
@@ -28315,7 +28514,9 @@ function ytd_html(rows){
     var res = (mode === 'day') ? (r._res || '') : (r.done ? ('완료' + (r.doneAt ? ' ' + ytd_esc(r.doneAt) : '')) : (r.st === 'late' ? '⚠️ 지연' : (r.st === 'today' ? '📍 오늘' : '진행')));
     var rc = /^완료/.test(res) ? 'g' : (/^연기/.test(res) ? 'b' : (/^늦게/.test(res) ? 'y' : (/미처리|지연/.test(res) ? 'r' : '')));
     var trc = (mode === 'day') ? ({ g: 'done', r: 'late', b: 'postr', y: 'laterow' }[rc] || '') : r.st;
-    return '<tr class="' + trc + '"><td class="c">' + ytd_esc(r.no) + '</td><td class="c">' + ytd_esc(r.who) + '</td>'
+    return '<tr class="' + trc + '" data-no="' + ytd_esc(r.no) + '">'
+      + (wr ? ('<td class="c ytd-ck"><input type="checkbox" class="ytd-cb" data-no="' + ytd_esc(r.no) + '"' + (r.done ? ' checked' : '') + ' title="' + (r.done ? '완료 해제 (시트 완료일 지움)' : '완료 처리 (시트 완료일 = 오늘)') + '" onchange="ytd_toggle(this)"></td>') : '')   /* [v733] */
+      + '<td class="c">' + ytd_esc(r.no) + '</td><td class="c">' + ytd_esc(r.who) + '</td>'
       + '<td>' + ytd_esc(r.tgt) + '</td><td>' + ytd_esc(r.task) + (r.memo ? (' <span class="ytd-memo">· ' + ytd_esc(r.memo) + '</span>') : '') + '</td>'
       + '<td class="c">' + ytd_tag(r.imp) + ' ' + ytd_tag(r.urg) + '</td><td class="c">' + dueHtml + '</td><td class="c"><span class="ytd-res ' + rc + '">' + res + '</span></td></tr>';
   }).join('');
@@ -28344,20 +28545,87 @@ function ytd_html(rows){
     +   '<button class="ytd-btn' + (mode === 'all' ? ' active' : '') + '" onclick="ytd_setMode(\'all\')">미완료 전체</button> '
     +   (mode === 'all' ? ('<button class="ytd-btn' + (showDone ? ' active' : '') + '" onclick="ytd_toggleDone()">완료 포함</button> ') : '')
     +   '<button class="ytd-btn" onclick="ytd_render(true)">↻ 새로고침</button></span></div>'
-    + '<div class="ytd-tbl-wrap"><table class="ytd-tbl"><thead><tr><th>No</th><th>담당</th><th>대상 (계약)</th><th>할 일</th><th>중요·긴급</th><th>기한</th><th>결과</th></tr></thead><tbody>'
-    +   (trs || '<tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:14px">' + (mode === 'day' ? '그날 할 일이 없습니다' : '미완료 항목이 없습니다 🎉') + '</td></tr>')
+    + '<div class="ytd-tbl-wrap"><table class="ytd-tbl"><thead><tr>' + (wr ? '<th class="ytd-ck" title="체크하면 시트 완료·완료일에 바로 기록">✓</th>' : '') + '<th>No</th><th>담당</th><th>대상 (계약)</th><th>할 일</th><th>중요·긴급</th><th>기한</th><th>결과</th></tr></thead><tbody>'
+    +   (trs || '<tr><td colspan="' + (wr ? 8 : 7) + '" style="text-align:center;color:#9CA3AF;padding:14px">' + (mode === 'day' ? '그날 할 일이 없습니다' : '미완료 항목이 없습니다 🎉') + '</td></tr>')
     + '</tbody></table></div>'
-    + '<div class="ytd-foot">담당자가 시트에서 완료 체크·완료일 입력 → 새로고침 시 바로 반영 · 갱신 ' + at + '</div>'
+    + '<div class="ytd-foot">' + (wr ? '✓ 체크박스를 누르면 시트 완료·완료일에 바로 기록됩니다(처음 한 번 PIN 입력) · 시트에서 체크해도 새로고침 시 반영' : '담당자가 시트에서 완료 체크·완료일 입력 → 새로고침 시 바로 반영') + ' · 갱신 ' + at + '</div>'
     + '</div>';
 }
+/* ▶ [v733] 완료 체크 → 시트 반영 (관리자 요청 2026-11-16) — YTD_WRITE_URL 이 비어 있으면 전부 비활성 */
+function ytd_canWrite(){ return !!(typeof YTD_WRITE_URL === 'string' && /^https?:\/\//.test(YTD_WRITE_URL)); }
+function ytd_row(no){ no = String(no); return (window._ytd.rows || []).filter(function(x){ return String(x.no) === no; })[0] || null; }
+function ytd_st(r){ var t0 = new Date(); t0.setHours(0, 0, 0, 0); var diff = r.dueD ? Math.round((r.dueD - t0) / 864e5) : null; return r.done ? 'done' : (diff === 0 ? 'today' : ((diff != null && diff < 0) ? 'late' : 'open')); }
+function ytd_rerender(){ var box = document.getElementById('ytdBox'); if (box && window._ytd.rows) { try { box.innerHTML = ytd_html(window._ytd.rows); } catch(_e){} } }
+function ytd_pin(){   /* 팀 공용 PIN — 이 브라우저에만 저장 · 서버가 틀렸다고 하면 지우고 다음에 다시 묻는다 */
+  var p = ''; try { p = localStorage.getItem('ytd_pin') || ''; } catch(_e){}
+  if (!p) {
+    p = window.prompt('To-do 완료 체크 PIN (팀 공용 · 이 브라우저에만 저장됩니다)');
+    if (p == null) return '';
+    p = String(p).trim(); if (!p) return '';
+    try { localStorage.setItem('ytd_pin', p); } catch(_e){}
+  }
+  return p;
+}
+function ytd_pinClear(){ try { localStorage.removeItem('ytd_pin'); } catch(_e){} }
+function ytd_toast(html, err){
+  var el = document.createElement('div'); el.className = 'ytd-toast' + (err ? ' err' : ''); el.innerHTML = html;
+  document.body.appendChild(el);
+  setTimeout(function(){ try { el.remove(); } catch(_e){} }, err ? 9000 : 3200);
+}
+function ytd_write(params, cb){   /* JSONP GET — 체크리스트(CK_API)와 같은 방식 · 10초 안에 응답 없으면 실패 처리 */
+  var name = '_ytdW' + Date.now() + Math.floor(Math.random() * 1e4), s = document.createElement('script'), fin = false;
+  var finish = function(res){ if (fin) return; fin = true; try { delete window[name]; } catch(_e){} try { if (s.parentNode) s.parentNode.removeChild(s); } catch(_e){} cb(res); };
+  window[name] = function(res){ finish(res); };
+  s.onerror = function(){ finish({ ok: false, error: '네트워크 오류' }); };
+  var q = Object.keys(params).map(function(k){ return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
+  s.src = YTD_WRITE_URL + '?' + q + '&callback=' + name + '&_=' + Date.now();
+  document.head.appendChild(s);
+  setTimeout(function(){ finish({ ok: false, error: '응답 시간 초과(10초)' }); }, 10000);
+}
+function ytd_toggle(el){
+  var no = String(el.getAttribute('data-no') || ''), want = !!el.checked;
+  var r = ytd_row(no);
+  if (!r || !ytd_canWrite()) { el.checked = !want; return; }
+  var pin = ytd_pin(); if (!pin) { el.checked = !want; return; }
+  el.disabled = true; var tr = el.closest ? el.closest('tr') : null; if (tr) tr.classList.add('saving');
+  var prev = { done: r.done, doneAt: r.doneAt, doneAtD: r.doneAtD, st: r.st };
+  window._ytd.busy = (window._ytd.busy || 0) + 1;
+  ytd_write({ action: want ? 'done' : 'undone', no: no, pin: pin, by: (window._ytd.who || '전체'), client: 'dashboard v733' }, function(res){
+    window._ytd.busy = Math.max(0, (window._ytd.busy || 1) - 1);
+    var cur = ytd_row(no) || r;   /* 응답 사이에 자동 갱신으로 rows 가 바뀌었을 수 있어 다시 찾는다 */
+    if (res && res.ok) {
+      cur.done = !!res.done; cur.doneAt = res.doneAt || ''; cur.doneAtD = cur.done ? ytd_dd(cur.doneAt, cur.meet) : null; cur.st = ytd_st(cur);
+      window._ytd.pend = window._ytd.pend || {}; window._ytd.pend[no] = { done: cur.done, doneAt: cur.doneAt, doneAtD: cur.doneAtD, until: Date.now() + 90000 };
+      ytd_rerender();
+      ytd_toast((cur.done ? '✅ #' + ytd_esc(no) + ' 완료 — 시트에 기록됨 (완료일 ' + ytd_esc(cur.doneAt || '오늘') + ')' : '↩️ #' + ytd_esc(no) + ' 완료 해제 — 시트 완료일 지움') + (res.at ? ' · ' + ytd_esc(res.at) : ''));
+      setTimeout(function(){ try { ytd_render(true, true); } catch(_e){} }, 2500);
+    } else {
+      cur.done = prev.done; cur.doneAt = prev.doneAt; cur.doneAtD = prev.doneAtD; cur.st = prev.st;
+      ytd_rerender();
+      var msg = (res && res.error) ? String(res.error) : '응답 없음';
+      var isPin = /PIN/i.test(msg); if (isPin) ytd_pinClear();
+      ytd_toast('⚠️ #' + ytd_esc(no) + ' 저장 실패 (' + ytd_esc(msg) + ') — 시트에서 직접 체크해 주세요 <a href="' + YTD_SHEET_URL + '" target="_blank" rel="noopener">시트 열기</a>' + (isPin ? ' · 다음 체크 때 PIN을 다시 묻습니다' : ''), true);
+    }
+  });
+}
+function ytd_applyPend(rows){   /* 쓰기 직후 gviz가 옛 값을 주면 90초까지는 방금 쓴 값을 유지 — 시트가 따라오면 자동 해제 */
+  var P = window._ytd.pend || {}, now = Date.now(), keep = {};
+  (rows || []).forEach(function(r){
+    var p = P[String(r.no)]; if (!p || now > p.until) return;
+    if (r.done === p.done) return;
+    r.done = p.done; r.doneAt = p.doneAt; r.doneAtD = p.doneAtD; r.st = ytd_st(r); keep[String(r.no)] = p;
+  });
+  window._ytd.pend = keep;
+}
 function ytd_toggleDone(){ window._ytd.showDone = !window._ytd.showDone; var box = document.getElementById('ytdBox'); if (box && window._ytd.rows) box.innerHTML = ytd_html(window._ytd.rows); }
-async function ytd_render(force){
+async function ytd_render(force, fresh){
   var box = document.getElementById('ytdBox'); if (!box) return;
+  if (window._ytd.busy && !force) return;   /* [v733] 저장 응답을 기다리는 동안은 자동 갱신 재렌더를 건너뛴다(체크박스 상태 보존) */
   ytd_injectCss();
   if (window._ytd.rows && !force) { try { box.innerHTML = ytd_html(window._ytd.rows); } catch(_e){} }   /* 자동갱신 재렌더 시 깜빡임 방지 — 캐시를 먼저 그리고 새로 읽는다 */
   try {
-    var resp = await ytd_fetch();
-    window._ytd.rows = ytd_parse(resp); window._ytd.at = Date.now();
+    var resp = await ytd_fetch(!!fresh);
+    window._ytd.rows = ytd_parse(resp); window._ytd.at = Date.now(); ytd_applyPend(window._ytd.rows);   /* [v733] */
     box = document.getElementById('ytdBox'); if (!box) return;
     box.innerHTML = ytd_html(window._ytd.rows);
   } catch(e){
@@ -30844,37 +31112,34 @@ function renderExitMgmtView(){
 })();
 </script>
 <script>
-/* [연체 대응 패턴 A~E + 리포트] v0.1 — 컬럼: 체크박스 ㅣ 계약번호 ㅣ 리포트 ㅣ 대응패턴 ㅣ ... (연체관리 표 렌더 비침습 주입) */
+/* [연체 대응 패턴 A~E + 리포트] v0.1 — 컬럼: 체크박스 ㅣ 계약번호 ㅣ 리포트 ㅣ 대응패턴 ㅣ ... (연체관리 표 렌더 비침습 주입)
+   [v741] 대응패턴(A~E, 연체일수 구간) → 대응등급(A~D, 연체 SOP v1.4 1-2장) — 표 '대응등급' 열 · 대응 리포트 · 종합 리포트가 같은 판정(_dlqGradeOf)을 쓴다 */
 (function(){
   if(window.__dpHooked) return; window.__dpHooked=true;
   function num(v){var n=parseInt(String(v==null?'':v).replace(/[^0-9-]/g,''));return isNaN(n)?0:n;}
   window._dpCB=function(cno){var b=null;(window.daeungRawData||[]).forEach(function(x){if(!x||String(x.no||'').trim()!==cno)return;var s=String(x.jobSub||'').replace(/\s/g,'');if(s.indexOf('법적조치검토')<0&&s.indexOf('내용증명발송')<0)return;var h=String(x.colH||'');var m=h.match(/(\d{3,4})/);if(m){var sc=parseInt(m[1]);if(sc>=200&&sc<=1000&&(b==null||sc>b))b=sc;}});return b;};
-  window._dpMeta={A:{n:'연체 사실 확인 고지',c:'#2E7D32',goal:'연체 인지→자발적 납부 유도(수납관리 수준)',act:'안내 문자/전화 1회, 납부 링크·계좌 안내',att:'단순안내',msg:'안녕하세요 고객님, 개런티즈 입니다.\n[이름]님, 임대료 납부일이 지난 것 같아 안내드립니다. 확인 후 납부 부탁드리며, 이미 납부하셨다면 양해 바랍니다.'},B:{n:'약속일 확답',c:'#2E75B6',goal:'납부 약속일 확정·기록',act:'통화로 약속일 확답·기록, 1차 독촉',att:'정중안내(톤 낮음)',msg:'안녕하세요 고객님, 개런티즈 입니다.\n[이름]님, 임대료가 아직 미납 상태입니다. 납부 예정일이 언제인지 알려주시기 바랍니다.\n• 납부 예정일 확정\n→YES : 납부 예정일 잊지 마시고 꼭 입금 진행 바랍니다.\n→NO : 이유 확인, 납부가 어려우시면 분납 협의가 필요하며, 미이행 시 계약상 법적 조치가 진행됩니다.'},C:{n:'패널티+법 진행 안내',c:'#E67E22',goal:'법적 압박을 통한 회수',act:'내용증명→지급명령→채무불이행자명부등재 단계 진행',att:'단호안내',msg:'안녕하세요 고객님, 개런티즈 입니다.\n[이름]님, 미납 지속으로 계약 해지 및 법적 절차(내용증명·지급명령)가 진행 중에 있습니다. 기한 내 완납 또는 분납 합의가 없으면 절차가 진행됩니다.'},D:{n:'분납 의무 진행',c:'#7030A0',goal:'분납 합의 이행 관리',act:'분납 스케줄 확정, 회차별 이행 점검',att:'강경경고',msg:'안녕하세요 고객님, 개런티즈 입니다.\n[이름]님, 장기 미납으로 계약 해지 및 법적 절차에 착수합니다. {기한}까지 완납 또는 분납 합의가 없으면 내용증명 발송 후 지급명령·소송을 진행하며, 연체료·소송비용이 가산되고 강제집행 대상이 됩니다.'},E:{n:'강제퇴실 진행',c:'#C0392B',goal:'계약 종료·점유 회수',act:'명도/강제퇴실 절차, 보증금 정산, 명부등재',att:'엄정 최종통보',msg:'안녕하세요 고객님, 개런티즈 입니다.\n[이름]님, 장기 미납으로 명도(강제퇴실)·강제집행 절차를 진행합니다. 연체료·집행비용 외 일체 비용은 전액 청구되며 미상환 시 재산 압류 및 신용정보 등재가 이루어집니다.'}};
+  window._dpMeta={A:{n:'잠재 고객',c:'#6a95dc',goal:'당일~D+3 회수 · 자동이체 전환 권유',act:'안내 문자/전화, 납부 링크·계좌 안내 — 안내하고 감사로 끝낸다',att:'서비스 마인드',who:'팀원A',msg:'안녕하세요 고객님, 개런티즈 입니다.\n[이름]님, 임대료 납부일이 지난 것 같아 안내드립니다. 확인 후 납부 부탁드리며, 이미 납부하셨다면 양해 바랍니다.'},B:{n:'관심 필요',c:'#2a5db0',goal:'D+7 이내 납부 약속 · 약속일+1 재확인 · 분납은 서면',act:'통화로 날짜·금액을 특정해 입금예정일에 기록',att:'친절하되 날짜·금액 특정',who:'팀원A',msg:'안녕하세요 고객님, 개런티즈 입니다.\n[이름]님, 임대료가 아직 미납 상태입니다. 납부 예정일이 언제인지 알려주시기 바랍니다.\n• 납부 예정일 확정\n→YES : 납부 예정일 잊지 마시고 꼭 입금 진행 바랍니다.\n→NO : 이유 확인, 납부가 어려우시면 분납 협의가 필요하며, 미이행 시 계약상 법적 조치가 진행됩니다.'},C:{n:'위험',c:'#c9962a',goal:'서면·법무 즉시 · D+20 안에 종결',act:'기한과 다음 절차 고지 · 내용증명·지급명령 준비(팀장) · 방문 병행',att:'단호하게 기한·절차 고지',who:'팀원B',msg:'안녕하세요 고객님, 개런티즈 입니다.\n[이름]님, 미납 지속으로 계약 해지 및 법적 절차(내용증명·지급명령)가 진행 중에 있습니다. 기한 내 완납 또는 분납 합의가 없으면 절차가 진행됩니다.'},D:{n:'다시 거래하지 않을 상대',c:'#8a5a05',goal:'지급명령·명도 · 고소 검토(6-3)',act:'사실만 짧게 절차 진행 통보 · 퇴실 요구 — 송무는 팀장',att:'사실만 짧게',who:'팀원B',msg:'안녕하세요 고객님, 개런티즈 입니다.\n[이름]님, 장기 미납으로 계약 해지 및 법적 절차에 착수합니다. {기한}까지 완납 또는 분납 합의가 없으면 내용증명 발송 후 지급명령·소송을 진행하며, 연체료·소송비용이 가산되고 강제집행 대상이 됩니다.',msgEvict:'안녕하세요 고객님, 개런티즈 입니다.\n[이름]님, 장기 미납으로 명도(강제퇴실)·강제집행 절차를 진행합니다. 연체료·집행비용 외 일체 비용은 전액 청구되며 미상환 시 재산 압류 및 신용정보 등재가 이루어집니다.'}};   /* [v741] A~D = 연체 SOP v1.4 1-2장 등급 카드 · 문구는 기존 A·B·C·D(+E=강제퇴실) 그대로 */
+  /* [v741] 대응패턴(A~E, 연체일수 구간) → 대응등급(A~D) — 연체관리 표 '대응등급' 열과 같은 판정(_dlqGradeOf) */
   window._dpPattern=function(cno){
     cno=String(cno).trim();
-    var d=(window._dlqTableRows||[]).find(function(r){return String(r.cno).trim()===cno;})||{};
+    var d=(window._dlqTableRows||[]).find(function(r){return String(r.cno).trim()===cno;})||{cno:cno};
     var days=num(d.days), amt=num(d.amt), grade=String(d.grade||'').replace(/등급/,'').trim();
     var inst=/분납/.test(String(d['연체구분']||''));
     var ended=/퇴실|공실/.test(String(d.vacancyStatus||''))||/종료/.test(String(d.contractStatus||''));
     var cb=window._dpCB(cno);
-    var sev=(grade==='D'||grade==='E'||grade==='F'), mild=(grade==='S'||grade==='A'||grade==='B');
-    var p,why=[];
-    var order=['A','B','C','D','E'];
-    var base=days<=7?'A':(days<=15?'B':(days<=30?'C':(days<=60?'D':'E')));
-    var bandTxt={A:'1~7일',B:'8~15일',C:'16~30일',D:'31~60일',E:'60일 초과'}[base];
-    why.push('연체 '+days+'일 → '+base+'구간('+bandTxt+')');
-    var _ix=order.indexOf(base);
-    if(cb!=null&&!isNaN(cb)&&Number(cb)>=600&&_ix>0){_ix--;why.push('CB '+cb+'점(우수) → 한 단계 완화');}
-    p=order[_ix];
-    return {pattern:p,nm:String(d.nm||''),days:days,amt:amt,grade:grade||'-',inst:inst,ended:ended,cb:cb,why:why,delinqType:String(d.delinqType||''),group:String(d.group||'')};
+    var x=null; try{ x=(typeof _dlqGradeOf==='function')?_dlqGradeOf(d):null; }catch(e){}
+    var p=x?x.g:(days<=3?'A':(days<=15?'B':(days<=30?'C':'D')));
+    var why=x?x.why.slice():['연체 '+days+'일 (판정 함수 없음 — 연체일수만 반영)'];
+    if(!why.length) why.push('감점 신호 없음');
+    return {pattern:p,pts:x?x.pts:null,rec:x?x.rec:'',recD:x?x.recD:'',evict:/강제퇴실/.test(String(d.vacancyStatus||'')),nm:String(d.nm||''),days:days,amt:amt,grade:grade||'-',inst:inst,ended:ended,cb:cb,why:why,delinqType:String(d.delinqType||''),group:String(d.group||''),cs:String(d.contractStatus||'계약중')};
   };
   window._dpPatternReportBlock=function(cno){
     var i=window._dpPattern(cno); if(!i)return ''; var m=window._dpMeta[i.pattern];
-    return '<div class="section"><div class="sectt">대응 패턴 (A~E)</div>'
+    return '<div class="section"><div class="sectt">대응등급 (A~D · 자동 판정)</div>'
       +'<div style="display:flex;gap:14px;align-items:center;padding:10px 14px;background:'+m.c+'14;border-left:5px solid '+m.c+';border-radius:8px;">'
       +'<div style="font-size:40px;font-weight:900;color:'+m.c+';line-height:1;">'+i.pattern+'</div>'
       +'<div style="flex:1;">'
-      +'<div style="font-size:15px;font-weight:800;color:'+m.c+';">'+m.n+' <span style="font-size:12px;color:#6b7280;font-weight:600;">· '+(i.group||'-')+(i.inst?' · 분납중':'')+(i.ended?' · 퇴실':'')+'</span></div>'
+      +'<div style="font-size:15px;font-weight:800;color:'+m.c+';">'+m.n+' <span style="font-size:12px;color:#6b7280;font-weight:600;">· '+(i.group||'-')+(i.inst?' · 분납중':'')+(i.ended?' · 퇴실':'')+' · 담당 '+(i.cs==='계약중'?m.who:'종료 채권 4장 기준')+(i.pts!=null?' · 감점 '+i.pts+'점':'')+'</span></div>'
       +'<div style="font-size:13px;margin-top:4px;color:#111827;"><b>목표(Goal)</b> · '+m.goal+'</div>'
       +'<div style="font-size:13px;margin-top:2px;color:#111827;"><b>권장 액션</b> · '+m.act+'</div>'
       +'<div style="font-size:12px;color:#6b7280;margin-top:2px;"><b>배정 근거</b> · '+i.why.join(' / ')+'</div>'
@@ -30888,21 +31153,21 @@ function renderExitMgmtView(){
     ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;';
     ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
     function row(k,v){return '<div style="display:flex;gap:8px;font-size:13px;margin:3px 0;"><div style="width:88px;color:#6b7280;flex:none;">'+k+'</div><div style="color:#111827;font-weight:600;">'+v+'</div></div>';}
-    var msg=m.msg.replace('[성명]',i.nm||'고객').replace('[금액]',i.amt.toLocaleString());
+    var msg=((i.evict&&m.msgEvict)?m.msgEvict:m.msg).replace('[이름]',i.nm||'고객').replace('[성명]',i.nm||'고객').replace('[금액]',i.amt.toLocaleString());
     ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:520px;width:92%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:inherit;">'
       +'<div style="background:'+m.c+';color:#fff;padding:14px 18px;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:space-between;">'
         +'<div><div style="font-size:12px;opacity:.85;">연체 대응 리포트 · '+cno+'</div><div style="font-size:18px;font-weight:800;">'+(i.nm||'')+' <span style="font-size:13px;font-weight:600;opacity:.9;">('+i.group+')</span></div></div>'
         +'<div style="text-align:right;"><div style="font-size:34px;font-weight:900;line-height:1;">'+i.pattern+'</div><div style="font-size:12px;">'+m.n+'</div></div></div>'
       +'<div style="padding:16px 18px;">'
         +'<div style="background:#F9FAFB;border:1px solid #EAEEF3;border-radius:8px;padding:10px 12px;margin-bottom:12px;">'
-          +row('연체일수',i.days+'일')+row('연체등급',i.grade)+row('연체금액','₩'+i.amt.toLocaleString())+row('연체종류',i.delinqType||'-')+row('상태',(i.inst?'분납중':'연체중')+(i.ended?' · 퇴실/공실':''))+row('CB점수',i.cb!=null?(i.cb+(i.cb>=600?' (양호)':' (주의)')):'미보유')+row('정시 납부율',(function(){var P=[];try{P=paymentRawData||[];}catch(_e){try{P=window.paymentRawData||[];}catch(_e2){}}var C=String(cno),due=0,ok=0;for(var x=0;x<P.length;x++){if(String(P[x]['계약번호']||'').trim()!==C)continue;var st=String(P[x]['납부상태']||'').trim();if(st===''||st==='납부예정')continue;due++;if(st==='정상납부')ok++;}return due>0?(Math.round(ok/due*1000)/10+'% <span style="color:#9ca3af;font-size:11px;font-weight:400;">('+ok+'/'+due+'건)</span>'):'<span style="color:#9ca3af;">데이터 없음</span>';})())+'</div>'
+          +row('연체일수',i.days+'일')+row('대응등급',i.pattern+' · '+m.n+(i.pts!=null?' · 감점 '+i.pts+'점':'')+(i.rec?' · 회의 기록 '+i.rec+' ('+i.recD+')':'')+' <a href="#" onclick="event.preventDefault();dlqGradePopup(\''+cno+'\')" style="color:#2563eb;font-weight:700;text-decoration:none">내역 보기</a>')+row('이력 등급',i.grade+' (계약관리 S~F)')+row('연체금액','₩'+i.amt.toLocaleString())+row('연체종류',i.delinqType||'-')+row('상태',(i.inst?'분납중':'연체중')+(i.ended?' · 퇴실/공실':''))+row('CB점수',i.cb!=null?(i.cb+(i.cb>=600?' (양호)':' (주의)')):'미보유')+row('정시 납부율',(function(){var P=[];try{P=paymentRawData||[];}catch(_e){try{P=window.paymentRawData||[];}catch(_e2){}}var C=String(cno),due=0,ok=0;for(var x=0;x<P.length;x++){if(String(P[x]['계약번호']||'').trim()!==C)continue;var st=String(P[x]['납부상태']||'').trim();if(st===''||st==='납부예정')continue;due++;if(st==='정상납부')ok++;}return due>0?(Math.round(ok/due*1000)/10+'% <span style="color:#9ca3af;font-size:11px;font-weight:400;">('+ok+'/'+due+'건)</span>'):'<span style="color:#9ca3af;">데이터 없음</span>';})())+'</div>'
         +'<div style="font-size:13px;margin-bottom:4px;"><b style="color:'+m.c+';">목표(Goal)</b> · '+m.goal+'</div>'
         +'<div style="font-size:13px;margin-bottom:4px;"><b style="color:'+m.c+';">권장 액션</b> · '+m.act+'</div>'
         +'<div style="font-size:12px;color:#6b7280;margin:6px 0 4px;"><b>배정 근거</b> · '+i.why.join(' / ')+'</div>'
         +'<div style="font-size:12px;color:#374151;margin-top:8px;font-weight:700;">📝 권장 문구 (태도: '+m.att+')</div>'
         +'<textarea id="dpMsg" style="width:100%;height:72px;margin-top:4px;font-size:12px;padding:8px;border:1px solid #d1d5db;border-radius:6px;resize:vertical;box-sizing:border-box;">'+msg+'</textarea>'
         +'<div style="text-align:right;margin-top:8px;"><button id="dpCopyBtn" style="background:'+m.c+';color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">문구 복사</button> <button id="dpCloseBtn" style="background:#E5E7EB;border:none;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;">닫기</button></div>'
-        +'<div style="font-size:10px;color:#9CA3AF;margin-top:8px;">※ 패턴 v0.1 — 연체등급·연체일수·분납·퇴실 기준 자동 배정. 경계값은 추후 조정.</div>'
+        +'<div style="font-size:10px;color:#9CA3AF;margin-top:8px;">※ 대응등급(자동) — 연체 SOP v1.4 1-2장 판정 신호로 계산한 참고 등급. 12월은 09:30 등급 회의에서 팀장이 확정하고, 점수 기준은 v1.5에서 조정한다.</div>'
       +'</div></div>';
     document.body.appendChild(ov);
     var cpy=ov.querySelector('#dpCopyBtn'); if(cpy)cpy.addEventListener('click',function(){try{navigator.clipboard.writeText(document.getElementById('dpMsg').value);this.textContent='복사됨';}catch(e){}});
