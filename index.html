@@ -9609,7 +9609,7 @@ function dpay_resPick(k){ window._dresPick = (window._dresPick === k) ? '' : k; 
 /* [v587] 대응 결과 요약 블록 */
 /* ▶ [v739] 운영팀 담당자 개편 (관리자 지시 2026-11-25) — 2026-11-26부터 팀장 박억대 · 팀원A 이원표 · 팀원B 김영철 (오진선·이지희는 운영관리 담당자에서 제외)
    · 보는 기간(기준일·기간 끝)이 11/26 이전이면 종전 담당자 그대로 → 지난 기록·성적은 그대로 보인다
-   · 11/26 이후 기간이라도 오진선·이지희 기록이 있으면(전환 주·월) 그 사람 칸을 뒤에 함께 보여준다 */
+   · [v744] 11/26 이후 기간은 새 담당자만 보여준다(담당자별 대응 KPI 4명 1행) — 오진선·이지희 기록은 '그 외' 건수로만 */
 function ops_newTeam(d){ var c = new Date(2026, 10, 26); return !(d instanceof Date) || isNaN(d.getTime()) || d.getTime() >= c.getTime(); }
 function dpay_resBlock(){
   var off = (typeof window._dresOff === 'number') ? Math.min(0, window._dresOff) : 0;
@@ -9647,12 +9647,11 @@ function dpay_resBlock(){
         var pn = function(nm){ var t=0, P9=All.pCnt||{}; Object.keys(P9).forEach(function(k9){ if (k9.indexOf(nm)>=0) t += Object.keys(P9[k9]).length; }); return t; };
         return '<span class="dres-who" title="대응자(담당자) 기준으로 결과와 성적을 봅니다">'
           + '<button class="' + (psel===''?'on':'') + '" onclick="dpay_resPerson(\'\')">대응자 전체</button>'
-          + (function(){   /* [v739] 담당자 개편 — 11/26 이후 기간: 박억대(팀장)·이원표(팀원A)·김영철(팀원B) · 이전 기간: 종전 김영철·오진선 · 개편 후에도 오진선 기록이 있으면 버튼 유지 */
+          + (function(){   /* [v739] 담당자 개편 — 11/26 이후 기간: 박억대(팀장)·이원표(팀원A)·김영철(팀원B) · 이전 기간: 종전 김영철·오진선 · [v744] 오진선 버튼 없음 */
               var _e9 = new Date(); _e9.setHours(0,0,0,0); _e9.setDate(_e9.getDate() + (isRange ? span.b : off));
               var _n9 = ops_newTeam(_e9);
               var B9 = _n9 ? [['박억대','p2','⚖️','팀장'],['이원표','b2','📞','팀원A'],['김영철','k2','🧑' + String.fromCharCode(0x200D) + '🔧','팀원B']]
                            : [['김영철','k2','🧑' + String.fromCharCode(0x200D) + '🔧',''],['오진선','p2','⚖️','']];
-              if (_n9 && (pn('오진선') > 0 || psel === '오진선')) B9.push(['오진선','x2','⚖️','이전 담당']);
               return B9.map(function(b){
                 return '<button class="' + (psel===b[0]?'on '+b[1]:'') + '" onclick="dpay_resPerson(\'' + b[0] + '\')" title="' + b[0] + (b[3]?' ('+b[3]+')':'') + ' 담당 대응만 — 성적도 ' + b[0] + ' 기준으로 재계산됩니다">' + b[2] + ' ' + b[0] + ' <b>' + pn(b[0]) + '</b></button>';
               }).join('');
@@ -28218,10 +28217,9 @@ function okpi_respSection(all, range, period){
       +'<div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:16px;color:#8A97A8;font-size:12px;margin-bottom:14px">선택 기간(<b>'+pTag+'</b>)에 대응 기록이 없습니다. (gid=554798125)</div>';
   }
   /* [v739] 담당자 개편 — 기간 끝이 11/26 이후: 박억대(팀장)·이원표(팀원A)·김영철(팀원B)·고송미 · 이전 기간: 종전 4명
-     · 개편 후 기간이라도 오진선·이지희 기록이 있으면 그 칸을 뒤에 덧붙인다(전환 주·월) */
+     · [v744] 개편 후 기간은 4명 고정(1행) — 오진선·이지희 기록은 아래 '그 외'에 건수로만 표시 (관리자 지시 2026-11-26) */
   var _nt9 = ops_newTeam(range && range.end);
   var PEOPLE = _nt9 ? ['박억대','이원표','김영철','고송미'] : ['김영철','오진선','이지희','고송미'];
-  if (_nt9) ['오진선','이지희'].forEach(function(p){ if (rows.some(function(r){ return (r.who||'').trim()===p; })) PEOPLE.push(p); });
   var PC={'김영철':'#4F46E5','오진선':(_nt9?'#94A3B8':'#0E7490'),'이지희':(_nt9?'#94A3B8':'#B45309'),'고송미':'#7C3AED','박억대':'#0E7490','이원표':'#2563EB'};
   var TASKC={'연체관리':'#DC2626','수납관리':'#F59E0B','계약(입주)관리':'#4F46E5','갱신관리':'#0E7490','중도퇴실관리':'#7C3AED','퇴실관리':'#64748B'};
   var DONE={'완납':1,'분납':1,'납부약속':1,'갱신희망':1,'묵시적갱신':1,'종료':1,'실제퇴실완료(개문포함)':1,'만기퇴실예정':1,'임대인합의확정':1,'갱신확정':1};
@@ -28352,7 +28350,7 @@ function okpi_respSection(all, range, period){
     +'</div>';
   return '<div class="okpi-section-title">👥 담당자별 대응 KPI <span class="pill">'+pTag+' · '+T.n+'건</span></div>'
     + head
-    +'<div style="display:grid;grid-template-columns:repeat('+(PEOPLE.length>4?3:4)+',1fr);gap:10px;margin-bottom:10px">'+cards+'</div>'   /* [v739] 5~6칸이면 3열 */
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">'+cards+'</div>'   /* [v744] 4명 1행 고정 */
     + othersNote
     + tipBox;
 }
