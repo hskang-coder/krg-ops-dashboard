@@ -10725,6 +10725,7 @@ function _dlqGubunCell(r){
    · 기준표(관리자 지정 7개): 심사결과 · 연체일수 · 약속 이행(이행률·약속일 거리) · 수신율 · KCB · 태도 [성실]·[회피]·[거부] · 국적(외국인)
      — 나쁠수록 감점이 커지고, 감점 합계가 클수록 C·D
    · 보조 신호(연체 SOP v1.4 1-2장): 연체 이력 · 만기 3개월 미만 · 법적절차 진행 · 분납 중(가점) · 출국·체류 언급
+   · 1~7일차 초기 완화 가점 3(연락 두절·[회피]·[거부]면 없음, 관리자 지시 2026-11-26 ③안)
    · 등급: 감점 A 0~1 · B 2~4 · C 5~8 · D 9 이상 / 첫 납부 연체·강제퇴실 진행은 D, 태도 [거부]는 최소 C
    · 12월은 참고 등급 — 09:30 등급 회의에서 팀장이 확정(대응 상세내용 맨 앞 [A]~[D]) · 표시 전용, 원본 시트는 손대지 않음 */
 function _dlqGradeCtx(){
@@ -10828,6 +10829,11 @@ function _dlqGradeOf(r){
   });
   if (exitR) it('aux', '출국·체류 언급', '대응 상세내용', '출국·귀국·체류 만료 언급', 1);
   if (/강제퇴실/.test(String(r.vacancyStatus || ''))) forceD = forceD || '강제퇴실 진행';
+  /* 초기 완화 — 1~7일차는 골든타임(7일 안에 약 76% 회수): 가점 3, 단 연락 두절(수신율 감점 3)·[회피]·[거부]면 없음 */
+  if (d >= 1 && d <= 7) {
+    if (p4 >= 3 || tg === '회피' || tg === '거부') it('adj', '초기 완화', '연체 1~7일차', d + '일차 — ' + (p4 >= 3 ? '연락 두절' : '태도 [' + tg + ']') + '이라 적용 안 함', 0);
+    else it('adj', '초기 완화', '연체 1~7일차(골든타임)', d + '일차 · 연락 가능', -3);
+  }
   /* 회의 확정 등급 — 최근 기록 대응 상세내용 맨 앞 [A]~[D] */
   var rec = '', recD = '';
   for (var j = 0; j < recent.length; j++) { var m3 = String(recent[j].content || '').match(/^\s*\[([ABCD])\]/); if (m3) { rec = m3[1]; recD = String(recent[j].date || '').slice(5).replace('-', '/'); break; } }
@@ -10861,7 +10867,7 @@ function dlqGradePopup(cno){
   var x; try { x = _dlqGradeOf(r); } catch(e){ alert('대응등급을 계산하지 못했습니다: ' + e.message); return; }
   var pc = function(p){ return p > 0 ? '<b class="gp-m">감점 ' + p + '</b>' : p < 0 ? '<b class="gp-pl">가점 ' + (-p) + '</b>' : '<span class="gp-z">0</span>'; };
   var row = function(i){ return '<tr' + (i.p ? '' : ' class="gp-0"') + '><td class="k">' + _dlqEsc(i.k) + '</td><td class="s">' + _dlqEsc(i.src) + '</td><td>' + _dlqEsc(i.val) + '</td><td class="p">' + pc(i.p) + '</td></tr>'; };
-  var core = x.items.filter(function(i){ return i.grp === 'core'; }), aux = x.items.filter(function(i){ return i.grp === 'aux'; });
+  var core = x.items.filter(function(i){ return i.grp === 'core'; }), aux = x.items.filter(function(i){ return i.grp === 'aux'; }), adj = x.items.filter(function(i){ return i.grp === 'adj'; });
   var cut = DLQ_GRADE_CUT, bands = [['A', 0, cut.B - 1], ['B', cut.B, cut.C - 1], ['C', cut.C, cut.D - 1], ['D', cut.D, null]];
   var scale = bands.map(function(b){ return '<div class="gp-band' + (b[0] === x.g ? ' on' : '') + '" style="--c:' + DLQ_GRADE_COL[b[0]] + '"><b>' + b[0] + '</b><span>' + DLQ_GRADE_NM[b[0]] + '<br>감점 ' + (b[2] == null ? b[1] + ' 이상' : b[1] + '~' + b[2]) + '</span></div>'; }).join('');
   var html = '<div class="gp-card" role="dialog" aria-label="대응등급 내역">'
@@ -10872,8 +10878,9 @@ function dlqGradePopup(cno){
     + (x.floorC ? '<div class="gp-rule">최소 C — ' + _dlqEsc(x.floorC) + '</div>' : '')
     + '<table class="gp-tbl"><thead><tr><th>기준</th><th>데이터 위치</th><th>이 계약</th><th>점수</th></tr></thead><tbody>' + core.map(row).join('') + '</tbody></table>'
     + (aux.length ? '<div class="gp-sec">보조 신호 · 연체 SOP 1-2장</div><table class="gp-tbl"><tbody>' + aux.map(row).join('') + '</tbody></table>' : '')
+    + (adj.length ? '<div class="gp-sec">조정 · 1~7일차 초기 완화</div><table class="gp-tbl"><tbody>' + adj.map(row).join('') + '</tbody></table>' : '')
     + '<div class="gp-sum">감점 합계 <b>' + x.pts + '점</b> → <b style="color:' + DLQ_GRADE_COL[x.g] + '">' + x.g + '</b>' + (x.rec ? ' · 회의 기록 <b>' + x.rec + '</b> (' + _dlqEsc(x.recD) + ')' + (x.rec !== x.g ? ' — 자동과 다름' : '') : '') + '</div>'
-    + '<div class="gp-note">12월은 참고 등급이며 09:30 등급 회의에서 팀장이 확정한다. 확정 등급은 대응 상세내용 맨 앞 [A]~[D], 태도는 [성실]·[회피]·[거부]로 적는다. 어느 등급이든 공통 규칙(08~21시, 협박·모욕·제3자 고지 금지)은 같다.</div>'
+    + '<div class="gp-note">1~7일차는 초기 완화 가점 3(연락 두절·[회피]·[거부]면 없음). 12월은 참고 등급이며 09:30 등급 회의에서 팀장이 확정한다. 확정 등급은 대응 상세내용 맨 앞 [A]~[D], 태도는 [성실]·[회피]·[거부]로 적는다. 어느 등급이든 공통 규칙(08~21시, 협박·모욕·제3자 고지 금지)은 같다.</div>'
     + '<div class="gp-ft"><button type="button" class="gp-x">닫기</button></div></div></div>';
   var old = document.getElementById('dlqGradeModal'); if (old) old.remove();
   var ov = document.createElement('div'); ov.id = 'dlqGradeModal'; ov.className = 'gp-ov'; ov.innerHTML = html;
