@@ -366,6 +366,18 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .cr-grade-C { color: #D97706; background: #FEF3C7; }
 .cr-grade-D { color: #DC2626; background: #FEE2E2; }
 .cr-grade-E { color: #4F46E5; background: #EDE9FE; }
+/* [v747] 계약 조회 헤더 — 대응등급(A~D) 배지 (연체관리 표와 같은 판정 · 누르면 등급 내역) */
+.cr-rgb { display: inline-flex; align-items: baseline; gap: 4px; cursor: pointer; }
+.cr-rgb .cr-rgb-l { font-size: 11px; font-weight: 800; opacity: .85; letter-spacing: -.2px; }
+.cr-rgb-none { color: #94A3B8; background: #F1F5F9; cursor: help; }
+/* [v747] 지표 칸 아래 '대응등급 내역' — 연체관리 등급 내역 팝업과 같은 기준표(.gp-*) */
+.cr-rgd { width: 100%; border: 1px solid #E2E8F0; border-radius: 10px; background: #fff; font-size: 12px; color: #1f2937; }
+.cr-rgd > summary { list-style: none; cursor: pointer; padding: 8px 12px; font-size: 12px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cr-rgd > summary::-webkit-details-marker { display: none; }
+.cr-rgd > summary::before { content: '▸'; color: #94A3B8; display: inline-block; transition: transform .15s; }
+.cr-rgd[open] > summary::before { transform: rotate(90deg); }
+.cr-rgd .cr-rgd-m { font-weight: 600; color: #64748B; }
+.cr-rgd .cr-rgd-b { padding: 0 12px 12px; }
 .cr-stats { display: flex; gap: 0; flex: 1; flex-wrap: wrap; margin-left: auto; }
 .cr-stat { flex: 1; min-width: 90px; text-align: center; padding: 8px 12px; border-left: 1px solid #E2E8F0; }
 .cr-stat-label { font-size: 10px; color: #94A3B8; font-weight: 600; margin-bottom: 3px; }
@@ -373,7 +385,10 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .cr-stat-val.warn { color: #DC2626; }
 /* ── [v427 crx] 입주관리 리디자인 전용 — 연체·수납 공유 클래스(cr-card, cr-badge-*, cr-tl-step 등)는 변경하지 않음 ── */
 .crx-chip { font-size:11px; color:#64748B; background:#F1F5F9; padding:3px 10px; border-radius:6px; font-weight:600; }
-.crx-stats { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-top:12px; width:100%; }
+.crx-stats { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:12px; width:100%; }   /* [v747] 6 → 7칸 (대응등급 칸 추가) */
+.crx-stat.crx-rg { cursor: pointer; }   /* [v747] 대응등급 칸 */
+.crx-stat.crx-rg.none { cursor: help; }
+.crx-stat.crx-rg .crx-rg-n { font-size: 10px; font-weight: 700; margin-top: 2px; line-height: 1.25; word-break: keep-all; }
 .crx-stat { background:#F8FAFC; border-radius:8px; padding:9px 8px; text-align:center; }
 .crx-stat .l { font-size:10px; color:#94A3B8; font-weight:600; margin-bottom:3px; }
 .crx-stat .v { font-size:17px; font-weight:800; color:#0F172A; }
@@ -7092,6 +7107,89 @@ function crIsSamil(){
   }
   return false;
 }
+/* ▶ [v747] 계약 조회 대응등급 — 헤더 배지 + 아래 지표 '대응등급' 칸 + 그 아래 '대응등급 내역' (관리자 지시 2026-11-27)
+   · 연체관리 표 '대응등급'과 같은 판정(_dlqGradeOf · 같은 행 window._dlqTableRows) — 배지·칸을 누르면 같은 등급 내역 팝업(dlqGradePopup)
+   · 내역은 등급 내역 팝업과 같은 기준표(구간 · 기준/데이터 위치/이 계약/점수 · 보조 신호 · 조정 · 합계)를 화면에 펼쳐 보여줌(접기 가능)
+   · 회의 확정 등급([A]~[D] 기록)이 자동과 다르면 헤더에 표와 같은 '회의 X' 칩
+   · 연체관리 데이터가 아직 없으면 '…' 표시 후, 데이터가 생기면 자동으로 채움(2초 간격 · 10분까지 · 다른 계약을 열면 중지)
+   · 연체 목록에 없는 계약(현재 연체 없음)은 '—' · 내역 없음 — 구 계약관리 등급(S~F)은 쓰지 않음 */
+function crRespGradeInner(cno){
+  cno = String(cno == null ? '' : cno).trim();
+  var esc = function(v){ return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  var none = function(t, mark, done){
+    return { done: done, detail: '',
+      badge: '<span class="cr-grade cr-rgb cr-rgb-none" title="' + esc(t) + '"><span class="cr-rgb-l">대응</span>' + mark + '</span>',
+      box: '<div class="crx-stat crx-rg none" title="' + esc(t) + '"><div class="l">대응등급</div><div class="v" style="color:#CBD5E1">' + mark + '</div></div>' };
+  };
+  var rows = window._dlqTableRows;
+  if (!Array.isArray(rows)) return none('연체관리 탭 데이터가 아직 없습니다 — 연체관리 탭을 한 번 열면 자동으로 표시됩니다', '…', false);
+  var nf = (typeof _normCno === 'function') ? _normCno : function(v){ return String(v == null ? '' : v).trim(); };
+  var nk = nf(cno);
+  var r = rows.find(function(x){ return x && nf(x.cno) === nk; });
+  if (!r) return none('연체관리 연체자 목록에 없는 계약 — 현재 연체가 없어 대응등급이 없습니다', '—', true);
+  var x; try { x = _dlqGradeOf(r); } catch(e){ return none('대응등급을 계산하지 못했습니다', '—', true); }
+  var COL = (typeof DLQ_GRADE_COL !== 'undefined') ? DLQ_GRADE_COL : {}, NM = (typeof DLQ_GRADE_NM !== 'undefined') ? DLQ_GRADE_NM : {};
+  var col = COL[x.g] || '#475569', nm = NM[x.g] || '';
+  var who = ''; try { who = _dlqGradeWho(r, x.g); } catch(_){}
+  var tip = '대응등급(자동) ' + x.g + (nm ? ' · ' + nm : '') + ' · 감점 ' + x.pts + '점 — 누르면 내역' + (who ? '\n담당: ' + who : '') + '\n'
+    + (x.why && x.why.length ? x.why.join('\n') : '감점 없음') + (x.rec ? '\n회의 기록: ' + x.rec + ' (' + x.recD + ')' : '');
+  var t = esc(tip).replace(/\n/g, '&#10;');
+  var click = ' onclick="event.stopPropagation();dlqGradePopup(\'' + esc(x.cno || cno).replace(/'/g, '') + '\')"';
+  var badge = '<span class="cr-grade cr-rgb" style="color:' + col + ';background:' + col + '1f" title="' + t + '"' + click + '><span class="cr-rgb-l">대응</span>' + x.g + '등급</span>';
+  if (x.rec && x.rec !== x.g) badge += '<span class="dlq-rg-rec" title="' + esc('회의 확정 ' + x.rec + ' (' + x.recD + ' Daily Report 기록) — 자동 판정 ' + x.g + '와 다름') + '">회의 ' + x.rec + '</span>';
+  var box = '<div class="crx-stat crx-rg" style="background:' + col + '17" title="' + t + '"' + click + '><div class="l" style="color:' + col + '">대응등급</div><div class="v" style="color:' + col + '">' + x.g + '등급</div>'
+    + (nm ? '<div class="crx-rg-n" style="color:' + col + '">' + esc(nm) + '</div>' : '') + '</div>';
+  /* 대응등급 내역 — dlqGradePopup 본문과 같은 구성 (연체관리 코드는 그대로 두고 화면용으로 같은 규칙을 그림) */
+  var items = x.items || [];
+  var pc = function(p){ return p > 0 ? '<b class="gp-m">감점 ' + p + '</b>' : p < 0 ? '<b class="gp-pl">가점 ' + (-p) + '</b>' : '<span class="gp-z">0</span>'; };
+  var row = function(i){ return '<tr' + (i.p ? '' : ' class="gp-0"') + '><td class="k">' + esc(i.k) + '</td><td class="s">' + esc(i.src) + '</td><td>' + esc(i.val) + '</td><td class="p">' + pc(i.p) + '</td></tr>'; };
+  var core = items.filter(function(i){ return i.grp === 'core'; }), aux = items.filter(function(i){ return i.grp === 'aux'; }), adj = items.filter(function(i){ return i.grp === 'adj'; });
+  var cut = (typeof DLQ_GRADE_CUT !== 'undefined') ? DLQ_GRADE_CUT : { B: 2, C: 5, D: 9 };
+  var bands = [['A', 0, cut.B - 1], ['B', cut.B, cut.C - 1], ['C', cut.C, cut.D - 1], ['D', cut.D, null]];
+  var scale = bands.map(function(b){ return '<div class="gp-band' + (b[0] === x.g ? ' on' : '') + '" style="--c:' + (COL[b[0]] || '#475569') + '"><b>' + b[0] + '</b><span>' + esc(NM[b[0]] || '') + '<br>감점 ' + (b[2] == null ? b[1] + ' 이상' : b[1] + '~' + b[2]) + '</span></div>'; }).join('');
+  var open = (window._crRgdOpen === false) ? '' : ' open';
+  var detail = '<details class="cr-rgd"' + open + ' style="border-color:' + col + '55" ontoggle="window._crRgdOpen=this.open">'
+    + '<summary>🏷️ 대응등급 내역 <b style="color:' + col + '">' + x.g + ' · ' + esc(nm) + '</b><span class="cr-rgd-m">감점 합계 ' + x.pts + '점' + (who ? ' · 담당 ' + esc(who) : '') + '</span></summary>'
+    + '<div class="cr-rgd-b"><div class="gp-scale">' + scale + '</div>'
+    + (x.forceD ? '<div class="gp-rule">D 고정 — ' + esc(x.forceD) + ' (감점과 관계없이 D)</div>' : '')
+    + (x.floorC ? '<div class="gp-rule">최소 C — ' + esc(x.floorC) + '</div>' : '')
+    + '<table class="gp-tbl"><thead><tr><th>기준</th><th>데이터 위치</th><th>이 계약</th><th>점수</th></tr></thead><tbody>' + core.map(row).join('') + '</tbody></table>'
+    + (aux.length ? '<div class="gp-sec">보조 신호 · 연체 SOP 1-2장</div><table class="gp-tbl"><tbody>' + aux.map(row).join('') + '</tbody></table>' : '')
+    + (adj.length ? '<div class="gp-sec">조정 · 1~7일차 초기 완화</div><table class="gp-tbl"><tbody>' + adj.map(row).join('') + '</tbody></table>' : '')
+    + '<div class="gp-sum">감점 합계 <b>' + x.pts + '점</b> → <b style="color:' + col + '">' + x.g + '</b>' + (x.rec ? ' · 회의 기록 <b>' + x.rec + '</b> (' + esc(x.recD) + ')' + (x.rec !== x.g ? ' — 자동과 다름' : '') : '') + '</div>'
+    + '<div class="gp-note">1~7일차는 초기 완화 가점 3(연락 두절·[회피]·[거부]면 없음). 12월은 참고 등급이며 09:30 등급 회의에서 팀장이 확정한다. 확정 등급은 대응 상세내용 맨 앞 [A]~[D], 태도는 [성실]·[회피]·[거부]로 적는다. 어느 등급이든 공통 규칙(08~21시, 협박·모욕·제3자 고지 금지)은 같다.</div>'
+    + '</div></details>';
+  return { done: true, badge: badge, box: box, detail: detail };
+}
+function _crRgKey(cno){ return String(cno == null ? '' : cno).trim().replace(/[^0-9A-Za-z\-_.]/g, ''); }
+function crRespGradeBadge(cno){
+  cno = String(cno == null ? '' : cno).trim();
+  var o = crRespGradeInner(cno);
+  if (!o.done) { var tok = (window._crRgTok = (window._crRgTok || 0) + 1), t0 = Date.now(); setTimeout(function(){ crRespGradeWatch(cno, t0, tok); }, 2000); }
+  return '<span id="crRespGradeWrap" data-cno="' + _crRgKey(cno) + '" style="display:inline-flex;align-items:center;gap:4px">' + o.badge + '</span>';
+}
+function crRespGradeBox(cno){
+  cno = String(cno == null ? '' : cno).trim();
+  return '<div id="crRespGradeBoxWrap" data-cno="' + _crRgKey(cno) + '" style="display:contents">' + crRespGradeInner(cno).box + '</div>';
+}
+function crRespGradeDetail(cno){
+  cno = String(cno == null ? '' : cno).trim();
+  return '<div id="crRespGradeDetailWrap" data-cno="' + _crRgKey(cno) + '" style="display:contents">' + crRespGradeInner(cno).detail + '</div>';
+}
+function crRespGradeWatch(cno, t0, tok){
+  if (tok !== window._crRgTok) return;   /* 새 계약 화면이 그려짐 → 이전 확인 중지 */
+  var key = _crRgKey(cno), el = document.getElementById('crRespGradeWrap');
+  if (!el || el.getAttribute('data-cno') !== key) return;
+  var o = crRespGradeInner(cno);
+  if (o.done) {
+    el.innerHTML = o.badge;
+    var bx = document.getElementById('crRespGradeBoxWrap'); if (bx && bx.getAttribute('data-cno') === key) bx.innerHTML = o.box;
+    var dt = document.getElementById('crRespGradeDetailWrap'); if (dt && dt.getAttribute('data-cno') === key) dt.innerHTML = o.detail;
+    return;
+  }
+  if (Date.now() - t0 > 600000) return;   /* 10분까지만 확인 */
+  setTimeout(function(){ crRespGradeWatch(cno, t0, tok); }, 2000);
+}
 function renderContractRecord(c, payments, responses = []) {
   // vacancyRawData에서 매칭 행 찾기 (없으면 빈 객체)
   const __vacRow = (Array.isArray(vacancyRawData) ? vacancyRawData.find(v => String(v.no).trim() === String(c['계약번호']||'').trim()) : null) || {};
@@ -7344,7 +7442,7 @@ function renderContractRecord(c, payments, responses = []) {
             if(co){ const lbl=/연대|보증/.test(String(v.contractInfo||''))?'연대보증인':'공동전차인';
               return n+', '+co+' <span style="font-size:12px;font-weight:700;color:#64748B;vertical-align:2px">('+lbl+')</span>'; }
             return n; })()}</span>
-          <span class="cr-grade ${gradeClass}">${grade}등급</span>
+          ${crRespGradeBadge(c['계약번호'])}   ${''/* [v747] 구 등급(S~F, 계약관리 등급 열) → 대응등급(A~D) 배지 */}
           ${_statusBadge(c['계약상태'])}
           ${String(c['잔여기간']||'').trim()?`<span class="crx-chip">잔여 ${fmt(c['잔여기간'])}</span>`:''}
         </div>
@@ -7357,7 +7455,9 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="crx-stat"><div class="l">누적일수</div><div class="v ${dispCumDays>0?'warn':''}">${dispCumDays}일</div></div>
         ${(function(){var b=parseFloat(String(c['청구수']==null?'':c['청구수']).replace(/[^0-9.]/g,''))||0;var r=(b>0&&isFinite(lateOccurCount))?Math.round(lateOccurCount/b*1000)/10:_lateRateNum(c);return '<div class="crx-stat rate"><div class="l">연체율</div><div class="v">'+(r==null?'—':r.toFixed(1)+'%')+'</div></div>';})()}
         <div class="crx-stat score"><div class="l">점수</div><div class="v" style="${_kcbScore(c)?'':'color:#D1D5DB'}">${_kcbScore(c)||'-'}</div></div>
+        ${crRespGradeBox(c['계약번호'])}   ${''/* [v747] 대응등급 칸 — 헤더 배지와 같은 판정 */}
       </div>
+      ${crRespGradeDetail(c['계약번호'])}   ${''/* [v747] 대응등급 내역 — 등급 내역 팝업과 같은 기준표 */}
     </div>
     <div class="cr-timeline">
       ${(function(){ /* [v531.4] 마커 위치에 현재 연체일수 라벨 표시 — bar만으로 며칠인지 알 수 없던 문제 */
