@@ -10571,7 +10571,7 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-doc-btn" id="dlqVisitBtn" onclick="dlqOpenVisitModal()">🚗 방문대응</button>
           <button class="dlq-doc-btn" id="dlqLegalBtn" onclick="dlqToggleLegalView()" style="background:#059669;color:#fff;border-color:#059669" title="법무 진척 보기 — 내용증명·지급명령·보정명령·기타집행">⚖️ 법무관리</button>
           <button class="dlq-doc-btn" id="dlqEvictConsentBtn" onclick="dlqGenerateEvictConsent()" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d;font-weight:600" title="계약 조항(제9조③ 등) 기반 중도퇴실 절차 개시 통지 문자 생성 — 체크박스로 대상 선택 후 클릭">🚪 강제퇴실권한위임</button>
-          <button class="dlq-doc-btn" id="dlqDailyReportBtn" onclick="dlqOpenDailyReport()" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8;font-weight:700" title="연체 Process(SOP-04-연체 v1.2) 기준 — 연체자마다 타임라인 단계(D+0~D+32)·분기(약속 대기·불이행 · 미수신 확정 · 5-2 강제퇴실)를 판정해 오진선·김영철 당일 대응 지시서 자동 생성">📋 Daily Report</button>
+          <button class="dlq-doc-btn" id="dlqDailyReportBtn" onclick="dlqOpenDailyReport()" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8;font-weight:700" title="연체 SOP v1.4 기준 — 대응등급(A~D)으로 담당 배정(A·B 팀원A · C·D 팀원B · 판정·송무 팀장) · 연체자마다 타임라인 단계(D+0~D+32)·분기(약속 · 미수신 확정 · 6-2 강제퇴실)를 판정해 팀장·팀원A·팀원B 당일 대응 지시서 자동 생성">📋 Daily Report</button>
           <span class="dlq-sel-info" id="dlqSelInfo" style="font-size:11px;color:#6366f1;font-weight:700;white-space:nowrap"></span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -11206,21 +11206,38 @@ function dlqGenerateEvictConsent(){
   win.document.write(html);
   win.document.close();
 }
-// ═══════════ [v658] 연체대응 Daily Report — 연체 Process(SOP-04-연체 v1.2) 기준 자동 지시 ═══════════
-// 매핑: 연체자 1명 = 연체 Process 타임라인의 정확히 한 행(시점) + 분기(약속 대기 · 약속 불이행 · 미수신 확정 · 5-2 강제퇴실 확정)
-//   담당: 오진선 = 팀장 역할 — D+5 판정 · 미수신/약속 불이행 즉시 지급명령 · 내용증명 2차 · 신청 마감 D+20 · 서면 해지 통지(2기 연체 D+31 · 상업 3기 D+61) · 명도(D+32/62) · 분납 승인 · 5-2 ①③⑥
-//         김영철 = 팀원A·B 역할 — D+0 문자 · D+1~2 콜 · 미수신 확정 내용증명 1차 · D+3~4 방문요청 · D+6~10 직접방문 · 퇴실 협의·확약서 · 5-2 ②④⑤
-//   원칙: 미수신 2회면 즉시 법무 · 납부약속은 D+7 이내만(초과는 서면 분납약정+내용증명) · 약속 불이행 당일 지급명령 · 법무는 날짜로 자동 진행 · 약속/분납이 법무 시계를 멈추지 않는다
-//   판정 순서: 종료 → 보정명령(병행) → 5-2 강제퇴실 확정 → 분납중 → 해지·명도(D+31/32 · 상업 D+61/62) → 약속 불이행 → 약속 당일 → 약속 대기 → 미수신 확정(병행) → 타임라인 행
-//   기준 문서: krg-manual-yeonche-sop.html (SOP-04-연체 v1.2, 2026-09-28) · 이전 규칙(연락 1~7일/방문 8~30일/법적 30일+)은 폐기
-window._dlqDrCfg = { amt:1000000, penalty:2500000, ncCount:2, promiseMax:7, evictRes:32, evictCom:62, includeTerminated:false, view:'target', sortKey:null, sortDir:'asc', cardFilter:null, stageFilter:null };
+// ═══════════ [v745] 연체대응 Daily Report — 연체 SOP v1.4 기준 · 플레이어 팀장 / 팀원A / 팀원B (관리자 지시 2026-11-26) ═══════════
+// 담당은 대응등급으로 정한다 — 09:30 등급 회의 확정 등급(대응 상세내용 맨 앞 [A]~[D] 기록) 우선, 없으면 자동 판정(_dlqGradeOf)
+//   A·B = 팀원A(회수 — 서비스 톤, 날짜 특정) · C·D = 팀원B(현장·집행 — 단호한 톤, 방문) · 판정·송무·승인·종료 채권 배분 = 팀장
+//   역할 고정 업무: 팀장 = ~09:30 KCB 조회·등급 회의 · D+5 판정(다음 날 09:30) · 내용증명 전결·지급명령·보정·해지 통지·명도·압류
+//                   팀원A = 내용증명 1차 초안 · 관리비 미납 매일 관리 · 종료 3개월 이내 / 팀원B = D+3~4 독촉장 부착 · 방문 · 6-2 현장 · 집행 입회 · 종료 3개월 초과
+//   원칙: 미수신 2회 확정 → 송무 요청(To-do·Slack) → 팀장 당일 접수 · 납부약속 D+7 이내만 · 약속 불이행 당일 지급명령 · 약속/분납이 법무 시계를 멈추지 않는다
+//         A·B가 미수신 확정·약속 불이행이면 다음 날 C·D 재판정
+//   판정 순서: 종료(4장) → 보정명령(병행) → 6-2 강제퇴실 확정 → 분납 → 해지·명도(D+31/32 · 상업 D+61/62 — 임대료 연체 건만) → 약속 불이행 → 약속 당일 → 약속 대기 → 미수신 확정(병행) → 타임라인 행
+//             (+ 09:30 등급 회의 안건 · 만기 3개월 미만 · 관리비)
+//   기준 문서: krg-manual-yeonche-sop.html (SOP-04-연체 v1.4, 2026-12-01 시행) · 표시 전용 — 원본 시트는 손대지 않음
+window._dlqDrCfg = { amt:1000000, penalty:2500000, ncCount:2, promiseMax:7, evictRes:32, evictCom:62, includeTerminated:false, view:'target', sortKey:null, sortDir:'asc', cardFilter:null, stageFilter:null, gradeFilter:null };
+var _DR_ROLES = ['팀장', '팀원A', '팀원B'];
+var _DR_RK   = { '팀장':'tl', '팀원A':'ta', '팀원B':'tb' };
+var _DR_RCOL = { '팀장':'#b03a2e', '팀원A':'#2a5db0', '팀원B':'#a2700a' };   // 매뉴얼 역할 색과 동일
+var _DR_RBG  = { '팀장':'#fffafa', '팀원A':'#f8fbff', '팀원B':'#fffdf6' };
+var _DR_RLN  = { '팀장':'#f6dcd8', '팀원A':'#dbe7f7', '팀원B':'#f1e4c2' };
+var _DR_RDOT = { '팀장':'🔴', '팀원A':'🔵', '팀원B':'🟠' };
+var _DR_RSUB = { '팀장':'판정·송무', '팀원A':'회수 · A·B', '팀원B':'현장·집행 · C·D' };
+var _DR_TONE   = { A:'서비스', B:'날짜 특정', C:'단호', D:'절차 통보' };
+var _DR_TONE_G = { A:'서비스 마인드 — 안내하고 감사로 끝낸다', B:'친절하되 날짜·금액을 반드시 특정한다', C:'단호하게 기한과 다음 절차를 고지한다', D:'사실만 짧게, 절차 진행을 통보한다' };
+function _drGcol(g){ return (typeof DLQ_GRADE_COL !== 'undefined' && DLQ_GRADE_COL[g]) || ({A:'#6a95dc',B:'#2a5db0',C:'#c9962a',D:'#8a5a05'})[g] || '#94a3b8'; }
+function _drGnm(g){ return (typeof DLQ_GRADE_NM !== 'undefined' && DLQ_GRADE_NM[g]) || ({A:'잠재 고객',B:'관심 필요',C:'위험',D:'다시 거래하지 않을 상대'})[g] || ''; }
 
 function _drParseDt(s){
   var m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
   return m ? new Date(+m[1], +m[2]-1, +m[3]) : null;
 }
+function _drPd(s){ try { var t = (typeof _parseAnyDateCell === 'function') ? _parseAnyDateCell(s) : null; if (t && !isNaN(t)) return t; } catch(_){} return _drParseDt(s); }
 function _drToday(){ var t = new Date(); t.setHours(0,0,0,0); return t; }
-function _drCycleStart(r){ return new Date(_drToday().getTime() - (r.days||0)*86400000); }   // 납기일(D+0) 추정 = 오늘 − 연체일수
+// [v745] 연체일수 — 임대료 연체가 없고 관리비 등만 연체면 그 항목의 연체일수 (대응등급과 같은 기준)
+function _drDays(r){ var a = (typeof _dlqAltOf === 'function') ? _dlqAltOf(r) : null; return a ? (a.days || 0) : (r.days || 0); }
+function _drCycleStart(r){ return new Date(_drToday().getTime() - _drDays(r)*86400000); }   // 납기일(D+0) 추정 = 오늘 − 연체일수
 var _DR_NC_KW = ['부재','두절','무응답','미응답','불통','안받','않받','수신거부','미수신','잠수'];
 function _drRecs(cno){
   if (typeof daeungRawData === 'undefined' || !Array.isArray(daeungRawData)) return [];
@@ -11243,6 +11260,11 @@ function _drLastRec(r){
   var rs = _drRecs(r.cno).filter(_drIsDlqRec);
   rs.sort(function(a,b){ var dd = (typeof cG_dateNum==='function') ? (cG_dateNum(b.date)-cG_dateNum(a.date)) : 0; if (dd) return dd; return (b._idx||0)-(a._idx||0); });
   return rs[0] || null;
+}
+// 이번 연체 사이클 기록 중 대응 상세내용이 패턴과 맞는 것이 있는지 (KCB 조회 · 연장 의사 확인 등)
+function _drSince(r, re){
+  var start = _drCycleStart(r);
+  return _drRecs(r.cno).some(function(d){ var dt = _drParseDt(d.date); if (!dt || dt < start) return false; return re.test(String(d.content||'')); });
 }
 // 법무 상태 — Daily Report 업무하위(내용증명 발송·지급명령·보정명령·도달·확정·기타집행) + 대응내용 키워드(해지 통지·가처분/명도). 소송취하 이후 기록만
 function _drLegal(cno){
@@ -11285,189 +11307,273 @@ function _drEvictConfirmed(r){
   var start = _drCycleStart(r);
   return _drRecs(r.cno).some(function(d){ var dt = _drParseDt(d.date); if (dt && dt < start) return false; return String(d.progress||'').trim() === '강제퇴실확정' || String(d.content||'').indexOf('강제퇴실확정') >= 0; });
 }
-// ── 지시 정의: 액션명 · 우선순위(1 즉시 → 5 관리) · 색(법무 빨강 · 방문/서면 주황 · 콜 파랑 · 판정/승인 보라 · 약속/납부 초록) · 연체 Process 근거 ──
+// [v745] 회의 확정 등급 — 최근 기록(연체일수 기준 7~30일, 대응등급과 같은 창) 대응 상세내용 맨 앞 [A]~[D]
+function _drRecGrade(r){
+  try {
+    var C = _dlqGradeCtx(), recs = C.byNo[String(r.cno||'').trim()] || [], d = _drDays(r);
+    var from = C.T - Math.min(Math.max(d, 7), 30) * 86400000;
+    for (var i = 0; i < recs.length; i++) {
+      var t = _drPd(recs[i].date); if (!t || t.getTime() < from) continue;
+      var m = String(recs[i].content || '').match(/^\s*\[([ABCD])\]/);
+      if (m) return { g:m[1], dt:t, ds:(t.getMonth()+1) + '/' + t.getDate() };
+    }
+  } catch(_){}
+  return null;
+}
+// [v745] 등급 정보 — 담당(owner)은 회의 확정 등급 우선, 없으면 자동 판정
+function _drGradeInfo(r){
+  var x = null; try { x = _dlqGradeOf(r); } catch(_){}
+  var auto = (x && x.g) || '-', rc = _drRecGrade(r), g = rc ? rc.g : auto;
+  return { cno:String(r.cno||'').trim(), auto:auto, rec:rc ? rc.g : '', recDt:rc ? rc.dt : null, recDs:rc ? rc.ds : '', g:g,
+           pts:x ? x.pts : null, forceD:(x && x.forceD) || '', owner:(g === 'C' || g === 'D') ? '팀원B' : '팀원A' };
+}
+// ── 지시 정의: 액션명 · 우선순위(1 즉시 → 5 관리) · 색(법무 빨강 · 방문/서면 주황 · 콜 파랑 · 판정/승인 보라 · 약속/납부 초록) · 연체 SOP v1.4 근거 ──
 var _DR_ACT = {
-  bohum:     { t:'종료 계약 — 보증보험 청구·법적 회수 검토',                       p:3, c:'#4F46E5', g:'종료 계약 연체 — 임대인 직접 협상 대신 보증보험사 청구 경로 검토 (SOP 4장 임대인 문의: 사실만 공유)' },
-  bojeong:   { t:'보정명령 처리 (기한 내 보정서 제출)',                           p:1, c:'#dc2626', g:'법원 보정명령 기한 도과 시 각하 — 법무 트랙 최우선 (SOP 6장)' },
-  ev1:       { t:'5-2 ① 확정·통지 → ③ 해지 통지 준비 → ⑥ 정산·재임대',             p:1, c:'#dc2626', g:'강제퇴실 확정 당일: 진척 기록(사유 A/B)·임대인 통지(회수 약속 금지)·정산 초안 → 해지 요건 도달 즉시 서면 해지 통지(명도 기한 도달+7일) → 명도 완료 +3영업일 정산서·재임대 (SOP 5-2)' },
-  ev2:       { t:'5-2 ② 비밀번호 현황 입수 · ④ 공실 판정 / 퇴실확약서 · ⑤ 비밀번호 변경', p:1, c:'#d97706', g:'비밀번호는 시트 F열→임대인·관리인→작동 확인만(개문 금지) · A 미거주: 공실 판정 3요건 사진·시간 기록 → 점유포기 확인 요청(7일) · B 거주: 퇴실확약서 → 명도확인서 → 즉시 비밀번호 변경 · 점유 중 변경·단전단수·짐 반출 금지 (SOP 5-2 · 법무 확인)', warn:true },
-  haeji:     { t:'서면 해지 통지 — 2기 연체 도달 (명도 기한 = 도달일+7일)',         p:1, c:'#dc2626', g:'내용증명 + 문자·카톡 사본 + 임대인 사본 · 해지 근거(민법 640조/상가 3기)·미납 내역·효력일·명도 기한·잔여물·정산·후속 절차 예고 (SOP 5-2 ③ · 법무 확인)' },
-  md:        { t:'명도 착수 — 점유이전금지가처분 접수',                              p:1, c:'#dc2626', g:'주거용 D+32 · 상업용 D+62: 가처분 접수 → 명도 기한 경과 즉시 명도소송 → 판결 → 강제집행 (SOP 6장 · 5-2 ④-B)' },
-  mdMgmt:    { t:'명도 진행 관리 — 가처분·소송·집행',                              p:2, c:'#dc2626', g:'명도 기한 경과 즉시 소장 → 판결 → 강제집행 신청(집행관 입회) → 집행 완료 직후 비밀번호 변경 (SOP 5-2 ⑤)' },
-  mdPrep:    { t:'명도 소송 서류 준비 · 주 1회 팀장 리뷰',                          p:2, c:'#dc2626', g:'해지 통지 후 명도 기한(도달+7일) 경과 대기 — 가처분·소장 서류 준비 (SOP D+21~31 행)' },
-  brkVisit:  { t:'약속 불이행 — 방문 2차 3영업일 내 · 퇴실확약서 협의 개시',          p:1, c:'#d97706', g:'재약속 금지(서면 분납약정·첫 회차 즉시만) — 타임라인 D+16~20 행으로 점프, D+11~15 단계 생략 (SOP 원칙 6 · 약속 불이행 행)' },
-  brkJi:     { t:'약속 불이행 당일 지급명령 신청',                                  p:1, c:'#dc2626', g:'납부약속으로 지연된 날수만큼 기다리지 않는다 — D+20 마감 대기 없이 당일 접수 (SOP 원칙 6 · 6장)' },
-  brkNae:    { t:'내용증명 1차 즉시 발송 (약속 불이행 · 미발송 건)',                 p:1, c:'#d97706', g:'지급명령과 같이 발송 (SOP 약속 불이행 행)' },
-  payToday:  { t:'약속일 당일 입금 확인 — 17시 마감',                               p:2, c:'#059669', g:'미입금이면 당일 약속 불이행 등록 → 익일 지급명령 신청·방문 2차 (SOP 약속 대기 행)' },
-  promWait:  { t:'약속일 관리 — 약속일 +1일 재확인 콜',                             p:5, c:'#059669', g:'약속을 이유로 D+3~4 방문요청·D+5 판정을 미루지 않는다 (SOP 약속 대기 행)' },
-  naeProm:   { t:'내용증명 1차 즉시 발송 — 약속일 D+7 초과 (납부 기한 = 약속일)',     p:3, c:'#d97706', g:'약속 상한 D+7 초과는 서면 분납약정 전제로만 허용, 내용증명 병행 — 약속이 법무 시계를 멈추지 않는다 (SOP 원칙 6)' },
-  promOver:  { t:'약속 상한 초과 — 서면 분납약정(첫 회차 즉시) 승인 판단',           p:2, c:'#4F46E5', g:'D+8 이후 약속은 팀장 승인·서면 분납약정으로만 (SOP 4장 납부약속)' },
-  bunnap:    { t:'분납 이행 점검 (주 1회) — 미이행 시 즉시 연체 처리 전환',          p:5, c:'#059669', g:'분납 허용 3조건: 총액·회차·날짜 서면 확정 · 첫 회차 즉시 납부 · 자동이체 전환 동의 (SOP 4장 분납 요청)' },
-  bunnapBrk: { t:'분납약정 불이행 — 즉시 연체 처리 전환 · 당일 지급명령 신청',         p:1, c:'#dc2626', g:'분납약정 회차 미입금 = 약속 불이행 — 재약속 금지, 지급명령·방문 2차 즉시 (SOP 4장 분납 요청 · 약속 불이행 행)' },
-  naeNc:     { t:'미수신 2회 확정 — 내용증명 1차 즉시 발송',                        p:2, c:'#d97706', g:'전화 중단 → 납부링크 문자·알림톡 전환 + 내용증명 발송(팀원B 전결) (SOP 원칙 2 · D+2 행)' },
-  jiPrep:    { t:'미수신 확정 — 지급명령 신청 준비 (팀장 보고)',                     p:2, c:'#dc2626', g:'D+2 미수신 2회 확정 즉시 — 계약서·청구내역·내용증명 송달증 준비 (SOP D+2 행)' },
-  jiNc:      { t:'미수신 건 지급명령 신청 접수 (D+3~5)',                            p:2, c:'#dc2626', g:'전화를 받지 않는 상대에게도 법원 서류는 송달된다 — 전자소송 접수 (SOP 원칙 2 · D+3~4 행)' },
-  d0:        { t:'D+0 — 17시 입금 마감 확인 → 미납 시 당일 문자 1차',                p:4, c:'#2563eb', g:'납기일 입금 미확인 → 미납 등록 (SOP D+0 행)' },
-  d1:        { t:'D+1 — 1차 전화: 납부일 확정 받기 (부재 시 문자+재콜 예약)',          p:4, c:'#2563eb', g:'골든타임 D+1~3 · 약속일은 D+7 이내 특정 날짜로만, 통화결과·약속일 기록 (SOP 원칙 1·6 · D+1 행)' },
-  d2:        { t:'D+2 — 2차 전화(시간대 변경) + 납부링크 문자·알림톡 전환',            p:4, c:'#2563eb', g:'미수신 횟수 기록 — 2회 누적이면 즉시 법무 (SOP D+2 행)' },
-  d2nc:      { t:'D+2 — 미수신 2회 확정: 전화 중단 → 납부링크 문자·알림톡 → 익일 비상연락처', p:3, c:'#2563eb', g:'채널전환 준수율 KPI 100% (SOP 4장 미수신 2회)' },
-  visitReq:  { t:'D+3~4 — 방문 1차: 방문요청 (독촉장 부착 · 사진 기록)',              p:3, c:'#d97706', g:'D+3부터는 발과 서류다 — 부착 사진 당일 기록 (SOP 원칙 4 · D+3~4 행)' },
-  d34call:   { t:'D+3~4 — 통화 성사 건 납부일 관리 · 비상연락처·공동계약자 통지',      p:4, c:'#2563eb', g:'공동계약은 전원 동시 통지(1인 통화로 종결 금지) (SOP 4장)' },
-  judge:     { t:'D+5 판정 (17시) — 회수 완료 / 문제 계약자 분류',                   p:2, c:'#4F46E5', g:'체크리스트: 미수신 2회↑ · 비상연락처 불통 · 납부일 미특정 · 약속 불이행 · 2개월↑ 누적 · 고위험 심사 플래그 → 해당 시 방문·법무 트랙 가동 (SOP 5장)' },
-  feeNotice: { t:'D+5 — 연체료 부과 안내',                                         p:4, c:'#2563eb', g:'연체료는 예외 없이 전건 자동 부과(면제는 팀장 승인) (SOP 6장 운영 규칙)' },
-  visit2:    { t:'D+6~10 — 방문 2차 직접방문: 대면 수납·분납 확정 / 미거주·결렬 시 강제퇴실 확정', p:3, c:'#d97706', g:'방문 결과·거주여부 당일 Daily Report 사진·시간 기록 · 강제퇴실 확정 시 5-2 세부 액션 개시 (SOP D+6~10 행 · 5장)' },
-  nae1:      { t:'D+6~10 — 내용증명 1차 (미발송 잔여 건)',                          p:3, c:'#d97706', g:'미납 금액·납부 기한(7일)·미이행 시 조치 예고 · 팀원B 전결 (SOP 6장 내용증명 1차)' },
-  bunnapOffer:{ t:'D+6~10 — 분납약정 제안(자동이체 전환 조건) · 임대인 상황 공유',     p:5, c:'#4F46E5', g:'분납 3조건 충족 시 팀장 승인 (SOP D+6~10 행)' },
-  exitTalk:  { t:'D+11~15 — 퇴실 협의 개시: 합의퇴실 조건 제시',                     p:3, c:'#d97706', g:'협의 내용·사진 기록 (SOP D+11~15 행)' },
-  nae2:      { t:'D+15 — 내용증명 2차: 계약해지 예고 + 퇴실 요구 + 법적조치 예고',    p:2, c:'#dc2626', g:'1차 발송 증빙 첨부 · 팀장 승인 (SOP 6장 내용증명 2차)' },
-  exitClose: { t:'D+16~20 — 합의퇴실/자진퇴실 협의 마감 (퇴실확약서)',               p:2, c:'#d97706', g:'퇴실확약서 필수 항목: 퇴실일 · 명도확인·비밀번호 변경 동의 · 잔여물 포기 · 정산 합의 · 불이행 시 법적 절차 동의 (SOP 5-2 ④-B)' },
-  jiDead:    { t:'D+16~20 — 지급명령 신청 마감 (전건)',                              p:1, c:'#dc2626', g:'미신청 건 전부 접수 · 신청일·사건번호 기록 (SOP D+16~20 행)' },
-  jiSongdal: { t:'기신청 지급명령 송달 확인',                                       p:3, c:'#dc2626', g:'송달 → 도달 기록 → 이의기간 경과 확인 (SOP 6장)' },
-  jiLate:    { t:'지급명령 즉시 신청 — 마감 D+20 경과',                              p:1, c:'#dc2626', g:"'검토 중' 금지 — 기한 도래 시 팀장 승인 하에 예외 없이 진행 (SOP 원칙 5)" },
-  evJi:      { t:'강제퇴실 확정 — 지급명령 즉시 신청 (미신청 건)',                    p:1, c:'#dc2626', g:'회수 트랙(지급명령 → 확정 → 계좌압류)과 명도 트랙(해지 통지 → 가처분 → 명도소송)은 병행 (SOP 5-2 ① · 6장)' },
-  hwakWait:  { t:'지급명령 도달 — 이의기간(2주) 경과 확인 → 확정',                   p:3, c:'#dc2626', g:'이의신청 시 본안 소송 전환 → 법무 위임 판단 (SOP 6장)' },
-  exec:      { t:'지급명령 확정 — 집행 준비(계좌압류) · 분납약정 서면화 · 명도 서류 준비', p:2, c:'#dc2626', g:'계좌압류(반환보증금·급여·예금) 우선, 유체동산은 실익 확인 후 · 주 1회 팀장 리뷰 (SOP D+21~31 행 · 6장)' },
-  etcMgmt:   { t:'기타집행 진행 관리',                                             p:2, c:'#dc2626', g:'압류·추심·명도 — 사건별 법무 확인 후 진행 (SOP 6장 운영 규칙 ③)' },
-  focus:     { t:'고액 — 집중 협의 · 연체패턴 기록',                                p:4, c:'#4F46E5', g:'고액(연체금액·위약금 기준 이상)은 팀장이 직접 납부계획 협의 (운영매뉴얼 SOP04 연체패턴관리)' },
-  ohKcb:     { t:'KCB 조회·등급 정리(A~E) → 김영철 전달',                            p:5, c:'#4F46E5', g:'D+1~3 신규 연체 — 법무관리 7단계 ② CB조회 · D+5 판정 참고자료 (운영매뉴얼 SOP04 법무관리)' }
+  // ── 팀장 · 판정 ──
+  mtg:       { t:'09:30 등급 회의',                                                     p:2, c:'#4F46E5', g:'~09:30 KCB 조회(전날 미납자 전건 · 공동계약자 각각) → 등급 회의에서 근거 제시·배정(A·B 팀원A / C·D 팀원B) → 확정 등급은 대응 상세내용 맨 앞 [A]~[D]로 기록 (SOP 1-2장 · 8장 일일 리듬)' },
+  // ── 팀장 · 송무 ──
+  bojeong:   { t:'보정명령 처리 — 기한 내 보정서 제출',                                    p:1, c:'#dc2626', g:'보정 기한 도과 시 각하 — 받는 즉시 Slack 공유 · 전자소송 현황 갱신 (SOP 4-2 ⑧ · 7장 운영 규칙 ④)' },
+  ncLegal:   { t:'미수신 2회 확정 — 내용증명 1차 전결·발송 + 지급명령 신청',                    p:2, c:'#dc2626', g:'송무 요청 당일 접수 — 전화를 받지 않는 상대에게도 법원 서류는 송달된다 · 내용증명 1차는 팀원A 초안·팀장 전결 · 지급명령은 미수신 건 D+3~5 접수 (SOP 원칙 2 · 3장 D+2·D+3~4 행 · 7장)' },
+  brkJi:     { t:'약속 불이행 당일 지급명령 신청',                                          p:1, c:'#dc2626', g:'D+20 마감을 기다리지 않는다 · 내용증명 미발송 건은 같이 발송 (SOP 원칙 6 · 3장 약속 불이행 행 · 7장)' },
+  promOver:  { t:'약속 상한 초과 — 서면 분납약정 승인 판단',                                 p:2, c:'#4F46E5', g:'약속일 D+8 이후는 팀장 승인·서면 분납약정(첫 회차 즉시)으로만, 내용증명 1차 병행(납부 기한 = 약속일) — 약속이 법무 시계를 멈추지 않는다 (SOP 원칙 6 · 5장 납부약속)' },
+  nae1:      { t:'D+6~10 — 내용증명 1차 전결·발송 (미발송 잔여 건)',                          p:3, c:'#d97706', g:'미납 금액·납부 기한(7일)·미이행 시 조치 예고 · 팀원A 초안 → 팀장 전결 (SOP 3장 D+6~10 행 · 7장)' },
+  nae2:      { t:'D+15 — 내용증명 2차: 계약해지 예고 + 퇴실 요구 + 법적조치 예고',              p:2, c:'#dc2626', g:'1차 발송 증빙 첨부 (SOP 3장 D+11~15 행 · 7장)' },
+  jiDead:    { t:'D+16~20 — 지급명령 신청 마감 (전건)',                                     p:1, c:'#dc2626', g:'미신청 건 전부 접수 · 신청일·사건번호 기록 (SOP 3장 D+16~20 행)' },
+  jiLate:    { t:'지급명령 즉시 신청 — 마감 D+20 경과',                                      p:1, c:'#dc2626', g:"'검토 중' 금지 — 기한 도래 시 예외 없이 진행 (SOP 원칙 5)" },
+  jiSongdal: { t:'기신청 지급명령 송달 확인',                                              p:3, c:'#dc2626', g:'송달 → 도달 기록 → 이의기간 경과 확인 · 미도달이면 법원에 송달 상태 확인 (SOP 4-2 ⑥ · 7장)' },
+  hwakWait:  { t:'지급명령 도달 — 이의기간(2주) 경과 확인 → 확정',                           p:3, c:'#dc2626', g:'이의신청 시 본안 소송 전환 → 법무 위임 판단 (SOP 7장)' },
+  exec:      { t:'지급명령 확정 — 계좌압류 신청 · 분납약정 서면화 · 명도 서류 준비',              p:2, c:'#dc2626', g:'계좌압류(반환보증금·급여·예금) 우선, 유체동산은 실익 확인 후(현장 입회 팀원B) · 주 1회 팀장 리뷰 (SOP 3장 D+21~31 행 · 7장)' },
+  etcMgmt:   { t:'기타집행 진행 관리',                                                    p:2, c:'#dc2626', g:'압류·추심·명도 — 사건별 법무(자문 변호사) 확인 후 진행 (SOP 7장 운영 규칙 ③)' },
+  haeji:     { t:'서면 해지 통지 — 2기 연체 도달 (명도 기한 = 도달일+7일)',                    p:1, c:'#dc2626', g:'내용증명 + 문자·카톡 사본 + 임대인 사본 · 해지 근거·미납 내역·효력일·명도 기한·잔여물·정산·후속 절차 예고 (SOP 6-2 ③ · 7장 · 법무 확인)' },
+  md:        { t:'명도 착수 — 점유이전금지가처분 접수',                                      p:1, c:'#dc2626', g:'주거용 D+32 · 상업용 D+62: 가처분 접수 → 명도 기한 경과 즉시 명도소송 → 판결 → 강제집행(현장 입회 팀원B) (SOP 3장 D+32 행 · 7장)' },
+  mdMgmt:    { t:'명도 진행 관리 — 가처분·소송·집행 기일',                                    p:2, c:'#dc2626', g:'명도 기한 경과 즉시 소장 → 판결 → 강제집행 신청(집행관 입회) · 기일이 잡히면 팀원B 입회 배정 (SOP 6-2 ④-B · 7장)' },
+  mdPrep:    { t:'명도 소송 서류 준비 · 주 1회 팀장 리뷰',                                   p:2, c:'#dc2626', g:'해지 통지 후 명도 기한(도달+7일) 경과 대기 — 가처분·소장 서류 준비 (SOP 3장 D+21~31 행)' },
+  ev1:       { t:'6-2 ① 강제퇴실 확정 기록(사유 A/B)·정산 초안 → ③ 해지 통지 → ⑥ 부족분 지급명령', p:1, c:'#dc2626', g:'확정 즉시 전화 트랙 종료 — 서면·법무·현장만 · 임대인 통지·협의·청소·종료 처리는 운영팀(회수 약속 금지, 사실만) · 명도 완료 +3영업일 정산서 (SOP 6-2)' },
+  evJi:      { t:'강제퇴실 확정 — 지급명령 즉시 신청 (미신청 건)',                             p:1, c:'#dc2626', g:'회수 트랙(지급명령 → 확정 → 계좌압류)과 명도 트랙(해지 통지 → 가처분 → 명도소송)은 병행 (SOP 6-2 ① · 7장)' },
+  endJi:     { t:'종료 채권 — 완납 약속 불이행: 위약벌 포함 지급명령 접수',                      p:2, c:'#dc2626', g:'밀린 월세·잔여 서비스 수수료·위약벌·공과금 합산 청구 (SOP 4-2 ④⑤)' },
+  endProm:   { t:'종료 약속자 날짜 관리',                                                 p:3, c:'#059669', g:'약속일 입금 확인 — 불이행이면 위약벌 포함 지급명령 (SOP 4장 담당 · 4-2 ⑤)' },
+  endMove:   { t:'종료 3개월 경계 — 팀원B 이관',                                           p:3, c:'#4F46E5', g:'종료일 +3개월이 지나는 날 To-do 시트 담당 변경 · 마지막 대응 기록 후 이관 (SOP 4장 담당)' },
+  // ── 등급 담당 (A·B 팀원A / C·D 팀원B) ──
+  d0:        { t:'D+0 — 17시 입금 마감 확인 → 미납 시 당일 문자 1차',                         p:4, c:'#2563eb', g:'입금 확인·미납 문자는 팀원A·B 공동 — 현장 나간 사람 몫은 남은 사람 · 미납 등록 (SOP 3장 D+0 행)' },
+  d1:        { t:'D+1 — 1차 전화: 납부일 확정 받기 (부재 시 문자+재콜 예약)',                    p:4, c:'#2563eb', g:'골든타임 D+1~3 · 약속일은 D+7 이내 특정 날짜로만 · 통화결과·약속일·등급 기록 (SOP 원칙 1·6 · 3장 D+1 행)' },
+  d2:        { t:'D+2 — 2차 전화(시간대 변경) + 납부링크 문자·알림톡 전환',                     p:4, c:'#2563eb', g:'미수신 횟수 기록 — 2회 누적이면 당일 팀장에게 송무 요청 (SOP 3장 D+2 행)' },
+  d2nc:      { t:'D+2 — 미수신 2회 확정: 전화 중단 → 납부링크 문자·알림톡 → 송무 요청',            p:3, c:'#2563eb', g:"To-do 시트 '송무 요청' 행 + Slack으로 팀장 이관 · 다음 날 비상연락처 · A·B였으면 다음 날 C·D 재판정 · 채널전환 준수율 100% (SOP 3장 D+2 행 · 5장 미수신 2회)" },
+  d2ncL:     { t:'D+2 — 미수신 2회 확정: 전화 중단 → 납부링크 문자·알림톡 (법무 기진행)',                  p:3, c:'#2563eb', g:'내용증명·지급명령이 이미 진행 중 — 다음 날 비상연락처 · 채널전환 준수율 100% (SOP 3장 D+2 행 · 5장 미수신 2회)' },
+  srReq:     { t:"미수신 2회 확정 — 송무 요청 (To-do '송무 요청' + Slack)",                     p:3, c:'#2563eb', g:'전화 중단 → 납부링크 문자·알림톡 유지 · 비상연락처 통지 · 팀장 당일 접수 (SOP 원칙 2 · 3장 D+2 행)' },
+  d34call:   { t:'D+3~4 — 통화 성사 건 납부일 관리 · 비상연락처·공동계약자 통지',                 p:4, c:'#2563eb', g:'공동계약은 전원 동시 통지(1인 통화로 종결 금지) (SOP 3장 D+3~4 행 · 5장)' },
+  feeNotice: { t:'D+5 — 연체료 부과 안내 문자 · 17시 입금 마감 확인',                          p:4, c:'#2563eb', g:'연체료는 예외 없이 전건 자동 부과(면제는 팀장 승인) · 미회수 건은 다음 날 09:30 등급 회의에서 판정 (SOP 3장 D+5 행 · 7장 운영 규칙 ①)' },
+  promWait:  { t:'약속일 관리 — 약속일 +1일 재확인 콜',                                       p:5, c:'#059669', g:'약속을 이유로 D+3~4 방문요청·D+5 판정을 미루지 않는다 (SOP 원칙 3 · 3장 약속 대기 행)' },
+  payToday:  { t:'약속일 당일 입금 확인 — 17시 마감',                                        p:2, c:'#059669', g:"미입금이면 다음 날 재확인 콜 → 미입금 시 '약속 불이행' 등록 → 팀장 송무 요청 (SOP 3장 약속 대기 행)" },
+  brkCall:   { t:'약속 불이행 — 재약속 금지 · 서면 분납약정(첫 회차 즉시) 또는 절차 진행 고지',      p:1, c:'#d97706', g:"재확인 콜 미입금 → '약속 불이행' 등록 → 팀장 송무 요청(To-do·Slack) · A·B였으면 다음 날 C·D 재판정 (SOP 3장 약속 불이행 행 · 5장)" },
+  bunnap:    { t:'분납 이행 점검 (주 1회) — 회차 미입금 시 즉시 연체 처리 전환',                   p:5, c:'#059669', g:'분납 허용 3조건: 총액·회차·날짜 서면 확정 · 첫 회차 즉시 납부 · 자동이체 전환 동의 — 접수 팀원A · 승인 팀장 (SOP 5장 분납 요청)' },
+  bunnapBrk: { t:'분납 회차 불이행 — 재약속 금지 · 절차 진행 고지',                            p:1, c:'#dc2626', g:'분납 회차 미입금 = 약속 불이행 — 팀장 당일 지급명령 · 팀원B 방문 2차 (SOP 5장 · 3장 약속 불이행 행)' },
+  abInstall: { t:'D+6~10 — 분납약정 제안(자동이체 전환 조건) · 임대인 상황 공유',                p:4, c:'#059669', g:'A·B로 남은 건만 팀원A — 분납 3조건 충족 시 팀장 승인 · 임대인에게는 사실만(회수 약속 금지) (SOP 3장 D+6~10 행 · 5장)' },
+  exitTalk:  { t:'D+11~15 — 퇴실 협의 개시: 합의퇴실 조건 제시',                              p:3, c:'#d97706', g:'협의 내용·사진 기록 · 협의는 등급 담당(대부분 팀원B) (SOP 3장 D+11~15 행)' },
+  exitClose: { t:'D+16~20 — 합의/자진퇴실 협의 마감 (퇴실확약서)',                            p:2, c:'#d97706', g:'퇴실확약서 필수 항목: 퇴실일 · 명도확인·비밀번호 변경 동의 · 잔여물 소유권 포기 · 미납 정산 합의 · 불이행 시 법적 절차 동의 — 표준 양식만 (SOP 3장 D+16~20 행 · 6-2 ④-B · 7장 운영 규칙 ②)' },
+  expiry:    { t:'만기 3개월 미만 — 연장 의사 확인',                                         p:4, c:'#2563eb', g:'연장하지 않거나 위험하면 운영팀(관리 담당) 공유 → 만기 퇴실 통보(퇴실일·정산 안내) · 판단은 09:30 등급 회의 · 연장 여부와 통보일 기록 (SOP 5장)' },
+  follow:    { t:'납부일 관리 · 통화 결과 기록',                                            p:5, c:'#2563eb', g:'7개 진척 값 · 등급 표기로 당일 기록 (SOP 9장)' },
+  // ── 팀원A 고정 ──
+  naeDraft:  { t:'내용증명 1차 초안 → 팀장 전결',                                           p:3, c:'#d97706', g:'등급과 관계없이 내용증명 1차 초안은 팀원A가 쓴다 — C·D 건도 초안만 팀원A, 전화·방문은 그대로 팀원B · 미납 금액·납부 기한(7일)·미이행 시 조치 예고 · 계약서·연체 내역 첨부 → 팀장 전결·발송 (SOP 7장)' },
+  mgmtFee:   { t:'미납 매일 관리 — 입금 확인·안내 문자 · 결과 기록',                                 p:4, c:'#059669', g:'관리비·변동관리비 미납 매일 점검 — 팀원A 성과 지표 (SOP 8장 R&R · 9장 KPI)' },
+  endA:      { t:'종료 3개월 이내 — 문자 먼저 → 관리비·공과금·청소비 미납 → 약속 건 체크',          p:3, c:'#2563eb', g:'매일 대응 순서: 관리비·공과금·청소비 미납자 먼저 → 약속(입금 예정일) 건 → CB 순 · 내용증명·지급명령 필요 건은 팀장 보고 (SOP 4장 · 4-2 ①)' },
+  // ── 팀원B 고정 ──
+  visitReq:  { t:'D+3~4 — 방문 1차: 독촉장 부착 (사진 기록)',                                  p:3, c:'#d97706', g:'현장팀 요청이 기본, 결과 확인은 팀원B · 부착 사진 당일 기록 · 약속 건도 예정대로 (SOP 원칙 4 · 3장 D+3~4 행)' },
+  visit2:    { t:'D+6~10 — 방문 2차 직접방문(주 1회 방문일): 대면 수납·분납 제안 / 미거주·결렬 → 팀장 강제퇴실 확정', p:3, c:'#d97706', g:'방문 결과·거주여부 당일 Daily Report 사진·시간 기록 · 분납 승인 팀장 · 준비물: 안내문 2부·연체 내역서·휴대폰·신분증 (SOP 3장 D+6~10 행 · 6장)' },
+  brkVisit:  { t:'약속 불이행 — 방문 2차 3영업일 내 · 퇴실확약서 협의 개시',                     p:1, c:'#d97706', g:'타임라인 D+16~20 행으로 점프(D+11~15 생략) (SOP 3장 약속 불이행 행 · 5장)' },
+  ev2:       { t:"6-2 ① 운영팀 '강제퇴실 업무 요청' · ② 비밀번호 현황 입수 · ④ 공실 판정/퇴실확약서 · ⑤ 명도 시점 비밀번호 변경", p:1, c:'#d97706', g:'비밀번호는 시트 F열→임대인·관리인→작동 확인만(개문 금지) · 미거주: 공실 판정 3요건 사진·시간 기록 → 점유포기 확인 요청(7일) · 거주: 퇴실확약서 → 명도확인서 → 즉시 비밀번호 변경 · 점유 중 변경·단전단수·짐 반출 금지 (SOP 6-2 · 법무 확인)', warn:true },
+  mdSite:    { t:'명도 집행 입회 준비 — 기일 확인 · 집행 완료 직후 비밀번호 변경',                  p:2, c:'#d97706', g:"가처분 집행·명도 강제집행 현장 입회 → 운영팀에 '강제퇴실 업무 요청' (SOP 6-2 ⑤ · 7장 운영 규칙 ④)" },
+  endB:      { t:'장기 종료 채권 — 소재 확인·방문 (월 2~3회, 송달 진척 연동)',                     p:4, c:'#d97706', g:'한 달 계획을 세워 몰아서 방문 · 송달 전 방문은 효과가 작다 · 최종 주소지가 확인되면 바로 (SOP 4장 담당 · 6장 방문 운영)' }
 };
-Object.keys(_DR_ACT).forEach(function(k){ _DR_ACT[k].id = k; });   // 액션 식별자 (문구 치환 extra가 붙어도 유지)
-// 연체자 1명 → [{who, act, seg}] (seg = 연체 Process 타임라인 행/분기 라벨)
+// 대상자별 표의 짧은 이름 (전체 문구·근거는 마우스오버 · 담당자별 지시서·인쇄에는 전체 문구)
+var _DR_SHORT = {
+  mtg:'09:30 등급 회의', bojeong:'보정명령 처리(기한 내)', ncLegal:'내용증명 1차 전결 + 지급명령', brkJi:'불이행 당일 지급명령', promOver:'약속 상한 초과 — 분납약정 승인',
+  nae1:'내용증명 1차 전결', nae2:'내용증명 2차(해지 예고)', jiDead:'지급명령 신청 마감', jiLate:'지급명령 즉시 신청', jiSongdal:'지급명령 송달 확인', hwakWait:'이의기간 경과 → 확정',
+  exec:'확정 → 계좌압류 신청', etcMgmt:'기타집행 관리', haeji:'서면 해지 통지', md:'명도 착수 — 가처분 접수', mdMgmt:'명도 진행 관리', mdPrep:'명도 서류 준비',
+  ev1:'6-2 확정 기록·정산 초안·해지 통지', evJi:'지급명령 즉시 신청', endJi:'위약벌 포함 지급명령', endProm:'종료 약속자 날짜 관리', endMove:'3개월 경계 → 팀원B 이관',
+  d0:'17시 마감 확인 → 문자 1차', d1:'1차 전화 — 납부일 확정', d2:'2차 전화 + 납부링크 문자', d2nc:'전화 중단 → 링크 문자 → 송무 요청', d2ncL:'전화 중단 → 링크 문자(법무 진행 중)', srReq:'송무 요청(To-do·Slack)',
+  d34call:'납부일 관리 · 비상연락처 통지', feeNotice:'연체료 안내 문자', promWait:'약속일 +1 재확인 콜', payToday:'약속 당일 입금 확인(17시)', brkCall:'불이행 — 재약속 금지·절차 고지',
+  bunnap:'분납 이행 점검(주 1회)', bunnapBrk:'분납 불이행 — 절차 고지', abInstall:'분납 제안 · 임대인 공유', exitTalk:'퇴실 협의 개시', exitClose:'퇴실확약서 마감',
+  expiry:'만기 — 연장 의사 확인', follow:'납부일 관리 · 기록', naeDraft:'내용증명 1차 초안', mgmtFee:'매일 관리(입금 확인·문자)', endA:'종료 3개월 이내 매일 대응',
+  visitReq:'독촉장 부착(사진)', visit2:'직접방문(주 1회 방문일)', brkVisit:'방문 2차 3영업일 내', ev2:'6-2 업무 요청·비밀번호 현황·공실 판정', mdSite:'명도 집행 입회 준비', endB:'장기 채권 소재·방문'
+};
+Object.keys(_DR_ACT).forEach(function(k){ _DR_ACT[k].id = k; _DR_ACT[k].s = _DR_SHORT[k] || _DR_ACT[k].t; });   // 액션 식별자 (문구 치환 extra가 붙어도 유지)
+// 연체자 1명 → [{who:'팀장'|'팀원A'|'팀원B', act, seg}] (seg = 연체 Process 타임라인 행/분기 라벨)
 function _drClassify(r, cfg){
   var out = [];
   var push = function(who, act, seg, extra){ out.push({ who:who, act:(extra ? Object.assign({}, act, extra) : act), seg:seg }); };
-  var days = r.days || 0, amt = r.amt || 0;
+  var days = _drDays(r);
   var legal = _drLegal(r.cno), nc = _drMissedCount(r), pr = _drPromise(r), last = _drLastRec(r);
   var pen = (typeof _dlqPenalty === 'function' ? _dlqPenalty(r.cno) : 0) || 0;
   var terminated = (r.contractStatus||'계약중') !== '계약중';
-  var bunnap = String(r.연체구분||'') === '분납중' || !!(last && String(last.progress||'').trim() === '분납');
-  var important = amt >= cfg.amt || pen >= cfg.penalty;   // 고액 기준 (등급은 우선순위 No의 중요도에 반영)
+  var alt = (typeof _dlqAltOf === 'function') ? _dlqAltOf(r) : null;
+  var bunnap = String(alt ? alt.gb : (r.연체구분||'')) === '분납중' || !!(last && String(last.progress||'').trim() === '분납');
+  var altOnly = !!alt;   // 임대료 연체 없이 관리비·기타 항목만 연체 — 차임 2기 연체(해지·명도) 요건과 무관하므로 해지·명도 행은 쓰지 않는다
+  var mgmtOnly = altOnly && /관리비/.test(String(r.altType||''));
+  var gi = _drGradeInfo(r), owner = gi.owner, ab = owner === '팀원A';
+  var own = function(act, seg, extra){ push(owner, act, seg, Object.assign({ tone:gi.g }, extra || {})); };   // 등급 담당 — 등급별 말투 칩
   var isCom = /상업|상가/.test(_drUseType(r.cno));
   var evictDay = isCom ? cfg.evictCom : cfg.evictRes, haejiDay = evictDay - 1;
+  var ncConf = nc >= cfg.ncCount && days >= 2;
+  var evict = !terminated && _drEvictConfirmed(r);
+  var start = _drCycleStart(r);
+  var md = pr.dateStr ? pr.dateStr.slice(5) : '';   // 약속일 MM/DD
+  var naeDraft = false;   // 팀원A 내용증명 1차 초안 필요
+  // ── 09:30 등급 회의 안건 (팀장) ──
+  var mtg = [];
+  if (!terminated) {
+    if (days >= 1 && days <= 3 && !_drSince(r, /KCB/i)) mtg.push(days === 1 ? 'KCB 조회 → 등급 확정' : 'KCB 미조회 → 조회 후 등급 확정');
+    if (gi.rec && gi.auto !== '-' && gi.rec !== gi.auto) mtg.push('재확인 — 자동 ' + gi.auto + ' ↔ 회의 ' + gi.rec);
+    if (ab && !evict && (ncConf || pr.state === 'broken')) mtg.push('C·D 재판정 — ' + (pr.state === 'broken' ? (bunnap ? '분납 회차 불이행' : '약속 불이행') : '미수신 ' + nc + '회 확정'));
+    else if (ab && !evict && !bunnap && days >= 6 && !(gi.recDt && gi.recDt.getTime() >= start.getTime() + 5 * 86400000)) mtg.push(days <= 10 ? 'D+5 판정 — 미회수 → 문제 계약자(C·D) 체크리스트' : 'D+5 판정 미기록 — A·B 유지 근거 확인 또는 C·D 전환');
+    if (gi.forceD === '첫 납부 연체' && gi.rec !== 'D') mtg.push('첫 납부 연체 — D 판정 · 형사 고소 검토 여부(6-3)');
+  }
+  var ee = terminated ? null : (typeof _dlqEndExit === 'function' ? _dlqEndExit(r.cno, r.contractStatus) : null);
+  // 만기 3개월 미만 연체자 — 해지·명도 단계 이전(6-2·D+31~ 제외)이고 이번 사이클에 연장 의사 기록이 없을 때만 (5장)
+  var expSoon = !!(ee && ee.kind === '만기' && !ee.fallback && ee.dday >= 0 && ee.dday < 90) && !evict && (altOnly || days < haejiDay)
+    && !_drSince(r, /(계약|만기)\s*(연장|갱신)|연장\s*(의사|희망|예정|안\s*함|안\s*한|하지|않|불가|거절)|재계약|만기\s*퇴실|퇴실\s*통보/);
+  if (expSoon) mtg.push('만기 D-' + ee.dday + ' — 연장/만기 퇴실 판단');
   var fin = function(){
-    if (!out.some(function(o){ return o.seg !== '법무'; })) push('김영철', _DR_ACT.d34call, 'D+' + days);   // 폴백(타임라인 행 없음)
-    if (important && !out.some(function(o){ return o.who === '오진선'; })) push('오진선', _DR_ACT.focus, '중요');
-    if (legal.etc && !out.some(function(o){ return o.act.id === 'etcMgmt'; })) push('오진선', _DR_ACT.etcMgmt, '법무');
-    var first = out.find(function(o){ return o.seg !== '법무' && o.seg !== '중요'; }) || out[0];   // 대표 단계 = 분기 판정 순서상 첫 타임라인/분기 라벨
+    if (expSoon) own(_DR_ACT.expiry, '만기', { t:'D-' + ee.dday + ' — 연장 의사 확인 (연장 안 함·위험 → 운영팀 공유·만기 퇴실 통보)', s:'D-' + ee.dday + ' 연장 의사 확인' });
+    if (mgmtOnly && !ab && !evict && !terminated) push('팀원A', _DR_ACT.mgmtFee, '관리비');   // 관리비만 연체 — 팀원A 매일 관리(성과 지표) · 임대료와 함께 연체면 등급 담당이 함께 대응(상태 칸 칩)
+    if (naeDraft && !legal.nae) push('팀원A', _DR_ACT.naeDraft, '법무');
+    var sr = out.find(function(o){ return o.who === '팀원A' && (o.act.id === 'srReq' || o.act.id === 'd2nc'); }), nd = out.find(function(o){ return o.who === '팀원A' && o.act.id === 'naeDraft'; });
+    if (sr && nd) { sr.act = Object.assign({}, sr.act, { t:sr.act.t + ' + 내용증명 1차 초안', s:sr.act.s + ' + 내용증명 초안' }); out.splice(out.indexOf(nd), 1); }
+    if (legal.etc && !out.some(function(o){ return o.act.id === 'etcMgmt'; })) push('팀장', _DR_ACT.etcMgmt, '법무');
+    if (!out.some(function(o){ return ['법무','관리비','만기'].indexOf(o.seg) < 0; })) own(_DR_ACT.follow, 'D+' + days);   // 폴백(타임라인 행 없음)
+    if (mtg.length) out.unshift({ who:'팀장', act:Object.assign({}, _DR_ACT.mtg, { t:'09:30 등급 회의 — ' + mtg.join(' · '), s:mtg.join(' · ') }), seg:'등급 회의' });
+    var first = out.find(function(o){ return ['법무','등급 회의','관리비','만기'].indexOf(o.seg) < 0; }) || out[0];   // 대표 단계 = 분기 판정 순서상 첫 타임라인/분기 라벨
     var stage = first.seg;
-    return out.map(function(o){ o.nc = nc; o.pen = pen; o.pr = pr; o.legal = legal; o.evictDay = evictDay; o.stage = stage; return o; });
+    return out.map(function(o){ o.nc = nc; o.pen = pen; o.pr = pr; o.legal = legal; o.evictDay = evictDay; o.stage = stage; o.gi = gi; o.days = days; o.ee = ee; return o; });
   };
   var legalTrack = function(seg){   // 기신청 지급명령 추적 — 송달 → 도달(이의기간) → 확정(집행)
-    if (legal.ji) push('오진선', legal.hwak ? _DR_ACT.exec : (legal.dodal ? _DR_ACT.hwakWait : _DR_ACT.jiSongdal), seg);
+    if (legal.ji) push('팀장', legal.hwak ? _DR_ACT.exec : (legal.dodal ? _DR_ACT.hwakWait : _DR_ACT.jiSongdal), seg);
   };
-  var legalMgmt = function(seg, deadAct){   // 지급명령 미신청이면 마감/즉시 신청, 기신청이면 추적 (타임라인과 병행)
-    if (legal.ji) legalTrack(seg);
-    else push('오진선', deadAct || _DR_ACT.jiLate, seg);
+  var legalMgmt = function(seg, deadAct){   // 지급명령 미신청이면 마감/즉시 신청, 기신청이면 추적
+    if (legal.ji) legalTrack(seg); else push('팀장', deadAct || _DR_ACT.jiLate, seg);
   };
   var lateLegal = function(seg){ if (days >= 21) legalMgmt(seg); else if (days >= 16) legalMgmt(seg, _DR_ACT.jiDead); };   // 약속이 법무 시계를 멈추지 않는다
-  if (terminated) { push('오진선', _DR_ACT.bohum, '종료'); return fin(); }
-  if (legal.bo)     push('오진선', _DR_ACT.bojeong, '법무');   // 비배타 — 보정서 제출과 나머지 절차 병행
-  // 5-2 강제퇴실 확정
-  if (_drEvictConfirmed(r)) {
-    push('오진선', _DR_ACT.ev1, '5-2'); push('김영철', _DR_ACT.ev2, '5-2');
-    if (days >= haejiDay && !legal.haeji) push('오진선', _DR_ACT.haeji, '5-2 ③');
-    if (days >= evictDay) push('오진선', legal.myeongdo ? _DR_ACT.mdMgmt : _DR_ACT.md, 'D+' + evictDay + '~');
-    if (!legal.ji) push('오진선', _DR_ACT.evJi, '5-2'); else legalTrack('5-2');
+  // ── 종료 채권 (4장) — 종료 3개월 이내 팀원A · 초과 팀원B · 법조치·약속자 날짜·경계 배분 팀장 ──
+  if (terminated) {
+    var ex = (typeof _dlqEndExit === 'function') ? _dlqEndExit(r.cno, r.contractStatus) : null, recent3 = !ex || !!ex.recent;
+    if (recent3) push('팀원A', _DR_ACT.endA, '종료 3개월 이내'); else push('팀원B', _DR_ACT.endB, '종료 3개월 초과');
+    if (legal.ji) legalTrack('종료');
+    else if (pr.state === 'broken') push('팀장', _DR_ACT.endJi, '종료');
+    if (pr.state === 'today' || pr.state === 'wait') push('팀장', _DR_ACT.endProm, '종료', { t:'종료 약속자 날짜 관리 — 약속일 ' + pr.dateStr + ' 입금 확인', s:'약속 ' + md + ' 입금 확인' });
+    if (ex && ex.kind === '퇴실' && ex.recent) {
+      var b3 = new Date(ex.d.getTime()); b3.setMonth(b3.getMonth() + 3);
+      var toB = Math.round((b3 - _drToday()) / 86400000);
+      if (toB >= 0 && toB <= 7) push('팀장', _DR_ACT.endMove, '종료', { t:'종료 3개월 경계 D-' + toB + ' — 팀원B 이관 (To-do 담당 변경·마지막 대응 기록)', s:'3개월 경계 D-' + toB + ' → 팀원B 이관' });
+    }
     return fin();
   }
-  // 분납중 — 서면 분납약정 이행 관리 (회차 불이행은 약속 불이행과 동일하게 즉시 전환)
+  if (legal.bo) push('팀장', _DR_ACT.bojeong, '법무');   // 비배타 — 보정서 제출과 나머지 절차 병행
+  // ── 6-2 강제퇴실 확정 ──
+  if (evict) {
+    push('팀장', _DR_ACT.ev1, '6-2'); push('팀원B', _DR_ACT.ev2, '6-2');
+    if (days >= haejiDay && !legal.haeji) push('팀장', _DR_ACT.haeji, '6-2 ③');
+    if (days >= evictDay) { push('팀장', legal.myeongdo ? _DR_ACT.mdMgmt : _DR_ACT.md, 'D+' + evictDay + '~'); if (legal.myeongdo) push('팀원B', _DR_ACT.mdSite, 'D+' + evictDay + '~'); }
+    if (!legal.ji) push('팀장', _DR_ACT.evJi, '6-2'); else legalTrack('6-2');
+    return fin();
+  }
+  // ── 분납 — 서면 분납약정 이행 관리 (회차 불이행은 약속 불이행과 같다) ──
   if (bunnap) {
-    if (pr.state === 'broken') { push('오진선', _DR_ACT.bunnapBrk, '분납 불이행', { t:'분납약정 회차(' + pr.dateStr + ') 불이행 — 즉시 연체 처리 전환 · 당일 지급명령 신청' }); push('김영철', _DR_ACT.brkVisit, '분납 불이행', { t:'분납 회차(' + pr.dateStr + ') 불이행 — 방문 2차 3영업일 내 · 퇴실확약서 협의 개시' }); }
-    else { push('오진선', _DR_ACT.bunnap, '분납'); if (pr.state === 'today') push('김영철', _DR_ACT.payToday, '분납', { t:'분납 회차 당일(' + pr.dateStr + ') 입금 확인 — 17시 마감' }); }
-    legalTrack('분납');
+    if (pr.state === 'broken') {
+      own(_DR_ACT.bunnapBrk, '분납 불이행', { t:'분납 회차(' + pr.dateStr + ') 불이행 — 재약속 금지 · 절차 진행 고지', s:'분납 ' + md + ' 불이행 — 절차 고지' });
+      if (legal.ji) legalTrack('분납 불이행');
+      else { push('팀장', _DR_ACT.brkJi, '분납 불이행', { t:'분납 회차 불이행 — 당일 지급명령 신청' + (legal.nae ? '' : ' + 내용증명 1차 같이 발송'), s:'분납 불이행 당일 지급명령' + (legal.nae ? '' : ' + 내용증명 1차') }); if (!legal.nae) naeDraft = true; }
+      push('팀원B', _DR_ACT.brkVisit, '분납 불이행', { t:'분납 회차 불이행 — 방문 2차 3영업일 내 · 퇴실확약서 협의 개시', s:'방문 2차 3영업일 내' });
+    } else {
+      own(_DR_ACT.bunnap, '분납');
+      if (pr.state === 'today') own(_DR_ACT.payToday, '분납', { t:'분납 회차 당일(' + pr.dateStr + ') 입금 확인 — 17시 마감', s:'분납 회차 당일 입금 확인(17시)' });
+      legalTrack('분납');
+    }
     return fin();
   }
-  // 해지 요건 도달(2기/3기 연체) · 명도
-  if (days >= evictDay) {
-    push('오진선', legal.myeongdo ? _DR_ACT.mdMgmt : _DR_ACT.md, 'D+' + evictDay + '~');
-    if (!legal.haeji) push('오진선', _DR_ACT.haeji, 'D+' + haejiDay);
+  // ── 해지 요건 도달(2기/3기 연체) · 명도 — 임대료 연체 건만 ──
+  if (!altOnly && days >= evictDay) {
+    push('팀장', legal.myeongdo ? _DR_ACT.mdMgmt : _DR_ACT.md, 'D+' + evictDay + '~');
+    if (!legal.haeji) push('팀장', _DR_ACT.haeji, 'D+' + haejiDay);
     legalMgmt('D+' + evictDay + '~');
+    if (legal.myeongdo) push('팀원B', _DR_ACT.mdSite, 'D+' + evictDay + '~');
     return fin();
   }
-  if (days >= haejiDay) {
-    push('오진선', legal.haeji ? _DR_ACT.mdPrep : _DR_ACT.haeji, 'D+' + haejiDay);
+  if (!altOnly && days >= haejiDay) {
+    push('팀장', legal.haeji ? _DR_ACT.mdPrep : _DR_ACT.haeji, 'D+' + haejiDay);
     legalMgmt('D+' + haejiDay);
     return fin();
   }
-  // 약속 불이행 — D+n 무관 · 즉시
+  // ── 약속 불이행 — D+n 무관 · 즉시 ──
   if (pr.state === 'broken') {
-    push('김영철', _DR_ACT.brkVisit, '약속 불이행', { t:'약속(' + pr.dateStr + ') 불이행 — 방문 2차 3영업일 내 · 퇴실확약서 협의 개시' });
-    if (legal.ji) legalTrack('약속 불이행'); else push('오진선', _DR_ACT.brkJi, '약속 불이행');
-    if (!legal.nae) push('김영철', _DR_ACT.brkNae, '약속 불이행');
+    own(_DR_ACT.brkCall, '약속 불이행', { t:'약속(' + pr.dateStr + ') 불이행 — 재약속 금지 · 서면 분납약정(첫 회차 즉시) 또는 절차 진행 고지', s:'약속 ' + md + ' 불이행 — 재약속 금지·절차 고지' });
+    if (legal.ji) legalTrack('약속 불이행');
+    else { push('팀장', _DR_ACT.brkJi, '약속 불이행', legal.nae ? null : { t:'약속 불이행 당일 지급명령 신청 + 내용증명 1차 같이 발송', s:'불이행 당일 지급명령 + 내용증명 1차' }); if (!legal.nae) naeDraft = true; }
+    push('팀원B', _DR_ACT.brkVisit, '약속 불이행');
     return fin();
   }
-  // 약속 당일
+  // ── 약속 당일 ──
   if (pr.state === 'today') {
-    push('김영철', _DR_ACT.payToday, '약속 당일', { t:'약속일 당일(' + pr.dateStr + ') 입금 확인 — 17시 마감' });
-    if (days >= 3 && days <= 4) push('김영철', _DR_ACT.visitReq, 'D+3~4');
+    own(_DR_ACT.payToday, '약속 당일', { t:'약속일 당일(' + pr.dateStr + ') 입금 확인 — 17시 마감', s:'약속 ' + md + ' 당일 입금 확인(17시)' });
+    if (days >= 3 && days <= 4) push('팀원B', _DR_ACT.visitReq, 'D+3~4');
     lateLegal('약속 당일');
     return fin();
   }
-  // 약속 대기
+  // ── 약속 대기 ──
   if (pr.state === 'wait') {
-    push('김영철', _DR_ACT.promWait, '약속 대기', { t:'약속일(' + pr.dateStr + ' · D+' + pr.dn + ') 관리 — 약속일 +1일 재확인 콜' });
-    if (pr.dn > cfg.promiseMax) { if (!legal.nae) push('김영철', _DR_ACT.naeProm, '약속 대기'); push('오진선', _DR_ACT.promOver, '약속 대기', { t:'약속 상한 D+' + cfg.promiseMax + ' 초과(약속일 D+' + pr.dn + ') — 서면 분납약정(첫 회차 즉시) 승인 판단' }); }
-    if (days >= 3 && days <= 4) push('김영철', _DR_ACT.visitReq, 'D+3~4');
-    if (days === 5) push('오진선', _DR_ACT.judge, 'D+5');
+    own(_DR_ACT.promWait, '약속 대기', { t:'약속일(' + pr.dateStr + ' · D+' + pr.dn + ') 관리 — 약속일 +1일 재확인 콜', s:'약속 ' + md + '(D+' + pr.dn + ') → +1일 재확인 콜' });
+    if (pr.dn > cfg.promiseMax) {
+      push('팀장', _DR_ACT.promOver, '약속 대기', { t:'약속 상한 D+' + cfg.promiseMax + ' 초과(약속일 D+' + pr.dn + ') — 서면 분납약정 승인 판단' + (legal.nae ? '' : ' + 내용증명 1차 전결(납부 기한 = 약속일)'), s:'약속 상한 초과(D+' + pr.dn + ') — 분납약정 승인' + (legal.nae ? '' : ' + 내용증명 1차') });
+      if (!legal.nae) naeDraft = true;
+    }
+    if (days >= 3 && days <= 4) push('팀원B', _DR_ACT.visitReq, 'D+3~4');
+    if (days === 5) own(_DR_ACT.feeNotice, 'D+5');
     lateLegal('약속 대기');
     return fin();
   }
-  // 미수신 2회 확정 → 즉시 법무 (타임라인 행과 병행)
-  var ncConf = nc >= cfg.ncCount && days >= 2;
-  if (ncConf) {
-    if (!legal.nae) push('김영철', _DR_ACT.naeNc, '미수신 확정');
-    if (!legal.ji) push('오진선', days >= 3 ? _DR_ACT.jiNc : _DR_ACT.jiPrep, '미수신 확정');
+  // ── 미수신 2회 확정 → 송무 요청 · 팀장 당일 접수 (타임라인 행과 병행) ──
+  if (ncConf && (!legal.nae || !legal.ji)) {
+    if (days !== 2) own(_DR_ACT.srReq, '미수신 확정');
+    var ncParts = [!legal.nae ? '내용증명 1차 전결·발송' : '', (!legal.ji && days < 16) ? (days >= 3 ? '지급명령 신청 접수' : '지급명령 신청 준비') : ''].filter(Boolean);   // D+16~ 지급명령은 타임라인 행(마감·즉시 신청)이 맡는다
+    if (ncParts.length) push('팀장', _DR_ACT.ncLegal, '미수신 확정', { t:'미수신 2회 확정 — ' + ncParts.join(' + '), s:ncParts.join(' + ').replace('·발송', '').replace(' 신청 ', ' ') });
+    if (!legal.nae) naeDraft = true;
   }
-  // 타임라인 행
-  if (days <= 0)        push('김영철', _DR_ACT.d0, 'D+0');
-  else if (days === 1)  push('김영철', _DR_ACT.d1, 'D+1');
-  else if (days === 2)  push('김영철', ncConf ? _DR_ACT.d2nc : _DR_ACT.d2, 'D+2');
-  else if (days <= 4)  { push('김영철', _DR_ACT.visitReq, 'D+3~4'); if (!ncConf) push('김영철', _DR_ACT.d34call, 'D+3~4'); }
-  else if (days === 5) { push('오진선', _DR_ACT.judge, 'D+5'); push('김영철', _DR_ACT.feeNotice, 'D+5'); }
-  else if (days <= 10) { push('김영철', _DR_ACT.visit2, 'D+6~10'); if (!legal.nae && !ncConf) push('김영철', _DR_ACT.nae1, 'D+6~10'); push('오진선', _DR_ACT.bunnapOffer, 'D+6~10'); }
-  else if (days <= 15) { push('김영철', _DR_ACT.exitTalk, 'D+11~15'); if (legal.naeN < 2) push('오진선', _DR_ACT.nae2, 'D+11~15'); }
-  else if (days <= 20) { push('김영철', _DR_ACT.exitClose, 'D+16~20'); push('오진선', legal.ji ? _DR_ACT.jiSongdal : _DR_ACT.jiDead, 'D+16~20'); }
-  else                  legalMgmt('D+21~' + (haejiDay - 1));
+  // ── 타임라인 행 ──
+  if (days <= 0)        own(_DR_ACT.d0, 'D+0');
+  else if (days === 1)  own(_DR_ACT.d1, 'D+1');
+  else if (days === 2)  own(ncConf ? ((!legal.nae || !legal.ji) ? _DR_ACT.d2nc : _DR_ACT.d2ncL) : _DR_ACT.d2, 'D+2');
+  else if (days <= 4)  { push('팀원B', _DR_ACT.visitReq, 'D+3~4'); if (!ncConf) own(_DR_ACT.d34call, 'D+3~4'); }
+  else if (days === 5)  own(_DR_ACT.feeNotice, 'D+5');
+  else if (days <= 10) {
+    own(ab ? _DR_ACT.abInstall : _DR_ACT.visit2, 'D+6~10');
+    if (!legal.nae && !ncConf) { push('팀장', _DR_ACT.nae1, 'D+6~10'); naeDraft = true; }
+  }
+  else if (days <= 15) { own(_DR_ACT.exitTalk, 'D+11~15'); if (legal.naeN < 2) push('팀장', _DR_ACT.nae2, 'D+11~15'); }
+  else if (days <= 20) { own(_DR_ACT.exitClose, 'D+16~20'); push('팀장', legal.ji ? _DR_ACT.jiSongdal : _DR_ACT.jiDead, 'D+16~20'); }
+  else                  legalMgmt(altOnly ? 'D+21~' : 'D+21~' + (haejiDay - 1));
   return fin();
 }
-// 단계 표시 순서 (타임라인 → 분기) · 대상자 단계 스트립·필터용
-var _DR_STAGE_ORDER = ['D+0','D+1','D+2','D+3~4','D+5','D+6~10','D+11~15','D+16~20','D+21~30','D+21~60','D+31','D+61','D+32~','D+62~','약속 대기','약속 당일','약속 불이행','미수신 확정','분납','분납 불이행','5-2','법무','종료','중요'];
+// 단계 표시 순서 (타임라인 → 분기 → 종료) · 단계 스트립·정렬용
+var _DR_STAGE_ORDER = ['D+0','D+1','D+2','D+3~4','D+5','D+6~10','D+11~15','D+16~20','D+21~30','D+21~60','D+21~','D+31','D+61','D+32~','D+62~','약속 대기','약속 당일','약속 불이행','미수신 확정','분납','분납 불이행','6-2','법무','종료 3개월 이내','종료 3개월 초과','종료'];
 function _drStageRank(s){ var i = _DR_STAGE_ORDER.indexOf(s); return i < 0 ? 99 : i; }
-// D+1~3 신규 연체 → 오진선 KCB 조회·등급 정리 병행 태스크 (판정 참고자료)
-function _drKcbTask(r){
-  return (r.days||0) >= 1 && (r.days||0) <= 3 && (r.contractStatus||'계약중') === '계약중';
-}
 function _drTargets(){
   var cfg = window._dlqDrCfg;
-  var base = (window._dlqTableRows || []).filter(function(r){
-    if (!cfg.includeTerminated && (r.contractStatus||'계약중') !== '계약중') return false;
-    return true;
-  });
+  var base = (window._dlqTableRows || []).filter(function(r){ return cfg.includeTerminated || (r.contractStatus||'계약중') === '계약중'; });
   var rows = [];
-  base.forEach(function(r){
-    var acts = _drClassify(r, cfg);
-    acts.forEach(function(dr){ rows.push(Object.assign({}, r, { _dr: dr })); });
-    if (_drKcbTask(r) && !acts.some(function(a){ return a.act === _DR_ACT.ohKcb; })) {
-      var m = acts[0] || {};
-      rows.push(Object.assign({}, r, { _dr: { who:'오진선', act:_DR_ACT.ohKcb, seg:'D+' + (r.days||0), stage:m.stage || ('D+' + (r.days||0)), nc:m.nc||0, pen:m.pen||0, pr:m.pr, legal:m.legal, evictDay:m.evictDay } }));
-    }
-  });
+  base.forEach(function(r){ _drClassify(r, cfg).forEach(function(dr){ rows.push(Object.assign({}, r, { _dr: dr })); }); });
   rows.forEach(function(r){ var s = (typeof _dlqScore === 'function') ? _dlqScore(r.cno) : null; r._sc = s ? parseFloat(s) : 0; });
-  var _sk = window._dlqDrCfg.sortKey, _dir = window._dlqDrCfg.sortDir === 'desc' ? -1 : 1;
+  var ro = { '팀장':0, '팀원A':1, '팀원B':2 };
   rows.sort(function(a,b){
-    if (a._dr.who !== b._dr.who) return a._dr.who === '오진선' ? -1 : 1;
-    if (_sk === 'score') { var sd = (a._sc - b._sc) * _dir; if (sd) return sd; }
+    if (a._dr.who !== b._dr.who) return ro[a._dr.who] - ro[b._dr.who];
     if (a._dr.act.p !== b._dr.act.p) return a._dr.act.p - b._dr.act.p;
-    return (b.days||0) - (a.days||0) || (b.amt||0) - (a.amt||0);
+    return (b._dr.days||0) - (a._dr.days||0) || (b.amt||0) - (a.amt||0);
   });
   rows._baseCount = base.length;
   return rows;
 }
 function _drEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function _drWon(v){ return '₩' + Math.round(v||0).toLocaleString(); }
-// [v658] 상태 셀 태그 — 연체 Process 단계 · 미수신 횟수 · 법무 진행 · 납부약속
-function _drSegTag(seg){ return seg ? '<span style="background:#1e293b;color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:800;letter-spacing:.02em;white-space:nowrap" title="연체 Process 단계 (SOP-04-연체 v1.2)">'+_drEsc(seg)+'</span>' : ''; }
-function _drNcTag(nc, cfg){ return nc >= cfg.ncCount ? '<span style="background:#fef2f2;color:#dc2626;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap" title="이번 연체 사이클 미수신 '+nc+'회 — '+cfg.ncCount+'회 확정 시 전화 중단·즉시 법무">미수신 '+nc+'회</span>' : (nc > 0 ? '<span style="background:#fff7ed;color:#c2410c;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">미수신 '+nc+'회</span>' : ''); }
+// 상태 셀 태그 — 연체 Process 단계 · 미수신 횟수 · 법무 진행 · 납부약속 · 연체구분 · 만기 · 첫 납부
+function _drSegTag(seg){ return seg ? '<span style="background:#1e293b;color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:800;letter-spacing:.02em;white-space:nowrap" title="연체 Process 단계 (SOP-04-연체 v1.4 3장)">'+_drEsc(seg)+'</span>' : ''; }
+function _drNcTag(nc, cfg){ return nc >= cfg.ncCount ? '<span style="background:#fef2f2;color:#dc2626;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap" title="이번 연체 사이클 미수신 '+nc+'회 — '+cfg.ncCount+'회 확정 시 전화 중단 → 송무 요청(팀장 당일 접수)">미수신 '+nc+'회</span>' : (nc > 0 ? '<span style="background:#fff7ed;color:#c2410c;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">미수신 '+nc+'회</span>' : ''); }
 function _drLegalStr(legal){
   if (!legal) return '';
   return [legal.nae ? '내용증명' + (legal.naeN > 1 ? '×' + legal.naeN : '') : '',
@@ -11480,33 +11586,59 @@ function _drPromTag(pr){
   var m = { broken:['#fef2f2','#dc2626','약속 불이행 '], today:['#fffbeb','#b45309','약속 당일 '], wait:['#ecfdf5','#047857','약속 '] }[pr.state] || ['#f1f5f9','#475569',''];
   return '<span style="background:'+m[0]+';color:'+m[1]+';border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap" title="Daily Report 입금예정일(D열) 기준 · 약속일 D+'+pr.dn+'">'+m[2]+_drEsc(pr.dateStr)+(pr.dn != null ? ' <span style="opacity:.75">D+'+pr.dn+'</span>' : '')+'</span>';
 }
-function _drGradeTag(grade){
-  return grade && grade !== '-' ? '<span style="background:'+(/[EF]/.test(String(grade))?'#dc2626':/[CD]/.test(String(grade))?'#d97706':'#64748b')+';color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:800">'+_drEsc(grade)+'</span>' : '';
+function _drTypeTag(r){
+  var a = (typeof _dlqAltOf === 'function') ? _dlqAltOf(r) : null, t = String(r.delinqType||'');
+  if (a) return '<span style="background:#ecfeff;color:#0e7490;border:1px dashed #67e8f9;border-radius:4px;padding:0 5px;font-size:10px;font-weight:800;white-space:nowrap" title="임대료는 연체 없음 — ' + String(a.type) + '만 연체. 해지 요건(차임 2기 연체)과 무관해 해지 통지·명도 단계는 넣지 않고 지급명령까지만 잡는다 (법무 확인 권장)">' + String(a.type) + '만 연체</span>';
+  var s = /관리비/.test(t) ? (t.indexOf('+') >= 0 ? '임대료+관리비' : '관리비') : '';
+  return s ? '<span style="background:#f0fdf4;color:#15803d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap" title="연체구분 — 임대료와 함께 관리비도 미납: 등급 담당이 함께 대응 · 관리비 미납 매일 점검은 팀원A 성과 지표">'+s+'</span>' : '';
+}
+function _drExpTag(ee){ return (ee && ee.kind === '만기' && !ee.fallback && ee.dday >= 0 && ee.dday < 90) ? '<span style="background:#fff7ed;color:#c2410c;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap" title="만기 3개월 미만 연체자 — 연장 의사부터 확인 (SOP 5장)">만기 D-'+ee.dday+'</span>' : ''; }
+function _drFirstTag(gi){ return (gi && gi.forceD === '첫 납부 연체') ? '<span style="background:#fef2f2;color:#b91c1c;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:800;white-space:nowrap" title="첫 청구부터 연체 — D등급 고정 · 정황이 있으면 6-3 형사 고소 검토(자문 변호사 확인)">첫 납부 연체</span>' : ''; }
+// [v745] 외국인 — 문자 영문 병기 · 여권명 기준 기록 · 보증인·본국 비상연락처 우선 (SOP 5장) · 계약관리 '국적구분'
+function _drNatTag(r){
+  try { var v = _dlqGradeCtx().vac[String(r.cno||'').trim()]; if (v && /외국/.test(String(v.natType||''))) return '<span style="background:#eef2ff;color:#4338ca;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap" title="외국인 — 문자 영문 병기 · 여권명 기준 기록 · 보증인·본국 비상연락처 우선 확보 (SOP 5장)">외국인</span>'; } catch(_){}
+  return '';
+}
+function _drStateHtml(t, cfg, sep){
+  var legal = t.legal || _drLegal(t.r.cno);
+  var s1 = '<span style="background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">D+'+(t.days||0)+'</span> ' + _drNcTag(t.nc||0, cfg) + ' ' + _drTypeTag(t.r);
+  var s2 = [_drLegalTag(legal), t.pr ? _drPromTag(t.pr) : '', _drExpTag(t.ee), _drFirstTag(t.gi), _drNatTag(t.r)].filter(Boolean).join(' ');
+  return s1 + (s2 ? (sep || '<br>') + s2 : '');
+}
+// [v745] 대응등급 칸 — 큰 배지 = 담당을 정한 등급(회의 확정 우선) · 아래 줄 = 출처(회의 날짜 / 자동) · 배지를 누르면 자동 판정 내역 팝업
+function _drGradeCell(t, forPrint){
+  var gi = t.gi; if (!gi || !/^[ABCD]$/.test(gi.g)) return '<span style="color:#cbd5e1">—</span>';
+  var col = _drGcol(gi.g), c = String(gi.cno).replace(/[^\w\-]/g, '');
+  var tip = (gi.rec ? '회의 확정 ' + gi.rec + ' (' + gi.recDs + ' 기록)' + (gi.auto !== '-' ? (gi.auto !== gi.rec ? ' · 자동 판정 ' + gi.auto + ' (다름)' : ' · 자동 판정도 ' + gi.auto) : '') : '자동 판정 ' + gi.auto + ' — 회의 확정 기록 없음')
+    + (gi.pts != null ? ' · 감점 ' + gi.pts + '점' : '') + '\n' + gi.g + ' ' + _drGnm(gi.g) + ' → 담당 ' + gi.owner + ' · 말투: ' + (_DR_TONE_G[gi.g] || '') + (forPrint ? '' : '\n누르면 등급 내역');
+  var b = '<span ' + (forPrint ? '' : 'onclick="event.stopPropagation();dlqGradePopup(\'' + c + '\')" ') + 'title="' + _drEsc(tip).replace(/\n/g, '&#10;') + '" style="display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:19px;padding:0 4px;box-sizing:border-box;border-radius:5px;background:' + col + ';color:#fff;font-size:11.5px;font-weight:800;cursor:' + (forPrint ? 'default' : 'pointer') + '">' + gi.g + '</span>';
+  var sub = gi.rec ? ('회의 ' + gi.recDs + (gi.auto !== '-' && gi.auto !== gi.rec ? ' · 자동 ' + gi.auto : '')) : '자동';
+  return b + '<div style="font-size:9px;color:' + (gi.rec ? '#334155' : '#94a3b8') + ';font-weight:700;margin-top:2px;white-space:nowrap">' + sub + '</div>';
 }
 function _drScoreCell(t){
   var sc = t.scStr;
   return '<td style="padding:7px 8px;white-space:nowrap;text-align:center">'+(sc?'<span style="background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 6px;font-size:10.5px;font-weight:800">'+sc+'</span>':'<span style="color:#cbd5e1">—</span>')+'</td>';
 }
-// ═══ [v659] 우선순위 No — 긴급도(즉시성) + 중요도(손실 규모) ═══
-//   긴급도 0~100: 액션 우선순위(P1 60 · P2 45 · P3 30 · P4 15 · P5 5) + 분기 가산(약속·분납 불이행 +15 · 미수신 확정·5-2 +10 · 명도 +10 · 해지·지급명령 마감 +6 · 보정명령 처리 중 +10) + 연체일 min(60)×0.25
-//   중요도 0~100: 연체금액 100만원당 8(최대 40) + 고액 기준↑ +10 + 위약금 기준↑ +10 + 등급 F 15/E 12/D 8/C 3 + KCB <600 8/<700 4 + 강제퇴실 상태 +8 (종료 계약 −10)
+// ═══ 우선순위 No — 긴급도(즉시성) + 중요도(손실 규모) ═══
+//   긴급도 0~100: 액션 우선순위(P1 60 · P2 45 · P3 30 · P4 15 · P5 5, 09:30 등급 회의 안건은 제외) + 분기 가산(약속·분납 불이행 +15 · 미수신 확정·6-2 +10 · 명도 +10 · 해지·지급명령 마감 +6 · 보정명령 처리 중 +10) + 연체일 min(60)×0.25
+//   중요도 0~100: 연체금액 100만원당 8(최대 40) + 고액 기준↑ +10 + 위약금 기준↑ +10 + 대응등급 D 15/C 8/B 3 + KCB <600 8/<700 4 + 강제퇴실 상태 +8 (종료 계약 −10)
 //   우선순위 = 긴급도 + 중요도 → 내림차순 순위(동점: 액션 P → 연체일 → 금액)
 function _drUrgency(t, cfg){
   var s = ({1:60, 2:45, 3:30, 4:15, 5:5})[t.p] || 0, st = t.stage || '';
   if (st === '약속 불이행' || st === '분납 불이행') s += 15;
-  else if (st === '미수신 확정' || st === '5-2') s += 10;
+  else if (st === '미수신 확정' || st === '6-2') s += 10;
   else if (/^D\+(32|62)~$/.test(st)) s += 10;
   else if (st === 'D+16~20' || st === 'D+31' || st === 'D+61') s += 6;
   if (t.legal && t.legal.bo) s += 10;
-  s += Math.min(t.r.days||0, 60) * 0.25;
+  s += Math.min(t.days||0, 60) * 0.25;
   return Math.max(0, Math.min(100, Math.round(s)));
 }
 function _drImportance(t, cfg){
   var amt = t.r.amt||0, s = Math.min(amt / 1000000, 5) * 8;
   if (amt >= cfg.amt) s += 10;
   if ((t.pen||0) >= cfg.penalty) s += 10;
-  var g = String(t.r.grade||'');
-  if (g.indexOf('F') >= 0) s += 15; else if (g.indexOf('E') >= 0) s += 12; else if (g.indexOf('D') >= 0) s += 8; else if (g.indexOf('C') >= 0) s += 3;
+  var g = t.gi && t.gi.g;
+  if (g === 'D') s += 15; else if (g === 'C') s += 8; else if (g === 'B') s += 3;
   if (t.sc && t.sc < 600) s += 8; else if (t.sc && t.sc < 700) s += 4;
   if (String(t.r.vacancyStatus||'').indexOf('강제퇴실') >= 0) s += 8;
   if ((t.r.contractStatus||'계약중') !== '계약중') s -= 10;
@@ -11517,7 +11649,7 @@ function _drRankList(list, cfg){
   var byPrio = list.slice().sort(function(a,b){
     if (b.prio !== a.prio) return b.prio - a.prio;
     if (a.p !== b.p) return a.p - b.p;
-    return (b.r.days||0) - (a.r.days||0) || (b.r.amt||0) - (a.r.amt||0);
+    return (b.days||0) - (a.days||0) || (b.r.amt||0) - (a.r.amt||0);
   });
   byPrio.forEach(function(t, i){ t.rank = i + 1; });
   return list;
@@ -11531,41 +11663,42 @@ function _drNoCell(t, no, total, forPrint){
     + (forPrint ? '<div style="font-size:8.5px;color:#475569;margin-top:1px">긴 '+t.urg+' · 중 '+t.imp+(no !== t.rank ? '<br>전체 '+t.rank+'위' : '')+'</div>' : '<div style="font-size:9px;color:#94a3b8;margin-top:1px">긴급 '+t.urg+' · 중요 '+t.imp+'</div>')
     + '</td>';
 }
-// [v455] 대상자 중심 뷰 — 연체자 1행에 오진선/김영철 액션을 필드로 병합 · [v659] 우선순위 순위 부여
+// 대상자 중심 — 연체자 1행에 팀장·팀원A·팀원B 액션을 필드로 병합 · 우선순위 순위 부여
 function _drByTarget(){
   var cfg = window._dlqDrCfg;
   var rows = _drTargets();
   var map = {}, order = [];
   rows.forEach(function(e){
-    var k = e.cno;
-    if (!map[k]) { map[k] = { r:e, oh:[], ky:[], p:9, pOh:9, pKy:9, nc:e._dr.nc||0, pen:e._dr.pen||0, sc:e._sc||0, scStr:(typeof _dlqScore === 'function') ? _dlqScore(k) : null, stage:e._dr.stage||e._dr.seg||'', pr:e._dr.pr||null, legal:e._dr.legal||null }; order.push(k); }
-    var isOh = e._dr.who === '오진선';
-    map[k][isOh ? 'oh' : 'ky'].push(Object.assign({}, e._dr.act, { seg:e._dr.seg }));   // [v658] 액션마다 연체 Process 행 라벨
-    map[k].p = Math.min(map[k].p, e._dr.act.p);
-    if (isOh) map[k].pOh = Math.min(map[k].pOh, e._dr.act.p); else map[k].pKy = Math.min(map[k].pKy, e._dr.act.p);
+    var k = e.cno, d = e._dr;
+    if (!map[k]) { map[k] = { r:e, gi:d.gi, days:d.days||0, ee:d.ee||null, tl:[], ta:[], tb:[], p:9, pw:{ '팀장':9, '팀원A':9, '팀원B':9 }, nc:d.nc||0, pen:d.pen||0, sc:e._sc||0, scStr:(typeof _dlqScore === 'function') ? _dlqScore(k) : null, stage:d.stage||d.seg||'', pr:d.pr||null, legal:d.legal||null }; order.push(k); }
+    var t = map[k];
+    t[_DR_RK[d.who]].push(Object.assign({}, d.act, { seg:d.seg }));   // 액션마다 연체 Process 행 라벨
+    if (d.act.id !== 'mtg') t.p = Math.min(t.p, d.act.p);              // 회의 안건은 긴급도에서 제외
+    t.pw[d.who] = Math.min(t.pw[d.who], d.act.p);
   });
   var list = _drRankList(order.map(function(k){ return map[k]; }), cfg);
-  // [v456] 헤더 클릭 정렬 — sortKey 없으면 우선순위(No) 순
+  // 헤더 클릭 정렬 — sortKey 없으면 우선순위(No) 순
   var sk = cfg.sortKey, dir = cfg.sortDir === 'desc' ? -1 : 1;
   if (sk) {
     var val = function(t){
-      if (sk === 'no')   return t.rank;                       // [v659] 우선순위
-      if (sk === 'cno')  return parseFloat(String(t.r.cno).replace(/[^\d.]/g,'')) || 0;
-      if (sk === 'nm')   return String(t.r.nm||'');
-      if (sk === 'days') return t.r.days || 0;
-      if (sk === 'amt')  return t.r.amt || 0;
-      if (sk === 'nc')   return t.nc || 0;
-      if (sk === 'stage') return _drStageRank(t.stage);   // [v658] 연체 Process 단계 정렬
-      if (sk === 'score') return t.sc || 0;       // [v464] 점수 정렬
-      if (sk === 'oh' || sk === 'ky') {           // [v457] TO DO LIST 정렬 — 우선순위 → 액션명 (같은 액션끼리 묶임)
-        var arr = (sk === 'oh') ? t.oh : t.ky;
-        return arr.length ? (String(arr[0].p) + '_' + arr[0].t) : '9_';
+      if (sk === 'no')    return t.rank;
+      if (sk === 'cno')   return parseFloat(String(t.r.cno).replace(/[^\d.]/g,'')) || 0;
+      if (sk === 'nm')    return String(t.r.nm||'');
+      if (sk === 'days')  return t.days || 0;
+      if (sk === 'amt')   return t.r.amt || 0;
+      if (sk === 'nc')    return t.nc || 0;
+      if (sk === 'stage') return _drStageRank(t.stage);
+      if (sk === 'score') return t.sc || 0;
+      if (sk === 'grade') return ({A:1,B:2,C:3,D:4})[t.gi && t.gi.g] || 9;
+      if (sk === 'tl' || sk === 'ta' || sk === 'tb') {   // TO DO 정렬 — 우선순위 → 액션명 (같은 액션끼리 묶임)
+        var a0 = t[sk].slice().sort(function(x,y){ return x.p - y.p; })[0];
+        return a0 ? (String(a0.p) + '_' + a0.t) : '9_';
       }
       return 0;
     };
     list.sort(function(a,b){
       var va = val(a), vb = val(b);
-      if (typeof va === 'string') return va.localeCompare(vb, 'ko') * dir;
+      if (typeof va === 'string') return va.localeCompare(vb, 'ko') * dir || a.rank - b.rank;
       return (va - vb) * dir || a.rank - b.rank;
     });
   } else {
@@ -11575,48 +11708,86 @@ function _drByTarget(){
   list._rows = rows;   // 액션 단위 행 (KPI·단계 스트립용) — 재계산 방지
   return list;
 }
-// [v659] 담당자별 목록 — 해당 담당자 액션이 있는 연체자만 · 카드/단계 필터 · 담당자 내 우선순위 No(전체 순위 순)
-function _drPersonList(who, list, cfg){
-  var key = who === '오진선' ? 'oh' : 'ky', pKey = who === '오진선' ? 'pOh' : 'pKy';
-  var pl = list.filter(function(t){ return t[key].length; });
+// [v745] 관리비·기타 연체 구분 — alt = 임대료 연체 없이 관리비·기타 항목만 연체 / mgmt = 관리비(변동관리비) 미납이 있는 모든 건
+function _drIsAltOnly(r){ return !!((typeof _dlqAltOf === 'function') ? _dlqAltOf(r) : null); }
+function _drHasMgmt(r){ return /관리비/.test(String(r.delinqType||'') + ' ' + String(r.altType||'')); }
+// [v745] Slack 바로가기 — Slack은 검색어를 주소로 넘길 수 없어(검색 화면만 열림) 계약번호를 복사해 두고 검색 화면을 연다 → 검색창에 붙여넣기
+var DR_SLACK_TEAM = 'T01GSH1SW9M', DR_SLACK_DOMAIN = 'krg0625', DR_SLACK_DLQ_CH = 'C0836SSF0NM';   // KRGGROUP 워크스페이스 · #심사_운영_연체
+function _drToast(msg){
+  var el = document.getElementById('drToast');
+  if (!el) { el = document.createElement('div'); el.id = 'drToast'; el.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:9600;background:#0f172a;color:#fff;border-radius:10px;padding:10px 16px;font-size:12.5px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:90vw;transition:opacity .3s'; document.body.appendChild(el); }
+  el.textContent = msg; el.style.opacity = '1';
+  clearTimeout(window._drToastT); window._drToastT = setTimeout(function(){ el.style.opacity = '0'; }, 4500);
+}
+function dlqDrSlack(cno){
+  cno = String(cno == null ? '' : cno).replace(/[^\w\-]/g, '');
+  var ok = function(){ _drToast('💬 계약번호 ' + cno + ' 복사됨 — Slack 검색창에 붙여넣기(⌘/Ctrl+V) 후 Enter'); };
+  var no = function(){ _drToast('💬 Slack 검색창에 ' + cno + ' 를 입력하고 Enter'); };
+  try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(cno).then(ok, no); else no(); } catch(_) { no(); }
+  window.open('https://app.slack.com/client/' + DR_SLACK_TEAM + '/search', '_blank');
+}
+function _drSlackBtn(cno){ var c = String(cno == null ? '' : cno).replace(/[^\w\-]/g, ''); return '<span onclick="event.stopPropagation();dlqDrSlack(\'' + c + '\')" title="Slack에서 이 계약 대화 찾기 — 계약번호를 복사하고 Slack 검색을 엽니다(검색창에 붙여넣기)" style="cursor:pointer;margin-left:5px;font-size:11px;opacity:.75">💬</span>'; }
+// 카드·등급·단계 필터 (who가 있으면 담당자 목록 기준)
+function _drFilter(list, cfg, who){
   var cf = cfg.cardFilter;
-  if (cf === 'urgent')    pl = pl.filter(function(t){ return t[pKey] === 1; });
-  else if (cf === 'nc')   pl = pl.filter(function(t){ return t.nc >= cfg.ncCount; });
-  else if (cf === 'pay')  pl = pl.filter(function(t){ return t.pr && t.pr.state !== 'none'; });
-  if (cfg.stageFilter)    pl = pl.filter(function(t){ return t.stage === cfg.stageFilter; });
+  if (cf === 'tl' || cf === 'ta' || cf === 'tb') { if (!who) list = list.filter(function(t){ return t[cf].length; }); }
+  else if (cf === 'urgent') list = list.filter(function(t){ return who ? t.pw[who] === 1 : t.p === 1; });
+  else if (cf === 'nc')     list = list.filter(function(t){ return t.nc >= cfg.ncCount; });
+  else if (cf === 'pay')    list = list.filter(function(t){ return t.pr && t.pr.state !== 'none'; });
+  else if (cf === 'mtg')    list = list.filter(function(t){ return t.tl.some(function(a){ return a.id === 'mtg'; }); });
+  else if (cf === 'alt')    list = list.filter(function(t){ return _drIsAltOnly(t.r); });   // [v745] 관리비·기타만 연체 (임대료 정상)
+  else if (cf === 'mgmt')   list = list.filter(function(t){ return _drHasMgmt(t.r); });     // [v745] 관리비 미납 포함 전체
+  if (cfg.gradeFilter)      list = list.filter(function(t){ return t.gi && t.gi.g === cfg.gradeFilter; });
+  if (cfg.stageFilter)      list = list.filter(function(t){ return t.stage === cfg.stageFilter; });
+  return list;
+}
+// 담당자별 목록 — 해당 담당자 액션이 있는 연체자만 · 담당자 내 우선순위 No(전체 순위 순)
+function _drPersonList(who, list, cfg){
+  var key = _DR_RK[who];
+  var pl = _drFilter(list.filter(function(t){ return t[key].length; }), cfg, who);
   pl.slice().sort(function(a,b){ return a.rank - b.rank; }).forEach(function(t, i){ t['_no_' + key] = i + 1; });
   pl._no = function(t){ return t['_no_' + key]; };
   pl._acts = function(t){ return t[key]; };
   pl._total = list.length;
   return pl;
 }
+// 지시 문구 — 앞의 단계 라벨(seg)과 같은 머리말('D+16~20 — ', '09:30 등급 회의 — ')은 떼고 보여준다
+function _drT(a){
+  var t = String(a.t || ''), sg = String(a.seg || '');
+  if (sg && t.indexOf(sg + ' — ') === 0) return t.slice(sg.length + 3);
+  if (sg && t.indexOf('09:30 ' + sg + ' — ') === 0) return t.slice(sg.length + 9);
+  return t;
+}
+function _drToneChip(a){
+  if (!a.tone || !_DR_TONE[a.tone]) return '';
+  var c = _drGcol(a.tone);
+  return '<span title="' + _drEsc('말투 ' + a.tone + ' — ' + _DR_TONE_G[a.tone] + ' (공통 규칙: 08~21시 · 협박·모욕 금지 · 제3자 고지 금지)') + '" style="display:inline-block;margin-left:5px;font-size:9.5px;font-weight:800;color:' + c + ';border:1px solid ' + c + ';border-radius:4px;padding:0 4px;vertical-align:1px;white-space:nowrap">' + a.tone + ' ' + _DR_TONE[a.tone] + '</span>';
+}
 function _drActRowsHtml(acts, forPrint){
   return acts.map(function(a){
     return '<div style="margin:1px 0 3px">'
-      + '<div style="font-size:'+(forPrint?'11.5px':'12px')+';font-weight:800;color:'+a.c+'">'+(a.seg?'<span style="font-size:9.5px;color:#64748b;font-weight:800;margin-right:4px">'+_drEsc(a.seg)+'</span>':'')+'▶ '+a.t+'</div>'
-      + '<div style="font-size:'+(forPrint?'10px':'10.5px')+';color:'+(a.warn?'#9a3412':'#64748b')+';line-height:1.4">'+a.g+(a.warn?' · ⚠ 정산 확정금액 현장 언급 금지':'')+'</div>'
+      + '<div style="font-size:'+(forPrint?'11.5px':'12px')+';font-weight:800;color:'+a.c+'">'+(a.seg?'<span style="font-size:9.5px;color:#64748b;font-weight:800;margin-right:4px">'+_drEsc(a.seg)+'</span>':'')+'▶ '+_drEsc(_drT(a))+_drToneChip(a)+'</div>'
+      + '<div style="font-size:'+(forPrint?'10px':'10.5px')+';color:'+(a.warn?'#9a3412':'#64748b')+';line-height:1.4">'+_drEsc(a.g)+(a.warn?' · ⚠ 정산 확정금액 현장 언급 금지':'')+'</div>'
       + '</div>';
   }).join('');
 }
 function _drPersonRowHtml(t, pl, cfg, forPrint){
-  var r = t.r, no = pl._no(t), acts = pl._acts(t), legal = t.legal || _drLegal(r.cno);
+  var r = t.r, no = pl._no(t), acts = pl._acts(t);
   var pad = forPrint ? 'padding:5px 7px' : 'padding:7px 8px';
   var cnoCell = forPrint
-    ? '<td style="'+pad+';font-weight:800">'+r.cno+'</td>'
-    : '<td style="'+pad+';white-space:nowrap"><span style="color:#2563eb;font-weight:700;cursor:pointer" onclick="dlqCloseDailyReport();dlqGoToContract(\''+r.cno+'\')">'+r.cno+'</span></td>';
+    ? '<td style="'+pad+';font-weight:800">'+_drEsc(r.cno)+'</td>'
+    : '<td style="'+pad+';white-space:nowrap"><span style="color:#2563eb;font-weight:700;cursor:pointer" onclick="dlqCloseDailyReport();dlqGoToContract(\''+r.cno+'\')">'+_drEsc(r.cno)+'</span>'+_drSlackBtn(r.cno)+'</td>';
   var aMin = Math.min.apply(null, acts.map(function(a){ return a.p; }));
-  // [v660] 단계·상태 = 2줄 고정폭(1줄: 단계·D+n·미수신 / 2줄: 법무·약속) · 등급 배지 제거(등급은 No 중요도에만 반영) · 금액은 상태 앞 · 최근 대응 내용이 가장 넓은 열
-  var st1 = _drSegTag(t.stage) + ' <span style="background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap">D+'+(r.days||0)+'</span> ' + _drNcTag(t.nc||0, cfg);
-  var st2 = [_drLegalTag(legal), t.pr ? _drPromTag(t.pr) : ''].filter(Boolean).join(' ');
   return '<tr style="border-bottom:1px solid #f1f5f9;background:'+(aMin===1?'#fff7f7':'#fff')+'">'
     + (forPrint ? '<td style="'+pad+';text-align:center;font-size:16px">☐</td>' : '')
     + _drNoCell(t, no, pl._total, forPrint)
     + cnoCell
     + '<td style="'+pad+(forPrint?'':';white-space:nowrap')+'"><b>'+_drEsc(r.nm)+'</b><br><span style="color:#64748b;font-size:10.5px">'+_drEsc(r.tel)+'</span></td>'
+    + '<td style="'+pad+';text-align:center;white-space:nowrap">'+_drGradeCell(t, forPrint)+'</td>'
     + _drScoreCell(t)
     + '<td style="'+pad+';text-align:right;'+(forPrint?'word-break:break-all':'white-space:nowrap')+';font-variant-numeric:tabular-nums">'+_drWon(r.amt)+(t.pen?'<br><span style="color:#dc2626;font-size:11px">'+_drWon(t.pen)+'</span>':'')+'</td>'
-    + '<td style="'+pad+';'+(forPrint?'white-space:normal':'white-space:nowrap')+';line-height:2">'+st1+(st2?(forPrint?' ':'<br>')+st2:'')+'</td>'
-    + '<td style="'+pad+(forPrint?'':';min-width:280px')+'"><div style="color:#475569;font-size:'+(forPrint?'10.5px':'11.5px')+';line-height:1.5;word-break:break-all">'+_drEsc(r.content||'—')+'</div></td>'
+    + '<td style="'+pad+';'+(forPrint?'white-space:normal':'white-space:nowrap')+';line-height:2">'+_drSegTag(t.stage)+' '+_drStateHtml(t, cfg, forPrint ? ' ' : '<br>')+'</td>'
+    + '<td style="'+pad+(forPrint?'':';min-width:260px')+'"><div style="color:#475569;font-size:'+(forPrint?'10.5px':'11.5px')+';line-height:1.5;word-break:break-all">'+_drEsc(r.content||'—')+'</div></td>'
     + '<td style="'+pad+';border-left:2px solid '+acts[0].c+';background:'+(acts.some(function(a){return a.warn;})?'#fff7ed':'#fcfdfe')+'">'+_drActRowsHtml(acts, forPrint)+'</td>'
     + (forPrint ? '<td style="'+pad+'"></td>' : '')
     + '</tr>';
@@ -11624,26 +11795,27 @@ function _drPersonRowHtml(t, pl, cfg, forPrint){
 function _drPersonTableHtml(who, pl, cfg, forPrint){
   if (!pl.length) return '<div style="padding:14px;color:#94a3b8;font-size:12px;background:#fff">오늘 배정 건이 없습니다.</div>';
   var th = function(s, extra){ return '<th style="padding:5px 8px;text-align:left;white-space:nowrap;'+(extra||'')+'">'+s+'</th>'; };
-  // [v661] 인쇄는 고정 레이아웃(colgroup 비율) — 용지(A3/A4)·내용 길이와 무관하게 열 비율 유지, 최근 대응 내용이 최대폭
-  var cols = '<colgroup><col style="width:2.6%"><col style="width:4.4%"><col style="width:5.2%"><col style="width:8.2%"><col style="width:3.6%"><col style="width:7%"><col style="width:13%"><col style="width:28%"><col style="width:22%"><col style="width:6%"></colgroup>';
+  // 인쇄는 고정 레이아웃(colgroup 비율) — 용지(A3/A4)·내용 길이와 무관하게 열 비율 유지, 최근 대응 내용이 최대폭
+  var cols = '<colgroup><col style="width:2.6%"><col style="width:4.4%"><col style="width:5%"><col style="width:8%"><col style="width:3.6%"><col style="width:3.4%"><col style="width:7%"><col style="width:12.5%"><col style="width:26.5%"><col style="width:21%"><col style="width:6%"></colgroup>';
   var head = forPrint
-    ? cols + '<tr>' + th('완료','text-align:center;padding:4px 3px') + th('No','text-align:center') + th('계약번호') + th('임(전)차인') + th('점수','text-align:center') + th('연체금액/위약금','text-align:right;white-space:normal') + th('단계 · 상태') + th('최근 대응 내용') + th('▶ 대응 지시 (연체 Process 근거 · SOP-04-연체 v1.2)','white-space:normal') + th('결과 · 메모','white-space:normal') + '</tr>'
-    : '<tr style="background:#f8fafc;color:#64748b;font-size:10.5px">' + _drTh('no','No','center') + _drTh('cno','계약번호') + _drTh('nm','임(전)차인') + _drTh('score','점수','center') + _drTh('amt','연체금액/위약금','right') + _drTh('stage','단계 · 상태','left','width:1%')
+    ? cols + '<tr>' + th('완료','text-align:center;padding:4px 3px') + th('No','text-align:center') + th('계약번호') + th('임(전)차인') + th('등급','text-align:center') + th('점수','text-align:center') + th('연체금액/위약금','text-align:right;white-space:normal') + th('단계 · 상태') + th('최근 대응 내용') + th('▶ 대응 지시 (연체 SOP v1.4)','white-space:normal') + th('결과 · 메모','white-space:normal') + '</tr>'
+    : '<tr style="background:#f8fafc;color:#64748b;font-size:10.5px">' + _drTh('no','No','center') + _drTh('cno','계약번호') + _drTh('nm','임(전)차인') + _drTh('grade','등급','center') + _drTh('score','점수','center') + _drTh('amt','연체금액/위약금','right') + _drTh('stage','단계 · 상태','left','width:1%')
       + '<th style="padding:6px 8px;text-align:left">최근 대응 내용 <span onclick="dlqDrSort(\'nc\')" title="미수신 횟수로 정렬" style="cursor:pointer;user-select:none;opacity:.7">📵'+(cfg.sortKey==='nc'?(cfg.sortDir==='asc'?'▲':'▼'):'↕')+'</span></th>'
-      + '<th style="padding:6px 8px;text-align:left;width:30%">▶ 대응 지시 (연체 Process 근거 · SOP-04-연체 v1.2)</th></tr>';
+      + '<th style="padding:6px 8px;text-align:left;width:30%">▶ 대응 지시 (연체 SOP v1.4)</th></tr>';
   return '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff'+(forPrint?';table-layout:fixed':'')+'"><thead>' + head + '</thead><tbody>'
     + pl.map(function(t){ return _drPersonRowHtml(t, pl, cfg, forPrint); }).join('') + '</tbody></table></div>';
 }
 function _drRoleText(who, cfg){
-  return who === '오진선'
-    ? '팀장 역할 — D+5 판정 · 미수신·약속 불이행 즉시 지급명령 · 내용증명 2차 · 신청 마감 D+20 · 서면 해지 통지(2기 연체) · 명도 D+'+cfg.evictRes+'(상업 D+'+cfg.evictCom+') · 분납 승인 · 5-2 ①③⑥'
-    : '팀원A·B 역할 — D+0 문자 · D+1~2 콜 · 미수신 '+cfg.ncCount+'회 확정 내용증명 1차 · D+3~4 방문요청(독촉장) · D+6~10 직접방문 · 퇴실 협의·확약서 · 5-2 ②④⑤';
+  if (who === '팀장') return '판정·송무·관리 — ~09:30 KCB 조회 → 09:30 등급 회의(근거 제시·배정) · D+5 판정(다음 날 09:30) · 송무 전 단계: 내용증명 전결·지급명령(미수신 D+3~5 · 불이행 당일 · 마감 D+20)·보정·해지 통지 D+'+(cfg.evictRes-1)+'·명도 D+'+cfg.evictRes+'(상업 D+'+cfg.evictCom+')·압류 · 분납·면제 승인 · 종료 채권 배분 · D-3 고위험군 사전 전화(당분간) · 17:30 팀 마감';
+  if (who === '팀원A') return '회수 · A·B 등급 — 09:00 수납 대응(공동) · A·B 1·2차 콜(서비스 톤, 날짜 특정) · 약속일 +1 재확인 콜 · 분납약정 접수 · 내용증명 1차 초안 · 종료 3개월 이내 채권 · 관리비 미납 매일 관리 · 미수신 '+cfg.ncCount+'회·약속 불이행 → 팀장 송무 요청';
+  return '현장·집행 · C·D 등급 — 수납 대응(공동) · C·D 콜(단호한 톤) · D+3~4 독촉장 부착 · 직접방문(주 1회 방문일) · 6-2 비밀번호 현황·업무 요청 · 가처분·명도·압류 입회 · 장기 종료 채권 월 2~3회 방문';
 }
-function _drSectionHtml(who, color, pl, cfg){
+function _drSectionHtml(who, pl, cfg){
+  var color = _DR_RCOL[who];
   var nActs = pl.reduce(function(n, t){ return n + pl._acts(t).length; }, 0);
   var head = '<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid #e2e8f0;background:#fff;border-radius:12px 12px 0 0;flex-wrap:wrap">'
-    + '<div style="width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">'+who.charAt(0)+'</div>'
-    + '<div><div style="font-size:14.5px;font-weight:800">'+who+' <span style="font-size:11px;color:#64748b;font-weight:600">· No = 담당자 내 우선순위(긴급도+중요도)</span></div><div style="font-size:11px;color:#64748b">'+_drRoleText(who, cfg)+'</div></div>'
+    + '<div style="min-width:40px;height:30px;padding:0 8px;border-radius:8px;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px">'+who+'</div>'
+    + '<div style="flex:1;min-width:260px"><div style="font-size:14.5px;font-weight:800">'+who+' · '+_DR_RSUB[who]+' <span style="font-size:11px;color:#64748b;font-weight:600">· No = 담당자 내 우선순위(긴급도+중요도)</span></div><div style="font-size:11px;color:#64748b">'+_drRoleText(who, cfg)+'</div></div>'
     + '<div style="margin-left:auto;display:flex;align-items:center;gap:6px">'
     + '<span style="font-size:12px;font-weight:700;color:#64748b;margin-right:4px">배정 '+pl.length+'명 · '+nActs+'건</span>'
     + '<button onclick="dlqDrSlackCopy(\''+who+'\')" title="'+who+' 지시 목록만 Slack용 텍스트로 복사" style="border:1px solid #e2e8f0;background:#fff;border-radius:7px;padding:4px 9px;font-size:11.5px;cursor:pointer">💬 복사</button>'
@@ -11651,22 +11823,23 @@ function _drSectionHtml(who, color, pl, cfg){
     + '</div></div>';
   return '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px">'+head+_drPersonTableHtml(who, pl, cfg, false)+'</div>';
 }
-// [v658] 연체 Process 단계 스트립 — 클릭 시 해당 단계 대상만 표시 (재클릭 해제)
+// 연체 Process 단계 스트립 — 클릭 시 해당 단계 대상만 표시 (재클릭 해제)
 function dlqDrStageFilter(stage){
   var cfg = window._dlqDrCfg;
   cfg.stageFilter = (cfg.stageFilter === stage) ? null : stage;
   var b = document.getElementById('dlqDrBody'); if (b) b.innerHTML = _drBuildHtml();
 }
-function _drStageStripHtml(rows, cfg){
-  var cnt = {}, seen = {};
-  rows.forEach(function(r){ if (seen[r.cno]) return; seen[r.cno] = 1; var st = r._dr.stage || r._dr.seg || '?'; cnt[st] = (cnt[st]||0) + 1; });
+function _drStageStripHtml(list, cfg){
+  var cnt = {};
+  list.forEach(function(t){ var st = t.stage || '?'; cnt[st] = (cnt[st]||0) + 1; });
   var keys = Object.keys(cnt).sort(function(a,b){ return _drStageRank(a) - _drStageRank(b); });
   if (!keys.length) return '';
   var color = function(st){
     if (/^D\+(0|1|2)$/.test(st)) return '#2563eb';
     if (st === 'D+3~4' || st === 'D+6~10' || st === 'D+11~15') return '#d97706';
-    if (st === 'D+5' || st === '분납' || st === '중요') return '#4F46E5';
+    if (st === 'D+5' || st === '분납') return '#4F46E5';
     if (/^약속/.test(st)) return st === '약속 불이행' ? '#dc2626' : '#059669';
+    if (/^종료/.test(st)) return '#64748b';
     return '#dc2626';
   };
   return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;margin-bottom:12px">'
@@ -11678,13 +11851,20 @@ function _drStageStripHtml(rows, cfg){
     + (cfg.stageFilter ? '<span onclick="dlqDrStageFilter(\''+cfg.stageFilter.replace(/'/g,'')+'\')" style="margin-left:auto;cursor:pointer;font-size:10.5px;color:#1d4ed8;font-weight:700">필터 해제 ✕</span>' : '')
     + '</div>';
 }
-// [v465] 카드 필터 토글 — 같은 카드 재클릭 시 해제, 'all'은 항상 해제
+// 카드 필터 토글 — 같은 카드 재클릭 시 해제, 'all'은 모든 필터 해제
 function dlqDrCardFilter(key){
   var cfg = window._dlqDrCfg;
-  cfg.cardFilter = (key === 'all' || cfg.cardFilter === key) ? null : key;
+  if (key === 'all') { cfg.cardFilter = null; cfg.gradeFilter = null; cfg.stageFilter = null; }
+  else cfg.cardFilter = (cfg.cardFilter === key) ? null : key;
   var b = document.getElementById('dlqDrBody'); if (b) b.innerHTML = _drBuildHtml();
 }
-// [v456] 정렬 순환: 오름차순 → 내림차순 → 기본(우선순위 No)
+// [v745] 대응등급 필터 — A·B·C·D 칸 클릭 (재클릭 해제)
+function dlqDrGradeFilter(g){
+  var cfg = window._dlqDrCfg;
+  cfg.gradeFilter = (cfg.gradeFilter === g) ? null : g;
+  var b = document.getElementById('dlqDrBody'); if (b) b.innerHTML = _drBuildHtml();
+}
+// 정렬 순환: 오름차순 → 내림차순 → 기본(우선순위 No)
 function dlqDrSort(key){
   var cfg = window._dlqDrCfg;
   if (cfg.sortKey !== key)      { cfg.sortKey = key; cfg.sortDir = 'asc'; }
@@ -11697,105 +11877,130 @@ function _drTh(key, label, align, extra){
   var arrow = cfg.sortKey === key ? (cfg.sortDir === 'asc' ? ' ▲' : ' ▼') : ' <span style="opacity:.35">↕</span>';
   return '<th onclick="dlqDrSort(\''+key+'\')" title="클릭하여 정렬 (오름차순→내림차순→우선순위 No)" style="padding:6px 8px;text-align:'+(align||'left')+';cursor:pointer;user-select:none;white-space:nowrap;'+(extra||'')+'">'+label+arrow+'</th>';
 }
-function _drActCell(acts, warnColor){
+function _drActCell(acts){
   if (!acts.length) return '<span style="color:#cbd5e1">—</span>';
   return acts.map(function(a){
-    return '<div style="margin:1px 0" title="'+_drEsc(a.g)+'">'
-      + '<span style="display:inline-block;background:'+(a.warn?'#fff7ed':'#f8fafc')+';border-left:3px solid '+a.c+';border-radius:0 5px 5px 0;padding:2px 7px;font-size:11px;font-weight:800;color:'+a.c+'">'+(a.seg?'<span style="font-size:9.5px;color:#64748b;font-weight:800;margin-right:4px">'+_drEsc(a.seg)+'</span>':'')+'▶ '+a.t+'</span>'
+    return '<div style="margin:1px 0 2px" title="'+_drEsc(a.t + '\n' + a.g)+'">'
+      + '<span style="display:inline-block;background:'+(a.warn?'#fff7ed':'#fff')+';border-left:3px solid '+a.c+';border-radius:0 5px 5px 0;padding:2px 7px;font-size:11px;font-weight:800;color:'+a.c+';line-height:1.35">'+(a.seg?'<span style="font-size:9.5px;color:#64748b;font-weight:800;margin-right:4px">'+_drEsc(a.seg)+'</span>':'')+_drEsc(a.s || a.t)+_drToneChip(a)+'</span>'
       + (a.warn?'<div style="font-size:10px;color:#9a3412;font-weight:600;padding:1px 0 0 4px">⚠ 정산 확정금액 현장 언급 금지</div>':'')
       + '</div>';
   }).join('');
 }
 function _drTargetViewHtml(cfg, list){
   var total = list.length;
-  // [v465] 카드 필터 — 클릭한 카드의 대상만 표시
-  var cf = cfg.cardFilter;
-  if (cf === 'oh')          list = list.filter(function(t){ return t.oh.length; });
-  else if (cf === 'ky')     list = list.filter(function(t){ return t.ky.length; });
-  else if (cf === 'urgent') list = list.filter(function(t){ return t.p === 1; });
-  else if (cf === 'nc')     list = list.filter(function(t){ return t.nc >= cfg.ncCount; });
-  else if (cf === 'pay')    list = list.filter(function(t){ return t.pr && t.pr.state !== 'none'; });
-  if (cfg.stageFilter)      list = list.filter(function(t){ return t.stage === cfg.stageFilter; });   // [v658] 단계 스트립 필터
+  list = _drFilter(list, cfg, null);
   var body = list.map(function(t){
     var r = t.r;
-    var legal = t.legal || _drLegal(r.cno);
-    var st2 = [_drLegalTag(legal), t.pr ? _drPromTag(t.pr) : ''].filter(Boolean).join(' ');
     return '<tr style="border-bottom:1px solid #f1f5f9;background:'+(t.p===1?'#fff7f7':'#fff')+'">'
       + _drNoCell(t, t.rank, total, false)
-      + '<td style="padding:7px 8px;white-space:nowrap"><span style="color:#2563eb;font-weight:700;cursor:pointer" onclick="dlqCloseDailyReport();dlqGoToContract(\''+r.cno+'\')">'+r.cno+'</span></td>'
+      + '<td style="padding:7px 8px;white-space:nowrap"><span style="color:#2563eb;font-weight:700;cursor:pointer" onclick="dlqCloseDailyReport();dlqGoToContract(\''+r.cno+'\')">'+_drEsc(r.cno)+'</span>'+_drSlackBtn(r.cno)+'</td>'
       + '<td style="padding:7px 8px;white-space:nowrap"><b>'+_drEsc(r.nm)+'</b><br><span style="color:#64748b;font-size:10.5px">'+_drEsc(r.tel)+'</span></td>'
+      + '<td style="padding:7px 6px;text-align:center;white-space:nowrap">'+_drGradeCell(t, false)+'</td>'
       + _drScoreCell(t)
       + '<td style="padding:7px 8px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums">'+_drWon(r.amt)+(t.pen?'<br><span style="color:#dc2626;font-size:11px">'+_drWon(t.pen)+'</span>':'')+'</td>'
       + '<td style="padding:7px 6px;white-space:nowrap">'+_drSegTag(t.stage)+'</td>'
-      + '<td style="padding:7px 8px;white-space:nowrap;line-height:2"><span style="background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">D+'+(r.days||0)+'</span> '+_drNcTag(t.nc||0, cfg)+(st2?'<br>'+st2:'')+'</td>'
-      + '<td style="padding:7px 8px;min-width:280px"><div style="color:#475569;font-size:11.5px;line-height:1.5;word-break:break-all">'+_drEsc(r.content||'—')+'</div></td>'
-      + '<td style="padding:7px 8px;background:#fbfaff;border-left:1px solid #ede9fe">'+_drActCell(t.oh)+'</td>'
-      + '<td style="padding:7px 8px;background:#f8fbff;border-left:1px solid #dbeafe">'+_drActCell(t.ky)+'</td>'
+      + '<td style="padding:7px 8px;min-width:140px;max-width:220px;line-height:2">'+_drStateHtml(t, cfg)+'</td>'
+      + '<td style="padding:7px 8px;min-width:170px;max-width:260px"><div style="color:#475569;font-size:11px;line-height:1.45;word-break:break-all;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden" title="'+_drEsc(r.content||'')+'">'+_drEsc(r.content||'—')+'</div></td>'
+      + _DR_ROLES.map(function(w){ return '<td style="padding:7px 8px;min-width:190px;background:'+_DR_RBG[w]+';border-left:1px solid '+_DR_RLN[w]+'">'+_drActCell(t[_DR_RK[w]])+'</td>'; }).join('')
       + '</tr>';
   }).join('');
+  if (!list.length) body = '<tr><td colspan="12" style="padding:18px;text-align:center;color:#94a3b8;font-size:12px">조건에 맞는 대상이 없습니다.</td></tr>';
   return '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px"><div style="overflow-x:auto">'
     + '<table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff">'
     + '<thead><tr style="background:#f8fafc;color:#64748b;font-size:10.5px">'
     + _drTh('no','No','center','padding-right:4px')
     + _drTh('cno','계약번호')
     + _drTh('nm','임(전)차인')
+    + _drTh('grade','등급','center')
     + _drTh('score','점수','center')
     + _drTh('amt','연체금액/위약금','right')
-    + _drTh('stage','단계','left','padding-right:2px;width:1%') + _drTh('days','상태 (D+연체일)','left','width:1%')
+    + _drTh('stage','단계','left','padding-right:2px;width:1%') + _drTh('days','상태 (D+연체일)','left')
     + '<th style="padding:6px 8px;text-align:left">최근 대응 내용 <span onclick="dlqDrSort(\'nc\')" title="미수신 횟수로 정렬" style="cursor:pointer;user-select:none;opacity:.7">📵'+(cfg.sortKey==='nc'?(cfg.sortDir==='asc'?'▲':'▼'):'↕')+'</span></th>'
-    + _drTh('oh','🟣 오진선 TO DO · 팀장(판정·법무)','left','width:16%;color:#4F46E5;font-weight:800')
-    + _drTh('ky','🔵 김영철 TO DO · 팀원(초동·현장·서면)','left','width:16%;color:#2563eb;font-weight:800')
+    + _drTh('tl', _DR_RDOT['팀장'] + ' 팀장 · 판정·송무', 'left', 'width:17%;color:'+_DR_RCOL['팀장']+';font-weight:800')
+    + _drTh('ta', _DR_RDOT['팀원A'] + ' 팀원A · 회수(A·B)', 'left', 'width:15%;color:'+_DR_RCOL['팀원A']+';font-weight:800')
+    + _drTh('tb', _DR_RDOT['팀원B'] + ' 팀원B · 현장·집행(C·D)', 'left', 'width:15%;color:'+_DR_RCOL['팀원B']+';font-weight:800')
     + '</tr></thead><tbody>' + body + '</tbody></table></div></div>';
 }
 function _drDateStr(){ var d = new Date(); return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')+' ('+['일','월','화','수','목','금','토'][d.getDay()]+')'; }
 function _drFooterHtml(cfg){
-  return '<div style="font-size:11px;color:#64748b;padding:4px 2px">기준: '
-    + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual-yeonche-sop.html" target="_blank" style="color:#c0392b;font-weight:700">🗓️ 연체 Process — SOP-04-연체 v1.2↗</a> · '
+  return '<div style="font-size:11px;color:#64748b;padding:4px 2px;line-height:1.6">기준: '
+    + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual-yeonche-sop.html" target="_blank" style="color:#c0392b;font-weight:700">🗓️ 연체관리 일자별 대응 매뉴얼 — SOP-04-연체 v1.4↗</a> · '
     + '<a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual.html#sop04" target="_blank" style="color:#2563eb;font-weight:700">운영매뉴얼 SOP04↗</a>'
-    + ' · 미수신 '+cfg.ncCount+'회 확정 즉시 법무 · 납부약속 상한 D+'+cfg.promiseMax+' · 지급명령 마감 D+20 · 명도 주거 D+'+cfg.evictRes+' / 상업 D+'+cfg.evictCom
-    + ' · 단계 = 납기일(D+0) 기준 연체일수 · <b>No = 우선순위</b>(긴급도: 액션 P·분기·연체일 + 중요도: 연체금액·위약금·등급·KCB) · Daily Report 생성일 '+_drDateStr()+' · build v661</div>';
+    + ' · <b>담당 = 대응등급</b>(09:30 회의 확정 [A]~[D] 기록 우선, 없으면 자동 판정) — A·B 팀원A · C·D 팀원B · 판정·송무·승인 팀장'
+    + ' · 미수신 '+cfg.ncCount+'회 확정 → 송무 요청(팀장 당일 접수) · 납부약속 상한 D+'+cfg.promiseMax+' · 지급명령 마감 D+20 · 해지 통지 D+'+(cfg.evictRes-1)+' · 명도 주거 D+'+cfg.evictRes+' / 상업 D+'+cfg.evictCom
+    + ' · 단계 = 납기일(D+0) 기준 연체일수(임대료 연체가 없으면 관리비 등 연체일수) · <b>No = 우선순위</b>(긴급도: 액션 P·분기·연체일 + 중요도: 연체금액·위약금·대응등급·KCB)'
+    + ' · 어느 등급이든 공통 규칙(08~21시 · 협박·모욕 금지 · 제3자 고지 금지) · 생성 '+_drDateStr()+' · build v745</div>';
 }
 function _drBuildHtml(){
   var cfg = window._dlqDrCfg;
   var list = _drByTarget();
   var rows = list._rows;
-  var oh = rows.filter(function(r){ return r._dr.who === '오진선'; });
-  var ky = rows.filter(function(r){ return r._dr.who === '김영철'; });
-  var urgent = rows.filter(function(r){ return r._dr.act.p === 1; }).length;
-  var _ncSeen = {}, ncCnt = 0;   // [v658] 미수신 확정 연체자 수 (중복 제거)
-  rows.forEach(function(r){ if (_ncSeen[r.cno]) return; if (r._dr.nc >= cfg.ncCount) { _ncSeen[r.cno] = 1; ncCnt++; } });
-  var baseCount = rows._baseCount != null ? rows._baseCount : rows.length;
-  // [v658] 납부약속 카운트 — 불이행 / 당일 / 대기 (연체자 기준 중복 제거)
-  var payBroken = 0, payToday = 0, payWait = 0, _seen = {};
-  rows.forEach(function(r){ if (_seen[r.cno]) return; _seen[r.cno] = 1; var st = r._dr.pr ? r._dr.pr.state : 'none'; if (st === 'broken') payBroken++; else if (st === 'today') payToday++; else if (st === 'wait') payWait++; });
+  var baseCount = list._baseCount != null ? list._baseCount : list.length;
+  var actN = { '팀장':0, '팀원A':0, '팀원B':0 }, urgent = 0;
+  rows.forEach(function(r){ actN[r._dr.who]++; if (r._dr.act.p === 1) urgent++; });
+  var manN = function(w){ var k = _DR_RK[w]; return list.filter(function(t){ return t[k].length; }).length; };
+  var ncCnt = list.filter(function(t){ return t.nc >= cfg.ncCount; }).length;
+  var payBroken = 0, payToday = 0, payWait = 0;
+  list.forEach(function(t){ var st = t.pr ? t.pr.state : 'none'; if (st === 'broken') payBroken++; else if (st === 'today') payToday++; else if (st === 'wait') payWait++; });
+  var mtgCnt = list.filter(function(t){ return t.tl.some(function(a){ return a.id === 'mtg'; }); }).length;
+  var altCnt = list.filter(function(t){ return _drIsAltOnly(t.r); }).length, mgmtCnt = list.filter(function(t){ return _drHasMgmt(t.r); }).length;
+  var gCnt = { A:0, B:0, C:0, D:0 }, recCnt = 0;
+  list.forEach(function(t){ if (t.gi && gCnt[t.gi.g] != null) gCnt[t.gi.g]++; if (t.gi && t.gi.rec) recCnt++; });
+  var pct = function(n){ return baseCount ? Math.round(n / baseCount * 100) : 0; };
   var cf = cfg.cardFilter;
-  var kpi = function(key, label, val, sub, color){
-    var active = cfg.cardFilter === key;
-    return '<div onclick="dlqDrCardFilter(\''+key+'\')" title="클릭 시 해당 대상만 표시 (다시 클릭하면 해제)" style="flex:1;min-width:130px;background:'+(active?'#eff6ff':'#fff')+';border:'+(active?'2px solid #1d4ed8':'1px solid #e2e8f0')+';border-radius:10px;padding:10px 12px;cursor:pointer">'
-      + '<div style="font-size:10.5px;color:#64748b;font-weight:700">'+label+(active?' <span style="color:#1d4ed8">●</span>':'')+'</div>'
+  var kpi = function(key, label, val, sub, color, extra){
+    var active = (key === 'all') ? !(cfg.cardFilter || cfg.gradeFilter || cfg.stageFilter) : cfg.cardFilter === key;
+    return '<div onclick="dlqDrCardFilter(\''+key+'\')" title="'+(key === 'all' ? '클릭 시 모든 필터 해제' : '클릭 시 해당 대상만 표시 (다시 클릭하면 해제)')+'" style="flex:1;min-width:124px;background:'+(active && key !== 'all' ?'#eff6ff':'#fff')+';border:'+(active && key !== 'all' ?'2px solid #1d4ed8':'1px solid #e2e8f0')+';border-radius:10px;padding:10px 12px;cursor:pointer;'+(extra||'')+'">'
+      + '<div style="font-size:10.5px;color:#64748b;font-weight:700">'+label+(active && key !== 'all'?' <span style="color:#1d4ed8">●</span>':'')+'</div>'
       + '<div style="font-size:20px;font-weight:800;color:'+color+'">'+val+'</div>'
       + '<div style="font-size:10.5px;color:#64748b">'+sub+'</div></div>';
   };
+  var gCell = function(g){
+    var on = cfg.gradeFilter === g, c = _drGcol(g);
+    return '<div onclick="event.stopPropagation();dlqDrGradeFilter(\''+g+'\')" title="'+g+' '+_drGnm(g)+' · 담당 '+((g==='A'||g==='B')?'팀원A':'팀원B')+' — 누르면 '+g+'등급만 (다시 누르면 해제)" style="flex:1;border:1.5px solid '+(on?c:'#e2e8f0')+';box-shadow:'+(on?'0 0 0 1.5px '+c:'none')+';border-radius:7px;padding:3px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;background:'+(on?'#f8fafc':'#fff')+'">'
+      + '<b style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:5px;background:'+c+';color:#fff;font-size:11px">'+g+'</b>'
+      + '<span style="font-size:14px;font-weight:900;color:#1f2937;line-height:1.15">'+gCnt[g]+'</span>'
+      + '<span style="font-size:9.5px;color:#64748b;font-weight:700">'+pct(gCnt[g])+'%</span></div>';
+  };
+  var gradeCard = '<div style="flex:1.8;min-width:220px;background:'+(cfg.gradeFilter?'#eff6ff':'#fff')+';border:'+(cfg.gradeFilter?'2px solid #1d4ed8':'1px solid #e2e8f0')+';border-radius:10px;padding:8px 10px">'
+    + '<div style="font-size:10.5px;color:#64748b;font-weight:700">🏷️ 대응등급'+(cfg.gradeFilter?' <span style="color:#1d4ed8">● '+cfg.gradeFilter+'</span>':'')+' <span style="font-weight:600" title="담당을 정한 등급 — 09:30 회의 확정 [A]~[D] 기록이 있으면 그 등급, 없으면 자동 판정">· 회의 확정 '+recCnt+' / 자동 '+(baseCount-recCnt)+'</span></div>'
+    + '<div style="display:flex;gap:5px;margin:4px 0 3px">'+['A','B','C','D'].map(gCell).join('')+'</div>'
+    + '<div style="font-size:10px;color:#64748b">A·B '+pct(gCnt.A+gCnt.B)+'% → 팀원A · C·D '+pct(gCnt.C+gCnt.D)+'% → 팀원B</div></div>';
+  var feeCell = function(key, label, n, sub, tip){
+    var on = cfg.cardFilter === key;
+    return '<div onclick="event.stopPropagation();dlqDrCardFilter(\''+key+'\')" title="'+tip+'" style="flex:1;border:1.5px solid '+(on?'#0e7490':'#e2e8f0')+';box-shadow:'+(on?'0 0 0 1.5px #0e7490':'none')+';border-radius:7px;padding:4px 6px;cursor:pointer;background:'+(on?'#ecfeff':'#fff')+'">'
+      + '<div style="font-size:10px;font-weight:800;color:#0e7490;white-space:nowrap">'+label+'</div><div style="font-size:16px;font-weight:900;color:#1f2937;line-height:1.2">'+n+'명</div><div style="font-size:9.5px;color:#64748b;white-space:nowrap">'+sub+'</div></div>';
+  };
+  var feeCard = '<div style="flex:1.5;min-width:200px;background:'+((cf==='alt'||cf==='mgmt')?'#ecfeff':'#fff')+';border:'+((cf==='alt'||cf==='mgmt')?'2px solid #0e7490':'1px solid #e2e8f0')+';border-radius:10px;padding:8px 10px">'
+    + '<div style="font-size:10.5px;color:#64748b;font-weight:700">💧 관리비·기타 연체 <span style="font-weight:600">· 누르면 개별 리스트</span></div>'
+    + '<div style="display:flex;gap:5px;margin-top:4px">'
+    + feeCell('alt', '관리비·기타만', altCnt, '임대료 정상 · 해지·명도 제외', '임대료 연체 없이 관리비·기타 청구만 연체 — 지급명령까지만(해지·명도 단계 없음) · 다시 누르면 해제')
+    + feeCell('mgmt', '관리비 포함', mgmtCnt, '팀원A 매일 점검', '관리비(변동관리비) 미납이 있는 모든 건 — 임대료와 함께 밀린 건 포함 · 다시 누르면 해제')
+    + '</div></div>';
   var sections = '';
   if (cfg.view !== 'target') {
-    if (cf !== 'ky') sections += _drSectionHtml('오진선', '#4F46E5', _drPersonList('오진선', list, cfg), cfg);
-    if (cf !== 'oh') sections += _drSectionHtml('김영철', '#2563eb', _drPersonList('김영철', list, cfg), cfg);
+    var only = (cf === 'tl' || cf === 'ta' || cf === 'tb') ? cf : null;
+    _DR_ROLES.forEach(function(w){ if (!only || _DR_RK[w] === only) sections += _drSectionHtml(w, _drPersonList(w, list, cfg), cfg); });
   }
-  return '<div style="padding:14px 18px;max-width:1500px;margin:0 auto">'
+  return '<div style="padding:14px 18px;max-width:1860px;margin:0 auto">'
     + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
     + kpi('all','대상 연체자', baseCount+'명', cfg.includeTerminated?'계약중+종료 포함':'계약중 기준', '#1e293b')
-    + kpi('oh','오진선 · 팀장 (판정·법무)', oh.length+'건', 'D+5 판정 · 지급명령·해지 통지·명도 · 분납 승인', '#4F46E5')
-    + kpi('ky','김영철 · 팀원 (초동·현장·서면)', ky.length+'건', 'D+0~2 문자·콜 · D+3~4 방문요청 · D+6~ 방문·확약서', '#2563eb')
-    + kpi('urgent','🚨 즉시 조치 (P1)', urgent+'건', '약속 불이행·지급명령 마감·해지·명도·5-2', '#dc2626')
-    + kpi('nc','📵 미수신 '+cfg.ncCount+'회 확정', ncCnt+'명', '전화 중단 → 내용증명 + 지급명령', '#dc2626')
+    + gradeCard
+    + kpi('tl', _DR_RDOT['팀장']+' 팀장 · 판정·송무', manN('팀장')+'명 · '+actN['팀장']+'건', '등급 회의 · 송무 · 승인', _DR_RCOL['팀장'])
+    + kpi('ta', _DR_RDOT['팀원A']+' 팀원A · 회수 A·B', manN('팀원A')+'명 · '+actN['팀원A']+'건', 'A·B 콜·약속 · 초안 · 관리비', _DR_RCOL['팀원A'])
+    + kpi('tb', _DR_RDOT['팀원B']+' 팀원B · 현장 C·D', manN('팀원B')+'명 · '+actN['팀원B']+'건', 'C·D 콜 · 독촉장 · 방문 · 집행', _DR_RCOL['팀원B'])
+    + kpi('mtg','🗓️ 09:30 등급 회의 안건', mtgCnt+'명', 'KCB · 재판정 · D+5 판정 · 만기', '#4F46E5')
+    + feeCard
+    + kpi('urgent','🚨 즉시 조치 (P1)', urgent+'건', '약속 불이행 · 지급명령 마감 · 해지·명도 · 6-2', '#dc2626')
+    + kpi('nc','📵 미수신 '+cfg.ncCount+'회 확정', ncCnt+'명', '전화 중단 → 송무 요청', '#dc2626')
     + kpi('pay','📅 납부약속', (payBroken+payToday+payWait)+'명', '불이행 '+payBroken+' / 당일 '+payToday+' / 대기 '+payWait, '#059669')
     + '</div>'
-    + _drStageStripHtml(rows, cfg)
+    + _drStageStripHtml(list, cfg)
     + (cfg.view === 'target' ? _drTargetViewHtml(cfg, list) : sections)
     + _drFooterHtml(cfg)
     + '</div>';
 }
-// [v659] 담당자별 인쇄 시트 — A4 가로 · 완료 체크 · 결과/메모란 · 담당자 내 우선순위 No
+// 담당자별 인쇄 시트 — A3 가로 · 완료 체크 · 결과/메모란 · 담당자 내 우선순위 No
 var _DR_PRINT_CSS = '@page{size:A3 landscape;margin:10mm}'
   + 'body{font-family:Pretendard,-apple-system,"Malgun Gothic",sans-serif;margin:0;padding:8px 10px;background:#fff;color:#0f172a;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
   + 'a{color:#2563eb;text-decoration:none}'
@@ -11807,20 +12012,20 @@ var _DR_PRINT_CSS = '@page{size:A3 landscape;margin:10mm}'
   + '.dr-sheet tr{page-break-inside:avoid;break-inside:avoid}.dr-sheet thead{display:table-header-group}'
   + '.dr-ft{font-size:10px;color:#475569;margin-top:10px;border-top:1px solid #cbd5e1;padding-top:5px}'
   + '@media print{.dr-noprint{display:none}}';
-// 인쇄 시트: A3 가로 (담당자별 지시서 — 완료 체크 · 담당 내 우선순위 No · 결과·메모란)
 function _drPrintSheet(who, cfg){
   var list = _drByTarget();
   var pl = _drPersonList(who, list, cfg);
   var nActs = pl.reduce(function(n, t){ return n + pl._acts(t).length; }, 0);
-  var color = who === '오진선' ? '#4F46E5' : '#2563eb';
-  var flt = [cfg.cardFilter ? ({urgent:'즉시 조치(P1)', nc:'미수신 '+cfg.ncCount+'회 확정', pay:'납부약속', oh:'', ky:''})[cfg.cardFilter] : '', cfg.stageFilter ? '단계 ' + cfg.stageFilter : ''].filter(Boolean).join(' · ');
+  var color = _DR_RCOL[who];
+  var flt = [cfg.cardFilter ? ({urgent:'즉시 조치(P1)', nc:'미수신 '+cfg.ncCount+'회 확정', pay:'납부약속', mtg:'09:30 등급 회의 안건', alt:'관리비·기타만 연체', mgmt:'관리비 포함', tl:'', ta:'', tb:''})[cfg.cardFilter] : '', cfg.gradeFilter ? '등급 ' + cfg.gradeFilter : '', cfg.stageFilter ? '단계 ' + cfg.stageFilter : ''].filter(Boolean).join(' · ');
   return '<div class="dr-sheet">'
-    + '<div class="dr-hd"><h1 style="color:'+color+'">📋 연체대응 Daily Report — '+who+'</h1>'
+    + '<div class="dr-hd"><h1 style="color:'+color+'">📋 연체대응 Daily Report — '+who+' · '+_DR_RSUB[who]+'</h1>'
     + '<div class="sub">'+_drDateStr()+' · '+_drEsc(_drRoleText(who, cfg))+(flt ? ' · 필터: '+_drEsc(flt) : '')+'</div>'
     + '<div class="cnt">배정 '+pl.length+'명 · '+nActs+'건 <span style="font-size:10px;font-weight:600;color:#64748b;margin-left:8px">용지 A3 · 가로 방향</span></div></div>'
     + _drPersonTableHtml(who, pl, cfg, true)
-    + '<div class="dr-ft">No = '+who+' 담당 내 우선순위 = 긴급도 + 중요도 (전체 순위가 다르면 함께 표기) · 긴급도: 액션 P·분기(약속/분납 불이행 · 미수신 확정 · 5-2 · 명도 · 마감)·연체일 / 중요도: 연체금액·위약금·등급·KCB·강제퇴실'
-    + ' · 기준 연체 Process SOP-04-연체 v1.2 — 미수신 '+cfg.ncCount+'회 확정 즉시 법무 · 납부약속 상한 D+'+cfg.promiseMax+' · 지급명령 마감 D+20 · 명도 주거 D+'+cfg.evictRes+' / 상업 D+'+cfg.evictCom+' · 완료 시 ☐ 체크 후 Daily Report 시트에 결과 기록</div>'
+    + '<div class="dr-ft">No = '+who+' 담당 내 우선순위 = 긴급도 + 중요도 (전체 순위가 다르면 함께 표기) · 긴급도: 액션 P·분기(약속/분납 불이행 · 미수신 확정 · 6-2 · 명도 · 마감)·연체일 / 중요도: 연체금액·위약금·대응등급·KCB·강제퇴실'
+    + ' · 등급 = 09:30 회의 확정 [A]~[D] 기록 우선(없으면 자동) — 말투: A 서비스 · B 날짜 특정 · C 단호 · D 절차 통보 · 공통 규칙 08~21시 · 협박·모욕·제3자 고지 금지'
+    + ' · 기준 연체 SOP-04-연체 v1.4 — 미수신 '+cfg.ncCount+'회 확정 → 송무 요청 · 납부약속 상한 D+'+cfg.promiseMax+' · 지급명령 마감 D+20 · 명도 주거 D+'+cfg.evictRes+' / 상업 D+'+cfg.evictCom+' · 완료 시 ☐ 체크 후 Daily Report 시트에 결과 기록(대응 상세내용 맨 앞 [등급]·태도 [성실]/[회피]/[거부])</div>'
     + '</div>';
 }
 function dlqDrPrintMenu(){
@@ -11830,8 +12035,8 @@ function dlqDrPrintMenu(){
 function dlqDrPrint(who){
   var m = document.getElementById('drPrintMenu'); if (m) m.style.display = 'none';
   var cfg = window._dlqDrCfg, html, title = '연체대응 Daily Report';
-  if (who === '오진선' || who === '김영철') { html = _drPrintSheet(who, cfg); title += ' — ' + who; }
-  else if (who === 'both') { html = _drPrintSheet('오진선', cfg) + '<div style="page-break-after:always;break-after:page"></div>' + _drPrintSheet('김영철', cfg); title += ' — 담당자별'; }
+  if (_DR_ROLES.indexOf(who) >= 0) { html = _drPrintSheet(who, cfg); title += ' — ' + who; }
+  else if (who === 'roles') { html = _DR_ROLES.map(function(w){ return _drPrintSheet(w, cfg); }).join('<div style="page-break-after:always;break-after:page"></div>'); title += ' — 담당자별'; }
   else { var body = document.getElementById('dlqDrBody'); if (!body) return; html = body.innerHTML; }
   var w = window.open('', '_blank');
   if (!w) { alert('팝업이 차단되었습니다. 이 사이트의 팝업을 허용해 주세요.'); return; }
@@ -11845,29 +12050,31 @@ function dlqOpenDailyReport(){
   var cfg = window._dlqDrCfg;
   var wrap = document.createElement('div');
   wrap.id = 'dlqDrModal';
-  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:24px;overflow:auto';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:20px 16px;overflow:auto';
   var mi = 'display:block;padding:7px 12px;font-size:12px;cursor:pointer;white-space:nowrap;border-radius:6px';
-  wrap.innerHTML = '<div style="background:#f6f8fb;border-radius:16px;width:100%;max-width:1520px;max-height:calc(100vh - 48px);overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)">'
+  var hov = ' onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'\'"';
+  wrap.innerHTML = '<div style="background:#f6f8fb;border-radius:16px;width:100%;max-width:1880px;max-height:calc(100vh - 48px);overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)">'
     + '<div style="position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid #e2e8f0;border-radius:16px 16px 0 0;padding:12px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-    + '<div style="font-size:16px;font-weight:800">📋 연체대응 Daily Report <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual-yeonche-sop.html" target="_blank" rel="noopener" title="연체관리 일자별 대응 매뉴얼 (SOP-04-연체 v1.2)" style="font-size:10px;font-weight:800;color:#c0392b;background:#fdf3f2;border:1px solid #eec5c0;border-radius:99px;padding:2px 8px;text-decoration:none;vertical-align:middle;margin-left:4px">연체 Process 기준 ↗</a></div>'
+    + '<div><div style="font-size:16px;font-weight:800">📋 연체대응 Daily Report <a href="https://hskang-coder.github.io/krg-ops-dashboard/krg-manual-yeonche-sop.html" target="_blank" rel="noopener" title="연체관리 일자별 대응 매뉴얼 (SOP-04-연체 v1.4)" style="font-size:10px;font-weight:800;color:#c0392b;background:#fdf3f2;border:1px solid #eec5c0;border-radius:99px;padding:2px 8px;text-decoration:none;vertical-align:middle;margin-left:4px">연체 SOP v1.4 기준 ↗</a></div>'
+    + '<div style="font-size:10.5px;color:#64748b;margin-top:2px">플레이어 <b style="color:'+_DR_RCOL['팀장']+'">팀장</b>(판정·송무) · <b style="color:'+_DR_RCOL['팀원A']+'">팀원A</b>(A·B 회수) · <b style="color:'+_DR_RCOL['팀원B']+'">팀원B</b>(C·D 현장·집행) — 담당은 대응등급으로 정한다</div></div>'
     + '<div style="display:flex;border:1px solid #e2e8f0;border-radius:7px;overflow:hidden">'
     + '<button id="drViewTarget" onclick="dlqDrSetView(\'target\')" style="border:none;padding:5px 11px;font-size:11.5px;font-weight:700;cursor:pointer;background:'+(cfg.view==='target'?'#1d4ed8':'#fff')+';color:'+(cfg.view==='target'?'#fff':'#64748b')+'">👤 대상자별</button>'
     + '<button id="drViewAssignee" onclick="dlqDrSetView(\'assignee\')" style="border:none;border-left:1px solid #e2e8f0;padding:5px 11px;font-size:11.5px;font-weight:700;cursor:pointer;background:'+(cfg.view==='assignee'?'#1d4ed8':'#fff')+';color:'+(cfg.view==='assignee'?'#fff':'#64748b')+'">👥 담당자별</button>'
     + '</div>'
     + '<label style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:4px">고액 ≥ <input id="drCfgAmt" type="number" value="'+cfg.amt+'" step="100000" style="width:78px;border:1px solid #e2e8f0;border-radius:5px;padding:2px 5px;font-size:11.5px;text-align:right">원</label>'
-    + '<label title="이번 연체 사이클 미수신 횟수가 이 값 이상이면 미수신 확정 → 전화 중단 · 내용증명 · 지급명령 (SOP 원칙 2)" style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:3px">미수신 ≥ <input id="drCfgNc" type="number" min="1" value="'+cfg.ncCount+'" style="width:36px;border:1px solid #e2e8f0;border-radius:5px;padding:2px 4px;font-size:11.5px;text-align:right">회</label>'
-    + '<label title="납부약속 인정 상한 — 약속일이 이 D+n을 넘으면 서면 분납약정 + 내용증명 1차 (SOP 원칙 6)" style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:3px">약속 상한 D+<input id="drCfgEv" type="number" min="1" value="'+cfg.promiseMax+'" style="width:36px;border:1px solid #e2e8f0;border-radius:5px;padding:2px 4px;font-size:11.5px;text-align:right"></label>'
-    + '<label title="명도 착수 시점 — 주거용 D+n (2기 연체 해지 요건 D+n−1) · 상업용은 자동 +30일 (3기 연체)" style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:3px">명도 D+<input id="drCfgMd" type="number" min="2" value="'+cfg.evictRes+'" style="width:40px;border:1px solid #e2e8f0;border-radius:5px;padding:2px 4px;font-size:11.5px;text-align:right"></label>'
-    + '<label style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:4px"><input id="drCfgTerm" type="checkbox" '+(cfg.includeTerminated?'checked':'')+'> 종료 포함</label>'
+    + '<label title="이번 연체 사이클 미수신 횟수가 이 값 이상이면 미수신 확정 → 전화 중단 · 송무 요청(내용증명·지급명령) (SOP 원칙 2)" style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:3px">미수신 ≥ <input id="drCfgNc" type="number" min="1" value="'+cfg.ncCount+'" style="width:36px;border:1px solid #e2e8f0;border-radius:5px;padding:2px 4px;font-size:11.5px;text-align:right">회</label>'
+    + '<label title="납부약속 인정 상한 — 약속일이 이 D+n을 넘으면 팀장 승인 서면 분납약정 + 내용증명 1차 (SOP 원칙 6)" style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:3px">약속 상한 D+<input id="drCfgEv" type="number" min="1" value="'+cfg.promiseMax+'" style="width:36px;border:1px solid #e2e8f0;border-radius:5px;padding:2px 4px;font-size:11.5px;text-align:right"></label>'
+    + '<label title="명도 착수 시점 — 주거용 D+n (2기 연체 해지 통지 D+n−1) · 상업용은 자동 +30일 (3기 연체)" style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:3px">명도 D+<input id="drCfgMd" type="number" min="2" value="'+cfg.evictRes+'" style="width:40px;border:1px solid #e2e8f0;border-radius:5px;padding:2px 4px;font-size:11.5px;text-align:right"></label>'
+    + '<label title="종료 채권 포함 — 종료 3개월 이내 팀원A · 초과 팀원B · 법조치 팀장 (SOP 4장)" style="font-size:11.5px;color:#64748b;display:flex;align-items:center;gap:4px"><input id="drCfgTerm" type="checkbox" '+(cfg.includeTerminated?'checked':'')+'> 종료 포함</label>'
     + '<span style="flex:1"></span>'
+    + '<a href="https://'+DR_SLACK_DOMAIN+'.slack.com/archives/'+DR_SLACK_DLQ_CH+'" target="_blank" rel="noopener" title="Slack #심사_운영_연체 채널 열기 · 계약별 대화는 표의 계약번호 옆 💬" style="border:1px solid #e2e8f0;background:#fff;border-radius:7px;padding:5px 11px;font-size:12px;color:#0f172a;text-decoration:none">#심사_운영_연체 ↗</a>'
     + '<button onclick="dlqDrSlackCopy()" style="border:1px solid #e2e8f0;background:#fff;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">💬 Slack용 복사</button>'
     + '<div style="position:relative"><button id="drPrintBtn" onclick="dlqDrPrintMenu()" title="담당자별 지시서 또는 현재 화면 출력" style="border:1px solid #e2e8f0;background:#fff;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer">🖨️ 인쇄 ▾</button>'
-    + '<div id="drPrintMenu" style="display:none;position:absolute;right:0;top:34px;background:#fff;border:1px solid #e2e8f0;border-radius:9px;box-shadow:0 8px 24px rgba(15,23,42,.18);padding:5px;z-index:20;min-width:190px">'
-    + '<div onclick="dlqDrPrint(\'오진선\')" style="'+mi+';color:#4F46E5;font-weight:700" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'\'">🟣 오진선 지시서</div>'
-    + '<div onclick="dlqDrPrint(\'김영철\')" style="'+mi+';color:#2563eb;font-weight:700" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'\'">🔵 김영철 지시서</div>'
-    + '<div onclick="dlqDrPrint(\'both\')" style="'+mi+';font-weight:700" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'\'">👥 두 사람 (각 별도 페이지)</div>'
+    + '<div id="drPrintMenu" style="display:none;position:absolute;right:0;top:34px;background:#fff;border:1px solid #e2e8f0;border-radius:9px;box-shadow:0 8px 24px rgba(15,23,42,.18);padding:5px;z-index:20;min-width:200px">'
+    + _DR_ROLES.map(function(w){ return '<div onclick="dlqDrPrint(\''+w+'\')" style="'+mi+';color:'+_DR_RCOL[w]+';font-weight:700"'+hov+'>'+_DR_RDOT[w]+' '+w+' 지시서 <span style="font-weight:600;color:#94a3b8">· '+_DR_RSUB[w]+'</span></div>'; }).join('')
+    + '<div onclick="dlqDrPrint(\'roles\')" style="'+mi+';font-weight:700"'+hov+'>👥 세 사람 (각 별도 페이지)</div>'
     + '<div style="border-top:1px solid #e2e8f0;margin:4px 0"></div>'
-    + '<div onclick="dlqDrPrint(\'all\')" style="'+mi+';color:#475569" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'\'">📄 현재 화면 전체</div>'
+    + '<div onclick="dlqDrPrint(\'all\')" style="'+mi+';color:#475569"'+hov+'>📄 현재 화면 전체</div>'
     + '</div></div>'
     + '<button onclick="dlqCloseDailyReport()" style="border:none;background:#1d4ed8;color:#fff;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">닫기 ✕</button>'
     + '</div><div id="dlqDrBody"></div></div>';
@@ -11902,33 +12109,34 @@ function dlqDrSlackCopy(who){
   var d = new Date();
   var ds = d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0');
   var t;
+  var gStr = function(gi){ return gi && /^[ABCD]$/.test(gi.g) ? gi.g + (gi.rec ? '' : '(자동)') : '-'; };
   var line = function(x, no){
     var r = x.r, lg = _drLegalStr(x.legal), pr = x.pr;
-    return '· ' + no + '. [' + (x.stage||'-') + '] ' + r.cno + ' ' + r.nm + ' / D+' + (r.days||0) + ' / ' + _drWon(r.amt) + (x.nc >= cfg.ncCount ? ' / 미수신 ' + x.nc + '회' : '') + (lg ? ' / ' + lg : '')
+    return '· ' + no + '. [' + (x.stage||'-') + '] ' + gStr(x.gi) + ' ' + r.cno + ' ' + r.nm + ' / D+' + (x.days||0) + ' / ' + _drWon(r.amt) + (x.nc >= cfg.ncCount ? ' / 미수신 ' + x.nc + '회' : '') + (lg ? ' / ' + lg : '')
       + (pr && pr.state !== 'none' ? ' / 약속 ' + pr.dateStr + (pr.state === 'broken' ? ' 불이행' : pr.state === 'today' ? ' 당일' : ' 대기') : '') + '\n';
   };
-  if (who === '오진선' || who === '김영철') {
+  var legend = '등급 = 09:30 회의 확정 우선, (자동) = 자동 판정 · 연체 SOP v1.4 기준';
+  if (_DR_ROLES.indexOf(who) >= 0) {
     var pl = _drPersonList(who, _drByTarget(), cfg), sorted = pl.slice().sort(function(a,b){ return a.rank - b.rank; });
-    t = '📋 연체대응 Daily Report — ' + ds + ' · ' + who + '\n배정 ' + pl.length + '명 (No = 담당 내 우선순위 · 연체 Process SOP-04-연체 v1.2 기준)\n\n';
-    sorted.forEach(function(x){ t += line(x, pl._no(x)); t += '   ' + (who === '오진선' ? '🟣' : '🔵') + ' ' + pl._acts(x).map(function(a){ return (a.seg ? '[' + a.seg + '] ' : '') + a.t; }).join(' + ') + '\n'; });
+    t = '📋 연체대응 Daily Report — ' + ds + ' · ' + who + ' (' + _DR_RSUB[who] + ')\n배정 ' + pl.length + '명 (No = 담당 내 우선순위 · ' + legend + ')\n\n';
+    sorted.forEach(function(x){ t += line(x, pl._no(x)); t += '   ' + _DR_RDOT[who] + ' ' + pl._acts(x).map(function(a){ return (a.seg ? '[' + a.seg + '] ' : '') + _drT(a); }).join(' + ') + '\n'; });
   } else if (cfg.view === 'target') {
-    var list = _drByTarget();
-    t = '📋 연체대응 Daily Report — ' + ds + '\n대상 ' + (list._baseCount||list.length) + '명 (대상자별 · No = 우선순위(긴급도+중요도) · 연체 Process SOP-04-연체 v1.2 기준)\n\n';
-    list.forEach(function(x){
+    var list = _drByTarget(), fl = _drFilter(list, cfg, null);
+    t = '📋 연체대응 Daily Report — ' + ds + '\n대상 ' + fl.length + '명' + (fl.length !== list.length ? ' (필터 적용 · 전체 ' + list.length + '명)' : '') + ' (대상자별 · No = 우선순위(긴급도+중요도) · ' + legend + ')\n\n';
+    fl.forEach(function(x){
       t += line(x, x.rank);
-      if (x.oh.length) t += '   🟣 오진선: ' + x.oh.map(function(a){return a.t;}).join(' + ') + '\n';
-      if (x.ky.length) t += '   🔵 김영철: ' + x.ky.map(function(a){return a.t;}).join(' + ') + '\n';
+      _DR_ROLES.forEach(function(w){ var a = x[_DR_RK[w]]; if (a.length) t += '   ' + _DR_RDOT[w] + ' ' + w + ': ' + a.map(function(y){ return (y.seg ? '[' + y.seg + '] ' : '') + (y.s || y.t); }).join(' + ') + '\n'; });
     });
   } else {
     var rows = _drTargets();
-    t = '📋 연체대응 Daily Report — ' + ds + '\n대상 ' + (rows._baseCount||rows.length) + '명 (담당자별 · 연체 Process SOP-04-연체 v1.2 기준)\n';
-    ['오진선','김영철'].forEach(function(w){
+    t = '📋 연체대응 Daily Report — ' + ds + '\n대상 ' + (rows._baseCount||rows.length) + '명 (담당자별 · ' + legend + ')\n';
+    _DR_ROLES.forEach(function(w){
       var lst = rows.filter(function(r){ return r._dr.who === w; });
-      t += '\n■ ' + w + ' (' + lst.length + '건)\n';
+      t += '\n■ ' + _DR_RDOT[w] + ' ' + w + ' · ' + _DR_RSUB[w] + ' (' + lst.length + '건)\n';
       var cur = '';
       lst.forEach(function(r){
         if (r._dr.act.t !== cur) { cur = r._dr.act.t; t += '\n▶ ' + cur + '\n'; }
-        t += '  · [' + (r._dr.seg||'-') + '] ' + r.cno + ' ' + r.nm + ' / D+' + (r.days||0) + ' / ' + _drWon(r.amt) + (r._dr.nc >= cfg.ncCount ? ' / 미수신 ' + r._dr.nc + '회' : '') + '\n';
+        t += '  · [' + (r._dr.seg||'-') + '] ' + gStr(r._dr.gi) + ' ' + r.cno + ' ' + r.nm + ' / D+' + (r._dr.days||0) + ' / ' + _drWon(r.amt) + (r._dr.nc >= cfg.ncCount ? ' / 미수신 ' + r._dr.nc + '회' : '') + '\n';
       });
     });
   }
@@ -11936,7 +12144,7 @@ function dlqDrSlackCopy(who){
   if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(done).catch(function(){ prompt('복사(Ctrl+C):', t); }); }
   else { prompt('복사(Ctrl+C):', t); }
 }
-// ═══════════ [v661] Daily Report 끝 ═══════════
+// ═══════════ [v745] Daily Report 끝 ═══════════
 /* [v610] 소송취하 컷오프 — 계약별 최근 '소송취하' 기록(일자·행순번). 취하 이전 법적 기록은 리셋 취급 */
 function _dlqLegalCut(cno){
   var Prow=(typeof daeungRawData!=='undefined'&&Array.isArray(daeungRawData))?daeungRawData:[];
