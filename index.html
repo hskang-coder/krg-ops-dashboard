@@ -378,6 +378,30 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 .cr-rgd[open] > summary::before { transform: rotate(90deg); }
 .cr-rgd .cr-rgd-m { font-weight: 600; color: #64748B; }
 .cr-rgd .cr-rgd-b { padding: 0 12px 12px; }
+/* [v748] 계약 조회 — 📞 통화 가이드 (등급별 멘트 · 말투 기준 · 쓰지 않는 말) */
+.cr-cg .cr-cg-b { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.cr-cg .cr-cg-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cr-cg .cr-cg-chips { display: inline-flex; gap: 4px; }
+.cr-cg .cr-cg-chip { border: 1.5px solid var(--c); background: #fff; color: var(--c); border-radius: 6px; padding: 2px 8px; font-size: 11.5px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; line-height: 1.4; font-family: inherit; }
+.cr-cg .cr-cg-chip.on { background: var(--c); color: #fff; }
+.cr-cg .cr-cg-chip i { font-style: normal; font-size: 10px; font-weight: 700; opacity: .85; }
+.cr-cg .cr-cg-goal { font-size: 12px; color: #334155; }
+.cr-cg .cr-cg-goal b { color: #64748B; margin-right: 6px; }
+.cr-cg .cr-cg-msg { border-left: 4px solid #94A3B8; background: #F8FAFC; border-radius: 6px; padding: 8px 12px; font-size: 13px; line-height: 1.7; color: #0F172A; }
+.cr-cg .h { font-size: 11px; font-weight: 800; color: #64748B; margin-bottom: 4px; }
+.cr-cg .cr-cg-fill { background: #FEF3C7; color: #92400E; border-radius: 4px; padding: 0 4px; font-weight: 800; }
+.cr-cg .cr-cg-tone { font-size: 12.5px; color: #1F2937; }
+.cr-cg .cr-cg-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; }
+.cr-cg .cr-cg-do, .cr-cg .cr-cg-no { border-radius: 8px; padding: 8px 10px; }
+.cr-cg .cr-cg-do { background: #F0FDF4; border: 1px solid #BBF7D0; }
+.cr-cg .cr-cg-no { background: #FEF2F2; border: 1px solid #FECACA; }
+.cr-cg ul { margin: 0; padding-left: 16px; list-style: disc; }
+.cr-cg li { margin: 2px 0; line-height: 1.5; }
+.cr-cg .bad { color: #B91C1C; font-weight: 700; }
+.cr-cg .arw { color: #94A3B8; margin: 0 5px; }
+.cr-cg .alt { color: #047857; font-weight: 700; }
+.cr-cg .cr-cg-cm .cr-cg-do, .cr-cg .cr-cg-cm .cr-cg-no { background: #F8FAFC; border-color: #E2E8F0; }
+.cr-cg .cr-cg-cm li { font-size: 11.5px; }
 .cr-stats { display: flex; gap: 0; flex: 1; flex-wrap: wrap; margin-left: auto; }
 .cr-stat { flex: 1; min-width: 90px; text-align: center; padding: 8px 12px; border-left: 1px solid #E2E8F0; }
 .cr-stat-label { font-size: 10px; color: #94A3B8; font-weight: 600; margin-bottom: 3px; }
@@ -7185,10 +7209,145 @@ function crRespGradeWatch(cno, t0, tok){
     el.innerHTML = o.badge;
     var bx = document.getElementById('crRespGradeBoxWrap'); if (bx && bx.getAttribute('data-cno') === key) bx.innerHTML = o.box;
     var dt = document.getElementById('crRespGradeDetailWrap'); if (dt && dt.getAttribute('data-cno') === key) dt.innerHTML = o.detail;
+    var cg = document.getElementById('crCallGuideWrap'); if (cg && cg.getAttribute('data-cno') === key && typeof crCallGuideInner === 'function') cg.innerHTML = crCallGuideInner(cno);   /* [v748] 통화 가이드 */
     return;
   }
   if (Date.now() - t0 > 600000) return;   /* 10분까지만 확인 */
   setTimeout(function(){ crRespGradeWatch(cno, t0, tok); }, 2000);
+}
+/* ▶ [v748] 계약 조회 — 📞 통화 가이드 (관리자 지시 2026-11-27)
+   · 그 계약 대응등급의 멘트(연체 SOP v1.4 1-2장 · 연체관리 '대응 리포트'와 같은 문구 window._dpMeta) + 말투 기준 + 쓰지 않는 말 → 대신 쓸 말
+   · ‘친절’·‘서비스 마인드’·‘단호’·‘사실만 짧게’ 같은 추상어를 담당자가 바로 지킬 수 있는 행동 기준으로 풀어 씀
+   · 기준 등급 = 회의 확정 등급([A]~[D] 기록)이 있으면 그것, 없으면 자동 판정 · A~D 칩으로 다른 등급 미리보기
+   · [이름]은 연체관리 표의 계약자명(없으면 '고객') · {기한}은 노란 빈칸(팀장이 정한 날짜를 넣어 말함) · D이고 강제퇴실 진행 중이면 강제퇴실 멘트
+   · 연체 목록에 없는 계약은 표시 없음 · 표시 전용 — 연체관리 코드·문구·시트는 바꾸지 않음 */
+var CR_CG = {
+  common: {
+    dos: [
+      '첫마디에 회사명(개런티즈)을 밝힌다 — 멘트 첫 줄 그대로',
+      '용건 전에 본인 확인 — “○○○ 님 본인 맞으신가요?”',
+      '고객이 말을 마칠 때까지 끊지 않는다 · 들은 사정은 “그러셨군요” 한마디로 받는다',
+      '문장 끝은 “~습니다”, “~부탁드립니다” — 반말·명령형 없이',
+      '끝낼 때 날짜·금액을 다시 말하고 “맞으시죠?”로 확인한다',
+      '고객이 언성을 높여도 내 목소리 크기·속도는 그대로',
+      '통화 후 대응 상세내용 맨 앞에 [A]~[D], 태도 [성실]·[회피]·[거부]를 적는다'
+    ],
+    donts: [
+      ['21시~다음 날 08시 전화·문자', ''],
+      ['본인 확인 전에 미납·금액·절차 이야기', '본인이 아니면 “개런티즈에서 연락드렸다고 전해 주세요”만'],
+      ['가족·룸메이트·직장·학교에 미납 사실 알리기, “주변에 알리겠다”', ''],
+      ['욕설·모욕·비하 — “사기꾼”, “도둑”, 국적·출신·한국어 실력 언급', ''],
+      ['회사가 할 수 없는 조치 — “출국 못 하게 하겠다”, “비자 취소”, “추방”, “출입국에 신고”', ''],
+      ['법원·검찰·경찰처럼 말하기 — “법원에서 연락드렸습니다”, “검찰로 넘어갔습니다”', ''],
+      ['정해지지 않은 절차를 한 것처럼 — “이미 고소했습니다”, “내일 집행합니다”', '팀장이 확정한 절차·날짜만'],
+      ['안 받는다고 연달아 거는 전화·문자', '부재면 문자를 남기고 기록 → 다음 연락은 SOP 일정대로']
+    ]
+  },
+  A: { tone: '서비스 마인드', def: '= 고객이 몰랐을 수 있다고 보고, 납부 방법을 알려 주고 감사로 끝낸다',
+    dos: [
+      '“혹시 확인이 늦어지셨을까 해서 연락드렸습니다”로 시작한다',
+      '금액과 납부 계좌(링크)를 바로 알려 준다',
+      '자동이체 전환을 한 번 권한다',
+      '“이미 납부하셨다면 양해 부탁드립니다. 감사합니다”로 끝낸다'
+    ],
+    donts: [
+      ['“연체”, “미납”, “체납”, “독촉”', '“납부일이 지난 것 같아”'],
+      ['“왜 안 내셨어요?”, “또 늦으셨네요”', '“혹시 확인이 늦어지셨을까 해서요”'],
+      ['“빨리”, “당장”, “오늘 안에 꼭”', '“확인 후 납부 부탁드립니다”'],
+      ['법적 조치·해지·연체료·신용 이야기', 'A에서는 꺼내지 않는다']
+    ] },
+  B: { tone: '친절하되 날짜·금액 특정', def: '= 말은 아래 ‘친절’의 기준대로 공손하게, 날짜와 금액은 반드시 숫자로',
+    dos: [
+      '“○월 ○일(○요일)까지 ○○원 가능하실까요?” — 날짜·금액을 넣어 묻는다',
+      '약속을 받으면 날짜·금액을 그대로 다시 말하고 입금예정일에 기록한다',
+      '“○일(약속일 다음 날)에 확인 연락드리겠습니다” — 다음 연락일을 알린다',
+      '분납은 문자로 일정을 보내고 고객 회신을 받아 둔다(서면)',
+      '어렵다고 하면 이유를 듣고 분납을 협의한다 — “미이행 시 계약상 법적 조치”는 이때 한 번만'
+    ],
+    donts: [
+      ['“편하실 때”, “여유 되실 때”, “천천히”, “이번 달 안에만”', '“○월 ○일까지 ○○원”'],
+      ['“언제쯤 되세요?”(날짜 없는 질문)', '“○일까지 가능하실까요?”'],
+      ['“다음에 또 연락드릴게요”', '“○일에 다시 연락드리겠습니다”'],
+      ['“연체료 빼 드릴게요”, “이번만 봐 드릴게요”', '감면·면제는 팀장 결정 — 약속하지 않는다'],
+      ['“안 내시면 쫓겨나요”, “고소할 거예요”', '“미이행 시 계약상 법적 조치가 진행됩니다”']
+    ] },
+  C: { tone: '단호', def: '= 큰 소리가 아니라, 기한·절차를 바꾸지 않고 같은 말로 되풀이한다',
+    dos: [
+      '기한을 날짜로 두 번 말한다 — “○월 ○일까지”',
+      '다음 절차를 순서대로, 사실만 — 내용증명 → 지급명령',
+      '같은 질문에는 같은 문장으로 답한다',
+      '연장·감면 요청은 그 자리에서 답하지 않는다 — “팀장 확인 후 오늘 중 회신드리겠습니다”',
+      '분납 합의는 문자·합의서로만'
+    ],
+    donts: [
+      ['“혹시”, “가능하시면”, “괜찮으시면”', '빼고 말한다 — 기한이 흐려진다'],
+      ['내용증명 발송 전에 “진행 중입니다”', '“법적 절차를 준비하고 있습니다” (멘트의 ‘진행 중’은 발송 후에만)'],
+      ['“감옥 가요”, “형사처벌 받아요”, “경찰에 신고했어요”', '팀장이 정한 절차만 말한다'],
+      ['“짐 빼겠다”, “비밀번호 바꾸겠다”, “단전·단수하겠다”', '퇴실은 명도 절차로만 — 팀장 확정 내용만 안내'],
+      ['언성 높이기·한숨·비꼬기 — “몇 번을 말해요?”', '같은 문장을 같은 크기로 다시']
+    ] },
+  D: { tone: '사실만 짧게', def: '= 세 문장(인사 · 절차 사실 · 기한)으로 끝내고 협상하지 않는다',
+    dos: [
+      '세 문장 안에 끝낸다 — 인사 → 절차 사실 → 기한',
+      '{기한}에는 팀장이 정한 날짜를 넣어 말한다',
+      '사정 설명은 끝까지 듣고 “말씀하신 내용 기록하겠습니다” 한 번만',
+      '분납·감면·연장은 약속하지 않는다 — “팀장 확인 후 서면으로 안내드리겠습니다”',
+      '통화가 길어지면 기한을 한 번 더 말하고 끝낸다'
+    ],
+    donts: [
+      ['“실망입니다”, “이럴 줄 알았어요”, “양심이 있으면”', '감정·훈계 없이 사실만'],
+      ['“끝까지 받아낸다”, “평생 따라다닌다”', '기한과 절차만'],
+      ['“바로 신용불량자로 올리겠다”', '멘트 문장 그대로 — “미상환 시 …”처럼 조건으로만'],
+      ['(강제퇴실) “짐 버리겠다”, “오늘 문 잠근다”', '명도·집행 날짜는 팀장이 확정한 것만']
+    ] }
+};
+function crCallGuideInner(cno, gSel){
+  cno = String(cno == null ? '' : cno).trim();
+  var rows = window._dlqTableRows; if (!Array.isArray(rows)) return '';
+  var nf = (typeof _normCno === 'function') ? _normCno : function(v){ return String(v == null ? '' : v).trim(); };
+  var nk = nf(cno), r = rows.find(function(x){ return x && nf(x.cno) === nk; }); if (!r) return '';
+  var x; try { x = _dlqGradeOf(r); } catch(e){ return ''; }
+  var esc = function(v){ return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  var ok = function(v){ return /^[ABCD]$/.test(String(v == null ? '' : v)); };
+  var base = ok(x.rec) ? x.rec : x.g, g = ok(gSel) ? gSel : base;
+  var G = CR_CG[g], CM = CR_CG.common; if (!G) return '';
+  var M = (window._dpMeta && window._dpMeta[g]) || {};
+  var COL = (typeof DLQ_GRADE_COL !== 'undefined') ? DLQ_GRADE_COL : {}, NM = (typeof DLQ_GRADE_NM !== 'undefined') ? DLQ_GRADE_NM : {};
+  var col = COL[g] || '#475569', key = _crRgKey(cno);
+  var who = ''; try { who = _dlqGradeWho(r, g); } catch(_){}
+  var evict = /강제퇴실/.test(String(r.vacancyStatus || ''));
+  var nm = String(r.nm == null ? '' : r.nm).trim(); if (!nm || nm === '-') nm = '고객';
+  var amt = parseInt(String(r.amt == null ? '' : r.amt).replace(/[^0-9-]/g, '')); if (isNaN(amt)) amt = 0;
+  var useEv = (g === 'D' && evict && !!M.msgEvict), raw = useEv ? M.msgEvict : (M.msg || '');
+  var msg = esc(raw).replace(/\[이름\]|\[성명\]/g, '<b class="cr-cg-nm">' + esc(nm) + '</b>').replace(/\[금액\]/g, amt.toLocaleString())
+    .replace(/\{기한\}/g, '<span class="cr-cg-fill" title="팀장이 정한 기한(날짜)을 넣어 말한다">{기한}</span>').replace(/\n/g, '<br>');
+  var li = function(t){ return '<li>' + esc(t) + '</li>'; };
+  var liNo = function(d){ return '<li><span class="bad">' + esc(d[0]) + '</span>' + (d[1] ? '<span class="arw">→</span><span class="alt">' + esc(d[1]) + '</span>' : '') + '</li>'; };
+  var chips = ['A', 'B', 'C', 'D'].map(function(k){
+    return '<button type="button" class="cr-cg-chip' + (k === g ? ' on' : '') + '" style="--c:' + (COL[k] || '#475569') + '" title="' + esc(k + ' · ' + (NM[k] || '') + (k === base ? ' — 이 계약 기준' : ' — 멘트 미리보기')) + '"'
+      + ' onclick="crCallGuideShow(\'' + key + '\',\'' + k + '\')">' + k + (k === base ? '<i>이 계약</i>' : '') + '</button>';
+  }).join('');
+  var srcTxt = (g !== base) ? ('미리보기 — 이 계약은 ' + base + '등급') : (ok(x.rec) ? ('회의 확정 ' + x.rec + (x.rec !== x.g ? ' · 자동 ' + x.g : '')) : '자동 판정');
+  var open = (window._crCgOpen === false) ? '' : ' open';
+  return '<details class="cr-rgd cr-cg"' + open + ' style="border-color:' + col + '55" ontoggle="window._crCgOpen=this.open">'
+    + '<summary>📞 통화 가이드 <b style="color:' + col + '">' + g + ' · ' + esc(NM[g] || '') + '</b><span class="cr-rgd-m">' + esc(srcTxt) + (who ? ' · 담당 ' + esc(who) : '') + ' · 통화 08~21시</span></summary>'
+    + '<div class="cr-cg-b">'
+    + '<div class="cr-cg-top"><span class="cr-cg-chips">' + chips + '</span>' + (M.goal ? '<span class="cr-cg-goal"><b>목표</b>' + esc(M.goal) + '</span>' : '') + '</div>'
+    + (raw ? '<div class="cr-cg-msg" style="border-left-color:' + col + '"><div class="h">멘트' + (useEv ? ' — 강제퇴실 진행 중' : '') + '</div>' + msg + '</div>' : '')
+    + '<div class="cr-cg-tone"><b style="color:' + col + '">‘' + esc(G.tone) + '’</b> ' + esc(G.def) + '</div>'
+    + '<div class="cr-cg-cols"><div class="cr-cg-do"><div class="h">✅ 이렇게 말한다</div><ul>' + G.dos.map(li).join('') + '</ul></div>'
+    + '<div class="cr-cg-no"><div class="h">⛔ 쓰지 않는다 → 대신</div><ul>' + G.donts.map(liNo).join('') + '</ul></div></div>'
+    + '<div class="cr-cg-cols cr-cg-cm"><div class="cr-cg-do"><div class="h">🤝 ‘친절’의 기준 — 모든 등급</div><ul>' + CM.dos.map(li).join('') + '</ul></div>'
+    + '<div class="cr-cg-no"><div class="h">🚫 모든 등급 금지</div><ul>' + CM.donts.map(liNo).join('') + '</ul></div></div>'
+    + '</div></details>';
+}
+function crCallGuide(cno){
+  cno = String(cno == null ? '' : cno).trim();
+  return '<div id="crCallGuideWrap" data-cno="' + _crRgKey(cno) + '" style="display:contents">' + crCallGuideInner(cno) + '</div>';
+}
+function crCallGuideShow(cno, g){   /* A~D 칩 — 같은 계약 화면에서만 다른 등급 미리보기 */
+  var w = document.getElementById('crCallGuideWrap'); if (!w || w.getAttribute('data-cno') !== _crRgKey(cno)) return;
+  w.innerHTML = crCallGuideInner(cno, g);
 }
 function renderContractRecord(c, payments, responses = []) {
   // vacancyRawData에서 매칭 행 찾기 (없으면 빈 객체)
@@ -7457,6 +7616,7 @@ function renderContractRecord(c, payments, responses = []) {
         <div class="crx-stat score"><div class="l">점수</div><div class="v" style="${_kcbScore(c)?'':'color:#D1D5DB'}">${_kcbScore(c)||'-'}</div></div>
         ${crRespGradeBox(c['계약번호'])}   ${''/* [v747] 대응등급 칸 — 헤더 배지와 같은 판정 */}
       </div>
+      ${crCallGuide(c['계약번호'])}   ${''/* [v748] 📞 통화 가이드 — 등급별 멘트 · 말투 기준 · 쓰지 않는 말 */}
       ${crRespGradeDetail(c['계약번호'])}   ${''/* [v747] 대응등급 내역 — 등급 내역 팝업과 같은 기준표 */}
     </div>
     <div class="cr-timeline">
