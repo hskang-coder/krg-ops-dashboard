@@ -1191,6 +1191,10 @@ body { font-family: 'Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:
 /* [v751] 연체자 현황 버튼 줄 수평 맞춤 — 버튼이 두 줄이 되거나 '선택됨' 안내가 아래로 내려가도 제목·첫 줄 버튼·검색창·엑셀이 한 줄에 맞춤 */
 .dlq-table-header-row { align-items: baseline; }
 .dlq-sel-info:empty { display: none; }   /* 빈 안내칸이 둘째 줄을 만들지 않게 — 선택하면 'N명 선택됨' 표시 */
+/* [v752] 연체자 현황 버튼 줄 한 줄로 — 버튼 안 여백 8→6px · 검색창 190→150px · 'N명 선택됨'은 제목 인원 옆 */
+.dlq-table-header-row .dlq-doc-btn { padding: 4px 6px; }
+.dlq-table-header-row .dlq-search-input { width: 150px; }
+.dlq-table-header-row .dlq-sel-info { padding: 1px 2px; }
 /* [v374] 한 행 통합 — gap/padding/font 컴팩트화 */
 .dlq-filter-bar { display:flex; gap:10px; flex-wrap:nowrap; align-items:center; padding:7px 11px; background:#f8fafc; border-radius:8px; margin-bottom:12px; border:1px solid #e2e8f0; overflow-x:auto; }
 .dlq-filter-group { display:flex; align-items:center; gap:4px; flex-wrap:nowrap; flex-shrink:0; }
@@ -4039,7 +4043,7 @@ function dlqSelectAll(checked) {
 function dlqUpdateSelInfo() {
   const n = window._dlqSelectedCnos.size;
   const info = document.getElementById('dlqSelInfo');
-  if (info) info.textContent = n > 0 ? n + '명 선택됨' : '체크박스로 연체자 선택 후 발행';
+  if (info) info.textContent = n > 0 ? n + '명 선택됨' : '';   /* [v752] 0명이면 비움 → 숨김 (버튼 줄 한 줄 유지 · 선택 없이 누르면 기존 안내창) */
 }
 
 // [v130] 방문대응 — Google Maps URL 멀티 경유지 길찾기
@@ -10750,8 +10754,9 @@ function buildDlqUI(d1, d2, d3, d4) {
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
           <div class="dlq-section-title no-border">연체자 현황</div>
           <span style="background:#1e40af;color:#fff;border-radius:10px;padding:2px 9px;font-size:12px;font-weight:700">${imdaCount}명</span>
+          <span class="dlq-sel-info" id="dlqSelInfo" style="font-size:11px;color:#6366f1;font-weight:700;white-space:nowrap"></span>   <!-- [v752] 버튼 끝 → 인원 옆 -->
         </div>
-        <div style="display:flex;align-items:center;gap:4px;flex:1;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:3px;flex:1;flex-wrap:wrap">
           <button class="dlq-doc-btn" id="dlqKcbNoticeBtn" onclick="dlqGenerateKcbNotice()" title="KCB 신용정보 조회 전 본인에게 보내는 사전고지 문자 — 체크박스로 대상 선택 후 클릭 (신용정보법 제32조 제6항 제4호·제7항)">📨 KCB 사전고지</button>   <!-- [v750] -->
           <button class="dlq-doc-btn" id="dlqMidExitBtn" onclick="dlqGenerateMidExitNotice()">🏠 중도퇴실 중요사항</button>
           <button class="dlq-doc-btn" id="dlqDocBtn1" onclick="dlqGenerateDoc('notice')">📄 연체독촉안내문</button>
@@ -10762,10 +10767,9 @@ function buildDlqUI(d1, d2, d3, d4) {
           <button class="dlq-doc-btn" id="dlqLegalBtn" onclick="dlqToggleLegalView()" style="background:#059669;color:#fff;border-color:#059669" title="법무 진척 보기 — 내용증명·지급명령·보정명령·기타집행">⚖️ 법무관리</button>
           <button class="dlq-doc-btn" id="dlqEvictConsentBtn" onclick="dlqGenerateEvictConsent()" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d;font-weight:600" title="계약 조항(제9조③ 등) 기반 중도퇴실 절차 개시 통지 문자 생성 — 체크박스로 대상 선택 후 클릭">🚪 강제퇴실권한위임</button>
           <button class="dlq-doc-btn" id="dlqDailyReportBtn" onclick="dlqOpenDailyReport()" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8;font-weight:700" title="연체 SOP v1.4 기준 — 대응등급(A~D)으로 담당 배정(A·B 팀원A · C·D 팀원B · 판정·송무 팀장) · 연체자마다 타임라인 단계(D+0~D+32)·분기(약속 · 미수신 확정 · 6-2 강제퇴실)를 판정해 팀장·팀원A·팀원B 당일 대응 지시서 자동 생성">📋 Daily Report</button>
-          <span class="dlq-sel-info" id="dlqSelInfo" style="font-size:11px;color:#6366f1;font-weight:700;white-space:nowrap"></span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          <input id="dlqSearchInput" type="text" class="dlq-search-input" placeholder="이름 또는 계약번호 검색..." oninput="dlqApplyFilter('search',this.value,null)">
+          <input id="dlqSearchInput" type="text" class="dlq-search-input" placeholder="이름·계약번호 검색" title="이름 또는 계약번호로 검색" oninput="dlqApplyFilter('search',this.value,null)">
           <button onclick="downloadDlqExcel()" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">⬇️ 엑셀</button>
         </div>
       </div>
